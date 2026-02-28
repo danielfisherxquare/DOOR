@@ -1,0 +1,352 @@
+/*
+ * Sound Debugger Panel
+ * 白底新拟态风格 (Neumorphism / Soft Design)
+ * 与 mechanical-clock.css 保持一致的设计语言
+ */
+
+/* ============================================
+   触发按钮 - 使用 clock-btn 基础样式 + 自定义颜色
+   ============================================ */
+.sound-debugger-toggle {
+    color: #78909c;
+}
+
+/* ============================================
+   面板容器 - 从按钮位置向上弹出
+   ============================================ */
+.sd-panel {
+    position: absolute;
+    bottom: calc(100% + 16px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 320px;
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    background: #f0f0f0;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow:
+        8px 8px 16px #d5d5d5,
+        -8px -8px 16px #ffffff,
+        0 12px 40px rgba(0, 0, 0, 0.08);
+    z-index: 200;
+    overflow: hidden;
+}
+
+/* ============================================
+   头部
+   ============================================ */
+.sd-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0;
+}
+
+.sd-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #555;
+    margin: 0;
+}
+
+.sd-close {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: #f0f0f0;
+    color: #999;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow:
+        3px 3px 6px #dcdcdc,
+        -3px -3px 6px #ffffff;
+    transition: all 150ms ease;
+}
+
+.sd-close:hover {
+    color: #e57373;
+    box-shadow:
+        4px 4px 8px #d5d5d5,
+        -4px -4px 8px #ffffff;
+}
+
+.sd-close:active {
+    box-shadow:
+        inset 2px 2px 4px #dcdcdc,
+        inset -2px -2px 4px #ffffff;
+}
+
+/* ============================================
+   滚动体
+   ============================================ */
+.sd-body {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+    /* 极简滚动条 */
+}
+
+.sd-body::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sd-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sd-body::-webkit-scrollbar-thumb {
+    background: #d0d0d0;
+    border-radius: 2px;
+}
+
+/* ============================================
+   区块 (Section) - 内陷卡槽新拟态风格
+   ============================================ */
+.sd-section {
+    background: #ebebeb;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 10px;
+    box-shadow:
+        inset 3px 3px 6px #dcdcdc,
+        inset -3px -3px 6px #fafafa;
+}
+
+.sd-section--global {
+    background: #f0f0f0;
+    box-shadow:
+        inset 2px 2px 5px #dcdcdc,
+        inset -2px -2px 5px #ffffff;
+}
+
+/* 区块标题 - 带有颜色标记 */
+.sd-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 0 0 10px 0;
+    padding-left: 10px;
+    border-left: 3px solid #ccc;
+}
+
+.sd-section-title--trigger {
+    color: #5c9ce6;
+    border-left-color: #5c9ce6;
+}
+
+.sd-section-title--thud {
+    color: #e8903e;
+    border-left-color: #e8903e;
+}
+
+.sd-section-title--clack {
+    color: #c5a032;
+    border-left-color: #c5a032;
+}
+
+.sd-section-title--res {
+    color: #9c6cc8;
+    border-left-color: #9c6cc8;
+}
+
+.sd-section-title--metal {
+    color: #26a69a;
+    border-left-color: #26a69a;
+}
+
+.sd-section-title--echo {
+    color: #66bb6a;
+    border-left-color: #66bb6a;
+}
+
+/* ============================================
+   滑块组
+   ============================================ */
+.sd-slider-group {
+    margin-bottom: 10px;
+}
+
+.sd-slider-group:last-child {
+    margin-bottom: 0;
+}
+
+.sd-slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.sd-slider-label {
+    font-size: 11px;
+    color: #777;
+}
+
+.sd-slider-value {
+    font-size: 11px;
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    color: #555;
+    font-weight: 600;
+    background: #e8e8e8;
+    padding: 1px 6px;
+    border-radius: 4px;
+}
+
+/* 滑块 - 新拟态凹槽轨道 */
+.sd-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: #e0e0e0;
+    box-shadow:
+        inset 1px 1px 3px #cccccc,
+        inset -1px -1px 3px #f5f5f5;
+    outline: none;
+    cursor: pointer;
+}
+
+.sd-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #f4f4f4;
+    border: none;
+    box-shadow:
+        2px 2px 5px #c8c8c8,
+        -2px -2px 5px #ffffff;
+    cursor: pointer;
+    transition: box-shadow 150ms ease;
+}
+
+.sd-slider::-webkit-slider-thumb:hover {
+    box-shadow:
+        3px 3px 8px #c0c0c0,
+        -3px -3px 8px #ffffff;
+}
+
+.sd-slider::-webkit-slider-thumb:active {
+    box-shadow:
+        inset 1px 1px 3px #cccccc,
+        inset -1px -1px 3px #f5f5f5;
+}
+
+.sd-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #f4f4f4;
+    border: none;
+    box-shadow:
+        2px 2px 5px #c8c8c8,
+        -2px -2px 5px #ffffff;
+    cursor: pointer;
+}
+
+/* ============================================
+   底部操作栏
+   ============================================ */
+.sd-actions {
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.sd-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 0;
+    border-radius: 10px;
+    border: none;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 150ms ease;
+    background: #f0f0f0;
+    color: #666;
+    box-shadow:
+        4px 4px 8px #dcdcdc,
+        -4px -4px 8px #ffffff;
+}
+
+.sd-btn:hover {
+    transform: translateY(-1px);
+    box-shadow:
+        5px 5px 12px #d5d5d5,
+        -5px -5px 12px #ffffff;
+}
+
+.sd-btn:active {
+    transform: translateY(0);
+    box-shadow:
+        inset 3px 3px 6px #dcdcdc,
+        inset -3px -3px 6px #ffffff;
+}
+
+/* 试听按钮 - 占满两列，荧光绿强调 */
+.sd-btn--play {
+    grid-column: span 2;
+    background: #d4ff00;
+    color: #555;
+    font-weight: 600;
+    box-shadow:
+        4px 4px 8px #b8d900,
+        -4px -4px 8px #f0ff66;
+}
+
+.sd-btn--play:hover {
+    box-shadow:
+        5px 5px 12px #a8c800,
+        -5px -5px 12px #f0ff66;
+}
+
+.sd-btn--play:active {
+    box-shadow:
+        inset 3px 3px 6px #b5d600,
+        inset -3px -3px 6px #e8f755;
+}
+
+.sd-btn--copy {
+    color: #78909c;
+}
+
+.sd-btn--export {
+    color: #26a69a;
+}
+
+.sd-btn--import {
+    color: #5c9ce6;
+}
+
+.sd-btn--reset {
+    color: #e57373;
+}
+
+/* ============================================
+   底部提示
+   ============================================ */
+.sd-hint {
+    text-align: center;
+    font-size: 10px;
+    color: #bbb;
+    margin: 10px 0 0 0;
+    flex-shrink: 0;
+}

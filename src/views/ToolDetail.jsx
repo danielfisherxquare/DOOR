@@ -2,6 +2,16 @@ import { useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import useToolsStore from '../stores/toolsStore'
 
+// 导入工具组件
+import MechanicalClock from '../components/tools/MechanicalClock'
+import MechanicalClock3D from '../components/tools/MechanicalClock3D'
+
+// 工具组件映射
+const TOOL_COMPONENTS = {
+  'MechanicalClock': MechanicalClock,
+  'MechanicalClock3D': MechanicalClock3D,
+}
+
 function ToolDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -24,6 +34,72 @@ function ToolDetail() {
     maintenance: '维护中'
   }
 
+  // 渲染工具内容
+  const renderToolContent = () => {
+    // 如果工具离线或维护中
+    if (currentTool?.status === 'offline') {
+      return (
+        <div style={{
+          textAlign: 'center',
+          padding: 'var(--spacing-2xl)',
+          color: 'var(--color-text-secondary)'
+        }}>
+          <p>⚠️ 该工具当前离线，请稍后再试</p>
+        </div>
+      )
+    }
+
+    if (currentTool?.status === 'maintenance') {
+      return (
+        <div style={{
+          textAlign: 'center',
+          padding: 'var(--spacing-2xl)',
+          color: 'var(--color-text-secondary)'
+        }}>
+          <p>🔧 该工具正在维护中，敬请期待</p>
+        </div>
+      )
+    }
+
+    // 根据组件名称渲染对应工具
+    const componentName = currentTool?.component
+    if (componentName && TOOL_COMPONENTS[componentName]) {
+      const ToolComponent = TOOL_COMPONENTS[componentName]
+      return <ToolComponent />
+    }
+
+    // 默认占位内容
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 200,
+        gap: 'var(--spacing-md)'
+      }}>
+        <p style={{ color: 'var(--color-text-secondary)' }}>
+          工具功能区域 - 待对接后台服务
+        </p>
+        <p style={{
+          fontSize: 'var(--font-size-xs)',
+          color: 'var(--color-text-muted)',
+          background: 'var(--color-bg-secondary)',
+          padding: 'var(--spacing-xs) var(--spacing-sm)',
+          borderRadius: 'var(--radius-sm)'
+        }}>
+          API端点: {currentTool?.apiEndpoint}
+        </p>
+        <button
+          className="btn btn--primary"
+          onClick={handleInvoke}
+        >
+          测试调用
+        </button>
+      </div>
+    )
+  }
+
   if (isLoading || !currentTool) {
     return (
       <div className="tool-detail">
@@ -39,7 +115,55 @@ function ToolDetail() {
           }}></div>
           加载中...
         </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    )
+  }
+
+  // 沉浸式全屏布局：机械时钟专用
+  const componentName = currentTool?.component
+  if (componentName === 'MechanicalClock' || componentName === 'MechanicalClock3D') {
+    const ToolComponent = TOOL_COMPONENTS[componentName]
+    return (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        background: '#ffffff',
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        {/* 左上角圆形 Soft Design 返回按钮 */}
+        <button
+          onClick={() => navigate('/')}
+          className="clock-back-btn"
+          title="返回首页"
+          style={{
+            position: 'fixed',
+            top: '3vh',
+            left: '3vh',
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            border: 'none',
+            background: '#f0f0f0',
+            color: '#999',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '6px 6px 12px #e0e0e0, -6px -6px 12px #ffffff',
+            transition: 'all 150ms ease',
+            zIndex: 101,
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+        </button>
+
+        <ToolComponent />
       </div>
     )
   }
@@ -47,8 +171,8 @@ function ToolDetail() {
   return (
     <div className="tool-detail">
       {/* 返回按钮 */}
-      <Link 
-        to="/" 
+      <Link
+        to="/"
         className="btn btn--ghost"
         style={{ marginBottom: 'var(--spacing-lg)', alignSelf: 'flex-start' }}
       >
@@ -67,9 +191,9 @@ function ToolDetail() {
         <div className="tool-detail__info">
           <h1>{currentTool.name}</h1>
           <p>{currentTool.description}</p>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
             gap: 'var(--spacing-sm)',
             marginTop: 'var(--spacing-sm)'
           }}>
@@ -83,51 +207,7 @@ function ToolDetail() {
 
       {/* 工具内容区域 */}
       <div className="tool-detail__content">
-        {currentTool.status === 'offline' ? (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: 'var(--spacing-2xl)',
-            color: 'var(--color-text-secondary)'
-          }}>
-            <p>⚠️ 该工具当前离线，请稍后再试</p>
-          </div>
-        ) : currentTool.status === 'maintenance' ? (
-          <div style={{ 
-            textAlign: 'center', 
-            padding: 'var(--spacing-2xl)',
-            color: 'var(--color-text-secondary)'
-          }}>
-            <p>🔧 该工具正在维护中，敬请期待</p>
-          </div>
-        ) : (
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: 200,
-            gap: 'var(--spacing-md)'
-          }}>
-            <p style={{ color: 'var(--color-text-secondary)' }}>
-              工具功能区域 - 待对接后台服务
-            </p>
-            <p style={{ 
-              fontSize: 'var(--font-size-xs)', 
-              color: 'var(--color-text-muted)',
-              background: 'var(--color-bg-secondary)',
-              padding: 'var(--spacing-xs) var(--spacing-sm)',
-              borderRadius: 'var(--radius-sm)'
-            }}>
-              API端点: {currentTool.apiEndpoint}
-            </p>
-            <button 
-              className="btn btn--primary"
-              onClick={handleInvoke}
-            >
-              测试调用
-            </button>
-          </div>
-        )}
+        {renderToolContent()}
       </div>
     </div>
   )

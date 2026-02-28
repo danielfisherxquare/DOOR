@@ -9,31 +9,31 @@
   --color-bg-primary: #e8eef5;
   --color-bg-secondary: #f0f4f8;
   --color-bg-card: #e8eef5;
-  
+
   --color-text-primary: #2d3748;
   --color-text-secondary: #718096;
   --color-text-muted: #a0aec0;
-  
+
   --color-accent: #6366f1;
   --color-accent-light: #818cf8;
   --color-accent-dark: #4f46e5;
-  
+
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
-  
+
   /* 胶囊圆角 */
   --radius-sm: 12px;
   --radius-md: 16px;
   --radius-lg: 20px;
   --radius-xl: 24px;
   --radius-full: 9999px;
-  
+
   /* 柔和阴影 */
   --shadow-soft: 6px 6px 12px #c5c9cc, -6px -6px 12px #ffffff;
   --shadow-soft-hover: 8px 8px 16px #b8bcc0, -8px -8px 16px #ffffff;
   --shadow-inset: inset 4px 4px 8px #c5c9cc, inset -4px -4px 8px #ffffff;
-  
+
   /* 间距 */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -41,7 +41,7 @@
   --spacing-lg: 24px;
   --spacing-xl: 32px;
   --spacing-2xl: 48px;
-  
+
   /* 字体 */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-size-xs: 0.75rem;
@@ -51,7 +51,7 @@
   --font-size-xl: 1.25rem;
   --font-size-2xl: 1.5rem;
   --font-size-3xl: 2rem;
-  
+
   /* 过渡 */
   --transition-fast: 0.15s ease;
   --transition-normal: 0.3s ease;
@@ -301,8 +301,21 @@ body {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ========================================
@@ -496,19 +509,19 @@ body {
     --spacing-xl: 24px;
     --spacing-2xl: 32px;
   }
-  
+
   .grid--tools {
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   }
-  
+
   .navbar {
     padding: var(--spacing-sm) var(--spacing-md);
   }
-  
+
   .navbar__brand span {
     display: none;
   }
-  
+
   .login-card {
     padding: var(--spacing-lg);
   }
@@ -518,7 +531,7 @@ body {
   .grid--tools {
     grid-template-columns: 1fr;
   }
-  
+
   .tool-detail__header {
     flex-direction: column;
     text-align: center;

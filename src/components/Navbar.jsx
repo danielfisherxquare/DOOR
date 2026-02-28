@@ -10,7 +10,7 @@ function Navbar() {
     navigate('/login')
   }
 
-  // 未登录时导航栏不显示用户信息
+  // 未登录时导航栏显示登录/注册按钮
   if (!isAuthenticated) {
     return (
       <nav className="navbar">
@@ -18,6 +18,14 @@ function Navbar() {
           <div className="navbar__logo">TP</div>
           <span>工具门户</span>
         </Link>
+        <div className="navbar__menu">
+          <Link to="/login" className="btn btn--ghost">
+            登录
+          </Link>
+          <Link to="/register" className="btn btn--primary">
+            注册
+          </Link>
+        </div>
       </nav>
     )
   }

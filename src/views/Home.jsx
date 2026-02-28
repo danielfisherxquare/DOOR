@@ -12,22 +12,22 @@ function Home() {
   return (
     <div className="home">
       {/* 页面标题 */}
-      <div style={{ 
-        textAlign: 'center', 
+      <div style={{
+        textAlign: 'center',
         marginBottom: 'var(--spacing-xl)',
         paddingTop: 'var(--spacing-md)'
       }}>
-        <h1 style={{ 
-          fontSize: 'var(--font-size-3xl)', 
-          fontWeight: 700, 
+        <h1 style={{
+          fontSize: 'var(--font-size-3xl)',
+          fontWeight: 700,
           color: 'var(--color-text-primary)',
           marginBottom: 'var(--spacing-sm)'
         }}>
           欢迎使用工具门户
         </h1>
-        <p style={{ 
-          fontSize: 'var(--font-size-md)', 
-          color: 'var(--color-text-secondary)' 
+        <p style={{
+          fontSize: 'var(--font-size-md)',
+          color: 'var(--color-text-secondary)'
         }}>
           选择您需要使用的工具
         </p>
@@ -35,8 +35,8 @@ function Home() {
 
       {/* 加载状态 */}
       {isLoading && (
-        <div style={{ 
-          textAlign: 'center', 
+        <div style={{
+          textAlign: 'center',
           padding: 'var(--spacing-2xl)',
           color: 'var(--color-text-secondary)'
         }}>
@@ -55,15 +55,15 @@ function Home() {
 
       {/* 错误状态 */}
       {error && (
-        <div className="card" style={{ 
-          textAlign: 'center', 
+        <div className="card" style={{
+          textAlign: 'center',
           color: 'var(--color-danger)',
           maxWidth: 400,
           margin: '0 auto'
         }}>
           <p>加载失败: {error}</p>
-          <button 
-            className="btn btn--secondary" 
+          <button
+            className="btn btn--secondary"
             onClick={fetchTools}
             style={{ marginTop: 'var(--spacing-md)' }}
           >
@@ -83,8 +83,8 @@ function Home() {
 
       {/* 空状态 */}
       {!isLoading && !error && tools.length === 0 && (
-        <div className="card" style={{ 
-          textAlign: 'center', 
+        <div className="card" style={{
+          textAlign: 'center',
           maxWidth: 400,
           margin: '0 auto'
         }}>
@@ -96,8 +96,8 @@ function Home() {
 
       {/* 统计信息 */}
       {!isLoading && !error && tools.length > 0 && (
-        <div style={{ 
-          marginTop: 'var(--spacing-xl)', 
+        <div style={{
+          marginTop: 'var(--spacing-xl)',
           textAlign: 'center',
           color: 'var(--color-text-muted)',
           fontSize: 'var(--font-size-sm)'
@@ -108,11 +108,6 @@ function Home() {
         </div>
       )}
 
-      <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }

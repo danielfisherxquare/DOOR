@@ -1,0 +1,477 @@
+/*
+ * 3D Segment Flip Clock — Triangular Prism / 三棱柱翻转 (修正版)
+ *
+ * 每个笔画都是三棱柱（横截面等边三角形，3个面）：
+ *   面A：白色 (OFF 态) - 定位于 0deg
+ *   面B：黑色 (过渡态) - 定位于 -120deg (或 240deg)
+ *   面C：荧光 (ON 态)  - 定位于 -240deg (或 120deg)
+ *
+ * 逻辑：
+ *   Rotor 0deg   -> 面A朝前 (0 + 0 = 0)
+ *   Rotor 120deg -> 面B朝前 (120 - 120 = 0)
+ *   Rotor 240deg -> 面C朝前 (240 - 240 = 0)
+ *
+ * 这种方案确保了三棱柱各个面的“正面”始终自然向外。
+ */
+
+/* ============================================
+   主容器
+   ============================================ */
+.mc3d {
+    --base: 0.25vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 90vw;
+    margin: 0 auto;
+    gap: 2vw;
+    background: #ffffff;
+}
+
+.mc3d__display {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    gap: 1vw;
+    perspective: 1200px;
+    /* 统一透视 */
+}
+
+.mc3d__group {
+    display: flex;
+    align-items: center;
+    gap: 0.8vw;
+}
+
+.mc3d__label {
+    display: none;
+}
+
+/* ============================================
+   数字容器 - 移除多余的 perspective
+   ============================================ */
+.digit-3d {
+    position: relative;
+}
+
+/* ============================================
+   七段显示器容器
+   ============================================ */
+.seven-segment-3d {
+    --flip-dur: 150ms;
+    --seg-gap: calc(3 * var(--base));
+
+    /* 横向笔画尺寸 */
+    --h-w: calc(36 * var(--base));
+    --h-h: calc(8 * var(--base));
+
+    /* 纵向笔画尺寸 */
+    --v-w: calc(8 * var(--base));
+    --v-h: calc(32 * var(--base));
+
+    /* 三棱柱内切圆半径 r = faceWidth / (2√3) */
+    --prism-r-h: calc(var(--h-h) / 3.464);
+    --prism-r-v: calc(var(--v-w) / 3.464);
+
+    position: relative;
+    width: calc(52 * var(--base));
+    height: calc(88 * var(--base));
+    transform-style: preserve-3d;
+}
+
+/* ============================================
+   Segment 3D 基础
+   ============================================ */
+.seg3d {
+    position: absolute;
+    transform-style: preserve-3d;
+    will-change: transform;
+}
+
+/* 旋转体 — 三棱柱容器 */
+.seg3d__body {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    will-change: transform;
+    opacity: 1;
+    /* 始终保持可见，由面的物理翻转决定显示内容 */
+}
+
+/* 面板基础 */
+.seg3d__face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    /* 隐藏内侧面，物理感关键 */
+    transform-style: preserve-3d;
+}
+
+/* ============================================
+   横向笔画（a, g, d）
+   ============================================ */
+.seg3d--h {
+    width: var(--h-w);
+    height: var(--h-h);
+}
+
+.seg3d--h .seg3d__body {
+    width: var(--h-w);
+    height: var(--h-h);
+}
+
+/* 横向面定位：绕 X 轴 */
+.seg3d--h .seg3d__face--white {
+    transform: rotateX(0deg) translateZ(var(--prism-r-h));
+    background: #ffffff;
+    clip-path: polygon(calc(var(--h-h)/2) 0%, calc(100% - var(--h-h)/2) 0%, 100% 50%, calc(100% - var(--h-h)/2) 100%, calc(var(--h-h)/2) 100%, 0% 50%);
+}
+
+.seg3d--h .seg3d__face--black {
+    transform: rotateX(-120deg) translateZ(var(--prism-r-h));
+    background: #1a1a1a;
+    box-shadow: inset 0 0 calc(3 * var(--base)) rgba(0, 0, 0, 0.6);
+    clip-path: polygon(calc(var(--h-h)/2) 0%, calc(100% - var(--h-h)/2) 0%, 100% 50%, calc(100% - var(--h-h)/2) 100%, calc(var(--h-h)/2) 100%, 0% 50%);
+}
+
+.seg3d--h .seg3d__face--glow {
+    transform: rotateX(-240deg) translateZ(var(--prism-r-h));
+    background: transparent;
+    filter: drop-shadow(calc(6 * var(--base)) calc(6 * var(--base)) calc(12 * var(--base)) #e0e0e0) drop-shadow(calc(-6 * var(--base)) calc(-6 * var(--base)) calc(12 * var(--base)) #ffffff);
+    clip-path: polygon(calc(var(--h-h)/2) 0%, calc(100% - var(--h-h)/2) 0%, 100% 50%, calc(100% - var(--h-h)/2) 100%, calc(var(--h-h)/2) 100%, 0% 50%);
+}
+
+.seg3d--h .seg3d__face--glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #d4ff00;
+    box-shadow: inset 0 0 calc(6 * var(--base)) rgba(0, 0, 0, 0.15);
+    clip-path: inherit;
+}
+
+/* ============================================
+   纵向笔画（b, c, e, f）
+   ============================================ */
+.seg3d--v {
+    width: var(--v-w);
+    height: var(--v-h);
+}
+
+.seg3d--v .seg3d__body {
+    width: var(--v-w);
+    height: var(--v-h);
+}
+
+/* 纵向面定位：绕 Y 轴 */
+.seg3d--v .seg3d__face--white {
+    transform: rotateY(0deg) translateZ(var(--prism-r-v));
+    background: #ffffff;
+    clip-path: polygon(50% 0%, 100% calc(var(--v-w)/2), 100% calc(100% - var(--v-w)/2), 50% 100%, 0% calc(100% - var(--v-w)/2), 0% calc(var(--v-w)/2));
+}
+
+.seg3d--v .seg3d__face--black {
+    transform: rotateY(-120deg) translateZ(var(--prism-r-v));
+    background: #1a1a1a;
+    box-shadow: inset 0 0 calc(3 * var(--base)) rgba(0, 0, 0, 0.6);
+    clip-path: polygon(50% 0%, 100% calc(var(--v-w)/2), 100% calc(100% - var(--v-w)/2), 50% 100%, 0% calc(100% - var(--v-w)/2), 0% calc(var(--v-w)/2));
+}
+
+.seg3d--v .seg3d__face--glow {
+    transform: rotateY(-240deg) translateZ(var(--prism-r-v));
+    background: transparent;
+    filter: drop-shadow(calc(6 * var(--base)) calc(6 * var(--base)) calc(12 * var(--base)) #e0e0e0) drop-shadow(calc(-6 * var(--base)) calc(-6 * var(--base)) calc(12 * var(--base)) #ffffff);
+    clip-path: polygon(50% 0%, 100% calc(var(--v-w)/2), 100% calc(100% - var(--v-w)/2), 50% 100%, 0% calc(100% - var(--v-w)/2), 0% calc(var(--v-w)/2));
+}
+
+.seg3d--v .seg3d__face--glow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #d4ff00;
+    box-shadow: inset 0 0 calc(6 * var(--base)) rgba(0, 0, 0, 0.15);
+    clip-path: inherit;
+}
+
+/* ============================================
+   笔画定位
+   ============================================ */
+.seg3d--a {
+    top: var(--seg-gap);
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.seg3d--g {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.seg3d--d {
+    bottom: var(--seg-gap);
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.seg3d--b {
+    top: calc(var(--seg-gap) + var(--h-h)/2);
+    right: var(--seg-gap);
+}
+
+.seg3d--c {
+    bottom: calc(var(--seg-gap) + var(--h-h)/2);
+    right: var(--seg-gap);
+}
+
+.seg3d--e {
+    bottom: calc(var(--seg-gap) + var(--h-h)/2);
+    left: var(--seg-gap);
+}
+
+.seg3d--f {
+    top: calc(var(--seg-gap) + var(--h-h)/2);
+    left: var(--seg-gap);
+}
+
+/* ============================================
+   静态状态
+   OFF = Rotor 0   (White face 0)
+   ON  = Rotor 240 (Glow face 0)
+   ============================================ */
+.seg3d--h.is-off .seg3d__body {
+    transform: rotateX(0deg);
+}
+
+.seg3d--h.is-on .seg3d__body {
+    transform: rotateX(240deg);
+}
+
+.seg3d--v.is-off .seg3d__body {
+    transform: rotateY(0deg);
+}
+
+.seg3d--v.is-on .seg3d__body {
+    transform: rotateY(240deg);
+}
+
+/* 初始空白：强制 rotate 0 并隐藏（可选，为了彻底纯白） */
+.mc3d__display.is-blank .seg3d__body {
+    transform: rotateX(0deg) !important;
+    transform: rotateY(0deg) !important;
+    opacity: 1 !important;
+    /* 显示白色面即为隐藏 */
+}
+
+/* ============================================
+   动画 (方案B: 0 <-> 240)
+   ============================================ */
+@keyframes pXOn {
+    0% {
+        transform: rotateX(0deg);
+    }
+
+    6% {
+        transform: rotateX(-8deg);
+    }
+
+    55% {
+        transform: rotateX(255deg);
+    }
+
+    75% {
+        transform: rotateX(232deg);
+    }
+
+    100% {
+        transform: rotateX(240deg);
+    }
+}
+
+@keyframes pXOff {
+    0% {
+        transform: rotateX(240deg);
+    }
+
+    6% {
+        transform: rotateX(248deg);
+    }
+
+    55% {
+        transform: rotateX(-15deg);
+    }
+
+    75% {
+        transform: rotateX(8deg);
+    }
+
+    100% {
+        transform: rotateX(0deg);
+    }
+}
+
+@keyframes pYOn {
+    0% {
+        transform: rotateY(0deg);
+    }
+
+    6% {
+        transform: rotateY(-8deg);
+    }
+
+    55% {
+        transform: rotateY(255deg);
+    }
+
+    75% {
+        transform: rotateY(232deg);
+    }
+
+    100% {
+        transform: rotateY(240deg);
+    }
+}
+
+@keyframes pYOff {
+    0% {
+        transform: rotateY(240deg);
+    }
+
+    6% {
+        transform: rotateY(248deg);
+    }
+
+    55% {
+        transform: rotateY(-15deg);
+    }
+
+    75% {
+        transform: rotateY(8deg);
+    }
+
+    100% {
+        transform: rotateY(0deg);
+    }
+}
+
+.seg3d--h.is-flipping.is-to-on .seg3d__body {
+    animation: pXOn var(--flip-dur) cubic-bezier(0.4, 2.0, 0.4, 0.85) both;
+}
+
+.seg3d--h.is-flipping.is-to-off .seg3d__body {
+    animation: pXOff var(--flip-dur) cubic-bezier(0.4, 2.0, 0.4, 0.85) both;
+}
+
+.seg3d--v.is-flipping.is-to-on .seg3d__body {
+    animation: pYOn var(--flip-dur) cubic-bezier(0.4, 2.0, 0.4, 0.85) both;
+}
+
+.seg3d--v.is-flipping.is-to-off .seg3d__body {
+    animation: pYOff var(--flip-dur) cubic-bezier(0.4, 2.0, 0.4, 0.85) both;
+}
+
+/* ============================================
+   冒号 & 其他
+   ============================================ */
+.colon-3d {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: calc(18 * var(--base));
+    padding: 0 calc(8 * var(--base));
+    height: calc(88 * var(--base));
+}
+
+.colon-3d__dot {
+    --dot-size: calc(10 * var(--base));
+    position: relative;
+    width: var(--dot-size);
+    height: var(--dot-size);
+    transform-style: preserve-3d;
+    transition: opacity 200ms ease;
+}
+
+.colon-3d__dot-face {
+    position: absolute;
+    backface-visibility: hidden;
+}
+
+.colon-3d__dot-face--front {
+    width: var(--dot-size);
+    height: var(--dot-size);
+    transform: translateZ(calc(var(--dot-size) / 2));
+    background: #d4ff00;
+    border-radius: 50%;
+    box-shadow: calc(3 * var(--base)) calc(3 * var(--base)) calc(6 * var(--base)) #e0e0e0, calc(-3 * var(--base)) calc(-3 * var(--base)) calc(6 * var(--base)) #ffffff, inset 0 0 calc(3 * var(--base)) rgba(0, 0, 0, 0.1);
+}
+
+.colon-3d__dot-face--back {
+    width: var(--dot-size);
+    height: var(--dot-size);
+    transform: translateZ(calc(var(--dot-size) / -2)) rotateY(180deg);
+    background: #d4ff00;
+    border-radius: 50%;
+}
+
+.colon-3d--paused .colon-3d__dot {
+    opacity: 0;
+}
+
+.mc3d__slow-btn {
+    position: fixed;
+    top: 3vh;
+    left: calc(3vh + 60px);
+    z-index: 101;
+    color: #9e9e9e;
+}
+
+.mc3d__slow-btn--active {
+    color: #ff6b6b;
+    background: #fef0f0;
+    box-shadow: inset 3px 3px 6px #f0d0d0, inset -3px -3px 6px #ffffff;
+}
+
+/* 模式切换按钮 */
+.mc3d__mode-btn {
+    position: fixed;
+    top: 3vh;
+    right: 3vh;
+    z-index: 101;
+    color: #9e9e9e;
+}
+
+.mc3d__mode-btn--clock {
+    color: #d4ff00;
+    background: #f8fbe0;
+    box-shadow: inset 3px 3px 6px #e8ecb0, inset -3px -3px 6px #ffffff;
+}
+
+@media (max-width: 600px) {
+    .mc3d {
+        width: 95vw;
+        --base: 0.17vw;
+    }
+
+    .mc3d__display {
+        gap: 6px;
+    }
+
+    .mc3d__group {
+        gap: 3px;
+    }
+
+    .colon-3d {
+        gap: 14px;
+        padding: 0 4px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .seg3d .seg3d__body {
+        animation: none !important;
+    }
+}
