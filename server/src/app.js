@@ -2,8 +2,12 @@ import express from 'express';
 import cors from 'cors';
 import { requestId } from './middleware/request-id.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { tenantContext } from './middleware/tenant-context.js';
 import healthRoutes from './modules/health/health.routes.js';
 import jobRoutes from './modules/jobs/job.routes.js';
+import authRoutes from './modules/auth/auth.routes.js';
+import raceRoutes from './modules/races/race.routes.js';
+import recordRoutes from './modules/records/record.routes.js';
 
 const app = express();
 
@@ -17,9 +21,14 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// ── 路由 ──────────────────────────────────────────────
+// ── 公开路由（无需认证）────────────────────────────────
 app.use('/api/health', healthRoutes);
-app.use('/api/jobs', jobRoutes);
+app.use('/api/auth', authRoutes);
+
+// ── 受保护路由（需要认证 + 租户隔离）──────────────────
+app.use('/api/jobs', tenantContext, jobRoutes);
+app.use('/api/races', raceRoutes);
+app.use('/api/records', recordRoutes);
 
 // ── 统一错误处理 ────────────────────────────────────────
 app.use(errorHandler);
