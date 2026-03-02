@@ -1,8 +1,11 @@
 /**
- * Record Routes — 选手记录 API（读路径）
+ * Record Routes — 选手记录 API（读路径 + 写路径）
  */
 import { Router } from 'express';
+import { Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { tenantContext } from '../../middleware/tenant-context.js';
+import { recordMapper } from '../../db/mappers/records.js';
 import * as recordRepo from './record.repository.js';
 
 const router = Router();
@@ -76,4 +79,71 @@ router.get('/quick-stats/:raceId', async (req, res, next) => {
     }
 });
 
+// ── 写路径 ────────────────────────────────────────────
+
+// PUT /api/records/:recordId — 单条记录更新
+router.put('/:recordId', async (req, res, next) => {
+    try {
+        const updated = await recordRepo.updateById(
+            req.tenantContext.orgId,
+            req.params.recordId,
+            req.body,
+        );
+        if (!updated) {
+            return res.status(404).json({ success: false, message: '记录不存在' });
+        }
+        res.json({ success: true, data: updated });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// DELETE /api/records/race/:raceId — 清空赛事数据
+router.delete('/race/:raceId', async (req, res, next) => {
+    try {
+        const deleted = await recordRepo.deleteByRaceId(
+            req.tenantContext.orgId,
+            req.params.raceId,
+        );
+        res.json({ success: true, deleted });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET /api/records/export/:raceId — 流式导出（NDJSON）
+router.get('/export/:raceId', async (req, res, next) => {
+    try {
+        res.setHeader('Content-Type', 'application/x-ndjson');
+        res.setHeader('Transfer-Encoding', 'chunked');
+
+        const dbStream = recordRepo.streamByRaceId(
+            req.tenantContext.orgId,
+            req.params.raceId,
+        );
+
+        const toNdjson = new Transform({
+            objectMode: true,
+            transform(row, _encoding, callback) {
+                try {
+                    const mapped = recordMapper.fromDbRow(row);
+                    callback(null, JSON.stringify(mapped) + '\n');
+                } catch (err) {
+                    callback(err);
+                }
+            },
+        });
+
+        await pipeline(dbStream, toNdjson, res);
+    } catch (err) {
+        // 如果 headers 已发送，不能再用 next
+        if (res.headersSent) {
+            res.end();
+            return;
+        }
+        next(err);
+    }
+});
+
 export default router;
+

@@ -8,6 +8,7 @@ import jobRoutes from './modules/jobs/job.routes.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import raceRoutes from './modules/races/race.routes.js';
 import recordRoutes from './modules/records/record.routes.js';
+import columnMappingRoutes from './modules/column-mappings/column-mapping.routes.js';
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/jobs', tenantContext, jobRoutes);
 app.use('/api/races', raceRoutes);
 app.use('/api/records', recordRoutes);
+app.use('/api/column-mappings', columnMappingRoutes);
 
 // ── 统一错误处理 ────────────────────────────────────────
 app.use(errorHandler);

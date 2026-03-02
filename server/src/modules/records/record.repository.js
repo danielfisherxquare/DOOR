@@ -260,3 +260,32 @@ export async function count(orgId, raceId) {
     const [{ count }] = await base.count('* as count');
     return parseInt(count, 10);
 }
+
+// ── 单条记录更新（写路径）──────────────────────────────
+
+export async function updateById(orgId, recordId, data) {
+    const row = recordMapper.toDbUpdate(data);
+    const [updated] = await knex('records')
+        .where({ org_id: orgId, id: recordId })
+        .update(row)
+        .returning('*');
+    return updated ? recordMapper.fromDbRow(updated) : null;
+}
+
+// ── 清空赛事数据 ──────────────────────────────────────
+
+export async function deleteByRaceId(orgId, raceId) {
+    return knex('records')
+        .where({ org_id: orgId, race_id: raceId })
+        .delete();
+}
+
+// ── 流式导出（返回 Knex stream 用于 NDJSON）──────────
+
+export function streamByRaceId(orgId, raceId) {
+    return knex('records')
+        .where({ org_id: orgId, race_id: raceId })
+        .orderBy('id', 'asc')
+        .stream();
+}
+
