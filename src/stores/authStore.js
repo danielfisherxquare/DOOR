@@ -15,21 +15,22 @@ const useAuthStore = create(
       // 登录
       login: async (username, password, rememberMe = false) => {
         set({ isLoading: true, error: null })
-        
+
         try {
-          const response = await authApi.login({ username, password, rememberMe })
-          
+          const response = await authApi.login({ login: username, password, rememberMe })
+
           if (response.success) {
-            const { user, token } = response.data
-            
+            const { user, accessToken, refreshToken } = response.data
+
             set({
               user,
-              token,
+              token: accessToken,
+              refreshToken,
               isAuthenticated: true,
               isLoading: false,
               error: null
             })
-            
+
             return { success: true }
           } else {
             set({
@@ -49,24 +50,25 @@ const useAuthStore = create(
       },
 
       // 注册
-      register: async (username, email, password) => {
+      register: async (username, email, password, orgName) => {
         set({ isLoading: true, error: null })
-        
+
         try {
-          const response = await authApi.register({ username, email, password })
-          
+          const response = await authApi.register({ username, email, password, orgName })
+
           if (response.success) {
-            const { user, token } = response.data
-            
+            const { user, accessToken, refreshToken } = response.data
+
             set({
               user,
-              token,
+              token: accessToken,
+              refreshToken,
               isAuthenticated: true,
               isLoading: false,
               error: null
             })
-            
-            return { success: true, verificationToken: response.data.verificationToken }
+
+            return { success: true }
           } else {
             set({
               isLoading: false,
@@ -87,14 +89,16 @@ const useAuthStore = create(
       // 登出
       logout: async () => {
         try {
-          await authApi.logout()
+          const { refreshToken } = get()
+          await authApi.logout({ refreshToken })
         } catch (error) {
           // 忽略登出错误
         }
-        
+
         set({
           user: null,
           token: null,
+          refreshToken: null,
           isAuthenticated: false,
           error: null
         })
@@ -104,7 +108,7 @@ const useAuthStore = create(
       fetchCurrentUser: async () => {
         try {
           const response = await authApi.getCurrentUser()
-          
+
           if (response.success) {
             set({ user: response.data })
             return true
@@ -128,7 +132,7 @@ const useAuthStore = create(
       // 忘记密码
       forgotPassword: async (email) => {
         set({ isLoading: true, error: null })
-        
+
         try {
           const response = await authApi.forgotPassword(email)
           set({ isLoading: false })
@@ -142,7 +146,7 @@ const useAuthStore = create(
       // 重置密码
       resetPassword: async (token, password) => {
         set({ isLoading: true, error: null })
-        
+
         try {
           const response = await authApi.resetPassword(token, password)
           set({ isLoading: false })
@@ -169,6 +173,7 @@ const useAuthStore = create(
       partialize: (state) => ({
         user: state.user,
         token: state.token,
+        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated
       })
     }

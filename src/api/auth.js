@@ -28,7 +28,7 @@ export const authApi = {
    * 用户登出
    * @returns {Promise<{ success: boolean }>}
    */
-  logout: () => request.post('/auth/logout'),
+  logout: (data) => request.post('/auth/logout', data),
 
   /**
    * 获取当前用户信息

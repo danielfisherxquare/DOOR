@@ -7,8 +7,9 @@ function Register() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [orgName, setOrgName] = useState('')
   const navigate = useNavigate()
-  
+
   const { register, isAuthenticated, isLoading, error, clearError } = useAuthStore()
 
   // 已登录则跳转
@@ -25,8 +26,8 @@ function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    if (!username.trim() || !email.trim() || !password.trim()) {
+
+    if (!username.trim() || !email.trim() || !password.trim() || !orgName.trim()) {
       return
     }
 
@@ -34,7 +35,7 @@ function Register() {
       return
     }
 
-    const result = await register(username, email, password)
+    const result = await register(username, email, password, orgName)
     if (result.success) {
       navigate('/', { replace: true })
     }
@@ -53,16 +54,31 @@ function Register() {
 
         <form className="login-card__form" onSubmit={handleSubmit}>
           {error && (
-            <div style={{ 
-              padding: '12px 16px', 
-              borderRadius: 'var(--radius-md)', 
-              background: 'rgba(239, 68, 68, 0.1)', 
+            <div style={{
+              padding: '12px 16px',
+              borderRadius: 'var(--radius-md)',
+              background: 'rgba(239, 68, 68, 0.1)',
               color: 'var(--color-danger)',
               fontSize: 'var(--font-size-sm)'
             }}>
               {error}
             </div>
           )}
+
+          <div className="input-group">
+            <label htmlFor="orgName" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+              组织名称
+            </label>
+            <input
+              id="orgName"
+              type="text"
+              className="input"
+              placeholder="您的团队或公司名称"
+              value={orgName}
+              onChange={(e) => setOrgName(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
 
           <div className="input-group">
             <label htmlFor="username" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
@@ -128,19 +144,19 @@ function Register() {
             />
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="btn btn--primary btn--large"
             disabled={isLoading}
             style={{ marginTop: 8 }}
           >
             {isLoading ? (
               <>
-                <span style={{ 
-                  width: 16, 
-                  height: 16, 
-                  border: '2px solid rgba(255,255,255,0.3)', 
-                  borderTopColor: 'white', 
+                <span style={{
+                  width: 16,
+                  height: 16,
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTopColor: 'white',
                   borderRadius: '50%',
                   animation: 'spin 0.8s linear infinite'
                 }}></span>
@@ -150,11 +166,11 @@ function Register() {
           </button>
         </form>
 
-        <p style={{ 
-          marginTop: 16, 
-          textAlign: 'center', 
-          fontSize: 'var(--font-size-sm)', 
-          color: 'var(--color-text-secondary)' 
+        <p style={{
+          marginTop: 16,
+          textAlign: 'center',
+          fontSize: 'var(--font-size-sm)',
+          color: 'var(--color-text-secondary)'
         }}>
           已有账号？{' '}
           <Link to="/login" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>
