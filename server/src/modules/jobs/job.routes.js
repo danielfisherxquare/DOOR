@@ -6,14 +6,12 @@ const router = Router();
 
 /**
  * GET /api/jobs/:jobId
- * 返回 JobStatus 结构
- *
- * NOTE: Phase 1 不需要认证中间件。Phase 2 加上 auth 后需要补充 org_id 过滤。
+ * 返回 JobStatus 结构（租户隔离）
  */
 router.get('/:jobId', async (req, res, next) => {
     try {
         const { jobId } = req.params;
-        const job = await jobRepo.findById(jobId);
+        const job = await jobRepo.findByOrgAndId(req.tenantContext.orgId, jobId);
 
         if (!job) {
             return res.status(404).json({
