@@ -272,6 +272,30 @@ export async function updateById(orgId, recordId, data) {
     return updated ? recordMapper.fromDbRow(updated) : null;
 }
 
+export async function bulkUpdate(orgId, updates) {
+    if (!Array.isArray(updates) || updates.length === 0) {
+        return { updated: 0 };
+    }
+
+    let updated = 0;
+    await knex.transaction(async (trx) => {
+        for (const item of updates) {
+            const recordId = Number(item?.id);
+            if (!Number.isFinite(recordId) || recordId <= 0) continue;
+
+            const row = recordMapper.toDbUpdate(item?.data || {});
+            if (Object.keys(row).length === 0) continue;
+
+            const count = await trx('records')
+                .where({ org_id: orgId, id: recordId })
+                .update(row);
+            updated += count;
+        }
+    });
+
+    return { updated };
+}
+
 // ── 清空赛事数据 ──────────────────────────────────────
 
 export async function deleteByRaceId(orgId, raceId) {
@@ -287,5 +311,84 @@ export function streamByRaceId(orgId, raceId) {
         .where({ org_id: orgId, race_id: raceId })
         .orderBy('id', 'asc')
         .stream();
+}
+
+// ── 校验成绩导入 ──────────────────────────────────────
+
+/**
+ * 批量导入校验成绩（更新 personal_best_full / personal_best_half）
+ * @param {string} orgId
+ * @param {number} raceId
+ * @param {Array<{ idNumber: string, netTime: string, raceName?: string, raceDate?: string, event: string }>} results
+ * @returns {Promise<{ updated: number }>}
+ */
+export async function importVerificationResults(orgId, raceId, results) {
+    if (!results || results.length === 0) return { updated: 0 };
+
+    const safeRaceId = Number(raceId);
+    if (!safeRaceId || !Number.isFinite(safeRaceId)) {
+        throw new Error('Invalid raceId');
+    }
+
+    // 分组：Full / Half
+    const fullMap = new Map();   // idNumber → pbJson
+    const halfMap = new Map();
+
+    for (const res of results) {
+        if (!res.idNumber || !res.netTime) continue;
+
+        const pbJson = JSON.stringify({
+            raceName: res.raceName || '未知赛事',
+            netTime: res.netTime,
+            date: res.raceDate || '',
+        });
+
+        const isHalf = res.event === 'Half' || res.event === '半马' || res.event === '半程';
+        const target = isHalf ? halfMap : fullMap;
+        // 同一 idNumber 后面的覆盖前面的
+        target.set(res.idNumber.trim(), pbJson);
+    }
+
+    let totalUpdated = 0;
+
+    await knex.transaction(async (trx) => {
+        // 1. 更新 Full
+        if (fullMap.size > 0) {
+            const ids = Array.from(fullMap.keys());
+            const BATCH = 500;
+            for (let i = 0; i < ids.length; i += BATCH) {
+                const batch = ids.slice(i, i + BATCH);
+                for (const idNum of batch) {
+                    const cnt = await trx('records')
+                        .where({ org_id: orgId, race_id: safeRaceId, id_number: idNum })
+                        .update({
+                            personal_best_full: fullMap.get(idNum),
+                            updated_at: knex.fn.now(),
+                        });
+                    totalUpdated += cnt;
+                }
+            }
+        }
+
+        // 2. 更新 Half
+        if (halfMap.size > 0) {
+            const ids = Array.from(halfMap.keys());
+            const BATCH = 500;
+            for (let i = 0; i < ids.length; i += BATCH) {
+                const batch = ids.slice(i, i + BATCH);
+                for (const idNum of batch) {
+                    const cnt = await trx('records')
+                        .where({ org_id: orgId, race_id: safeRaceId, id_number: idNum })
+                        .update({
+                            personal_best_half: halfMap.get(idNum),
+                            updated_at: knex.fn.now(),
+                        });
+                    totalUpdated += cnt;
+                }
+            }
+        }
+    });
+
+    return { updated: totalUpdated };
 }
 

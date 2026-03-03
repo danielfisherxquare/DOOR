@@ -44,3 +44,4 @@ registerHandler('echo', async (job, _ctx) => {
     // 直接返回 payload 作为 result
     return job.payload;
 });
+

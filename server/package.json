@@ -5,21 +5,24 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
-    "worker": "node src/worker.js",
-    "worker:dev": "node --watch src/worker.js",
-    "migrate": "npx knex migrate:latest --knexfile src/db/knex.js",
-    "migrate:make": "npx knex migrate:make --knexfile src/db/knex.js",
-    "test": "node --test 'tests/**/*.test.js'"
+    "start": "node --env-file=.env src/index.js",
+    "dev": "node --env-file=.env --watch src/index.js",
+    "worker": "node --env-file=.env src/worker.js",
+    "worker:dev": "node --env-file=.env --watch src/worker.js",
+    "migrate": "npx knex migrate:latest --knexfile knexfile.js",
+    "migrate:make": "npx knex migrate:make --knexfile knexfile.js",
+    "test": "node --env-file=.env --test"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
     "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
     "pg": "^8.13.0",
     "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2"
   }
 }

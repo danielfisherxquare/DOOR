@@ -3,6 +3,12 @@ import knex from './db/knex.js';
 import { env } from './config/env.js';
 import * as jobRepo from './modules/jobs/job.repository.js';
 import { getHandler, getRegisteredTypes } from './modules/jobs/job.handlers.js';
+// Phase 4: 导入提交 handler（需要在 job.handlers.js 之后导入，避免 TDZ）
+import './modules/import-sessions/commit-import-session.handler.js';
+// Phase 5: 审核步骤 handler（5 步）
+import './modules/audit/audit.job-handler.js';
+// Phase 6: 抽签 finalize handler
+import './modules/lottery/lottery-finalize.job-handler.js';
 
 const WORKER_ID = `worker-${randomUUID().slice(0, 8)}`;
 let running = true;

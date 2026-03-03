@@ -3,7 +3,7 @@
  */
 export const env = {
   PORT: parseInt(process.env.PORT || '3001', 10),
-  DATABASE_URL: process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door',
+  DATABASE_URL: process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:15432/door',
   JWT_SECRET: process.env.JWT_SECRET || 'door-secret-key-change-in-production',
   NODE_ENV: process.env.NODE_ENV || 'development',
   WORKER_POLL_INTERVAL_MS: parseInt(process.env.WORKER_POLL_INTERVAL_MS || '2000', 10),

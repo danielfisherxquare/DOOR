@@ -98,6 +98,24 @@ router.put('/:recordId', async (req, res, next) => {
     }
 });
 
+// POST /api/records/bulk-update — 批量更新记录
+router.post('/bulk-update', async (req, res, next) => {
+    try {
+        const { updates } = req.body;
+        if (!Array.isArray(updates)) {
+            return res.status(400).json({ success: false, message: 'updates must be an array' });
+        }
+
+        const result = await recordRepo.bulkUpdate(
+            req.tenantContext.orgId,
+            updates,
+        );
+        res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // DELETE /api/records/race/:raceId — 清空赛事数据
 router.delete('/race/:raceId', async (req, res, next) => {
     try {
@@ -141,6 +159,30 @@ router.get('/export/:raceId', async (req, res, next) => {
             res.end();
             return;
         }
+        next(err);
+    }
+});
+
+// POST /api/records/import-verification/:raceId — 校验成绩导入
+router.post('/import-verification/:raceId', async (req, res, next) => {
+    try {
+        const raceId = Number(req.params.raceId);
+        if (!raceId || !Number.isFinite(raceId)) {
+            return res.status(400).json({ success: false, message: 'Invalid raceId' });
+        }
+
+        const results = req.body;
+        if (!Array.isArray(results)) {
+            return res.status(400).json({ success: false, message: 'Body must be an array of verification results' });
+        }
+
+        const result = await recordRepo.importVerificationResults(
+            req.tenantContext.orgId,
+            raceId,
+            results,
+        );
+        res.json({ success: true, data: result });
+    } catch (err) {
         next(err);
     }
 });
