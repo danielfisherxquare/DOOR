@@ -6,20 +6,19 @@
  *   POST → enqueue job → 返回 jobId → 前端轮询 GET /api/jobs/:jobId
  */
 import { Router } from 'express';
-import { tenantContext } from '../../middleware/tenant-context.js';
+import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import * as auditRepo from './audit.repository.js';
 import * as jobRepo from '../jobs/job.repository.js';
 
 const router = Router();
-router.use(tenantContext);
 
 // ─── 统计 ────────────────────────────────────────────────────────────
 
 // GET /api/audit/prep-stats/:raceId — 审核准备统计
-router.get('/prep-stats/:raceId', async (req, res, next) => {
+router.get('/prep-stats/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await auditRepo.getPrepStats(
-            req.tenantContext.orgId, Number(req.params.raceId));
+            req.authContext.orgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -27,10 +26,10 @@ router.get('/prep-stats/:raceId', async (req, res, next) => {
 // ─── 重置 ────────────────────────────────────────────────────────────
 
 // POST /api/audit/reset/:raceId — 重置审核状态（含叠加保护）
-router.post('/reset/:raceId', async (req, res, next) => {
+router.post('/reset/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await auditRepo.resetAudit(
-            req.tenantContext.orgId, Number(req.params.raceId));
+            req.authContext.orgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -44,7 +43,7 @@ router.post('/reset/:raceId', async (req, res, next) => {
  */
 async function enqueueAuditStep(req, res, next, stepNumber, stepName) {
     try {
-        const { orgId, userId } = req.tenantContext;
+        const { orgId, userId } = req.authContext;
         const raceId = Number(req.params.raceId);
 
         // 创建 audit_run 记录
@@ -71,23 +70,23 @@ async function enqueueAuditStep(req, res, next, stepNumber, stepName) {
 }
 
 // POST /api/audit/step/underage/:raceId — 步骤 1: 年龄检查
-router.post('/step/underage/:raceId', (req, res, next) =>
+router.post('/step/underage/:raceId', requireRaceAccess('raceId'), (req, res, next) =>
     enqueueAuditStep(req, res, next, 1, 'underage'));
 
 // POST /api/audit/step/blacklist/:raceId — 步骤 2: 黑名单碰撞
-router.post('/step/blacklist/:raceId', (req, res, next) =>
+router.post('/step/blacklist/:raceId', requireRaceAccess('raceId'), (req, res, next) =>
     enqueueAuditStep(req, res, next, 2, 'blacklist'));
 
 // POST /api/audit/step/fake-elite/:raceId — 步骤 3: 精英伪造
-router.post('/step/fake-elite/:raceId', (req, res, next) =>
+router.post('/step/fake-elite/:raceId', requireRaceAccess('raceId'), (req, res, next) =>
     enqueueAuditStep(req, res, next, 3, 'fake_elite'));
 
 // POST /api/audit/step/direct-lock/:raceId — 步骤 4: 直通锁定
-router.post('/step/direct-lock/:raceId', (req, res, next) =>
+router.post('/step/direct-lock/:raceId', requireRaceAccess('raceId'), (req, res, next) =>
     enqueueAuditStep(req, res, next, 4, 'direct_lock'));
 
 // POST /api/audit/step/mass-pool/:raceId — 步骤 5: 大众池标记
-router.post('/step/mass-pool/:raceId', (req, res, next) =>
+router.post('/step/mass-pool/:raceId', requireRaceAccess('raceId'), (req, res, next) =>
     enqueueAuditStep(req, res, next, 5, 'mass_pool'));
 
 export default router;

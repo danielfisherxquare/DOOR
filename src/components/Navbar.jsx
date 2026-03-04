@@ -10,7 +10,7 @@ function Navbar() {
     navigate('/login')
   }
 
-  // 未登录时导航栏显示登录/注册按钮
+  // 未登录时导航栏只显示登录按钮
   if (!isAuthenticated) {
     return (
       <nav className="navbar">
@@ -21,9 +21,6 @@ function Navbar() {
         <div className="navbar__menu">
           <Link to="/login" className="btn btn--ghost">
             登录
-          </Link>
-          <Link to="/register" className="btn btn--primary">
-            注册
           </Link>
         </div>
       </nav>
@@ -46,9 +43,9 @@ function Navbar() {
             {user?.username || '用户'}
           </span>
         </div>
-        
-        <button 
-          className="btn btn--ghost" 
+
+        <button
+          className="btn btn--ghost"
           onClick={handleLogout}
           title="退出登录"
         >

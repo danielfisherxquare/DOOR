@@ -37,6 +37,8 @@ export const userMapper = {
             role: row.role,
             avatar: row.avatar,
             emailVerified: row.email_verified,
+            status: row.status,
+            mustChangePassword: row.must_change_password,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
         };
@@ -56,7 +58,7 @@ export const userMapper = {
             username: data.username,
             email: data.email,
             password_hash: data.passwordHash,
-            role: data.role || 'admin',
+            role: data.role || 'org_admin',
         };
     },
 };

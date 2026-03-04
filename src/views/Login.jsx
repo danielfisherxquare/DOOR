@@ -8,7 +8,7 @@ function Login() {
   const [rememberMe, setRememberMe] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  
+
   const { login, isAuthenticated, isLoading, error, clearError } = useAuthStore()
 
   // 已登录则跳转
@@ -35,7 +35,7 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!username.trim() || !password.trim()) {
       return
     }
@@ -67,10 +67,10 @@ function Login() {
 
         <form className="login-card__form" onSubmit={handleSubmit}>
           {error && (
-            <div style={{ 
-              padding: '12px 16px', 
-              borderRadius: 'var(--radius-md)', 
-              background: 'rgba(239, 68, 68, 0.1)', 
+            <div style={{
+              padding: '12px 16px',
+              borderRadius: 'var(--radius-md)',
+              background: 'rgba(239, 68, 68, 0.1)',
               color: 'var(--color-danger)',
               fontSize: 'var(--font-size-sm)'
             }}>
@@ -110,16 +110,16 @@ function Login() {
             />
           </div>
 
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
-            marginTop: 8 
+            marginTop: 8
           }}>
-            <label style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 8, 
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
               cursor: 'pointer',
               fontSize: 'var(--font-size-sm)',
               color: 'var(--color-text-secondary)'
@@ -133,10 +133,10 @@ function Login() {
               />
               记住我
             </label>
-            <Link 
-              to="/forgot-password" 
-              style={{ 
-                fontSize: 'var(--font-size-sm)', 
+            <Link
+              to="/forgot-password"
+              style={{
+                fontSize: 'var(--font-size-sm)',
                 color: 'var(--color-primary)',
                 textDecoration: 'none'
               }}
@@ -145,19 +145,19 @@ function Login() {
             </Link>
           </div>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="btn btn--primary btn--large"
             disabled={isLoading}
             style={{ marginTop: 16 }}
           >
             {isLoading ? (
               <>
-                <span style={{ 
-                  width: 16, 
-                  height: 16, 
-                  border: '2px solid rgba(255,255,255,0.3)', 
-                  borderTopColor: 'white', 
+                <span style={{
+                  width: 16,
+                  height: 16,
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTopColor: 'white',
                   borderRadius: '50%',
                   animation: 'spin 0.8s linear infinite'
                 }}></span>
@@ -166,18 +166,6 @@ function Login() {
             ) : '登 录'}
           </button>
         </form>
-
-        <p style={{ 
-          marginTop: 16, 
-          textAlign: 'center', 
-          fontSize: 'var(--font-size-sm)', 
-          color: 'var(--color-text-secondary)' 
-        }}>
-          还没有账号？{' '}
-          <Link to="/register" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>
-            立即注册
-          </Link>
-        </p>
       </div>
 
       <style>{`

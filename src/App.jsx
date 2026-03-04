@@ -1,40 +1,42 @@
 import { Routes, Route } from 'react-router-dom'
-import ProtectedRoute from './components/ProtectedRoute'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import Home from './views/Home'
 import Login from './views/Login'
-import Register from './views/Register'
 import ForgotPassword from './views/ForgotPassword'
 import ResetPassword from './views/ResetPassword'
 import ToolDetail from './views/ToolDetail'
+import AdminProtectedRoute from './components/AdminProtectedRoute'
+import AdminLayout from './components/admin/AdminLayout'
 
 function App() {
   return (
     <div className="app">
-      <Navbar />
-      <main className="main-content">
-        <Routes>
-          {/* 公开路由 */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
-          
-          {/* 受保护路由 */}
-          <Route path="/" element={
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          } />
-          <Route path="/tool/:id" element={
-            <ProtectedRoute>
-              <ToolDetail />
-            </ProtectedRoute>
-          } />
-        </Routes>
-      </main>
-      <Footer />
+      <Routes>
+        {/* 管理后台 — 独立 layout，不含 Navbar/Footer */}
+        <Route path="/admin/*" element={
+          <AdminProtectedRoute>
+            <AdminLayout />
+          </AdminProtectedRoute>
+        } />
+
+        {/* 门户区 — 含 Navbar/Footer */}
+        <Route path="*" element={
+          <>
+            <Navbar />
+            <main className="main-content">
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/tool/:id" element={<ToolDetail />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password/:token" element={<ResetPassword />} />
+              </Routes>
+            </main>
+            <Footer />
+          </>
+        } />
+      </Routes>
     </div>
   )
 }

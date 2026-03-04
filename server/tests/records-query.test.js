@@ -18,8 +18,8 @@ let app, server, baseUrl;
 
 async function api(path, options = {}) {
     const res = await fetch(`${baseUrl}${path}`, {
-        headers: { 'Content-Type': 'application/json', ...options.headers },
         ...options,
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     });
     const body = await res.json().catch(() => null);
     return { status: res.status, body };
@@ -40,11 +40,12 @@ describe('Records Query', () => {
         await knex('users').del();
         await knex('organizations').del();
 
+        const { requireAuth } = await import('../src/middleware/require-auth.js');
         app = express();
         app.use(express.json());
         app.use('/api/auth', authRoutes);
-        app.use('/api/races', raceRoutes);
-        app.use('/api/records', recordRoutes);
+        app.use('/api/races', requireAuth, raceRoutes);
+        app.use('/api/records', requireAuth, recordRoutes);
         server = app.listen(0);
         baseUrl = `http://localhost:${server.address().port}`;
 
@@ -53,16 +54,21 @@ describe('Records Query', () => {
             method: 'POST',
             body: JSON.stringify({ username: 'rec_admin', email: 'rec@test.com', password: 'pass123', orgName: '记录测试组织' }),
         });
-        token = regRes.body.data.accessToken;
-        orgId = regRes.body.data.user.orgId;
+        if (regRes.status !== 201) console.log('REGISTER FAILED:', regRes);
+        token = regRes.body?.data?.accessToken;
+        orgId = regRes.body?.data?.user?.orgId;
 
         // 创建赛事
+        console.log('TOKEN GENERATED:', token);
         const raceRes = await api('/api/races', {
             method: 'POST',
             body: JSON.stringify({ name: '测试赛事', date: '2026-10-01', location: '测试地点' }),
             ...authed(token),
         });
-        raceId = raceRes.body.data.id;
+        console.log('CREATE RACE RESP:', JSON.stringify(raceRes));
+        if (raceRes.status !== 201) console.log('CREATE RACE FAILED:', JSON.stringify(raceRes));
+        raceId = raceRes.body?.data?.id;
+        console.log('CREATED RACE ID:', raceId);
 
         // 插入测试记录（直接入库）
         const records = [

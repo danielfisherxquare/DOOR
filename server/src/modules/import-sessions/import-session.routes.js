@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import { importSessionRepository } from './import-session.repository.js';
 import * as jobRepository from '../jobs/job.repository.js';
 
@@ -9,7 +10,7 @@ const router = Router();
 // ==========================================
 router.post('/', async (req, res, next) => {
     try {
-        const orgId = req.tenantContext.orgId;
+        const orgId = req.authContext.orgId;
         const session = await importSessionRepository.create(orgId);
         res.json({
             success: true,
@@ -26,7 +27,7 @@ router.post('/', async (req, res, next) => {
 router.get('/:sid', async (req, res, next) => {
     try {
         const { sid } = req.params;
-        const orgId = req.tenantContext.orgId;
+        const orgId = req.authContext.orgId;
         const session = await importSessionRepository.findById(orgId, sid);
 
         if (!session) {
@@ -48,7 +49,7 @@ router.get('/:sid', async (req, res, next) => {
 router.put('/:sid/summary', async (req, res, next) => {
     try {
         const { sid } = req.params;
-        const orgId = req.tenantContext.orgId;
+        const orgId = req.authContext.orgId;
         const summary = req.body;
 
         const session = await importSessionRepository.setSummary(orgId, sid, summary);
@@ -67,8 +68,8 @@ router.put('/:sid/summary', async (req, res, next) => {
 router.post('/:sid/chunks', async (req, res, next) => {
     try {
         const { sid } = req.params;
-        const orgId = req.tenantContext.orgId;
-        const rows = req.body; // 注意外层需要在 express 加大限制
+        const orgId = req.authContext.orgId;
+        const rows = req.body;
 
         const totalRows = await importSessionRepository.appendChunk(orgId, sid, rows);
         res.json({
@@ -86,7 +87,7 @@ router.post('/:sid/chunks', async (req, res, next) => {
 router.get('/:sid/chunks', async (req, res, next) => {
     try {
         const { sid } = req.params;
-        const orgId = req.tenantContext.orgId;
+        const orgId = req.authContext.orgId;
         const offset = parseInt(req.query.offset || '0', 10);
         const limit = parseInt(req.query.limit || '100', 10);
 
@@ -106,7 +107,7 @@ router.get('/:sid/chunks', async (req, res, next) => {
 router.delete('/:sid', async (req, res, next) => {
     try {
         const { sid } = req.params;
-        const orgId = req.tenantContext.orgId;
+        const orgId = req.authContext.orgId;
 
         const deleted = await importSessionRepository.cancel(orgId, sid);
         if (!deleted) {
@@ -124,11 +125,12 @@ router.delete('/:sid', async (req, res, next) => {
 
 // ==========================================
 // 7. 提交会话 (触发 Job)
+// 此时涉及到提交到某一场具体比赛，因此这里需要挂载 requireRaceAccess
 // ==========================================
-router.post('/:sid/commit', async (req, res, next) => {
+router.post('/:sid/commit', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const { sid } = req.params;
-        const orgId = req.tenantContext.orgId;
+        const orgId = req.authContext.orgId;
         const { raceId, category } = req.body;
 
         const session = await importSessionRepository.findById(orgId, sid);
@@ -146,7 +148,7 @@ router.post('/:sid/commit', async (req, res, next) => {
             'commit-import-session',
             { sessionId: sid, raceId, category: category || 'Mass' },
             `${orgId}:import:${sid}`, // idempotency_key 保证只产生一个
-            req.tenantContext.userId,  // createdBy
+            req.authContext.userId,  // createdBy
         );
 
         res.json({

@@ -18,7 +18,7 @@ export async function findOrgById(id) {
 
 // ── User ─────────────────────────────────────────────
 
-export async function createUser({ orgId, username, email, passwordHash, role = 'admin' }) {
+export async function createUser({ orgId, username, email, passwordHash, role = 'org_admin', createdBy = null }) {
     const [row] = await knex('users')
         .insert({
             org_id: orgId,
@@ -26,6 +26,9 @@ export async function createUser({ orgId, username, email, passwordHash, role = 
             email,
             password_hash: passwordHash,
             role,
+            status: 'active',
+            must_change_password: false,
+            created_by: createdBy,
         })
         .returning('*');
     return row;
@@ -40,6 +43,66 @@ export async function findUserByLogin(login) {
 
 export async function findUserById(id) {
     return knex('users').where({ id }).first();
+}
+
+export async function updateUser(id, fields) {
+    const [row] = await knex('users')
+        .where({ id })
+        .update({ ...fields, updated_at: knex.fn.now() })
+        .returning('*');
+    return row;
+}
+
+// ── 登录安全 ─────────────────────────────────────────
+
+export async function incrementFailedAttempts(userId) {
+    await knex('users')
+        .where({ id: userId })
+        .increment('failed_login_attempts', 1);
+}
+
+export async function lockUser(userId, minutes) {
+    const lockedUntil = new Date(Date.now() + minutes * 60 * 1000);
+    await knex('users')
+        .where({ id: userId })
+        .update({ locked_until: lockedUntil });
+}
+
+export async function resetFailedAttempts(userId) {
+    await knex('users')
+        .where({ id: userId })
+        .update({ failed_login_attempts: 0, locked_until: null });
+}
+
+// ── Race Permissions ─────────────────────────────────
+
+export async function findRacePermissions(userId) {
+    return knex('user_race_permissions')
+        .where({ user_id: userId })
+        .select('race_id', 'access_level');
+}
+
+export async function setRacePermission(userId, orgId, raceId, accessLevel, grantedBy) {
+    const data = {
+        user_id: userId,
+        org_id: orgId,
+        race_id: raceId,
+        access_level: accessLevel,
+        created_by: grantedBy,
+    };
+    await knex('user_race_permissions')
+        .insert(data)
+        .onConflict(['user_id', 'race_id'])
+        .merge({
+            access_level: accessLevel,
+            created_by: grantedBy,
+        });
+}
+
+export async function removeRacePermission(userId, raceId) {
+    await knex('user_race_permissions')
+        .where({ user_id: userId, race_id: raceId })
+        .del();
 }
 
 // ── Refresh Token ────────────────────────────────────
@@ -73,3 +136,4 @@ export async function cleanExpiredTokens() {
         .where('expires_at', '<=', new Date())
         .delete();
 }
+

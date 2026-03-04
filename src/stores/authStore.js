@@ -10,7 +10,35 @@ const useAuthStore = create(
       token: null,
       isAuthenticated: false,
       isLoading: false,
+      isBootstrapping: true,
       error: null,
+
+      // 启动时恢复会话
+      bootstrapAuth: async () => {
+        const token = get().token
+        if (!token) {
+          set({ isBootstrapping: false })
+          return
+        }
+        try {
+          const response = await authApi.getCurrentUser()
+          if (response.success) {
+            set({
+              user: response.data,
+              isAuthenticated: true,
+              isBootstrapping: false,
+            })
+          } else {
+            set({ isBootstrapping: false, isAuthenticated: false, user: null, token: null })
+          }
+        } catch {
+          set({ isBootstrapping: false, isAuthenticated: false, user: null, token: null })
+        }
+      },
+
+      // 角色判断
+      hasRole: (...roles) => roles.includes(get().user?.role),
+      canAccessAdmin: () => ['org_admin', 'super_admin'].includes(get().user?.role),
 
       // 登录
       login: async (username, password, rememberMe = false) => {

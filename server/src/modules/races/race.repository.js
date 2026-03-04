@@ -10,6 +10,28 @@ export async function create(orgId, data) {
     return raceMapper.fromDbRow(inserted);
 }
 
+export async function findAllAllowed(orgId, userId, role) {
+    let query = knex('races').orderBy('created_at', 'desc');
+
+    if (role === 'super_admin') {
+        // 超管看全部
+    } else if (role === 'org_admin') {
+        // 机构超管看本机构全部
+        query = query.where({ org_id: orgId });
+    } else {
+        // 普通角色：INNER JOIN user_race_permissions
+        query = query
+            .innerJoin('user_race_permissions', 'races.id', 'user_race_permissions.race_id')
+            .where('user_race_permissions.user_id', userId)
+            // 防止跨机构数据残留，加倍保险
+            .andWhere('races.org_id', orgId);
+    }
+
+    const rows = await query.select('races.*'); // 防止 select 到 join 表字段冲突
+    return rows.map(raceMapper.fromDbRow);
+}
+
+// 保留原内部调用的 findAll (供其他服务使用)
 export async function findAll(orgId) {
     const rows = await knex('races')
         .where({ org_id: orgId })

@@ -17,8 +17,8 @@ let app, server, baseUrl;
 
 async function api(path, options = {}) {
     const res = await fetch(`${baseUrl}${path}`, {
-        headers: { 'Content-Type': 'application/json', ...options.headers },
         ...options,
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     });
     const body = await res.json().catch(() => null);
     return { status: res.status, body };

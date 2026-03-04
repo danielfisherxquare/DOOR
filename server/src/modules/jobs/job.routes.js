@@ -11,7 +11,7 @@ const router = Router();
 router.get('/:jobId', async (req, res, next) => {
     try {
         const { jobId } = req.params;
-        const job = await jobRepo.findByOrgAndId(req.tenantContext.orgId, jobId);
+        const job = await jobRepo.findByOrgAndId(req.authContext.orgId, jobId);
 
         if (!job) {
             return res.status(404).json({

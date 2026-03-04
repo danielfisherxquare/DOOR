@@ -11,8 +11,8 @@ const BASE = process.env.API_BASE || 'http://localhost:3001';
 async function api(path, options = {}) {
     const url = `${BASE}${path}`;
     const res = await fetch(url, {
-        headers: { 'Content-Type': 'application/json', ...options.headers },
         ...options,
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     });
     const body = await res.json().catch(() => null);
     return { status: res.status, body };
