@@ -1,207 +1,155 @@
-# DOOR Project Rules
+# DOOR 部署文档（单仓库）
 
-This repository contains two different projects under the `door` directory. Automation must distinguish them correctly.
+本仓库在 `door/` 目录下包含两套工程，请务必区分：
 
-## Structure
+- `door/`：前端门户（Vite + React），构建产物在 `door/dist/`
+- `door/server/`：后端服务（Express + Postgres + Knex），通过 Docker Compose 部署
 
-- `door/`
-  Frontend portal project. This is a Vite React app.
-- `door/server/`
-  Actual DOOR backend service. This is the deployable server project.
+后端部署命令必须在 `door/server/` 下执行，不要在 `door/` 根目录执行后端相关命令。
 
-## Critical Rule
+## 生产架构（推荐）
 
-Backend deployment commands must run in `door/server`, not in `door`.
+1. 用户访问：`http(s)://<domain>:8080`
+2. Nginx（容器）：
+   - `/`：静态文件（挂载 `../dist`）
+   - `/api/*`：反代到 `app:3001`
+3. Node 后端：`app:3001`
+4. Postgres：`postgres:5432`
 
-Wrong:
+对应配置文件：
 
-```bash
-cd door
-npm install
-npm run start
-docker compose up -d
-```
+- `door/server/docker-compose.yml`
+- `door/server/nginx.conf`
 
-Correct:
+## 首次部署（Docker Compose）
+
+在服务器上执行（建议在 `door/server/`）：
+
+### 1. 初始化后端环境变量
 
 ```bash
 cd door/server
 cp .env.example .env
-docker compose up -d --build
-docker compose exec app npm run migrate
-docker compose exec -e SUPER_ADMIN_PASSWORD="your_password" app node scripts/seed-super-admin.js
+# 编辑 .env：至少设置 POSTGRES_PASSWORD / JWT_SECRET / NODE_ENV
+# 可选：CORS_ORIGIN / DISABLE_REGISTRATION
 ```
 
-## Current Architecture
+说明：
 
-- `door/server` runs on the remote server as the system backend.
-- `tool` is the local client application.
-- `tool` should connect to the backend API exposed by the remote `door/server`.
-- If not otherwise specified, treat the current backend host as `http://47.251.107.41:3001`.
+- `CORS_ORIGIN` 支持逗号分隔多 origin，例如 `https://a.com,http://localhost:5173`
+- `DISABLE_REGISTRATION=true` 建议在生产关闭公开注册
 
-## Port Rules
-
-Preferred production setup:
-
-- Public: `22`, `80`, `443`, `8080`
-- Private/internal only: `3001`, `5432`
-
-Temporary direct API setup:
-
-- Public: `22`, `3001`
-- Do not expose: `5173`, `5432`, `15432`
-
-Notes:
-
-- `5173` is a Vite dev port. It is not a production port.
-- `5432` and `15432` are database-related ports and must not be exposed to the public internet.
-- If a reverse proxy is used, it should expose `80/443` and forward API traffic to the backend app on internal `3001`.
-
-## Nginx Reverse Proxy Setup (Production)
-
-This section describes how to configure Nginx to serve both static files and proxy API requests.
-
-### Architecture
-
-```
-User Access: www.xquareliu.com:8080
-    ↓
-Nginx (Docker container, port 80 inside, exposed as 8080)
-    ↓
-├── Static Files: /usr/share/nginx/html (mapped from dist/)
-└── API Proxy: /api/* → app:3001 → Express Backend
-    ↓
-PostgreSQL Database
-```
-
-### Configuration Steps
-
-#### 1. Build Frontend First
+### 2. 构建前端（生成 door/dist）
 
 ```bash
 cd door
+npm ci
 npm run build
-# Build output will be in door/dist/
 ```
 
-#### 2. Update docker-compose.yml
-
-Ensure the Nginx service includes the dist volume mount:
-
-```yaml
-nginx:
-  image: nginx:alpine
-  ports:
-    - "8080:80"  # Expose port 8080 for public access
-  volumes:
-    - ./nginx.conf:/etc/nginx/conf.d/default.conf
-    - ../dist:/usr/share/nginx/html:ro  # Mount frontend build
-  depends_on:
-    - app
-```
-
-#### 3. Update nginx.conf (if needed)
-
-The Nginx config should handle both static files and API proxy:
-
-```nginx
-upstream app_backend {
-    server app:3001;
-}
-
-server {
-    listen 80;
-    server_name _;
-
-    # API Reverse Proxy
-    location /api {
-        proxy_pass http://app_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    # Static Files (served from dist/)
-    location / {
-        root /usr/share/nginx/html;
-        try_files $uri $uri/ /index.html;
-    }
-}
-```
-
-#### 4. Deploy
+### 3. 启动后端 + 数据库 + Nginx
 
 ```bash
 cd door/server
 docker compose up -d --build
 ```
 
-### Verify Deployment
-
-| Check | Command |
-|-------|---------|
-| Nginx running | `docker compose ps nginx` |
-| Port 8080 listening | `ss -ltnp | grep 8080` |
-| Static files accessible | `curl -I http://127.0.0.1:8080/` |
-| API accessible | `curl -I http://127.0.0.1:8080/api/health/live` |
-
-## Health Checks
-
-Run these checks on the server from `door/server` context:
+### 4. 运行数据库迁移
 
 ```bash
-docker compose ps
-docker compose logs --tail=200 app
-docker compose logs --tail=200 nginx
-docker compose logs --tail=200 postgres
-
-curl -i http://127.0.0.1:3001/api/health/live
-curl -i http://127.0.0.1:3001/api/health/ready
-
-ss -ltnp | grep 3001
-ss -ltnp | grep 5432
+docker compose exec app npm run migrate
 ```
 
-Expected:
+### 5. 创建或更新超级管理员（平台超管）
 
-- `/api/health/live` returns HTTP `200` with `{"status":"ok"}`
-- `/api/health/ready` returns HTTP `200` with database connected
+平台超管的特点：`org_id = NULL`，角色为 `super_admin`。
 
-If public `3001` returns `502` or empty reply:
+```bash
+# 必填: SUPER_ADMIN_PASSWORD
+docker compose exec \
+  -e SUPER_ADMIN_PASSWORD="your_password" \
+  -e SUPER_ADMIN_USERNAME="superadmin" \
+  -e SUPER_ADMIN_EMAIL="admin@platform.local" \
+  app node scripts/seed-super-admin.js
+```
 
-- confirm the deployment is running from `door/server`
-- confirm the container named `app` is healthy
-- confirm port `3001` is served by the Node app, not by a wrong proxy
-- confirm migrations completed successfully
+### 6. 验证健康检查
 
-## Files To Trust
+```bash
+curl -i http://127.0.0.1:8080/api/health/ready
+curl -i http://127.0.0.1:3001/api/health/ready
+```
 
-For backend deployment, use these files in `door/server`:
+期望：HTTP 200，且包含 `{"status":"ok","database":"connected"}`。
 
-- `package.json`
-- `.env.example`
-- `docker-compose.yml`
-- `Dockerfile`
-- `nginx.conf`
-- `docs/deployment.md`
+## 常规更新
 
-For frontend portal behavior in `door`, use:
+```bash
+cd door/server
+git pull
+docker compose up -d --build
+docker compose exec app npm run migrate
+```
 
-- `package.json`
-- `vite.config.js`
-- `src/`
+如果前端也更新了，记得重新构建 `door/dist/`（见“构建前端”步骤）。
 
-## Automation Guidance
+## 回滚（基于备份）
 
-OpenClaw or any other automation should follow these rules:
+```bash
+cd door/server
+bash scripts/backup-postgres.sh
 
-- Never assume `door` root is the backend deploy directory.
-- Always inspect `door/server/package.json` before backend operations.
-- Only run Docker deployment commands inside `door/server`.
-- Treat root `door/package.json` as frontend-only.
-- Before changing network settings, preserve the `tool -> door/server` API relationship.
+# 回滚时：
+docker compose stop app worker
+bash scripts/restore-postgres.sh backups/door_backup_YYYYMMDD_HHMMSS.sql
+git checkout <previous-tag-or-commit>
+docker compose up -d --build app worker nginx
+```
+
+## 登录与权限排查
+
+### 超管无法登录（优先）
+
+后端提供诊断脚本，可在容器内查看迁移状态、`users` 关键字段是否齐全、以及是否存在重复的“平台用户”记录：
+
+```bash
+cd door/server
+docker compose exec app node scripts/diagnose-auth.js
+```
+
+常见原因：
+
+- 迁移没跑全：尤其是 `20260304000001_auth_permission_overhaul.js`（角色枚举、`org_id` nullable、登录安全字段等）
+- seed 重复导致 `org_id = NULL` 的平台用户重复，从而登录命中非预期记录
+- 账号被锁定（多次失败登录）或被禁用（`status = disabled`）
+
+### 门户登录后白屏
+
+优先查看浏览器 Console 的第一条报错，以及 Network 里 `/api/auth/me` 是否 401 循环或 5xx。
+
+## tool 系统对接 door/server
+
+推荐让 `tool` 走与生产一致的入口（Nginx 8080），避免直连 `3001` 带来的 CORS 问题：
+
+- 推荐：`http://<domain>:8080`（前端 + API 都经 Nginx）
+- 直连 API（临时）：`http://<host>:3001`（需要正确配置 `CORS_ORIGIN`）
+
+注意：`tool` 的 `VITE_API_BASE_URL` 建议配置成后端“根地址”（例如 `http://47.251.107.41:3001`），不要在末尾再加 `/api`。
+
+## 端口建议
+
+生产建议：
+
+- 对外：`22`, `80/443`, `8080`
+- 仅内网：`3001`, `5432`
+
+不应对外暴露：
+
+- `5173`（Vite dev）
+- `5432/15432`（数据库）
+
+## 参考
+
+- 后端部署与命令：`door/server/docs/deployment.md`
+- 后端权限模型与角色说明：`door/server/README.md`
+

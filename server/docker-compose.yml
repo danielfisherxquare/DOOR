@@ -23,6 +23,9 @@ services:
       DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
       NODE_ENV: ${NODE_ENV:-development}
+      # Optional runtime config (recommended in production)
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,6 +37,7 @@ services:
       DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
       NODE_ENV: ${NODE_ENV:-development}
+      DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-false}
     depends_on:
       postgres:
         condition: service_healthy
