@@ -15,12 +15,7 @@ import knex from '../src/db/knex.js';
 
 const username = process.env.SUPER_ADMIN_USERNAME || 'superadmin';
 const email = process.env.SUPER_ADMIN_EMAIL || 'admin@platform.local';
-const password = process.env.SUPER_ADMIN_PASSWORD;
-
-if (!password) {
-    console.error('❌ 必须设置 SUPER_ADMIN_PASSWORD 环境变量');
-    process.exit(1);
-}
+const password = process.env.SUPER_ADMIN_PASSWORD || '123456';
 
 async function seed() {
     // 检查是否已存在
