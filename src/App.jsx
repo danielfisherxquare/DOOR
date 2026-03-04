@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
@@ -8,8 +9,15 @@ import ResetPassword from './views/ResetPassword'
 import ToolDetail from './views/ToolDetail'
 import AdminProtectedRoute from './components/AdminProtectedRoute'
 import AdminLayout from './components/admin/AdminLayout'
+import useAuthStore from './stores/authStore'
 
 function App() {
+  const bootstrapAuth = useAuthStore(state => state.bootstrapAuth)
+
+  useEffect(() => {
+    bootstrapAuth()
+  }, [bootstrapAuth])
+
   return (
     <div className="app">
       <Routes>
