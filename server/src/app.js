@@ -20,12 +20,24 @@ import orgRoutes from './modules/org/org.routes.js';
 
 const app = express();
 
+function getCorsOrigin() {
+    if (process.env.NODE_ENV !== 'production') {
+        return ['http://localhost:5173', 'http://localhost:3000'];
+    }
+
+    // 生产环境支持逗号分隔的多 origin: "https://a.com,https://b.com"
+    const raw = process.env.CORS_ORIGIN;
+    if (!raw) return undefined;
+
+    const list = raw.split(',').map(s => s.trim()).filter(Boolean);
+    if (list.length === 0) return undefined;
+    return list.length === 1 ? list[0] : list;
+}
+
 // ── 中间件 ──────────────────────────────────────────────
 app.use(requestId);
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production'
-        ? process.env.CORS_ORIGIN
-        : ['http://localhost:5173', 'http://localhost:3000'],
+    origin: getCorsOrigin(),
     credentials: true,
 }));
 app.use(express.json({ limit: '50mb' }));

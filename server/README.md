@@ -57,7 +57,11 @@ NODE_ENV=production
 npx knex migrate:latest
 
 # 2. 创建超级管理员
-node scripts/seed-super-admin.js
+## Docker 部署（推荐）
+docker compose exec -e SUPER_ADMIN_PASSWORD="your_password" app node scripts/seed-super-admin.js
+
+## 本地运行（需要 .env）
+node --env-file=.env scripts/seed-super-admin.js
 
 # 3. 验证迁移
 node --test tests/auth.test.js

@@ -14,7 +14,10 @@ cp .env.example .env
 docker compose up -d --build
 
 # 4. 执行数据库迁移
-docker compose exec app npx knex migrate:latest --knexfile src/db/knex.js
+docker compose exec app npm run migrate
+
+# 4.1 创建超级管理员（首次部署必做）
+docker compose exec -e SUPER_ADMIN_PASSWORD="your_password" app node scripts/seed-super-admin.js
 
 # 5. 验证健康检查
 curl http://localhost:3001/api/health/live   # → {"status":"ok"}
@@ -34,7 +37,7 @@ git pull origin main
 docker compose up -d --build
 
 # 4. 执行 migration
-docker compose exec app npx knex migrate:latest --knexfile src/db/knex.js
+docker compose exec app npm run migrate
 
 # 5. 验证健康检查
 curl http://localhost:3001/api/health/ready

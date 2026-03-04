@@ -14,7 +14,11 @@ function Login() {
   // 已登录则跳转
   useEffect(() => {
     if (isAuthenticated) {
-      const from = location.state?.from?.pathname || '/'
+      const params = new URLSearchParams(location.search)
+      const redirect = params.get('redirect')
+      const from = location.state?.from?.pathname
+        || (redirect && redirect.startsWith('/') ? redirect : null)
+        || '/'
       navigate(from, { replace: true })
     }
   }, [isAuthenticated, navigate, location])
@@ -49,7 +53,11 @@ function Login() {
 
     const result = await login(username, password, rememberMe)
     if (result.success) {
-      const from = location.state?.from?.pathname || '/'
+      const params = new URLSearchParams(location.search)
+      const redirect = params.get('redirect')
+      const from = location.state?.from?.pathname
+        || (redirect && redirect.startsWith('/') ? redirect : null)
+        || '/'
       navigate(from, { replace: true })
     }
   }

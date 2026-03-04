@@ -28,7 +28,8 @@ Correct:
 cd door/server
 cp .env.example .env
 docker compose up -d --build
-docker compose exec app npx knex migrate:latest --knexfile src/db/knex.js
+docker compose exec app npm run migrate
+docker compose exec -e SUPER_ADMIN_PASSWORD="your_password" app node scripts/seed-super-admin.js
 ```
 
 ## Current Architecture
@@ -204,4 +205,3 @@ OpenClaw or any other automation should follow these rules:
 - Only run Docker deployment commands inside `door/server`.
 - Treat root `door/package.json` as frontend-only.
 - Before changing network settings, preserve the `tool -> door/server` API relationship.
-

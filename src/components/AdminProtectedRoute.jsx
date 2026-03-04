@@ -31,7 +31,7 @@ function AdminProtectedRoute({ children }) {
 
     // 未登录
     if (!isAuthenticated) {
-        return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname)}`} replace />
+        return <Navigate to="/login" state={{ from: location }} replace />
     }
 
     // 非管理员

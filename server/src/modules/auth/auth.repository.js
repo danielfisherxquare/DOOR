@@ -38,6 +38,11 @@ export async function findUserByLogin(login) {
     return knex('users')
         .where('username', login)
         .orWhere('email', login)
+        // 多租户下 username/email 可能不全局唯一；另外 org_id=null 的平台用户也可能重复。
+        // 这里通过排序保证选择结果稳定，并优先匹配 super_admin（避免命中错误记录导致“无法登录”）。
+        .orderByRaw(`CASE WHEN role = 'super_admin' THEN 0 ELSE 1 END`)
+        .orderBy('updated_at', 'desc')
+        .orderBy('created_at', 'desc')
         .first();
 }
 
