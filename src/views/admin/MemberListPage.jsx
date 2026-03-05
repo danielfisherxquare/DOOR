@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import adminApi from '../../api/adminApi'
 import useAuthStore from '../../stores/authStore'
@@ -16,17 +16,16 @@ function MemberListPage() {
     const limit = 20
     const [searchParams] = useSearchParams()
     const orgId = searchParams.get('orgId') || undefined
+    const isGlobalSuperAdmin = isSuperAdmin && !orgId
 
     const fetchMembers = () => {
-        if (isSuperAdmin && !orgId) {
-            setMembers([])
-            setTotal(0)
-            setLoading(false)
-            return
-        }
-
         setLoading(true)
-        adminApi.getOrgUsers({ page, limit, keyword, orgId })
+
+        const loader = isGlobalSuperAdmin
+            ? adminApi.getAllUsers({ page, limit, keyword })
+            : adminApi.getOrgUsers({ page, limit, keyword, orgId })
+
+        loader
             .then((res) => {
                 if (res.success) {
                     setMembers(res.data.items)
@@ -54,7 +53,11 @@ function MemberListPage() {
     const handleToggleStatus = async (member) => {
         const newStatus = member.status === 'active' ? 'disabled' : 'active'
         try {
-            await adminApi.updateOrgUser(member.id, { status: newStatus }, orgId)
+            if (isGlobalSuperAdmin) {
+                await adminApi.updateUser(member.id, { status: newStatus })
+            } else {
+                await adminApi.updateOrgUser(member.id, { status: newStatus }, orgId)
+            }
             fetchMembers()
         } catch (err) {
             alert(err.message)
@@ -63,8 +66,12 @@ function MemberListPage() {
 
     const handleResetPassword = async (member) => {
         if (!confirm(`确定重置 ${member.username} 的密码？`)) return
+
         try {
-            const res = await adminApi.resetOrgUserPassword(member.id, orgId)
+            const res = isGlobalSuperAdmin
+                ? await adminApi.resetUserPassword(member.id)
+                : await adminApi.resetOrgUserPassword(member.id, orgId)
+
             if (res.success) alert(res.data.message)
         } catch (err) {
             alert(err.message)
@@ -73,7 +80,11 @@ function MemberListPage() {
 
     const handleRoleChange = async (member, newRole) => {
         try {
-            await adminApi.updateOrgUser(member.id, { role: newRole }, orgId)
+            if (isGlobalSuperAdmin) {
+                await adminApi.updateUser(member.id, { role: newRole })
+            } else {
+                await adminApi.updateOrgUser(member.id, { role: newRole }, orgId)
+            }
             fetchMembers()
         } catch (err) {
             alert(err.message)
@@ -89,9 +100,9 @@ function MemberListPage() {
                 <Link to={`/admin/members/new${orgId ? `?orgId=${orgId}` : ''}`} className="btn btn--primary">+ 新建成员</Link>
             </div>
 
-            {isSuperAdmin && !orgId && (
+            {isGlobalSuperAdmin && (
                 <div style={{ padding: '12px 16px', marginBottom: 16, borderRadius: 10, background: 'rgba(245,158,11,0.1)', color: '#b45309', fontSize: 14 }}>
-                    请先在左侧选择机构，再进行成员管理。
+                    未选择机构：当前显示全平台用户，可直接进行用户管理与赛事权限分配。
                 </div>
             )}
 
@@ -102,9 +113,8 @@ function MemberListPage() {
                     value={keyword}
                     onChange={(e) => setKeyword(e.target.value)}
                     style={{ maxWidth: 300 }}
-                    disabled={isSuperAdmin && !orgId}
                 />
-                <button type="submit" className="btn btn--secondary" disabled={isSuperAdmin && !orgId}>搜索</button>
+                <button type="submit" className="btn btn--secondary">搜索</button>
             </form>
 
             {loading ? (
@@ -118,6 +128,7 @@ function MemberListPage() {
                                     <th style={thStyle}>用户名</th>
                                     <th style={thStyle}>邮箱</th>
                                     <th style={thStyle}>角色</th>
+                                    {isGlobalSuperAdmin && <th style={thStyle}>机构</th>}
                                     <th style={thStyle}>状态</th>
                                     <th style={thStyle}>操作</th>
                                 </tr>
@@ -131,12 +142,29 @@ function MemberListPage() {
                                             <select
                                                 value={m.role}
                                                 onChange={(e) => handleRoleChange(m, e.target.value)}
+                                                disabled={isGlobalSuperAdmin && m.role === 'super_admin'}
                                                 style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }}
                                             >
-                                                <option value="race_editor">编辑</option>
-                                                <option value="race_viewer">只读</option>
+                                                {isGlobalSuperAdmin ? (
+                                                    m.role === 'super_admin'
+                                                        ? <option value="super_admin">super_admin</option>
+                                                        : (
+                                                            <>
+                                                                <option value="org_admin">org_admin</option>
+                                                                <option value="race_editor">race_editor</option>
+                                                                <option value="race_viewer">race_viewer</option>
+                                                                <option value="super_admin">super_admin</option>
+                                                            </>
+                                                        )
+                                                ) : (
+                                                    <>
+                                                        <option value="race_editor">赛事编辑</option>
+                                                        <option value="race_viewer">赛事只读</option>
+                                                    </>
+                                                )}
                                             </select>
                                         </td>
+                                        {isGlobalSuperAdmin && <td style={tdStyle}>{m.org_name || m.org_id || '-'}</td>}
                                         <td style={tdStyle}>
                                             <span style={{ color: m.status === 'active' ? '#16a34a' : '#ef4444', fontWeight: 600, fontSize: 13 }}>
                                                 {m.status === 'active' ? '正常' : '禁用'}
@@ -148,19 +176,21 @@ function MemberListPage() {
                                                     {m.status === 'active' ? '禁用' : '启用'}
                                                 </button>
                                                 <button className="btn btn--ghost btn--sm" onClick={() => handleResetPassword(m)}>重置密码</button>
-                                                <Link
-                                                    to={`/admin/race-permissions?userId=${m.id}&username=${m.username}${orgId ? `&orgId=${orgId}` : ''}`}
-                                                    className="btn btn--ghost btn--sm"
-                                                >
-                                                    赛事授权
-                                                </Link>
+                                                {m.role !== 'super_admin' && (
+                                                    <Link
+                                                        to={`/admin/race-permissions?userId=${m.id}&username=${m.username}${orgId ? `&orgId=${orgId}` : ''}`}
+                                                        className="btn btn--ghost btn--sm"
+                                                    >
+                                                        赛事授权
+                                                    </Link>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
                                 ))}
                                 {members.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} style={{ ...tdStyle, textAlign: 'center', color: '#999' }}>暂无成员</td>
+                                        <td colSpan={isGlobalSuperAdmin ? 6 : 5} style={{ ...tdStyle, textAlign: 'center', color: '#999' }}>暂无成员</td>
                                     </tr>
                                 )}
                             </tbody>
