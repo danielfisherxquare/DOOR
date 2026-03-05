@@ -114,6 +114,55 @@ describe('Race Mapper', () => {
         assert.equal(result.events, JSON.stringify([{ name: '半马' }]));
     });
 
+    it('toDbUpdate 正确序列化 events', () => {
+        const data = { events: [{ name: '全马', targetCount: 8000 }] };
+        const result = raceMapper.toDbUpdate(data);
+        assert.equal(result.events, JSON.stringify([{ name: '全马', targetCount: 8000 }]));
+        assert.ok(result.updated_at, 'updated_at 应自动添加');
+    });
+
+    it('fromDbRow 支持 events 为字符串 JSON', () => {
+        const row = {
+            id: '2',
+            org_id: 'o-1',
+            name: '字符串赛事',
+            date: '2026-06-01',
+            location: '成都',
+            events: '[{\"name\":\"半马\",\"targetCount\":6000}]',
+            conflict_rule: 'strict',
+            location_lat: null,
+            location_lng: null,
+            route_data: null,
+            map_features_data: null,
+            created_at: '2026-01-01',
+            updated_at: '2026-01-02',
+        };
+
+        const result = raceMapper.fromDbRow(row);
+        assert.deepEqual(result.events, [{ name: '半马', targetCount: 6000 }]);
+    });
+
+    it('fromDbRow 遇到非法 events JSON 回退 null', () => {
+        const row = {
+            id: '3',
+            org_id: 'o-1',
+            name: '坏数据赛事',
+            date: '2026-06-02',
+            location: '广州',
+            events: '{bad-json',
+            conflict_rule: 'strict',
+            location_lat: null,
+            location_lng: null,
+            route_data: null,
+            map_features_data: null,
+            created_at: '2026-01-01',
+            updated_at: '2026-01-02',
+        };
+
+        const result = raceMapper.fromDbRow(row);
+        assert.equal(result.events, null);
+    });
+
     it('toDbUpdate 只含传入字段', () => {
         const data = { name: '更新名称' };
         const result = raceMapper.toDbUpdate(data);

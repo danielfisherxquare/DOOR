@@ -2,6 +2,7 @@
  * 导入会话 Mapper
  * 处理数据库 snake_case 和外层 camelCase 的转换
  */
+import { deserializeJsonb, serializeJsonb } from './jsonb.js';
 
 export const importSessionMapper = {
     fromDbRow(row) {
@@ -12,8 +13,8 @@ export const importSessionMapper = {
             status: row.status,
             rawCount: row.raw_count,
             totalRows: row.total_rows,
-            rawPreview: row.raw_preview || [],
-            stats: row.stats || {},
+            rawPreview: deserializeJsonb(row.raw_preview, []),
+            stats: deserializeJsonb(row.stats, {}),
             createdAt: row.created_at,
             updatedAt: row.updated_at,
         };
@@ -25,8 +26,8 @@ export const importSessionMapper = {
             status: data.status || 'open',
             raw_count: data.rawCount || 0,
             total_rows: data.totalRows || 0,
-            raw_preview: data.rawPreview ? JSON.stringify(data.rawPreview) : '[]',
-            stats: data.stats ? JSON.stringify(data.stats) : '{}',
+            raw_preview: serializeJsonb(data.rawPreview, []),
+            stats: serializeJsonb(data.stats, {}),
         };
     },
 
@@ -36,7 +37,7 @@ export const importSessionMapper = {
             id: row.id,
             sessionId: row.session_id,
             seq: row.seq,
-            rowsData: typeof row.rows_data === 'string' ? JSON.parse(row.rows_data) : (row.rows_data || []),
+            rowsData: deserializeJsonb(row.rows_data, []),
             rowCount: row.row_count,
             createdAt: row.created_at,
         };
@@ -46,7 +47,7 @@ export const importSessionMapper = {
         return {
             session_id: data.sessionId,
             seq: data.seq,
-            rows_data: JSON.stringify(data.rowsData),
+            rows_data: serializeJsonb(data.rowsData, []),
             row_count: data.rowCount,
         };
     }

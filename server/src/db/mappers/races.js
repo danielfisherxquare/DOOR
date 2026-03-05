@@ -1,6 +1,7 @@
-﻿/**
+/**
  * Races Mapper - snake_case (DB) -> camelCase (API)
  */
+import { deserializeJsonb, serializeJsonb } from './jsonb.js';
 
 export const raceMapper = {
     fromDbRow(row) {
@@ -11,7 +12,7 @@ export const raceMapper = {
             name: row.name,
             date: row.date,
             location: row.location,
-            events: row.events ?? null,
+            events: deserializeJsonb(row.events, null),
             conflictRule: row.conflict_rule,
             locationLat: row.location_lat,
             locationLng: row.location_lng,
@@ -29,7 +30,7 @@ export const raceMapper = {
             name: data.name,
             date: data.date,
             location: data.location ?? '',
-            events: data.events ?? null,
+            events: serializeJsonb(data.events, null),
             conflict_rule: data.conflictRule ?? 'strict',
             location_lat: data.locationLat ?? null,
             location_lng: data.locationLng ?? null,
@@ -43,7 +44,7 @@ export const raceMapper = {
         if (data.name !== undefined) row.name = data.name;
         if (data.date !== undefined) row.date = data.date;
         if (data.location !== undefined) row.location = data.location;
-        if (data.events !== undefined) row.events = data.events ?? null;
+        if (data.events !== undefined) row.events = serializeJsonb(data.events, null);
         if (data.conflictRule !== undefined) row.conflict_rule = data.conflictRule;
         if (data.locationLat !== undefined) row.location_lat = data.locationLat;
         if (data.locationLng !== undefined) row.location_lng = data.locationLng;

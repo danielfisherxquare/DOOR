@@ -2,6 +2,7 @@
  * Records Mapper — snake_case (DB) ↔ camelCase (API)
  * 40+ 字段，与前端 DbRecord 接口 1:1 对齐
  */
+import { deserializeJsonb, serializeJsonb } from './jsonb.js';
 
 export const recordMapper = {
     fromDbRow(row) {
@@ -34,8 +35,8 @@ export const recordMapper = {
             paymentStatus: row.payment_status,
             mark: row.mark,
             lotteryStatus: row.lottery_status,
-            personalBestFull: row.personal_best_full ?? null,
-            personalBestHalf: row.personal_best_half ?? null,
+            personalBestFull: deserializeJsonb(row.personal_best_full, null),
+            personalBestHalf: deserializeJsonb(row.personal_best_half, null),
             lotteryZone: row.lottery_zone,
             bagWindowNo: row.bag_window_no,
             bagNo: row.bag_no,
@@ -84,8 +85,8 @@ export const recordMapper = {
             payment_status: data.paymentStatus ?? '',
             mark: data.mark ?? '',
             lottery_status: data.lotteryStatus ?? null,
-            personal_best_full: data.personalBestFull ? JSON.stringify(data.personalBestFull) : null,
-            personal_best_half: data.personalBestHalf ? JSON.stringify(data.personalBestHalf) : null,
+            personal_best_full: serializeJsonb(data.personalBestFull, null),
+            personal_best_half: serializeJsonb(data.personalBestHalf, null),
             lottery_zone: data.lotteryZone ?? null,
             bag_window_no: data.bagWindowNo ?? null,
             bag_no: data.bagNo ?? null,
@@ -132,10 +133,10 @@ export const recordMapper = {
 
         // JSON 字段需序列化
         if (data.personalBestFull !== undefined) {
-            row.personal_best_full = data.personalBestFull ? JSON.stringify(data.personalBestFull) : null;
+            row.personal_best_full = serializeJsonb(data.personalBestFull, null);
         }
         if (data.personalBestHalf !== undefined) {
-            row.personal_best_half = data.personalBestHalf ? JSON.stringify(data.personalBestHalf) : null;
+            row.personal_best_half = serializeJsonb(data.personalBestHalf, null);
         }
 
         row.updated_at = new Date();

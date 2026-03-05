@@ -2,6 +2,7 @@
  * Snapshot Mapper — snake_case (DB) ↔ camelCase (API)
  * 覆盖 pipeline_snapshots + pipeline_snapshot_items 两张表
  */
+import { deserializeJsonb, serializeJsonb } from './jsonb.js';
 
 // ─── pipeline_snapshots ────────────────────────────────────────────
 export const snapshotMapper = {
@@ -12,7 +13,7 @@ export const snapshotMapper = {
             orgId: row.org_id,
             raceId: Number(row.race_id),
             snapshotType: row.snapshot_type,
-            snapshotData: row.snapshot_data ?? {},
+            snapshotData: deserializeJsonb(row.snapshot_data, {}),
             createdAt: row.created_at,
         };
     },
@@ -22,7 +23,7 @@ export const snapshotMapper = {
             org_id: orgId,
             race_id: data.raceId,
             snapshot_type: data.snapshotType,
-            snapshot_data: data.snapshotData ? JSON.stringify(data.snapshotData) : '{}',
+            snapshot_data: serializeJsonb(data.snapshotData, {}),
         };
     },
 };
@@ -35,7 +36,7 @@ export const snapshotItemMapper = {
             id: Number(row.id),
             snapshotId: Number(row.snapshot_id),
             recordId: Number(row.record_id),
-            fieldData: row.field_data ?? {},
+            fieldData: deserializeJsonb(row.field_data, {}),
         };
     },
 
@@ -43,7 +44,7 @@ export const snapshotItemMapper = {
         return {
             snapshot_id: snapshotId,
             record_id: recordId,
-            field_data: JSON.stringify(fieldData),
+            field_data: serializeJsonb(fieldData, {}),
         };
     },
 };

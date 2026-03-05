@@ -2,6 +2,7 @@
  * Lottery Mapper — snake_case (DB) ↔ camelCase (API)
  * 覆盖 race_capacity / lottery_configs / lottery_lists / lottery_rules / lottery_weights 五张表
  */
+import { deserializeJsonb, serializeJsonb } from './jsonb.js';
 
 // ─── race_capacity ──────────────────────────────────────────────────
 export const raceCapacityMapper = {
@@ -53,7 +54,7 @@ export const lotteryConfigMapper = {
             zone: row.zone,
             eventType: row.event_type,
             capacity: Number(row.capacity),
-            rules: row.rules ?? [],          // jsonb 已自动解析
+            rules: deserializeJsonb(row.rules, []),
             calcType: row.calc_type,
             length: Number(row.length),
             width: Number(row.width),
@@ -72,7 +73,7 @@ export const lotteryConfigMapper = {
             zone: data.zone ?? null,
             event_type: data.eventType ?? null,
             capacity: data.capacity ?? 0,
-            rules: data.rules ? JSON.stringify(data.rules) : '[]',
+            rules: serializeJsonb(data.rules, []),
             calc_type: data.calcType ?? 'manual',
             length: data.length ?? 0,
             width: data.width ?? 0,
@@ -87,7 +88,7 @@ export const lotteryConfigMapper = {
         if (data.zone !== undefined) row.zone = data.zone;
         if (data.eventType !== undefined) row.event_type = data.eventType;
         if (data.capacity !== undefined) row.capacity = data.capacity;
-        if (data.rules !== undefined) row.rules = JSON.stringify(data.rules);
+        if (data.rules !== undefined) row.rules = serializeJsonb(data.rules, []);
         if (data.calcType !== undefined) row.calc_type = data.calcType;
         if (data.length !== undefined) row.length = data.length;
         if (data.width !== undefined) row.width = data.width;
@@ -197,7 +198,7 @@ export const lotteryWeightMapper = {
             targetGroup: row.target_group,
             weightType: row.weight_type,
             enabled: Number(row.enabled),
-            weightConfig: row.weight_config ?? {},  // jsonb 已自动解析
+            weightConfig: deserializeJsonb(row.weight_config, {}),
             priority: Number(row.priority),
             createdAt: row.created_at,
             updatedAt: row.updated_at,
@@ -211,7 +212,7 @@ export const lotteryWeightMapper = {
             target_group: data.targetGroup ?? 'ALL',
             weight_type: data.weightType ?? 'gender',
             enabled: data.enabled ?? 0,
-            weight_config: data.weightConfig ? JSON.stringify(data.weightConfig) : '{}',
+            weight_config: serializeJsonb(data.weightConfig, {}),
             priority: data.priority ?? 0,
         };
     },
@@ -221,7 +222,7 @@ export const lotteryWeightMapper = {
         if (data.targetGroup !== undefined) row.target_group = data.targetGroup;
         if (data.weightType !== undefined) row.weight_type = data.weightType;
         if (data.enabled !== undefined) row.enabled = data.enabled;
-        if (data.weightConfig !== undefined) row.weight_config = JSON.stringify(data.weightConfig);
+        if (data.weightConfig !== undefined) row.weight_config = serializeJsonb(data.weightConfig, {});
         if (data.priority !== undefined) row.priority = data.priority;
         row.updated_at = new Date();
         return row;
