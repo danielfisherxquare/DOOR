@@ -55,6 +55,7 @@ function AdminLayout() {
     const superAdminMenus = [
         { path: '/orgs', label: '机构管理', icon: '🏢' },
         { path: '/users', label: '用户管理', icon: '👤' },
+        { path: '/races', label: '赛事管理', icon: '🏁' },
     ]
 
     const orgAdminMenus = [
