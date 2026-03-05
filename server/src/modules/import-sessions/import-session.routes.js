@@ -3,17 +3,63 @@ import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import { requireRoles } from '../../middleware/require-roles.js';
 import { importSessionRepository } from './import-session.repository.js';
 import * as jobRepository from '../jobs/job.repository.js';
+import knex from '../../db/knex.js';
 
 const router = Router();
 
 router.use(requireRoles('org_admin', 'super_admin', 'race_editor'));
+
+function badRequest(message) {
+    return Object.assign(new Error(message), { status: 400, expose: true });
+}
+
+function notFound(message) {
+    return Object.assign(new Error(message), { status: 404, expose: true });
+}
+
+async function resolveOrgId(req, options = {}) {
+    const { sid } = options;
+    const { role, orgId } = req.authContext || {};
+
+    if (orgId) return orgId;
+
+    if (role !== 'super_admin') {
+        throw badRequest('当前账号未绑定机构，无法操作导入会话');
+    }
+
+    // super_admin 可显式传 orgId
+    const explicitOrgId = req.query.orgId || req.body?.orgId;
+    if (explicitOrgId) {
+        const org = await knex('organizations').where({ id: explicitOrgId }).first('id');
+        if (!org) throw notFound('目标机构不存在');
+        return explicitOrgId;
+    }
+
+    // 对已有会话，可反查归属机构
+    if (sid) {
+        const session = await knex('import_sessions').where({ id: sid }).first('id', 'org_id');
+        if (!session) throw notFound('Session not found');
+        return session.org_id;
+    }
+
+    // 创建会话时，可通过 raceId 推导机构
+    const raceIdRaw = req.query.raceId || req.body?.raceId;
+    const raceId = Number(raceIdRaw);
+    if (!Number.isFinite(raceId) || raceId <= 0) {
+        throw badRequest('super_admin 创建导入会话时必须提供 raceId 或 orgId');
+    }
+    const race = await knex('races').where({ id: raceId }).first('id', 'org_id');
+    if (!race) throw notFound('目标赛事不存在');
+
+    return race.org_id;
+}
 
 // ==========================================
 // 1. 创建会话
 // ==========================================
 router.post('/', async (req, res, next) => {
     try {
-        const orgId = req.authContext.orgId;
+        const orgId = await resolveOrgId(req);
         const session = await importSessionRepository.create(orgId);
         res.json({
             success: true,
@@ -30,7 +76,7 @@ router.post('/', async (req, res, next) => {
 router.get('/:sid', async (req, res, next) => {
     try {
         const { sid } = req.params;
-        const orgId = req.authContext.orgId;
+        const orgId = await resolveOrgId(req, { sid });
         const session = await importSessionRepository.findById(orgId, sid);
 
         if (!session) {
@@ -52,7 +98,7 @@ router.get('/:sid', async (req, res, next) => {
 router.put('/:sid/summary', async (req, res, next) => {
     try {
         const { sid } = req.params;
-        const orgId = req.authContext.orgId;
+        const orgId = await resolveOrgId(req, { sid });
         const summary = req.body;
 
         const session = await importSessionRepository.setSummary(orgId, sid, summary);
@@ -71,7 +117,7 @@ router.put('/:sid/summary', async (req, res, next) => {
 router.post('/:sid/chunks', async (req, res, next) => {
     try {
         const { sid } = req.params;
-        const orgId = req.authContext.orgId;
+        const orgId = await resolveOrgId(req, { sid });
         const rows = req.body;
 
         const totalRows = await importSessionRepository.appendChunk(orgId, sid, rows);
@@ -90,7 +136,7 @@ router.post('/:sid/chunks', async (req, res, next) => {
 router.get('/:sid/chunks', async (req, res, next) => {
     try {
         const { sid } = req.params;
-        const orgId = req.authContext.orgId;
+        const orgId = await resolveOrgId(req, { sid });
         const offset = parseInt(req.query.offset || '0', 10);
         const limit = parseInt(req.query.limit || '100', 10);
 
@@ -110,7 +156,7 @@ router.get('/:sid/chunks', async (req, res, next) => {
 router.delete('/:sid', async (req, res, next) => {
     try {
         const { sid } = req.params;
-        const orgId = req.authContext.orgId;
+        const orgId = await resolveOrgId(req, { sid });
 
         const deleted = await importSessionRepository.cancel(orgId, sid);
         if (!deleted) {
