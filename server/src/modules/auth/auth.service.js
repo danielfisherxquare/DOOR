@@ -7,6 +7,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { env } from '../../config/env.js';
 import * as authRepo from './auth.repository.js';
 import { userMapper } from '../../db/mappers/auth.js';
+import { listVisibleRacesForOrg } from '../races/race-access.service.js';
 
 const ACCESS_TOKEN_EXPIRES = '15m';
 const REFRESH_TOKEN_DAYS = 30;
@@ -296,7 +297,29 @@ export async function assignRaceRole(operatorContext, targetUserId, raceId, role
         throw err;
     }
 
-    // TODO: 可以再验证 raceId 是否属于该机构，但这主要依赖数据库约束或稍后的查表，暂假定由调用方 / 管理员知晓
+    if (!targetUser.org_id) {
+        const err = new Error('目标用户未绑定机构，无法配置赛事权限');
+        err.status = 400;
+        err.expose = true;
+        throw err;
+    }
+
+    const numericRaceId = Number(raceId);
+    if (!Number.isFinite(numericRaceId) || numericRaceId <= 0) {
+        const err = new Error('无效 raceId');
+        err.status = 400;
+        err.expose = true;
+        throw err;
+    }
+
+    const visibleRaces = await listVisibleRacesForOrg(targetUser.org_id);
+    const raceInfo = visibleRaces.find((item) => Number(item.id) === numericRaceId);
+    if (!raceInfo) {
+        const err = new Error(`赛事 ${numericRaceId} 不在目标用户所属机构的可见范围内`);
+        err.status = 403;
+        err.expose = true;
+        throw err;
+    }
 
     let accessLevel = null;
     if (role) {
@@ -308,7 +331,13 @@ export async function assignRaceRole(operatorContext, targetUserId, raceId, role
         };
         accessLevel = roleToAccessLevel[role] || null;
         if (!accessLevel) {
-            const err = new Error(`无效赛事权限角色: ${role}`);
+            const err = new Error(`不支持的赛事权限角色: ${role}`);
+            err.status = 400;
+            err.expose = true;
+            throw err;
+        }
+        if (raceInfo.orgAccessLevel === 'viewer' && accessLevel === 'editor') {
+            const err = new Error(`赛事 ${numericRaceId} 对目标机构仅开放 viewer，成员不可配置为 editor`);
             err.status = 400;
             err.expose = true;
             throw err;
@@ -316,10 +345,16 @@ export async function assignRaceRole(operatorContext, targetUserId, raceId, role
     }
 
     if (accessLevel) {
-        await authRepo.setRacePermission(targetUserId, targetUser.org_id, raceId, accessLevel, operatorContext.userId);
-        return { message: `已授予赛事访问权限: ${accessLevel}` };
-    } else {
-        await authRepo.removeRacePermission(targetUserId, raceId);
-        return { message: '已移除赛事访问权限' };
+        await authRepo.setRacePermission(
+            targetUserId,
+            targetUser.org_id,
+            numericRaceId,
+            accessLevel,
+            operatorContext.userId,
+        );
+        return { message: `赛事权限已更新为: ${accessLevel}` };
     }
+
+    await authRepo.removeRacePermission(targetUserId, numericRaceId);
+    return { message: '赛事权限已移除' };
 }

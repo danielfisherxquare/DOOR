@@ -8,6 +8,7 @@ import { recordMapper } from '../../db/mappers/records.js';
 import * as recordRepo from './record.repository.js';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import { resolveRaceAccess } from '../races/race-access.service.js';
+import knex from '../../db/knex.js';
 
 const router = Router();
 
@@ -23,6 +24,48 @@ async function resolveScopedOrgId(req, raceId) {
     }
 
     return req.authContext.orgId;
+}
+
+async function resolveRaceIdByRecordId(req) {
+    const recordId = Number(req.params.recordId);
+    if (!Number.isFinite(recordId) || recordId <= 0) {
+        throw Object.assign(new Error('无效 recordId'), { status: 400, expose: true });
+    }
+    const row = await knex('records').where({ id: recordId }).first('race_id');
+    if (!row) {
+        throw Object.assign(new Error('记录不存在'), { status: 404, expose: true });
+    }
+    return row.race_id;
+}
+
+async function resolveRaceIdByBulkUpdates(req) {
+    const updates = Array.isArray(req.body?.updates) ? req.body.updates : [];
+    if (updates.length === 0) {
+        throw Object.assign(new Error('updates must be a non-empty array'), { status: 400, expose: true });
+    }
+
+    const recordIds = [...new Set(
+        updates
+            .map((item) => Number(item?.id))
+            .filter((id) => Number.isFinite(id) && id > 0),
+    )];
+    if (recordIds.length === 0) {
+        throw Object.assign(new Error('updates 中缺少有效 recordId'), { status: 400, expose: true });
+    }
+
+    const rows = await knex('records')
+        .whereIn('id', recordIds)
+        .select('id', 'race_id');
+    if (rows.length !== recordIds.length) {
+        throw Object.assign(new Error('部分记录不存在或不可访问'), { status: 404, expose: true });
+    }
+
+    const raceIds = new Set(rows.map((row) => Number(row.race_id)));
+    if (raceIds.size !== 1) {
+        throw Object.assign(new Error('批量修改仅支持同一赛事的数据'), { status: 400, expose: true });
+    }
+
+    return rows[0].race_id;
 }
 
 // POST /api/records/query — 综合查询
@@ -97,10 +140,10 @@ router.get('/quick-stats/:raceId', requireRaceAccess('raceId'), async (req, res,
 // ── 写路径 ────────────────────────────────────────────
 
 // PUT /api/records/:recordId — 单条记录更新
-router.put('/:recordId', async (req, res, next) => {
+router.put('/:recordId', requireRaceAccess(resolveRaceIdByRecordId), async (req, res, next) => {
     try {
         const updated = await recordRepo.updateById(
-            req.authContext.orgId,
+            req.raceAccess.operatorOrgId,
             req.params.recordId,
             req.body,
         );
@@ -114,7 +157,7 @@ router.put('/:recordId', async (req, res, next) => {
 });
 
 // POST /api/records/bulk-update — 批量更新记录
-router.post('/bulk-update', async (req, res, next) => {
+router.post('/bulk-update', requireRaceAccess(resolveRaceIdByBulkUpdates), async (req, res, next) => {
     try {
         const { updates } = req.body;
         if (!Array.isArray(updates)) {
@@ -122,7 +165,7 @@ router.post('/bulk-update', async (req, res, next) => {
         }
 
         const result = await recordRepo.bulkUpdate(
-            req.authContext.orgId,
+            req.raceAccess.operatorOrgId,
             updates,
         );
         res.json({ success: true, data: result });
@@ -203,4 +246,3 @@ router.post('/import-verification/:raceId', requireRaceAccess('raceId'), async (
 });
 
 export default router;
-

@@ -6,8 +6,21 @@ import { Router } from 'express';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import * as bibRepo from './bib.repository.js';
 import * as rollbackRepo from '../lottery/lottery-rollback.repository.js';
+import knex from '../../db/knex.js';
 
 const router = Router();
+
+async function resolveRaceIdByBibTemplateId(req) {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+        throw Object.assign(new Error('无效模板 ID'), { status: 400, expose: true });
+    }
+    const row = await knex('bib_numbering_configs').where({ id }).first('race_id');
+    if (!row) {
+        throw Object.assign(new Error('模板不存在'), { status: 404, expose: true });
+    }
+    return row.race_id;
+}
 
 // GET /api/bib/overview/:raceId — 统计概览
 router.get('/overview/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
@@ -34,10 +47,9 @@ router.post('/templates', requireRaceAccess((req) => req.body.raceId), async (re
 });
 
 // DELETE /api/bib/templates/:id — 删除模板
-import { requireOrgScope } from '../../middleware/require-org-scope.js';
-router.delete('/templates/:id', requireOrgScope(), async (req, res, next) => {
+router.delete('/templates/:id', requireRaceAccess(resolveRaceIdByBibTemplateId), async (req, res, next) => {
     try {
-        const deleted = await bibRepo.deleteTemplate(req.authContext.orgId, Number(req.params.id));
+        const deleted = await bibRepo.deleteTemplate(req.raceAccess.operatorOrgId, Number(req.params.id));
         if (!deleted) return res.status(404).json({ success: false, message: '模板不存在' });
         res.json({ success: true });
     } catch (err) { next(err); }

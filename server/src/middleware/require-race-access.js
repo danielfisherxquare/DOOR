@@ -12,15 +12,10 @@ export function requireRaceAccess(resolveRaceId) {
                 return res.status(401).json({ success: false, message: '未授权' });
             }
 
-            // 超级管理员畅通无阻
-            if (role === 'super_admin') {
-                return next();
-            }
-
             // 解析目标 raceId
             let raceId;
             if (typeof resolveRaceId === 'function') {
-                raceId = resolveRaceId(req);
+                raceId = await resolveRaceId(req);
             } else if (typeof resolveRaceId === 'string') {
                 raceId = req.params[resolveRaceId] || req.body[resolveRaceId] || req.query[resolveRaceId];
             }
@@ -42,6 +37,15 @@ export function requireRaceAccess(resolveRaceId) {
                 return res.status(err.status).json({
                     success: false,
                     message: err.expose ? err.message : '权限校验失败',
+                });
+            }
+            if (err?.code === '42P01') {
+                const missingOrgRacePermissions = String(err.message || '').includes('org_race_permissions');
+                return res.status(500).json({
+                    success: false,
+                    message: missingOrgRacePermissions
+                        ? '数据库缺少 org_race_permissions 表，请先执行后端迁移 (npm run migrate)'
+                        : '数据库表结构不完整，请先执行后端迁移 (npm run migrate)',
                 });
             }
             console.error('[AUTH ERROR] requireRaceAccess:', err);

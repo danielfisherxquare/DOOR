@@ -1,9 +1,12 @@
 import { Router } from 'express';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
+import { requireRoles } from '../../middleware/require-roles.js';
 import { importSessionRepository } from './import-session.repository.js';
 import * as jobRepository from '../jobs/job.repository.js';
 
 const router = Router();
+
+router.use(requireRoles('org_admin', 'super_admin', 'race_editor'));
 
 // ==========================================
 // 1. 创建会话

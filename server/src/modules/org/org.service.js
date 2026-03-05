@@ -86,6 +86,34 @@ export async function updateOrgUser(orgId, userId, fields) {
     return row;
 }
 
+export async function deleteOrgUser(orgId, userId, operatorContext) {
+    const uQuery = knex('users').where({ id: userId });
+    if (orgId) uQuery.andWhere({ org_id: orgId });
+    const user = await uQuery.first('id', 'org_id', 'username', 'role');
+    if (!user) throw Object.assign(new Error('用户不存在或不属于本机构'), { status: 404, expose: true });
+
+    if (String(operatorContext?.userId) === String(userId)) {
+        throw Object.assign(new Error('不允许删除当前登录账号'), { status: 400, expose: true });
+    }
+
+    if (operatorContext?.role === 'org_admin' && user.role === 'org_admin') {
+        throw Object.assign(new Error('机构管理员不能删除机构管理员账号'), { status: 403, expose: true });
+    }
+
+    if (user.role === 'super_admin') {
+        throw Object.assign(new Error('不能在机构成员管理中删除 super_admin'), { status: 400, expose: true });
+    }
+
+    await knex.transaction(async (trx) => {
+        await trx('user_race_permissions').where({ created_by: userId }).update({ created_by: null });
+        await trx('refresh_tokens').where({ user_id: userId }).del();
+        await trx('user_race_permissions').where({ user_id: userId }).del();
+        await trx('users').where({ id: userId }).del();
+    });
+
+    return { message: `成员 ${user.username} 已删除` };
+}
+
 // ── 赛事权限管理 ─────────────────────────────────────
 
 export async function getUserRacePermissions(orgId, userId) {

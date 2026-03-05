@@ -33,6 +33,18 @@ function OrgListPage() {
 
     const totalPages = Math.ceil(total / limit)
 
+    const handleDeleteOrg = async (org) => {
+        if (!confirm(`确定删除机构 ${org.name} 吗？该机构下必须无用户和赛事。`)) return
+        try {
+            const res = await adminApi.deleteOrg(org.id)
+            if (res.success) {
+                fetchOrgs()
+            }
+        } catch (err) {
+            alert(err.message)
+        }
+    }
+
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -63,6 +75,7 @@ function OrgListPage() {
                                     <th style={thStyle}>用户数</th>
                                     <th style={thStyle}>赛事数</th>
                                     <th style={thStyle}>创建时间</th>
+                                    <th style={thStyle}>操作</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -75,10 +88,15 @@ function OrgListPage() {
                                         <td style={tdStyle}>{org.userCount ?? '-'}</td>
                                         <td style={tdStyle}>{org.raceCount ?? '-'}</td>
                                         <td style={tdStyle}>{org.created_at ? new Date(org.created_at).toLocaleDateString() : '-'}</td>
+                                        <td style={tdStyle}>
+                                            <button className="btn btn--ghost btn--sm" onClick={() => handleDeleteOrg(org)} style={{ color: '#dc2626' }}>
+                                                删除
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                                 {orgs.length === 0 && (
-                                    <tr><td colSpan={4} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>暂无机构</td></tr>
+                                    <tr><td colSpan={5} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>暂无机构</td></tr>
                                 )}
                             </tbody>
                         </table>

@@ -5,8 +5,21 @@
 import { Router } from 'express';
 import * as pipelineRepo from './pipeline-config.repository.js';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
+import knex from '../../db/knex.js';
 
 const router = Router();
+
+async function resolveRaceIdByStartZoneId(req) {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) {
+        throw Object.assign(new Error('无效 startZoneId'), { status: 400, expose: true });
+    }
+    const row = await knex('start_zones').where({ id }).first('race_id');
+    if (!row) {
+        throw Object.assign(new Error('出发区不存在'), { status: 404, expose: true });
+    }
+    return row.race_id;
+}
 
 // GET /api/pipeline/preview/:raceId — Pipeline 预览汇总
 router.get('/preview/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
@@ -41,10 +54,10 @@ router.post('/start-zones', requireRaceAccess((req) => req.body.raceId), async (
 });
 
 // DELETE /api/pipeline/start-zones/:id — 删除出发区
-router.delete('/start-zones/:id', async (req, res, next) => {
+router.delete('/start-zones/:id', requireRaceAccess(resolveRaceIdByStartZoneId), async (req, res, next) => {
     try {
         const deleted = await pipelineRepo.deleteStartZone(
-            req.authContext.orgId, Number(req.params.id));
+            req.raceAccess.operatorOrgId, Number(req.params.id));
         if (!deleted) return res.status(404).json({ success: false, message: '出发区不存在' });
         res.json({ success: true });
     } catch (err) { next(err); }

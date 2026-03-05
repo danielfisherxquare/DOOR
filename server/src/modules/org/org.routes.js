@@ -83,6 +83,18 @@ router.patch('/users/:userId', async (req, res, next) => {
     }
 });
 
+router.delete('/users/:userId', async (req, res, next) => {
+    try {
+        const orgId = await getOrgId(req);
+        if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId for super_admin' });
+
+        const result = await orgService.deleteOrgUser(orgId, req.params.userId, req.authContext);
+        res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+});
+
 router.post('/users/:userId/reset-password', async (req, res, next) => {
     try {
         const orgId = await getOrgId(req);

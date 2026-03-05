@@ -86,6 +86,33 @@ export async function updateOrg(orgId, fields) {
     return row;
 }
 
+export async function deleteOrg(orgId) {
+    const org = await knex('organizations').where({ id: orgId }).first('id', 'name');
+    if (!org) throw Object.assign(new Error('机构不存在'), { status: 404, expose: true });
+
+    const [{ count: userCountRaw }, { count: raceCountRaw }] = await Promise.all([
+        knex('users').where({ org_id: orgId }).count('* as count').first(),
+        knex('races').where({ org_id: orgId }).count('* as count').first(),
+    ]);
+
+    const userCount = Number(userCountRaw || 0);
+    const raceCount = Number(raceCountRaw || 0);
+    if (userCount > 0 || raceCount > 0) {
+        throw Object.assign(
+            new Error(`机构下仍有数据（用户 ${userCount}、赛事 ${raceCount}），请先清理后再删除`),
+            { status: 400, expose: true },
+        );
+    }
+
+    await knex.transaction(async (trx) => {
+        await trx('user_race_permissions').where({ org_id: orgId }).del();
+        await trx('org_race_permissions').where({ org_id: orgId }).del();
+        await trx('organizations').where({ id: orgId }).del();
+    });
+
+    return { message: `机构 ${org.name} 已删除` };
+}
+
 // ── 全平台用户管理 ────────────────────────────────────
 
 export async function listAllUsers({ page = 1, limit = 20, keyword = '', role = '' }) {
@@ -155,6 +182,34 @@ export async function updateUserByAdmin(userId, fields) {
         .update({ ...data, updated_at: knex.fn.now() })
         .returning(['id', 'username', 'email', 'role', 'status', 'org_id']);
     return row;
+}
+
+export async function deleteUserByAdmin(userId, operatorUserId) {
+    const user = await knex('users').where({ id: userId }).first('id', 'username', 'role');
+    if (!user) throw Object.assign(new Error('用户不存在'), { status: 404, expose: true });
+
+    if (String(operatorUserId) === String(userId)) {
+        throw Object.assign(new Error('不允许删除当前登录账号'), { status: 400, expose: true });
+    }
+
+    if (user.role === 'super_admin') {
+        const [{ count: superAdminCountRaw }] = await Promise.all([
+            knex('users').where({ role: 'super_admin' }).count('* as count').first(),
+        ]);
+        const superAdminCount = Number(superAdminCountRaw || 0);
+        if (superAdminCount <= 1) {
+            throw Object.assign(new Error('系统至少需要保留一个 super_admin 账号'), { status: 400, expose: true });
+        }
+    }
+
+    await knex.transaction(async (trx) => {
+        await trx('user_race_permissions').where({ created_by: userId }).update({ created_by: null });
+        await trx('refresh_tokens').where({ user_id: userId }).del();
+        await trx('user_race_permissions').where({ user_id: userId }).del();
+        await trx('users').where({ id: userId }).del();
+    });
+
+    return { message: `用户 ${user.username} 已删除` };
 }
 
 export async function resetUserPassword(userId) {

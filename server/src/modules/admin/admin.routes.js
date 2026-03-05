@@ -53,6 +53,14 @@ router.patch('/orgs/:orgId', async (req, res, next) => {
     } catch (err) { next(err); }
 });
 
+// DELETE /api/admin/orgs/:orgId
+router.delete('/orgs/:orgId', async (req, res, next) => {
+    try {
+        const result = await adminService.deleteOrg(req.params.orgId);
+        res.json({ success: true, data: result });
+    } catch (err) { next(err); }
+});
+
 // POST /api/admin/orgs/:orgId/admins — 为机构创建管理员
 router.post('/orgs/:orgId/admins', async (req, res, next) => {
     try {
@@ -113,6 +121,14 @@ router.get('/users', async (req, res, next) => {
 router.patch('/users/:userId', async (req, res, next) => {
     try {
         const result = await adminService.updateUserByAdmin(req.params.userId, req.body);
+        res.json({ success: true, data: result });
+    } catch (err) { next(err); }
+});
+
+// DELETE /api/admin/users/:userId
+router.delete('/users/:userId', async (req, res, next) => {
+    try {
+        const result = await adminService.deleteUserByAdmin(req.params.userId, req.authContext.userId);
         res.json({ success: true, data: result });
     } catch (err) { next(err); }
 });

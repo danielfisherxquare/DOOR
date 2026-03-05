@@ -3,8 +3,11 @@
  */
 import { Router } from 'express';
 import * as repo from './column-mapping.repository.js';
+import { requireRoles } from '../../middleware/require-roles.js';
 
 const router = Router();
+
+router.use(requireRoles('org_admin', 'super_admin', 'race_editor'));
 
 // GET /api/column-mappings — 获取全部映射
 router.get('/', async (req, res, next) => {

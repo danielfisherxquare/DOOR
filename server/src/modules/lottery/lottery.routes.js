@@ -4,10 +4,79 @@
  */
 import { Router } from 'express';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
-import { requireOrgScope } from '../../middleware/require-org-scope.js';
 import * as lotteryRepo from './lottery.repository.js';
+import knex from '../../db/knex.js';
 
 const router = Router();
+
+function normalizePositiveInt(raw, fieldName) {
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value <= 0) {
+        throw Object.assign(new Error(`无效 ${fieldName}`), { status: 400, expose: true });
+    }
+    return value;
+}
+
+function resolveSingleRaceIdFromEntries(req) {
+    const entries = Array.isArray(req.body?.entries) ? req.body.entries : [];
+    if (entries.length === 0) {
+        throw Object.assign(new Error('entries must be a non-empty array'), { status: 400, expose: true });
+    }
+
+    const raceIds = new Set(
+        entries
+            .map((entry) => Number(entry?.raceId))
+            .filter((raceId) => Number.isFinite(raceId) && raceId > 0),
+    );
+    if (raceIds.size !== 1) {
+        throw Object.assign(new Error('批量请求必须且只能包含一个 raceId'), { status: 400, expose: true });
+    }
+
+    return [...raceIds][0];
+}
+
+async function resolveRaceIdByLotteryListEntryId(req) {
+    const id = normalizePositiveInt(req.params.id, '名单条目 ID');
+    const row = await knex('lottery_lists').where({ id }).first('race_id');
+    if (!row) {
+        throw Object.assign(new Error('名单条目不存在'), { status: 404, expose: true });
+    }
+    return row.race_id;
+}
+
+async function resolveRaceIdByBulkDeleteListIds(req) {
+    const ids = [...new Set(
+        (Array.isArray(req.body?.ids) ? req.body.ids : [])
+            .map((id) => Number(id))
+            .filter((id) => Number.isFinite(id) && id > 0),
+    )];
+    if (ids.length === 0) {
+        throw Object.assign(new Error('ids must be a non-empty array'), { status: 400, expose: true });
+    }
+
+    const rows = await knex('lottery_lists')
+        .whereIn('id', ids)
+        .select('id', 'race_id');
+    if (rows.length !== ids.length) {
+        throw Object.assign(new Error('部分名单条目不存在或不可访问'), { status: 404, expose: true });
+    }
+
+    const raceIds = new Set(rows.map((row) => Number(row.race_id)));
+    if (raceIds.size !== 1) {
+        throw Object.assign(new Error('批量删除仅支持同一赛事的数据'), { status: 400, expose: true });
+    }
+
+    return rows[0].race_id;
+}
+
+async function resolveRaceIdByLotteryWeightId(req) {
+    const id = normalizePositiveInt(req.params.id, '权重 ID');
+    const row = await knex('lottery_weights').where({ id }).first('race_id');
+    if (!row) {
+        throw Object.assign(new Error('权重不存在'), { status: 404, expose: true });
+    }
+    return row.race_id;
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 //  race_capacity
@@ -44,7 +113,7 @@ router.get('/lists/:raceId', requireRaceAccess('raceId'), async (req, res, next)
 });
 
 // POST /api/lottery/lists — 批量保存名单（UPSERT）
-router.post('/lists', requireRaceAccess((req) => req.body.entries?.[0]?.raceId), async (req, res, next) => {
+router.post('/lists', requireRaceAccess(resolveSingleRaceIdFromEntries), async (req, res, next) => {
     try {
         const data = await lotteryRepo.saveLists(req.raceAccess.operatorOrgId, req.body.entries || []);
         res.json({ success: true, data });
@@ -61,25 +130,25 @@ router.delete('/lists/:raceId', requireRaceAccess('raceId'), async (req, res, ne
 });
 
 // DELETE /api/lottery/lists/entry/:id — 删除单条名单
-router.delete('/lists/entry/:id', requireOrgScope(), async (req, res, next) => {
+router.delete('/lists/entry/:id', requireRaceAccess(resolveRaceIdByLotteryListEntryId), async (req, res, next) => {
     try {
-        const deleted = await lotteryRepo.deleteList(req.authContext.orgId, Number(req.params.id));
+        const deleted = await lotteryRepo.deleteList(req.raceAccess.operatorOrgId, Number(req.params.id));
         if (!deleted) return res.status(404).json({ success: false, message: '名单条目不存在' });
         res.json({ success: true });
     } catch (err) { next(err); }
 });
 
 // PUT /api/lottery/lists/entry/:id — 更新单条名单
-router.put('/lists/entry/:id', requireOrgScope(), async (req, res, next) => {
+router.put('/lists/entry/:id', requireRaceAccess(resolveRaceIdByLotteryListEntryId), async (req, res, next) => {
     try {
-        const data = await lotteryRepo.updateList(req.authContext.orgId, Number(req.params.id), req.body);
+        const data = await lotteryRepo.updateList(req.raceAccess.operatorOrgId, Number(req.params.id), req.body);
         if (!data) return res.status(404).json({ success: false, message: '名单条目不存在' });
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
 
 // POST /api/lottery/lists/bulk-add — 批量新增
-router.post('/lists/bulk-add', requireRaceAccess((req) => req.body.entries?.[0]?.raceId), async (req, res, next) => {
+router.post('/lists/bulk-add', requireRaceAccess(resolveSingleRaceIdFromEntries), async (req, res, next) => {
     try {
         const data = await lotteryRepo.bulkAddLists(req.raceAccess.operatorOrgId, req.body.entries || []);
         res.json({ success: true, data });
@@ -87,7 +156,7 @@ router.post('/lists/bulk-add', requireRaceAccess((req) => req.body.entries?.[0]?
 });
 
 // POST /api/lottery/lists/bulk-put — 批量 UPSERT
-router.post('/lists/bulk-put', requireRaceAccess((req) => req.body.entries?.[0]?.raceId), async (req, res, next) => {
+router.post('/lists/bulk-put', requireRaceAccess(resolveSingleRaceIdFromEntries), async (req, res, next) => {
     try {
         const data = await lotteryRepo.bulkPutLists(req.raceAccess.operatorOrgId, req.body.entries || []);
         res.json({ success: true, data });
@@ -95,9 +164,9 @@ router.post('/lists/bulk-put', requireRaceAccess((req) => req.body.entries?.[0]?
 });
 
 // POST /api/lottery/lists/bulk-delete — 批量删除
-router.post('/lists/bulk-delete', requireOrgScope(), async (req, res, next) => {
+router.post('/lists/bulk-delete', requireRaceAccess(resolveRaceIdByBulkDeleteListIds), async (req, res, next) => {
     try {
-        const data = await lotteryRepo.bulkDeleteLists(req.authContext.orgId, req.body.ids || []);
+        const data = await lotteryRepo.bulkDeleteLists(req.raceAccess.operatorOrgId, req.body.ids || []);
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -151,9 +220,9 @@ router.post('/weights', requireRaceAccess((req) => req.body.raceId), async (req,
 });
 
 // DELETE /api/lottery/weights/:id — 删除权重
-router.delete('/weights/:id', requireOrgScope(), async (req, res, next) => {
+router.delete('/weights/:id', requireRaceAccess(resolveRaceIdByLotteryWeightId), async (req, res, next) => {
     try {
-        const deleted = await lotteryRepo.deleteWeight(req.authContext.orgId, Number(req.params.id));
+        const deleted = await lotteryRepo.deleteWeight(req.raceAccess.operatorOrgId, Number(req.params.id));
         if (!deleted) return res.status(404).json({ success: false, message: '权重不存在' });
         res.json({ success: true });
     } catch (err) { next(err); }

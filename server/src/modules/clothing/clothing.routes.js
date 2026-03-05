@@ -8,6 +8,22 @@ import * as clothingRepo from './clothing.repository.js';
 
 const router = Router();
 
+function resolveSingleRaceIdFromItems(req) {
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (items.length === 0) {
+        throw Object.assign(new Error('items must be a non-empty array'), { status: 400, expose: true });
+    }
+    const raceIds = new Set(
+        items
+            .map((item) => Number(item?.raceId))
+            .filter((raceId) => Number.isFinite(raceId) && raceId > 0),
+    );
+    if (raceIds.size !== 1) {
+        throw Object.assign(new Error('批量请求必须且只能包含一个 raceId'), { status: 400, expose: true });
+    }
+    return [...raceIds][0];
+}
+
 // GET /api/clothing/limits/:raceId — 获取库存
 router.get('/limits/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
@@ -26,7 +42,7 @@ router.post('/limits', requireRaceAccess((req) => req.body.raceId), async (req, 
 });
 
 // POST /api/clothing/limits/bulk — 批量保存库存（UPSERT）
-router.post('/limits/bulk', requireRaceAccess((req) => req.body.items?.[0]?.raceId), async (req, res, next) => {
+router.post('/limits/bulk', requireRaceAccess(resolveSingleRaceIdFromItems), async (req, res, next) => {
     try {
         const data = await clothingRepo.saveLimits(req.raceAccess.operatorOrgId, req.body.items || []);
         res.json({ success: true, data });

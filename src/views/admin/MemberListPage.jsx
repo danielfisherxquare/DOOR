@@ -91,6 +91,21 @@ function MemberListPage() {
         }
     }
 
+    const handleDeleteMember = async (member) => {
+        if (!confirm(`确定删除成员 ${member.username} 吗？此操作不可恢复。`)) return
+
+        try {
+            if (isGlobalSuperAdmin) {
+                await adminApi.deleteUser(member.id)
+            } else {
+                await adminApi.deleteOrgUser(member.id, orgId)
+            }
+            fetchMembers()
+        } catch (err) {
+            alert(err.message)
+        }
+    }
+
     const totalPages = Math.ceil(total / limit)
 
     return (
@@ -184,6 +199,9 @@ function MemberListPage() {
                                                         赛事授权
                                                     </Link>
                                                 )}
+                                                <button className="btn btn--ghost btn--sm" onClick={() => handleDeleteMember(m)} style={{ color: '#dc2626' }}>
+                                                    删除
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>

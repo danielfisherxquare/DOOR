@@ -74,6 +74,16 @@ function UserListPage() {
         }
     }
 
+    const handleDeleteUser = async (user) => {
+        if (!confirm(`确定删除用户 ${user.username} 吗？此操作不可恢复。`)) return
+        try {
+            await adminApi.deleteUser(user.id)
+            fetchUsers()
+        } catch (err) {
+            alert(err.message)
+        }
+    }
+
     const roleLabels = { super_admin: '超管', org_admin: '机构管理', race_editor: '编辑', race_viewer: '只读' }
     const totalPages = Math.ceil(total / limit)
 
@@ -148,6 +158,9 @@ function UserListPage() {
                                                     {u.status === 'active' ? '禁用' : '启用'}
                                                 </button>
                                                 <button className="btn btn--ghost btn--sm" onClick={() => handleResetPassword(u)}>重置密码</button>
+                                                <button className="btn btn--ghost btn--sm" onClick={() => handleDeleteUser(u)} style={{ color: '#dc2626' }}>
+                                                    删除
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
