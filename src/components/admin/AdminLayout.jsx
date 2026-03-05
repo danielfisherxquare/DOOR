@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Routes, Route, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import adminApi from '../../api/adminApi'
@@ -11,6 +11,7 @@ import MemberListPage from '../../views/admin/MemberListPage'
 import MemberCreatePage from '../../views/admin/MemberCreatePage'
 import RaceManagementPage from '../../views/admin/RaceManagementPage'
 import RacePermissionsPage from '../../views/admin/RacePermissionsPage'
+import OrgRacePermissionsPage from '../../views/admin/OrgRacePermissionsPage'
 
 function AdminLayout() {
     const { user, logout } = useAuthStore()
@@ -61,6 +62,7 @@ function AdminLayout() {
     const orgAdminMenus = [
         { path: '/members', label: '成员管理', icon: '👥' },
         { path: '/races', label: '赛事管理', icon: '🏁' },
+        { path: '/org-race-permissions', label: '机构赛事授权', icon: '🏢', superOnly: true },
         { path: '/race-permissions', label: '赛事授权', icon: '🔑' },
     ]
 
@@ -131,7 +133,9 @@ function AdminLayout() {
                                 </div>
                             )}
 
-                            {orgAdminMenus.map((m) => (
+                            {orgAdminMenus
+                                .filter((m) => !m.superOnly || isSuperAdmin)
+                                .map((m) => (
                                 <Link
                                     key={m.path}
                                     to={`/admin${m.path}${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`}
@@ -175,6 +179,7 @@ function AdminLayout() {
                     <Route path="members" element={<MemberListPage />} />
                     <Route path="members/new" element={<MemberCreatePage />} />
                     <Route path="races" element={<RaceManagementPage />} />
+                    <Route path="org-race-permissions" element={<OrgRacePermissionsPage />} />
                     <Route path="race-permissions" element={<RacePermissionsPage />} />
                 </Routes>
             </main>

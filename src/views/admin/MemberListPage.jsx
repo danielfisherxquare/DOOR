@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import adminApi from '../../api/adminApi'
 import useAuthStore from '../../stores/authStore'
@@ -118,13 +118,13 @@ function MemberListPage() {
             </form>
 
             {loading ? (
-                <div style={{ textAlign: 'center', padding: 40, color: '#999' }}>加载中...</div>
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-muted, #999)' }}>加载中...</div>
             ) : (
                 <>
-                    <div style={{ background: 'white', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                    <div style={{ background: 'var(--color-bg-card, #fff)', borderRadius: 12, overflow: 'hidden', boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
-                                <tr style={{ borderBottom: '1px solid #e5e7eb', background: '#fafafa' }}>
+                                <tr style={{ borderBottom: '1px solid var(--border-color, #e5e7eb)', background: 'var(--color-bg-secondary, #fafafa)' }}>
                                     <th style={thStyle}>用户名</th>
                                     <th style={thStyle}>邮箱</th>
                                     <th style={thStyle}>角色</th>
@@ -135,7 +135,7 @@ function MemberListPage() {
                             </thead>
                             <tbody>
                                 {members.map((m) => (
-                                    <tr key={m.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                    <tr key={m.id} style={{ borderBottom: '1px solid var(--border-color, #f0f0f0)' }}>
                                         <td style={tdStyle}><span style={{ fontWeight: 600 }}>{m.username}</span></td>
                                         <td style={tdStyle}>{m.email}</td>
                                         <td style={tdStyle}>
@@ -143,7 +143,7 @@ function MemberListPage() {
                                                 value={m.role}
                                                 onChange={(e) => handleRoleChange(m, e.target.value)}
                                                 disabled={isGlobalSuperAdmin && m.role === 'super_admin'}
-                                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13 }}
+                                                style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border-color, #d1d5db)', fontSize: 13 }}
                                             >
                                                 {isGlobalSuperAdmin ? (
                                                     m.role === 'super_admin'
@@ -190,7 +190,7 @@ function MemberListPage() {
                                 ))}
                                 {members.length === 0 && (
                                     <tr>
-                                        <td colSpan={isGlobalSuperAdmin ? 6 : 5} style={{ ...tdStyle, textAlign: 'center', color: '#999' }}>暂无成员</td>
+                                        <td colSpan={isGlobalSuperAdmin ? 6 : 5} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>暂无成员</td>
                                     </tr>
                                 )}
                             </tbody>
@@ -210,7 +210,7 @@ function MemberListPage() {
     )
 }
 
-const thStyle = { padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#666' }
+const thStyle = { padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary, #666)' }
 const tdStyle = { padding: '12px 16px', fontSize: 14 }
 
 export default MemberListPage

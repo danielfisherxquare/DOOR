@@ -99,6 +99,22 @@ npm ci
 npm run dev
 ```
 
+## 编码约定（必须）
+
+- 所有源码统一 `UTF-8`（无 BOM）+ `LF`。
+- 提交前执行：
+
+```bash
+npm run check:encoding
+```
+
+Windows 本地排查乱码时建议先切换终端编码：
+
+```powershell
+chcp 65001
+Get-Content .\src\api\adminApi.js -Encoding utf8
+```
+
 ## 防止“自动拉起”导致冲突
 
 1. `docker compose up` 只能在 `door/server/` 执行，不要在仓库根目录误执行。  

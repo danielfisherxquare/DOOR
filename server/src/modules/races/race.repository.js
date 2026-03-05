@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Race Repository - race data access layer (tenant isolated)
  */
 import knex from '../../db/knex.js';
@@ -20,17 +20,25 @@ export async function findAllAllowed(orgId, userId, role, options = {}) {
             query = query.where({ org_id: filterOrgId });
         }
     } else if (role === 'org_admin') {
-        // org_admin sees all races in own org
-        query = query.where({ org_id: orgId });
+        // org_admin sees own races + org granted races
+        query = query
+            .leftJoin('org_race_permissions as grp', function joinOrgRacePermissions() {
+                this.on('races.id', '=', 'grp.race_id').andOnVal('grp.org_id', '=', orgId);
+            })
+            .where(function whereVisible() {
+                this.where('races.org_id', orgId).orWhereNotNull('grp.org_id');
+            });
     } else {
         // race-level users: only assigned races
         query = query
             .innerJoin('user_race_permissions', 'races.id', 'user_race_permissions.race_id')
-            .where('user_race_permissions.user_id', userId)
-            .andWhere('races.org_id', orgId);
+            .where('user_race_permissions.user_id', userId);
+        if (orgId) {
+            query = query.andWhere('user_race_permissions.org_id', orgId);
+        }
     }
 
-    const rows = await query.select('races.*');
+    const rows = await query.distinct('races.*');
     return rows.map(raceMapper.fromDbRow);
 }
 

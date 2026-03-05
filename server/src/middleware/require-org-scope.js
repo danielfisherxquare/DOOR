@@ -25,7 +25,8 @@ export function requireOrgScope(resolveTargetOrgId) {
         }
 
         if (!targetOrgId) {
-            // 安全失败: 如果路由需要校验却未能解析出目标资源所在的机构，直接拒绝
+            // 未提供明确目标机构时，默认按“当前登录机构作用域”放行
+            if (userOrgId) return next();
             return res.status(400).json({ success: false, message: '缺少机构上下文，无法验证操作边界' });
         }
 

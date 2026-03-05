@@ -12,7 +12,7 @@ const router = Router();
 // GET /api/bib/overview/:raceId — 统计概览
 router.get('/overview/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const data = await bibRepo.getOverview(req.authContext.orgId, Number(req.params.raceId));
+        const data = await bibRepo.getOverview(req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -20,7 +20,7 @@ router.get('/overview/:raceId', requireRaceAccess('raceId'), async (req, res, ne
 // GET /api/bib/templates/:raceId — 获取模板列表
 router.get('/templates/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const data = await bibRepo.getTemplates(req.authContext.orgId, Number(req.params.raceId));
+        const data = await bibRepo.getTemplates(req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -28,7 +28,7 @@ router.get('/templates/:raceId', requireRaceAccess('raceId'), async (req, res, n
 // POST /api/bib/templates — 保存模板
 router.post('/templates', requireRaceAccess((req) => req.body.raceId), async (req, res, next) => {
     try {
-        const data = await bibRepo.upsertTemplate(req.authContext.orgId, req.body);
+        const data = await bibRepo.upsertTemplate(req.raceAccess.operatorOrgId, req.body);
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -46,7 +46,7 @@ router.delete('/templates/:id', requireOrgScope(), async (req, res, next) => {
 // GET /api/bib/dataset/:raceId — 获取分配数据集
 router.get('/dataset/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const data = await bibRepo.getDataset(req.authContext.orgId, Number(req.params.raceId));
+        const data = await bibRepo.getDataset(req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -54,7 +54,7 @@ router.get('/dataset/:raceId', requireRaceAccess('raceId'), async (req, res, nex
 // GET /api/bib/execution-dataset/:raceId — 获取排号引擎专用数据集
 router.get('/execution-dataset/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const data = await bibRepo.getExecutionDataset(req.authContext.orgId, Number(req.params.raceId));
+        const data = await bibRepo.getExecutionDataset(req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -62,7 +62,7 @@ router.get('/execution-dataset/:raceId', requireRaceAccess('raceId'), async (req
 // POST /api/bib/snapshot/:raceId — 创建排号快照
 router.post('/snapshot/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const data = await bibRepo.createBibSnapshot(req.authContext.orgId, Number(req.params.raceId));
+        const data = await bibRepo.createBibSnapshot(req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -70,7 +70,7 @@ router.post('/snapshot/:raceId', requireRaceAccess('raceId'), async (req, res, n
 // POST /api/bib/rollback/:raceId — 回滚排号
 router.post('/rollback/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const data = await rollbackRepo.rollbackBib(req.authContext.orgId, Number(req.params.raceId));
+        const data = await rollbackRepo.rollbackBib(req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -79,7 +79,7 @@ router.post('/rollback/:raceId', requireRaceAccess('raceId'), async (req, res, n
 router.post('/bulk-assign/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await bibRepo.bulkAssign(
-            req.authContext.orgId,
+            req.raceAccess.operatorOrgId,
             Number(req.params.raceId),
             req.body.assignments || []
         );
@@ -90,7 +90,7 @@ router.post('/bulk-assign/:raceId', requireRaceAccess('raceId'), async (req, res
 // POST /api/bib/clear/:raceId — 一键清空
 router.post('/clear/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const data = await bibRepo.clearBib(req.authContext.orgId, Number(req.params.raceId));
+        const data = await bibRepo.clearBib(req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });

@@ -10,6 +10,8 @@ export const adminApi = {
     getOrgDetail: (orgId) => request.get(`/admin/orgs/${orgId}`),
     updateOrg: (orgId, data) => request.patch(`/admin/orgs/${orgId}`, data),
     createOrgAdmin: (orgId, data) => request.post(`/admin/orgs/${orgId}/admins`, data),
+    getOrgRacePermissions: (orgId) => request.get(`/admin/orgs/${orgId}/race-permissions`),
+    setOrgRacePermissions: (orgId, data) => request.put(`/admin/orgs/${orgId}/race-permissions`, data),
 
     // ── Super Admin: 全平台用户管理 ──────────────────
     getAllUsers: (params) => request.get('/admin/users', { params }),

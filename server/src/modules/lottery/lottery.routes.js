@@ -16,7 +16,7 @@ const router = Router();
 // GET /api/lottery/configs/:raceId — 获取容量配置
 router.get('/configs/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const data = await lotteryRepo.getRaceCapacity(req.authContext.orgId, Number(req.params.raceId));
+        const data = await lotteryRepo.getRaceCapacity(req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -25,7 +25,7 @@ router.get('/configs/:raceId', requireRaceAccess('raceId'), async (req, res, nex
 router.post('/configs/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await lotteryRepo.saveRaceCapacity(
-            req.authContext.orgId, Number(req.params.raceId), req.body);
+            req.raceAccess.operatorOrgId, Number(req.params.raceId), req.body);
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -38,7 +38,7 @@ router.post('/configs/:raceId', requireRaceAccess('raceId'), async (req, res, ne
 router.get('/lists/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await lotteryRepo.getLists(
-            req.authContext.orgId, Number(req.params.raceId), req.query.listType);
+            req.raceAccess.operatorOrgId, Number(req.params.raceId), req.query.listType);
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -46,7 +46,7 @@ router.get('/lists/:raceId', requireRaceAccess('raceId'), async (req, res, next)
 // POST /api/lottery/lists — 批量保存名单（UPSERT）
 router.post('/lists', requireRaceAccess((req) => req.body.entries?.[0]?.raceId), async (req, res, next) => {
     try {
-        const data = await lotteryRepo.saveLists(req.authContext.orgId, req.body.entries || []);
+        const data = await lotteryRepo.saveLists(req.raceAccess.operatorOrgId, req.body.entries || []);
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -55,7 +55,7 @@ router.post('/lists', requireRaceAccess((req) => req.body.entries?.[0]?.raceId),
 router.delete('/lists/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const deleted = await lotteryRepo.deleteLists(
-            req.authContext.orgId, Number(req.params.raceId), req.query.listType);
+            req.raceAccess.operatorOrgId, Number(req.params.raceId), req.query.listType);
         res.json({ success: true, data: { deleted } });
     } catch (err) { next(err); }
 });
@@ -81,7 +81,7 @@ router.put('/lists/entry/:id', requireOrgScope(), async (req, res, next) => {
 // POST /api/lottery/lists/bulk-add — 批量新增
 router.post('/lists/bulk-add', requireRaceAccess((req) => req.body.entries?.[0]?.raceId), async (req, res, next) => {
     try {
-        const data = await lotteryRepo.bulkAddLists(req.authContext.orgId, req.body.entries || []);
+        const data = await lotteryRepo.bulkAddLists(req.raceAccess.operatorOrgId, req.body.entries || []);
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -89,7 +89,7 @@ router.post('/lists/bulk-add', requireRaceAccess((req) => req.body.entries?.[0]?
 // POST /api/lottery/lists/bulk-put — 批量 UPSERT
 router.post('/lists/bulk-put', requireRaceAccess((req) => req.body.entries?.[0]?.raceId), async (req, res, next) => {
     try {
-        const data = await lotteryRepo.bulkPutLists(req.authContext.orgId, req.body.entries || []);
+        const data = await lotteryRepo.bulkPutLists(req.raceAccess.operatorOrgId, req.body.entries || []);
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -105,7 +105,7 @@ router.post('/lists/bulk-delete', requireOrgScope(), async (req, res, next) => {
 // GET /api/lottery/lists/conflicts/:raceId — 冲突检测
 router.get('/lists/conflicts/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const data = await lotteryRepo.getConflicts(req.authContext.orgId, Number(req.params.raceId));
+        const data = await lotteryRepo.getConflicts(req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -117,7 +117,7 @@ router.get('/lists/conflicts/:raceId', requireRaceAccess('raceId'), async (req, 
 // GET /api/lottery/rules/:raceId — 获取规则
 router.get('/rules/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const data = await lotteryRepo.getRules(req.authContext.orgId, Number(req.params.raceId));
+        const data = await lotteryRepo.getRules(req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -125,7 +125,7 @@ router.get('/rules/:raceId', requireRaceAccess('raceId'), async (req, res, next)
 // POST /api/lottery/rules — 保存规则（UPSERT）
 router.post('/rules', requireRaceAccess((req) => req.body.raceId), async (req, res, next) => {
     try {
-        const data = await lotteryRepo.saveRule(req.authContext.orgId, req.body);
+        const data = await lotteryRepo.saveRule(req.raceAccess.operatorOrgId, req.body);
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -137,7 +137,7 @@ router.post('/rules', requireRaceAccess((req) => req.body.raceId), async (req, r
 // GET /api/lottery/weights/:raceId — 获取权重
 router.get('/weights/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const data = await lotteryRepo.getWeights(req.authContext.orgId, Number(req.params.raceId));
+        const data = await lotteryRepo.getWeights(req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -145,7 +145,7 @@ router.get('/weights/:raceId', requireRaceAccess('raceId'), async (req, res, nex
 // POST /api/lottery/weights — 保存权重（UPSERT）
 router.post('/weights', requireRaceAccess((req) => req.body.raceId), async (req, res, next) => {
     try {
-        const data = await lotteryRepo.saveWeight(req.authContext.orgId, req.body);
+        const data = await lotteryRepo.saveWeight(req.raceAccess.operatorOrgId, req.body);
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -162,7 +162,7 @@ router.delete('/weights/:id', requireOrgScope(), async (req, res, next) => {
 // DELETE /api/lottery/weights/all/:raceId — 清空所有权重
 router.delete('/weights/all/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const deleted = await lotteryRepo.deleteAllWeights(req.authContext.orgId, Number(req.params.raceId));
+        const deleted = await lotteryRepo.deleteAllWeights(req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data: { deleted } });
     } catch (err) { next(err); }
 });
@@ -177,7 +177,8 @@ import * as rollbackRepo from './lottery-rollback.repository.js';
 // POST /api/lottery/finalize/:raceId — 入队 finalize Job
 router.post('/finalize/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const { orgId, userId } = req.authContext;
+        const { userId } = req.authContext;
+        const orgId = req.raceAccess.operatorOrgId;
         const raceId = Number(req.params.raceId);
         const idempotencyKey = `lottery:finalize:${raceId}`;
         const job = await jobRepo.enqueue(orgId, 'lottery:finalize', { raceId }, idempotencyKey, userId, raceId);
@@ -188,7 +189,7 @@ router.post('/finalize/:raceId', requireRaceAccess('raceId'), async (req, res, n
 // GET /api/lottery/results/:raceId — 聚合统计结果
 router.get('/results/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const { orgId } = req.authContext;
+        const orgId = req.raceAccess.operatorOrgId;
         const raceId = Number(req.params.raceId);
         const results = await lotteryRepo.getLotteryResults(orgId, raceId);
         res.json({ success: true, data: results });
@@ -198,7 +199,7 @@ router.get('/results/:raceId', requireRaceAccess('raceId'), async (req, res, nex
 // GET /api/lottery/has-snapshot/:raceId — 查询是否有抽签快照
 router.get('/has-snapshot/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const { orgId } = req.authContext;
+        const orgId = req.raceAccess.operatorOrgId;
         const raceId = Number(req.params.raceId);
         const has = await snapshotRepo.hasSnapshot(orgId, raceId, 'pre_lottery');
         res.json({ success: true, data: { hasSnapshot: has } });
@@ -208,7 +209,7 @@ router.get('/has-snapshot/:raceId', requireRaceAccess('raceId'), async (req, res
 // POST /api/lottery/rollback/:raceId — 回滚抽签
 router.post('/rollback/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const { orgId } = req.authContext;
+        const orgId = req.raceAccess.operatorOrgId;
         const raceId = Number(req.params.raceId);
         const result = await rollbackRepo.rollbackLottery(orgId, raceId);
         res.json({ success: true, data: result });

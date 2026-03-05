@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import adminApi from '../../api/adminApi'
 import useAuthStore from '../../stores/authStore'
@@ -68,11 +68,11 @@ function MemberCreatePage() {
     }
 
     const cardStyle = {
-        background: 'white', borderRadius: 12, padding: 32,
+        background: 'var(--color-bg-card, #fff)', borderRadius: 12, padding: 32,
         boxShadow: '0 1px 3px rgba(0,0,0,0.06)', maxWidth: 520,
     }
     const inputGroupStyle = { display: 'grid', gap: 8, marginBottom: 16 }
-    const labelStyle = { fontSize: 13, fontWeight: 600, color: '#555' }
+    const labelStyle = { fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary, #555)' }
 
     return (
         <div>
@@ -113,7 +113,7 @@ function MemberCreatePage() {
                 <div style={inputGroupStyle}>
                     <label style={labelStyle}>初始密码</label>
                     <input className="input" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
-                    <span style={{ fontSize: 12, color: '#999' }}>成员首次登录将被要求修改密码</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-text-muted, #999)' }}>成员首次登录将被要求修改密码</span>
                 </div>
                 <div style={inputGroupStyle}>
                     <label style={labelStyle}>角色</label>

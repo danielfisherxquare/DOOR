@@ -12,7 +12,7 @@ const router = Router();
 router.get('/limits/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await clothingRepo.getLimits(
-            req.authContext.orgId, Number(req.params.raceId));
+            req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -20,7 +20,7 @@ router.get('/limits/:raceId', requireRaceAccess('raceId'), async (req, res, next
 // POST /api/clothing/limits — 保存单条库存（UPSERT）
 router.post('/limits', requireRaceAccess((req) => req.body.raceId), async (req, res, next) => {
     try {
-        const data = await clothingRepo.saveLimit(req.authContext.orgId, req.body);
+        const data = await clothingRepo.saveLimit(req.raceAccess.operatorOrgId, req.body);
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -28,7 +28,7 @@ router.post('/limits', requireRaceAccess((req) => req.body.raceId), async (req, 
 // POST /api/clothing/limits/bulk — 批量保存库存（UPSERT）
 router.post('/limits/bulk', requireRaceAccess((req) => req.body.items?.[0]?.raceId), async (req, res, next) => {
     try {
-        const data = await clothingRepo.saveLimits(req.authContext.orgId, req.body.items || []);
+        const data = await clothingRepo.saveLimits(req.raceAccess.operatorOrgId, req.body.items || []);
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -38,7 +38,7 @@ router.post('/limits/increment', requireRaceAccess((req) => req.body.raceId), as
     try {
         const { raceId, event, gender, size, delta } = req.body;
         const data = await clothingRepo.incrementUsed(
-            req.authContext.orgId, raceId, event, gender, size, delta ?? 1);
+            req.raceAccess.operatorOrgId, raceId, event, gender, size, delta ?? 1);
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -47,7 +47,7 @@ router.post('/limits/increment', requireRaceAccess((req) => req.body.raceId), as
 router.get('/statistics/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await clothingRepo.getStatistics(
-            req.authContext.orgId, Number(req.params.raceId));
+            req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });

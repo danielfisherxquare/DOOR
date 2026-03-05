@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import racesApi from '../../api/races'
@@ -182,8 +182,8 @@ function RaceManagementPage() {
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16 }}>
-                <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                    <div style={{ padding: '14px 16px', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>
+                <div style={{ background: 'var(--color-bg-card, #fff)', borderRadius: 12, boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))' }}>
+                    <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-color, #e5e7eb)', fontWeight: 600 }}>
                         {editingRace ? '编辑赛事' : '创建赛事'}
                     </div>
 
@@ -202,7 +202,7 @@ function RaceManagementPage() {
                                         <option key={org.id} value={org.id}>{org.name}</option>
                                     ))}
                                 </select>
-                                {editingRace && <div style={{ marginTop: 6, fontSize: 12, color: '#888' }}>编辑时不允许跨机构迁移赛事</div>}
+                                {editingRace && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-text-muted, #888)' }}>编辑时不允许跨机构迁移赛事</div>}
                             </div>
                         )}
 
@@ -261,19 +261,19 @@ function RaceManagementPage() {
                     </form>
                 </div>
 
-                <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-                    <div style={{ padding: '14px 16px', borderBottom: '1px solid #e5e7eb', fontWeight: 600 }}>
+                <div style={{ background: 'var(--color-bg-card, #fff)', borderRadius: 12, boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))', overflow: 'hidden' }}>
+                    <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-color, #e5e7eb)', fontWeight: 600 }}>
                         赛事列表
                     </div>
 
                     {loading ? (
-                        <div style={{ padding: 32, textAlign: 'center', color: '#999' }}>加载中...</div>
+                        <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>加载中...</div>
                     ) : races.length === 0 ? (
-                        <div style={{ padding: 32, textAlign: 'center', color: '#999' }}>暂无赛事</div>
+                        <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>暂无赛事</div>
                     ) : (
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
-                                <tr style={{ background: '#fafafa', borderBottom: '1px solid #e5e7eb' }}>
+                                <tr style={{ background: 'var(--color-bg-secondary, #fafafa)', borderBottom: '1px solid var(--border-color, #e5e7eb)' }}>
                                     <th style={thStyle}>名称</th>
                                     {isSuperAdmin && <th style={thStyle}>机构</th>}
                                     <th style={thStyle}>日期</th>
@@ -285,7 +285,7 @@ function RaceManagementPage() {
                             </thead>
                             <tbody>
                                 {races.map((race) => (
-                                    <tr key={race.id} style={{ borderBottom: '1px solid #f2f2f2' }}>
+                                    <tr key={race.id} style={{ borderBottom: '1px solid var(--border-color, #f2f2f2)' }}>
                                         <td style={tdStyle}>{race.name}</td>
                                         {isSuperAdmin && <td style={tdStyle}>{orgNameById.get(String(race.orgId)) || race.orgId || '-'}</td>}
                                         <td style={tdStyle}>{race.date || '-'}</td>
@@ -309,8 +309,8 @@ function RaceManagementPage() {
     )
 }
 
-const labelStyle = { display: 'block', fontSize: 13, marginBottom: 6, color: '#555', fontWeight: 600 }
-const thStyle = { textAlign: 'left', fontSize: 13, fontWeight: 600, color: '#666', padding: '12px 14px' }
+const labelStyle = { display: 'block', fontSize: 13, marginBottom: 6, color: 'var(--color-text-secondary, #555)', fontWeight: 600 }
+const thStyle = { textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary, #666)', padding: '12px 14px' }
 const tdStyle = { fontSize: 14, padding: '12px 14px' }
 
 export default RaceManagementPage

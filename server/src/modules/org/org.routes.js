@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Org Routes - org admin APIs
  */
 import { Router } from 'express';

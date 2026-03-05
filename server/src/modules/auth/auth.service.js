@@ -298,9 +298,26 @@ export async function assignRaceRole(operatorContext, targetUserId, raceId, role
 
     // TODO: 可以再验证 raceId 是否属于该机构，但这主要依赖数据库约束或稍后的查表，暂假定由调用方 / 管理员知晓
 
+    let accessLevel = null;
     if (role) {
-        await authRepo.setRacePermission(targetUserId, targetUser.org_id, raceId, role, operatorContext.userId);
-        return { message: `已授予赛事访问权限: ${role}` };
+        const roleToAccessLevel = {
+            race_editor: 'editor',
+            race_viewer: 'viewer',
+            editor: 'editor',
+            viewer: 'viewer',
+        };
+        accessLevel = roleToAccessLevel[role] || null;
+        if (!accessLevel) {
+            const err = new Error(`无效赛事权限角色: ${role}`);
+            err.status = 400;
+            err.expose = true;
+            throw err;
+        }
+    }
+
+    if (accessLevel) {
+        await authRepo.setRacePermission(targetUserId, targetUser.org_id, raceId, accessLevel, operatorContext.userId);
+        return { message: `已授予赛事访问权限: ${accessLevel}` };
     } else {
         await authRepo.removeRacePermission(targetUserId, raceId);
         return { message: '已移除赛事访问权限' };

@@ -130,7 +130,7 @@ router.delete('/:sid', async (req, res, next) => {
 router.post('/:sid/commit', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const { sid } = req.params;
-        const orgId = req.authContext.orgId;
+        const orgId = req.raceAccess.operatorOrgId;
         const { raceId, category } = req.body;
 
         const session = await importSessionRepository.findById(orgId, sid);

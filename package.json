@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "check:encoding": "node scripts/check-encoding.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },

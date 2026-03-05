@@ -1,10 +1,11 @@
-﻿/**
+/**
  * Race Routes - race CRUD API
  */
 import { Router } from 'express';
 import * as raceRepo from './race.repository.js';
 import { requireRoles } from '../../middleware/require-roles.js';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
+import knex from '../../db/knex.js';
 
 const router = Router();
 
@@ -38,21 +39,21 @@ router.post('/', requireRoles('org_admin', 'super_admin'), async (req, res, next
     try {
         validateCreatePayload(req.body ?? {});
 
-        let orgId = req.authContext.orgId;
-
-        // super_admin has no fixed org_id, prefer request body orgId
-        if (!orgId) {
+        let orgId = req.authContext.orgId || null;
+        if (req.authContext.role === 'super_admin') {
             orgId = normalizeOrgId(req.body.orgId);
-
-            // fallback: first org in system for backward compatibility
             if (!orgId) {
-                const knex = (await import('../../db/knex.js')).default;
-                const firstOrg = await knex('organizations').orderBy('created_at', 'asc').first();
-                if (!firstOrg) {
-                    return res.status(400).json({ success: false, message: 'No organization exists yet. Please create one first.' });
-                }
-                orgId = firstOrg.id;
+                return res.status(400).json({ success: false, message: 'super_admin 创建赛事时必须提供 orgId' });
             }
+        }
+
+        if (!orgId) {
+            return res.status(400).json({ success: false, message: '缺少有效的机构信息，无法创建赛事' });
+        }
+
+        const org = await knex('organizations').where({ id: orgId }).first('id');
+        if (!org) {
+            return res.status(404).json({ success: false, message: '目标机构不存在' });
         }
 
         const race = await raceRepo.create(orgId, req.body);
@@ -77,7 +78,7 @@ router.get('/', async (req, res, next) => {
 // GET /api/races/:raceId - get one race
 router.get('/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const race = await raceRepo.findById(req.authContext.orgId, req.params.raceId);
+        const race = await raceRepo.findById(req.raceAccess.operatorOrgId, req.params.raceId);
         if (!race) {
             return res.status(404).json({ success: false, message: 'Race not found' });
         }
@@ -90,7 +91,7 @@ router.get('/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
 // PUT /api/races/:raceId - update race
 router.put('/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const race = await raceRepo.update(req.authContext.orgId, req.params.raceId, req.body);
+        const race = await raceRepo.update(req.raceAccess.operatorOrgId, req.params.raceId, req.body);
         if (!race) {
             return res.status(404).json({ success: false, message: 'Race not found' });
         }
@@ -103,7 +104,7 @@ router.put('/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
 // DELETE /api/races/:raceId - delete race (cascades records)
 router.delete('/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const deleted = await raceRepo.remove(req.authContext.orgId, req.params.raceId);
+        const deleted = await raceRepo.remove(req.raceAccess.operatorOrgId, req.params.raceId);
         if (!deleted) {
             return res.status(404).json({ success: false, message: 'Race not found' });
         }

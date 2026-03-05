@@ -122,8 +122,8 @@ router.post('/race-permissions', requireAuth, requireRoles('org_admin', 'super_a
         if (!targetUserId || !raceId) {
             return res.status(400).json({ success: false, message: '缺少 targetUserId 或 raceId' });
         }
-        if (role && !['race_editor', 'race_viewer'].includes(role)) {
-            return res.status(400).json({ success: false, message: '赛事角色无效' });
+        if (role && !['race_editor', 'race_viewer', 'editor', 'viewer'].includes(role)) {
+            return res.status(400).json({ success: false, message: '赛事角色无效，支持 race_editor/race_viewer/editor/viewer' });
         }
         const result = await authService.assignRaceRole(req.authContext, targetUserId, raceId, role);
         res.json({ success: true, data: result });

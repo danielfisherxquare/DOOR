@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import adminApi from '../../api/adminApi'
 import useAuthStore from '../../stores/authStore'
 
@@ -18,19 +18,19 @@ function AdminDashboard() {
             .then((res) => {
                 if (res.success) setStats(res.data)
             })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoading(false))
     }, [isSuperAdmin])
 
     const cardStyle = {
-        background: 'white',
+        background: 'var(--color-bg-card, #fff)',
         borderRadius: 12,
         padding: '24px 28px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+        boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))',
         flex: '1 1 200px',
     }
 
-    const numStyle = { fontSize: 32, fontWeight: 700, color: 'var(--color-accent, #6366f1)' }
+    const numStyle = { fontSize: 32, fontWeight: 700, color: 'var(--color-purple, #6366f1)' }
     const labelStyle = { fontSize: 13, color: 'var(--color-text-secondary, #666)', marginTop: 4 }
 
     return (
@@ -67,6 +67,7 @@ function AdminDashboard() {
                         <>
                             <a href="/admin/orgs" className="btn btn--primary">🏢 管理机构</a>
                             <a href="/admin/users" className="btn btn--secondary">👤 管理用户</a>
+                            <a href="/admin/org-race-permissions" className="btn btn--secondary">🏢 机构赛事授权</a>
                         </>
                     )}
                     <a href="/admin/members" className="btn btn--secondary">👥 管理成员</a>

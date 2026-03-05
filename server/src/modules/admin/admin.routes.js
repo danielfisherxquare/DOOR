@@ -70,6 +70,34 @@ router.post('/orgs/:orgId/admins', async (req, res, next) => {
     }
 });
 
+// GET /api/admin/orgs/:orgId/race-permissions
+router.get('/orgs/:orgId/race-permissions', async (req, res, next) => {
+    try {
+        const result = await adminService.getOrgRacePermissions(req.params.orgId);
+        res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// PUT /api/admin/orgs/:orgId/race-permissions
+router.put('/orgs/:orgId/race-permissions', async (req, res, next) => {
+    try {
+        const { permissions } = req.body;
+        if (!Array.isArray(permissions)) {
+            return res.status(400).json({ success: false, message: 'permissions must be an array' });
+        }
+        const result = await adminService.setOrgRacePermissions(
+            req.params.orgId,
+            req.authContext.userId,
+            permissions,
+        );
+        res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+});
+
 // ── 全平台用户管理 ────────────────────────────────────
 
 // GET /api/admin/users

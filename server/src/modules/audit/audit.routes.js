@@ -18,7 +18,7 @@ const router = Router();
 router.get('/prep-stats/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await auditRepo.getPrepStats(
-            req.authContext.orgId, Number(req.params.raceId));
+            req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -29,7 +29,7 @@ router.get('/prep-stats/:raceId', requireRaceAccess('raceId'), async (req, res, 
 router.post('/reset/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await auditRepo.resetAudit(
-            req.authContext.orgId, Number(req.params.raceId));
+            req.raceAccess.operatorOrgId, Number(req.params.raceId));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -43,7 +43,8 @@ router.post('/reset/:raceId', requireRaceAccess('raceId'), async (req, res, next
  */
 async function enqueueAuditStep(req, res, next, stepNumber, stepName) {
     try {
-        const { orgId, userId } = req.authContext;
+        const { userId } = req.authContext;
+        const orgId = req.raceAccess.operatorOrgId;
         const raceId = Number(req.params.raceId);
 
         // 创建 audit_run 记录

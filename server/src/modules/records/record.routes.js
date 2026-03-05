@@ -4,21 +4,34 @@
 import { Router } from 'express';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { tenantContext } from '../../middleware/tenant-context.js';
 import { recordMapper } from '../../db/mappers/records.js';
 import * as recordRepo from './record.repository.js';
+import { requireRaceAccess } from '../../middleware/require-race-access.js';
+import { resolveRaceAccess } from '../races/race-access.service.js';
 
 const router = Router();
 
-// 所有记录路由都需要认证
-router.use(tenantContext);
+async function resolveScopedOrgId(req, raceId) {
+    if (raceId !== undefined && raceId !== null && raceId !== '') {
+        const access = await resolveRaceAccess(req.authContext, raceId, req.method);
+        req.raceAccess = access;
+        return access.operatorOrgId;
+    }
+
+    if (['race_editor', 'race_viewer'].includes(req.authContext.role)) {
+        throw Object.assign(new Error('当前角色必须指定 raceId'), { status: 400, expose: true });
+    }
+
+    return req.authContext.orgId;
+}
 
 // POST /api/records/query — 综合查询
 router.post('/query', async (req, res, next) => {
     try {
         const { keyword, filters, offset, limit, raceId, sort } = req.body;
+        const scopedOrgId = await resolveScopedOrgId(req, raceId);
         const result = await recordRepo.query(
-            req.tenantContext.orgId,
+            scopedOrgId,
             raceId,
             { keyword, filters, offset, limit, sort },
         );
@@ -32,8 +45,9 @@ router.post('/query', async (req, res, next) => {
 router.post('/analysis', async (req, res, next) => {
     try {
         const { keyword, filters, raceId } = req.body;
+        const scopedOrgId = await resolveScopedOrgId(req, raceId);
         const result = await recordRepo.analysis(
-            req.tenantContext.orgId,
+            scopedOrgId,
             raceId,
             { keyword, filters },
         );
@@ -50,8 +64,9 @@ router.post('/unique-values', async (req, res, next) => {
         if (!field) {
             return res.status(400).json({ success: false, message: '缺少 field 参数' });
         }
+        const scopedOrgId = await resolveScopedOrgId(req, raceId);
         const values = await recordRepo.uniqueValues(
-            req.tenantContext.orgId,
+            scopedOrgId,
             raceId,
             field,
             limit,
@@ -63,13 +78,13 @@ router.post('/unique-values', async (req, res, next) => {
 });
 
 // GET /api/records/quick-stats/:raceId — 首页快速统计
-router.get('/quick-stats/:raceId', async (req, res, next) => {
+router.get('/quick-stats/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const winnerStatuses = req.query.statuses
             ? req.query.statuses.split(',')
             : [];
         const result = await recordRepo.quickStats(
-            req.tenantContext.orgId,
+            req.raceAccess.operatorOrgId,
             req.params.raceId,
             winnerStatuses,
         );
@@ -85,7 +100,7 @@ router.get('/quick-stats/:raceId', async (req, res, next) => {
 router.put('/:recordId', async (req, res, next) => {
     try {
         const updated = await recordRepo.updateById(
-            req.tenantContext.orgId,
+            req.authContext.orgId,
             req.params.recordId,
             req.body,
         );
@@ -107,7 +122,7 @@ router.post('/bulk-update', async (req, res, next) => {
         }
 
         const result = await recordRepo.bulkUpdate(
-            req.tenantContext.orgId,
+            req.authContext.orgId,
             updates,
         );
         res.json({ success: true, data: result });
@@ -117,10 +132,10 @@ router.post('/bulk-update', async (req, res, next) => {
 });
 
 // DELETE /api/records/race/:raceId — 清空赛事数据
-router.delete('/race/:raceId', async (req, res, next) => {
+router.delete('/race/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const deleted = await recordRepo.deleteByRaceId(
-            req.tenantContext.orgId,
+            req.raceAccess.operatorOrgId,
             req.params.raceId,
         );
         res.json({ success: true, deleted });
@@ -130,13 +145,13 @@ router.delete('/race/:raceId', async (req, res, next) => {
 });
 
 // GET /api/records/export/:raceId — 流式导出（NDJSON）
-router.get('/export/:raceId', async (req, res, next) => {
+router.get('/export/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         res.setHeader('Content-Type', 'application/x-ndjson');
         res.setHeader('Transfer-Encoding', 'chunked');
 
         const dbStream = recordRepo.streamByRaceId(
-            req.tenantContext.orgId,
+            req.raceAccess.operatorOrgId,
             req.params.raceId,
         );
 
@@ -164,7 +179,7 @@ router.get('/export/:raceId', async (req, res, next) => {
 });
 
 // POST /api/records/import-verification/:raceId — 校验成绩导入
-router.post('/import-verification/:raceId', async (req, res, next) => {
+router.post('/import-verification/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const raceId = Number(req.params.raceId);
         if (!raceId || !Number.isFinite(raceId)) {
@@ -177,7 +192,7 @@ router.post('/import-verification/:raceId', async (req, res, next) => {
         }
 
         const result = await recordRepo.importVerificationResults(
-            req.tenantContext.orgId,
+            req.raceAccess.operatorOrgId,
             raceId,
             results,
         );
