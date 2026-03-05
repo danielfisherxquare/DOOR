@@ -113,7 +113,7 @@ function MemberCreatePage() {
                 <div style={inputGroupStyle}>
                     <label style={labelStyle}>初始密码</label>
                     <input className="input" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
-                    <span style={{ fontSize: 12, color: 'var(--color-text-muted, #999)' }}>成员首次登录将被要求修改密码</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-warning)', fontWeight: 600 }}>成员首次登录将被要求修改密码</span>
                 </div>
                 <div style={inputGroupStyle}>
                     <label style={labelStyle}>角色</label>

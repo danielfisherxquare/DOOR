@@ -1,6 +1,5 @@
-/**
- * Races Mapper — snake_case (DB) ↔ camelCase (API)
- * 字段与前端 Race 接口 1:1 对齐
+﻿/**
+ * Races Mapper - snake_case (DB) -> camelCase (API)
  */
 
 export const raceMapper = {
@@ -12,13 +11,13 @@ export const raceMapper = {
             name: row.name,
             date: row.date,
             location: row.location,
-            events: row.events ?? null,           // jsonb 已自动解析
+            events: row.events ?? null,
             conflictRule: row.conflict_rule,
             locationLat: row.location_lat,
             locationLng: row.location_lng,
             routeData: row.route_data,
             mapFeaturesData: row.map_features_data,
-            createAt: row.created_at,             // 兼容前端 Race.createAt 命名
+            createAt: row.created_at,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
         };
@@ -30,7 +29,7 @@ export const raceMapper = {
             name: data.name,
             date: data.date,
             location: data.location ?? '',
-            events: data.events ? JSON.stringify(data.events) : null,
+            events: data.events ?? null,
             conflict_rule: data.conflictRule ?? 'strict',
             location_lat: data.locationLat ?? null,
             location_lng: data.locationLng ?? null,
@@ -44,7 +43,7 @@ export const raceMapper = {
         if (data.name !== undefined) row.name = data.name;
         if (data.date !== undefined) row.date = data.date;
         if (data.location !== undefined) row.location = data.location;
-        if (data.events !== undefined) row.events = data.events ? JSON.stringify(data.events) : null;
+        if (data.events !== undefined) row.events = data.events ?? null;
         if (data.conflictRule !== undefined) row.conflict_rule = data.conflictRule;
         if (data.locationLat !== undefined) row.location_lat = data.locationLat;
         if (data.locationLng !== undefined) row.location_lng = data.locationLng;

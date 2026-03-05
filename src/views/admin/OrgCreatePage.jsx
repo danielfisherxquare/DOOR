@@ -97,7 +97,7 @@ function OrgCreatePage() {
                     <div style={inputGroupStyle}>
                         <label style={labelStyle}>初始密码</label>
                         <input className="input" value={adminPassword} onChange={e => setAdminPassword(e.target.value)} disabled={loading} />
-                        <span style={{ fontSize: 12, color: 'var(--color-text-muted, #999)' }}>管理员首次登录将被要求修改密码</span>
+                        <span style={{ fontSize: 12, color: 'var(--color-warning)', fontWeight: 600 }}>管理员首次登录将被要求修改密码</span>
                     </div>
                     <div style={{ display: 'flex', gap: 12 }}>
                         <button type="submit" className="btn btn--primary" disabled={loading || !adminUsername.trim() || !adminEmail.trim()}>

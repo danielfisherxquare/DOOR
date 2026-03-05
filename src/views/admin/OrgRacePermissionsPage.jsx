@@ -33,7 +33,7 @@ function OrgRacePermissionsPage() {
                     setSelectedOrgId(items[0].id)
                 }
             })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoading(false))
     }, [isSuperAdmin, presetOrgId])
 
@@ -177,15 +177,15 @@ function OrgRacePermissionsPage() {
             <div style={{ background: 'var(--color-bg-card, #fff)', borderRadius: 12, boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))', overflow: 'hidden' }}>
                 <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-color, #e5e7eb)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 600 }}>赛事列表</span>
-                    <span style={{ fontSize: 13, color: 'var(--color-text-muted, #999)' }}>已选 {enabledCount} 场</span>
+                    <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>已选 {enabledCount} 场</span>
                 </div>
 
                 {!selectedOrgId ? (
-                    <div style={{ padding: 36, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>请选择一个机构</div>
+                    <div style={{ padding: 36, textAlign: 'center', color: 'var(--color-text-secondary)' }}>请选择一个机构</div>
                 ) : loading ? (
-                    <div style={{ padding: 36, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>加载中...</div>
+                    <div style={{ padding: 36, textAlign: 'center', color: 'var(--color-text-secondary)' }}>加载中...</div>
                 ) : allRaces.length === 0 ? (
-                    <div style={{ padding: 36, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>暂无可授权赛事</div>
+                    <div style={{ padding: 36, textAlign: 'center', color: 'var(--color-text-secondary)' }}>暂无可授权赛事</div>
                 ) : (
                     <div style={{ padding: 8 }}>
                         {allRaces.map((race) => {
@@ -210,7 +210,7 @@ function OrgRacePermissionsPage() {
                                     />
                                     <div style={{ flex: 1 }}>
                                         <div style={{ fontWeight: 600, fontSize: 14 }}>{race.name}</div>
-                                        <div style={{ fontSize: 12, color: 'var(--color-text-muted, #999)' }}>
+                                        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
                                             {(race.org_name || race.org_id) ? `${race.org_name || race.org_id}` : '-'}
                                             {race.date ? ` · ${race.date}` : ''}
                                             {race.location ? ` · ${race.location}` : ''}

@@ -194,22 +194,22 @@ function RacePermissionsPage() {
                             </div>
                         ))}
                         {members.length === 0 && (
-                            <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-text-muted, #999)', fontSize: 13 }}>暂无用户</div>
+                            <div style={{ padding: 16, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 13 }}>暂无用户</div>
                         )}
                     </div>
                 </div>
 
                 <div style={{ flex: 1, background: 'var(--color-bg-card, #fff)', borderRadius: 12, boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))' }}>
                     {!selectedUser ? (
-                        <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>请先选择一个用户</div>
+                        <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-secondary)' }}>请先选择一个用户</div>
                     ) : loading ? (
-                        <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>加载中...</div>
+                        <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-secondary)' }}>加载中...</div>
                     ) : (
                         <>
                             <div style={{ padding: '12px 16px', background: 'var(--color-bg-secondary, #fafafa)', borderBottom: '1px solid var(--border-color, #e5e7eb)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
                                     <span style={{ fontWeight: 600 }}>{selectedUsername}</span>
-                                    <span style={{ fontSize: 13, color: 'var(--color-text-muted, #999)', marginLeft: 8 }}>的赛事权限</span>
+                                    <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginLeft: 8 }}>的赛事权限</span>
                                 </div>
                                 <div style={{ display: 'flex', gap: 8 }}>
                                     <button className="btn btn--ghost btn--sm" onClick={handleSelectAll}>
@@ -222,7 +222,7 @@ function RacePermissionsPage() {
                             </div>
 
                             {allRaces.length === 0 ? (
-                                <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>该用户所属机构暂无赛事</div>
+                                <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-secondary)' }}>该用户所属机构暂无赛事</div>
                             ) : (
                                 <div style={{ padding: 8 }}>
                                     {allRaces.map((race) => {
@@ -238,7 +238,7 @@ function RacePermissionsPage() {
                                                 />
                                                 <div style={{ flex: 1 }}>
                                                     <div style={{ fontWeight: 600, fontSize: 14 }}>{race.name}</div>
-                                                    <div style={{ fontSize: 12, color: 'var(--color-text-muted, #999)' }}>
+                                                    <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
                                                         {race.date || ''}
                                                         {race.location ? ` · ${race.location}` : ''}
                                                     </div>

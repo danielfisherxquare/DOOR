@@ -106,7 +106,7 @@ function UserListPage() {
             </div>
 
             {loading ? (
-                <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-muted, #999)' }}>加载中...</div>
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-secondary)' }}>加载中...</div>
             ) : (
                 <>
                     <div style={{ background: 'var(--color-bg-card, #fff)', borderRadius: 12, overflow: 'hidden', boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))' }}>
@@ -133,7 +133,7 @@ function UserListPage() {
                                         </td>
                                         <td style={tdStyle}>
                                             {u.role === 'super_admin' ? (
-                                                <span style={{ color: 'var(--color-text-muted, #999)' }}>平台级</span>
+                                                <span style={{ color: 'var(--color-text-secondary)' }}>平台级</span>
                                             ) : (
                                                 <select
                                                     value={u.org_id || ''}
@@ -166,7 +166,7 @@ function UserListPage() {
                                     </tr>
                                 ))}
                                 {users.length === 0 && (
-                                    <tr><td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>暂无用户</td></tr>
+                                    <tr><td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary)' }}>暂无用户</td></tr>
                                 )}
                             </tbody>
                         </table>

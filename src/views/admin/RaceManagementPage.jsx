@@ -1,8 +1,35 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import racesApi from '../../api/races'
 import adminApi from '../../api/adminApi'
+
+const createEmptyEvent = () => ({
+    name: '',
+    targetCount: 0,
+})
+
+const normalizeEventsForForm = (events) => {
+    if (!Array.isArray(events) || events.length === 0) {
+        return [createEmptyEvent()]
+    }
+
+    return events.map((event) => ({
+        name: typeof event?.name === 'string' ? event.name : '',
+        targetCount: Number.isFinite(Number(event?.targetCount)) ? Math.max(0, Math.floor(Number(event.targetCount))) : 0,
+    }))
+}
+
+const normalizeEventsForSubmit = (events) => {
+    if (!Array.isArray(events)) return []
+
+    return events
+        .map((event) => ({
+            name: typeof event?.name === 'string' ? event.name.trim() : '',
+            targetCount: Number.isFinite(Number(event?.targetCount)) ? Math.max(0, Math.floor(Number(event.targetCount))) : 0,
+        }))
+        .filter((event) => event.name)
+}
 
 const buildEmptyForm = (orgId = '') => ({
     name: '',
@@ -10,6 +37,7 @@ const buildEmptyForm = (orgId = '') => ({
     location: '',
     conflictRule: 'strict',
     orgId,
+    events: [createEmptyEvent()],
 })
 
 function RaceManagementPage() {
@@ -42,16 +70,20 @@ function RaceManagementPage() {
     }, [isSuperAdmin, selectedOrgId, editingRace])
 
     const orgNameById = useMemo(
-        () => new Map((orgs || []).map((o) => [String(o.id), o.name])),
+        () => new Map((orgs || []).map((org) => [String(org.id), org.name])),
         [orgs],
     )
 
+    const sanitizedEvents = useMemo(() => normalizeEventsForSubmit(form.events), [form.events])
+
     const canSubmit = useMemo(() => {
         if (!form.name.trim()) return false
+        if (sanitizedEvents.length === 0) return false
+
         if (!isSuperAdmin) return true
         const targetOrgId = editingRace?.orgId || form.orgId || selectedOrgId
         return !!targetOrgId
-    }, [form.name, form.orgId, isSuperAdmin, editingRace, selectedOrgId])
+    }, [form.name, form.orgId, isSuperAdmin, editingRace, selectedOrgId, sanitizedEvents.length])
 
     const loadRaces = async () => {
         setLoading(true)
@@ -79,8 +111,39 @@ function RaceManagementPage() {
         setForm(buildEmptyForm(selectedOrgId))
     }
 
-    const handleSubmit = async (e) => {
-        e.preventDefault()
+    const updateEvent = (index, key, value) => {
+        setForm((prev) => {
+            const nextEvents = [...(prev.events || [])]
+            const current = nextEvents[index] || createEmptyEvent()
+            nextEvents[index] = {
+                ...current,
+                [key]: key === 'targetCount'
+                    ? (Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : 0)
+                    : value,
+            }
+            return { ...prev, events: nextEvents }
+        })
+    }
+
+    const addEventRow = () => {
+        setForm((prev) => ({
+            ...prev,
+            events: [...(prev.events || []), createEmptyEvent()],
+        }))
+    }
+
+    const removeEventRow = (index) => {
+        setForm((prev) => {
+            const nextEvents = (prev.events || []).filter((_, idx) => idx !== index)
+            return {
+                ...prev,
+                events: nextEvents.length > 0 ? nextEvents : [createEmptyEvent()],
+            }
+        })
+    }
+
+    const handleSubmit = async (event) => {
+        event.preventDefault()
         if (!canSubmit) return
 
         setSaving(true)
@@ -91,6 +154,7 @@ function RaceManagementPage() {
             date: form.date || '',
             location: form.location || '',
             conflictRule: form.conflictRule,
+            events: sanitizedEvents,
         }
 
         if (isSuperAdmin) {
@@ -128,12 +192,13 @@ function RaceManagementPage() {
             location: race.location || '',
             conflictRule: race.conflictRule || 'strict',
             orgId: race.orgId || selectedOrgId || '',
+            events: normalizeEventsForForm(race.events),
         })
         setMessage('')
     }
 
     const handleDelete = async (race) => {
-        if (!confirm(`确定删除赛事「${race.name}」吗？该操作不可恢复。`)) return
+        if (!window.confirm(`确定删除赛事「${race.name}」吗？该操作不可恢复。`)) return
 
         setMessage('')
         try {
@@ -151,6 +216,9 @@ function RaceManagementPage() {
     }
 
     const eventCount = (race) => (Array.isArray(race.events) ? race.events.length : 0)
+    const eventTargetTotal = (race) => (Array.isArray(race.events)
+        ? race.events.reduce((sum, item) => sum + (Number(item?.targetCount) || 0), 0)
+        : 0)
 
     return (
         <div>
@@ -164,7 +232,7 @@ function RaceManagementPage() {
                     padding: '12px 16px', marginBottom: 16, borderRadius: 10,
                     background: 'rgba(245,158,11,0.1)', color: '#b45309', fontSize: 14,
                 }}>
-                    未选择机构：当前显示全平台赛事；创建赛事时请在表单中选择目标机构。
+                    未选择机构：当前显示全平台赛事。创建赛事时请在表单中选择目标机构。
                 </div>
             )}
 
@@ -181,7 +249,7 @@ function RaceManagementPage() {
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '420px 1fr', gap: 16 }}>
                 <div style={{ background: 'var(--color-bg-card, #fff)', borderRadius: 12, boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))' }}>
                     <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-color, #e5e7eb)', fontWeight: 600 }}>
                         {editingRace ? '编辑赛事' : '创建赛事'}
@@ -194,7 +262,7 @@ function RaceManagementPage() {
                                 <select
                                     className="input"
                                     value={form.orgId}
-                                    onChange={(e) => setForm((prev) => ({ ...prev, orgId: e.target.value }))}
+                                    onChange={(event) => setForm((prev) => ({ ...prev, orgId: event.target.value }))}
                                     disabled={!!editingRace}
                                 >
                                     <option value="">请选择机构</option>
@@ -202,7 +270,7 @@ function RaceManagementPage() {
                                         <option key={org.id} value={org.id}>{org.name}</option>
                                     ))}
                                 </select>
-                                {editingRace && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-text-muted, #888)' }}>编辑时不允许跨机构迁移赛事</div>}
+                                {editingRace && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-text-muted, #888)' }}>编辑时不支持跨机构迁移</div>}
                             </div>
                         )}
 
@@ -211,7 +279,7 @@ function RaceManagementPage() {
                             <input
                                 className="input"
                                 value={form.name}
-                                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
                                 placeholder="例如：2026 春季马拉松"
                             />
                         </div>
@@ -222,7 +290,7 @@ function RaceManagementPage() {
                                 className="input"
                                 type="date"
                                 value={form.date}
-                                onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
+                                onChange={(event) => setForm((prev) => ({ ...prev, date: event.target.value }))}
                             />
                         </div>
 
@@ -231,9 +299,48 @@ function RaceManagementPage() {
                             <input
                                 className="input"
                                 value={form.location}
-                                onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))}
+                                onChange={(event) => setForm((prev) => ({ ...prev, location: event.target.value }))}
                                 placeholder="例如：北京"
                             />
+                        </div>
+
+                        <div>
+                            <label style={labelStyle}>比赛项目与目标人数 *</label>
+                            <div style={{ display: 'grid', gap: 8 }}>
+                                {(form.events || []).map((eventItem, index) => (
+                                    <div key={`event-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr 130px auto', gap: 8 }}>
+                                        <input
+                                            className="input"
+                                            value={eventItem.name}
+                                            onChange={(event) => updateEvent(index, 'name', event.target.value)}
+                                            placeholder="项目名称，例如：马拉松"
+                                        />
+                                        <input
+                                            className="input"
+                                            type="number"
+                                            min={0}
+                                            step={1}
+                                            value={eventItem.targetCount}
+                                            onChange={(event) => updateEvent(index, 'targetCount', event.target.value)}
+                                            placeholder="目标人数"
+                                        />
+                                        <button
+                                            type="button"
+                                            className="btn btn--ghost btn--sm"
+                                            onClick={() => removeEventRow(index)}
+                                            disabled={(form.events || []).length <= 1}
+                                        >
+                                            删除
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                            <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <button type="button" className="btn btn--ghost btn--sm" onClick={addEventRow}>+ 添加项目</button>
+                                <span style={{ fontSize: 12, color: 'var(--color-text-muted, #666)' }}>
+                                    当前目标总人数：{sanitizedEvents.reduce((sum, item) => sum + item.targetCount, 0).toLocaleString()}
+                                </span>
+                            </div>
                         </div>
 
                         <div>
@@ -241,7 +348,7 @@ function RaceManagementPage() {
                             <select
                                 className="input"
                                 value={form.conflictRule}
-                                onChange={(e) => setForm((prev) => ({ ...prev, conflictRule: e.target.value }))}
+                                onChange={(event) => setForm((prev) => ({ ...prev, conflictRule: event.target.value }))}
                             >
                                 <option value="strict">严格 (strict)</option>
                                 <option value="permissive">宽松 (permissive)</option>
@@ -267,9 +374,9 @@ function RaceManagementPage() {
                     </div>
 
                     {loading ? (
-                        <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>加载中...</div>
+                        <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-secondary)' }}>加载中...</div>
                     ) : races.length === 0 ? (
-                        <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>暂无赛事</div>
+                        <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-secondary)' }}>暂无赛事</div>
                     ) : (
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
@@ -279,6 +386,7 @@ function RaceManagementPage() {
                                     <th style={thStyle}>日期</th>
                                     <th style={thStyle}>地点</th>
                                     <th style={thStyle}>项目数</th>
+                                    <th style={thStyle}>目标人数</th>
                                     <th style={thStyle}>规则</th>
                                     <th style={thStyle}>操作</th>
                                 </tr>
@@ -291,6 +399,7 @@ function RaceManagementPage() {
                                         <td style={tdStyle}>{race.date || '-'}</td>
                                         <td style={tdStyle}>{race.location || '-'}</td>
                                         <td style={tdStyle}>{eventCount(race)}</td>
+                                        <td style={tdStyle}>{eventTargetTotal(race).toLocaleString()}</td>
                                         <td style={tdStyle}>{race.conflictRule || 'strict'}</td>
                                         <td style={tdStyle}>
                                             <div style={{ display: 'flex', gap: 8 }}>

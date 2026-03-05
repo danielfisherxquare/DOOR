@@ -133,7 +133,7 @@ function MemberListPage() {
             </form>
 
             {loading ? (
-                <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-muted, #999)' }}>加载中...</div>
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-secondary)' }}>加载中...</div>
             ) : (
                 <>
                     <div style={{ background: 'var(--color-bg-card, #fff)', borderRadius: 12, overflow: 'hidden', boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))' }}>
@@ -208,7 +208,7 @@ function MemberListPage() {
                                 ))}
                                 {members.length === 0 && (
                                     <tr>
-                                        <td colSpan={isGlobalSuperAdmin ? 6 : 5} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-muted, #999)' }}>暂无成员</td>
+                                        <td colSpan={isGlobalSuperAdmin ? 6 : 5} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary)' }}>暂无成员</td>
                                     </tr>
                                 )}
                             </tbody>

@@ -147,7 +147,7 @@ function ToolDetail() {
             borderRadius: '50%',
             border: 'none',
             background: '#f0f0f0',
-            color: '#999',
+            color: 'var(--color-text-secondary)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
