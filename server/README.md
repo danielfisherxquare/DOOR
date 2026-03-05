@@ -1,120 +1,86 @@
-# DOOR 门户系统 — 权限模型与部署指南
+# DOOR Server README（端口统一版）
 
-## 权限模型
+## 服务与端口
 
-### 角色体系
+- API 服务：`3001`
+- PostgreSQL：`5432`
+- Nginx（在 `docker-compose.yml` 中）：`8080 -> app:3001`
 
-| 角色 | 说明 | 可见范围 |
-|------|------|----------|
-| `super_admin` | 超级管理员 | 全平台所有机构和赛事 |
-| `org_admin` | 机构管理员 | 本机构所有赛事 + 成员管理 |
-| `race_editor` | 赛事编辑 | 仅被分配的赛事（可读写） |
-| `race_viewer` | 赛事只读 | 仅被分配的赛事（只读） |
+默认数据库连接（代码兜底）：
 
-### API 权限矩阵
+- `postgres://door:door_dev@localhost:5432/door`
 
-| API 分组 | 无 Token | race_viewer | race_editor | org_admin | super_admin |
-|----------|----------|-------------|-------------|-----------|-------------|
-| `/api/auth/*` | ✅ 公开 | ✅ | ✅ | ✅ | ✅ |
-| `/api/races` GET | ❌ 401 | ✅ 仅授权 | ✅ 仅授权 | ✅ 本机构 | ✅ 全平台 |
-| `/api/records` GET | ❌ | ✅ 仅授权 | ✅ | ✅ | ✅ |
-| `/api/records` POST | ❌ | ❌ 403 | ✅ | ✅ | ✅ |
-| `/api/admin/*` | ❌ | ❌ | ❌ | ❌ | ✅ |
-| `/api/org/*` | ❌ | ❌ | ❌ | ✅ | ✅ |
+说明：旧端口 `15432` 已废弃。
 
-### 管理后台路由
+## 目录内启动规则
 
-| 路由 | 页面 | 可访问角色 |
-|------|------|------------|
-| `/admin` | 仪表板 | org_admin, super_admin |
-| `/admin/orgs` | 机构列表 | super_admin |
-| `/admin/orgs/new` | 新建机构 | super_admin |
-| `/admin/users` | 全平台用户 | super_admin |
-| `/admin/members` | 成员管理 | org_admin, super_admin |
-| `/admin/members/new` | 新建成员 | org_admin, super_admin |
-| `/admin/race-permissions` | 赛事授权 | org_admin, super_admin |
-
----
-
-## 部署检查清单
-
-### 环境变量
+所有 Docker 命令必须在 `door/server/` 目录执行。
 
 ```bash
-# .env 必需
-DATABASE_URL=postgres://user:pass@host:5432/door
-JWT_SECRET=<至少32位随机字符串>
-JWT_REFRESH_SECRET=<至少32位随机字符串>
-DISABLE_REGISTRATION=true       # 生产环境关闭注册
-CORS_ORIGIN=https://your-domain.com
-NODE_ENV=production
+cd door/server
 ```
 
-### 部署步骤
+## 本地运行（不走 Docker）
 
 ```bash
-# 1. 运行数据库迁移
-npx knex migrate:latest
-
-# 2. 创建超级管理员
-## Docker 部署（推荐）
-docker compose exec -e SUPER_ADMIN_PASSWORD="your_password" app node scripts/seed-super-admin.js
-
-## 本地运行（需要 .env）
-node --env-file=.env scripts/seed-super-admin.js
-
-# 3. 验证迁移
-node --test tests/auth.test.js
-node --test tests/permissions.test.js
-
-# 4. 启动服务
-npm start
+npm ci
+cp .env.example .env
+npm run migrate
+npm run dev
 ```
 
-### 日常维护
+健康检查：
 
 ```bash
-# 权限一致性巡检（建议每日 cron）
-node scripts/audit-permissions.js
-
-# 发现问题时自动修复
-node scripts/audit-permissions.js --fix
-
-# 迁移回滚（紧急情况）
-npx knex migrate:rollback
+curl http://localhost:3001/api/health/live
+curl http://localhost:3001/api/health/ready
 ```
 
----
+## Docker 运行（推荐）
 
-## 项目结构
+```bash
+cd door/server
+cp .env.example .env
+docker compose up -d --build
+docker compose exec app npm run migrate
+```
 
+健康检查：
+
+```bash
+curl http://localhost:8080/api/health/ready
+curl http://localhost:3001/api/health/ready
 ```
-door/
-├── server/
-│   ├── src/
-│   │   ├── app.js                      # Express 应用入口
-│   │   ├── middleware/
-│   │   │   ├── require-auth.js         # JWT 验证 + 角色映射
-│   │   │   ├── require-roles.js        # 角色白名单守卫
-│   │   │   ├── require-race-access.js  # 赛事级授权
-│   │   │   └── rate-limiter.js         # 登录限流
-│   │   └── modules/
-│   │       ├── auth/                   # 认证模块
-│   │       ├── admin/                  # 平台管理 API (super_admin)
-│   │       ├── org/                    # 机构管理 API (org_admin)
-│   │       ├── races/                  # 赛事模块
-│   │       └── ...                     # 其他业务模块
-│   ├── scripts/
-│   │   ├── seed-super-admin.js         # 超管初始化
-│   │   └── audit-permissions.js        # 权限巡检
-│   └── tests/
-│       ├── auth.test.js                # 认证测试
-│       ├── permissions.test.js         # 权限场景测试
-│       └── ...
-├── src/                                # 前端 React
-│   ├── views/admin/                    # 管理后台页面
-│   ├── components/admin/               # 管理后台组件
-│   ├── api/adminApi.js                 # 管理 API 封装
-│   └── stores/authStore.js             # 认证状态管理
-└── package.json
+
+## 超级管理员初始化
+
+```bash
+docker compose exec \
+  -e SUPER_ADMIN_PASSWORD="your_password" \
+  -e SUPER_ADMIN_USERNAME="superadmin" \
+  -e SUPER_ADMIN_EMAIL="admin@platform.local" \
+  app node scripts/seed-super-admin.js
 ```
+
+## 权限模型（简表）
+
+| 角色 | 能力范围 |
+|---|---|
+| `super_admin` | 全平台（机构、用户、赛事） |
+| `org_admin` | 本机构全部赛事与成员管理 |
+| `race_editor` | 被授权赛事可读写 |
+| `race_viewer` | 被授权赛事只读 |
+
+## 常见问题
+
+1. `ECONNREFUSED 127.0.0.1:15432`  
+原因：仍在使用旧端口配置。  
+处理：改为 `5432`，并检查 `DATABASE_URL` 是否覆盖了默认值。
+
+2. `database "door_test" does not exist`（跑测试时）  
+原因：测试库未创建。  
+处理：先创建 `door_test`，再执行 `node --test`。
+
+3. `Missing orgId for super_admin`  
+原因：访问 `/api/org/*` 时超管未提供 `orgId`。  
+处理：请求参数追加 `?orgId=<机构ID>`。

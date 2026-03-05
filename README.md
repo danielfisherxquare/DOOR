@@ -1,154 +1,123 @@
-# DOOR 部署文档（单仓库）
+# DOOR 系统 README（端口统一版）
 
-本仓库在 `door/` 目录下包含两套工程，请务必区分：
+本仓库中与 DOOR 相关的主要目录：
 
-- `door/`：前端门户（Vite + React），构建产物在 `door/dist/`
-- `door/server/`：后端服务（Express + Postgres + Knex），通过 Docker Compose 部署
+- `door/`：门户前端（Vite + React）
+- `door/server/`：后端 API（Express + PostgreSQL + Knex）
+- `tool/`：本地数据管理工具（Vite + Electron）
 
-后端部署命令必须在 `door/server/` 下执行，不要在 `door/` 根目录执行后端相关命令。
+## 端口基线（当前统一）
 
-## 生产架构（推荐）
+| 服务 | 默认端口 | 说明 |
+|---|---:|---|
+| DOOR 后端 API | `3001` | `http://localhost:3001/api/...` |
+| DOOR 前端 dev | `5173` | Vite dev server，`/api` 代理到 `3001` |
+| TOOL 前端 dev | `5174` | Vite dev server，`/api` 代理到 `3001` |
+| Nginx 网关 | `8080` | Docker 部署入口，`/api` 反代到 `app:3001` |
+| PostgreSQL | `5432` | Docker 映射 `5432:5432` |
 
-1. 用户访问：`http(s)://<domain>:8080`
-2. Nginx（容器）：
-   - `/`：静态文件（挂载 `../dist`）
-   - `/api/*`：反代到 `app:3001`
-3. Node 后端：`app:3001`
-4. Postgres：`postgres:5432`
+说明：`15432` 已废弃，不再作为默认端口使用。
 
-对应配置文件：
+## 云端部署配置（DOOR 生产）
 
-- `door/server/docker-compose.yml`
-- `door/server/nginx.conf`
+已确认你的 DOOR 项目部署在云服务器 `http://47.251.107.41`（阿里云），且服务器不开放 `80/443`，因此统一使用 `8080` 作为对外入口端口。
 
-## 首次部署（Docker Compose）
+- 主入口（IP）：`http://47.251.107.41:8080`
+- 域名入口（可选）：`http://www.xquareliu.com:8080`
 
-在服务器上执行（建议在 `door/server/`）：
+需要确保以下配置一致：
 
-### 1. 初始化后端环境变量
+1. 前端（`door/.env`）
+
+```env
+VITE_API_BASE_URL=http://47.251.107.41:8080/api
+```
+
+2. 后端（`door/server/.env`）
+
+```env
+PORT=3001
+PUBLIC_BASE_URL=http://47.251.107.41:8080
+CORS_ORIGIN=http://47.251.107.41:8080,http://www.xquareliu.com:8080
+```
+
+3. 网关（`door/server/nginx.conf`）
+
+```nginx
+listen 8080;
+server_name 47.251.107.41 www.xquareliu.com;
+```
+
+4. Docker 映射（`door/server/docker-compose.yml`）
+
+```yaml
+nginx:
+  ports:
+    - "8080:8080"
+```
+
+## 启动方式
+
+### 1. Docker 一体部署（推荐）
+
+在 `door/server/` 目录执行：
 
 ```bash
 cd door/server
 cp .env.example .env
-# 编辑 .env：至少设置 POSTGRES_PASSWORD / JWT_SECRET / NODE_ENV
-# 可选：CORS_ORIGIN / DISABLE_REGISTRATION
-```
-
-说明：
-
-- `CORS_ORIGIN` 支持逗号分隔多 origin，例如 `https://a.com,http://localhost:5173`
-- `DISABLE_REGISTRATION=true` 建议在生产关闭公开注册
-
-### 2. 构建前端（生成 door/dist）
-
-```bash
-cd door
-npm ci
-npm run build
-```
-
-### 3. 启动后端 + 数据库 + Nginx
-
-```bash
-cd door/server
 docker compose up -d --build
-```
-
-### 4. 运行数据库迁移
-
-```bash
 docker compose exec app npm run migrate
 ```
 
-### 5. 创建或更新超级管理员（平台超管）
-
-平台超管的特点：`org_id = NULL`，角色为 `super_admin`。
-
-```bash
-# 必填: SUPER_ADMIN_PASSWORD
-docker compose exec \
-  -e SUPER_ADMIN_PASSWORD="your_password" \
-  -e SUPER_ADMIN_USERNAME="superadmin" \
-  -e SUPER_ADMIN_EMAIL="admin@platform.local" \
-  app node scripts/seed-super-admin.js
-```
-
-### 6. 验证健康检查
+健康检查：
 
 ```bash
 curl -i http://127.0.0.1:8080/api/health/ready
 curl -i http://127.0.0.1:3001/api/health/ready
 ```
 
-期望：HTTP 200，且包含 `{"status":"ok","database":"connected"}`。
+### 2. 本地开发（分进程）
 
-## 常规更新
-
-```bash
-cd door/server
-git pull
-docker compose up -d --build
-docker compose exec app npm run migrate
-```
-
-如果前端也更新了，记得重新构建 `door/dist/`（见“构建前端”步骤）。
-
-## 回滚（基于备份）
+后端（`door/server`）：
 
 ```bash
-cd door/server
-bash scripts/backup-postgres.sh
-
-# 回滚时：
-docker compose stop app worker
-bash scripts/restore-postgres.sh backups/door_backup_YYYYMMDD_HHMMSS.sql
-git checkout <previous-tag-or-commit>
-docker compose up -d --build app worker nginx
+npm ci
+npm run dev
 ```
 
-## 登录与权限排查
-
-### 超管无法登录（优先）
-
-后端提供诊断脚本，可在容器内查看迁移状态、`users` 关键字段是否齐全、以及是否存在重复的“平台用户”记录：
+门户前端（`door`）：
 
 ```bash
-cd door/server
-docker compose exec app node scripts/diagnose-auth.js
+npm ci
+npm run dev
 ```
 
-常见原因：
+工具前端（`tool`）：
 
-- 迁移没跑全：尤其是 `20260304000001_auth_permission_overhaul.js`（角色枚举、`org_id` nullable、登录安全字段等）
-- seed 重复导致 `org_id = NULL` 的平台用户重复，从而登录命中非预期记录
-- 账号被锁定（多次失败登录）或被禁用（`status = disabled`）
+```bash
+npm ci
+npm run dev
+```
 
-### 门户登录后白屏
+## 防止“自动拉起”导致冲突
 
-优先查看浏览器 Console 的第一条报错，以及 Network 里 `/api/auth/me` 是否 401 循环或 5xx。
+1. `docker compose up` 只能在 `door/server/` 执行，不要在仓库根目录误执行。  
+2. `door` 的 Vite 配置默认 `open: true`，会自动打开浏览器；如不需要自动打开，可用：
+   `npm run dev -- --open false`
+3. `tool` 的 Electron 联调使用 `npm run electron:dev`，内部会先等 `5174` 可用再拉起 Electron。  
+4. 如果本机已有 PostgreSQL 占用 `5432`，请先释放端口，或修改 `door/server/docker-compose.yml` 的映射端口并同步更新相关文档与环境变量。  
+5. `VITE_API_BASE_URL` 传“根地址”，不要手动追加 `/api`（代码会自动处理）。
 
-## tool 系统对接 door/server
+## 常用地址
 
-推荐让 `tool` 走与生产一致的入口（Nginx 8080），避免直连 `3001` 带来的 CORS 问题：
-
-- 推荐：`http://<domain>:8080`（前端 + API 都经 Nginx）
-- 直连 API（临时）：`http://<host>:3001`（需要正确配置 `CORS_ORIGIN`）
-
-注意：`tool` 的 `VITE_API_BASE_URL` 建议配置成后端“根地址”（例如 `http://47.251.107.41:3001`），不要在末尾再加 `/api`。
-
-## 端口建议
-
-生产建议：
-
-- 对外：`22`, `80/443`, `8080`
-- 仅内网：`3001`, `5432`
-
-不应对外暴露：
-
-- `5173`（Vite dev）
-- `5432`（数据库）
+- 门户（dev）：`http://localhost:5173`
+- 工具（dev）：`http://localhost:5174`
+- API（直连）：`http://localhost:3001`
+- 网关（Docker）：`http://localhost:8080`
+- DOOR 云端入口（IP）：`http://47.251.107.41:8080`
+- DOOR 云端入口（域名）：`http://www.xquareliu.com:8080`
 
 ## 参考
 
-- 后端部署与命令：`door/server/docs/deployment.md`
-- 后端权限模型与角色说明：`door/server/README.md`
+- 后端详细说明：[door/server/README.md](./server/README.md)
+- 工具详细说明：[tool/README.md](../tool/README.md)

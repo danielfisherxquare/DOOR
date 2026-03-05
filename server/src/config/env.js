@@ -3,6 +3,7 @@
  */
 export const env = {
   PORT: parseInt(process.env.PORT || '3001', 10),
+  PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL || 'http://47.251.107.41:8080',
   DATABASE_URL: process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door',
   JWT_SECRET: process.env.JWT_SECRET || 'door-secret-key-change-in-production',
   NODE_ENV: process.env.NODE_ENV || 'development',

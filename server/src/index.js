@@ -2,28 +2,27 @@ import app from './app.js';
 import { env } from './config/env.js';
 import knex from './db/knex.js';
 
-const server = app.listen(env.PORT, () => {
-    console.log(`🚀 服务器已启动: http://localhost:${env.PORT}`);
-    console.log(`📡 API 地址: http://localhost:${env.PORT}/api`);
-    console.log(`🌍 环境: ${env.NODE_ENV}`);
+const server = app.listen(env.PORT, '0.0.0.0', () => {
+    console.log(`Server started on 0.0.0.0:${env.PORT}`);
+    console.log(`Public URL: ${env.PUBLIC_BASE_URL}`);
+    console.log(`API URL: ${env.PUBLIC_BASE_URL}/api`);
+    console.log(`Environment: ${env.NODE_ENV}`);
 });
 
-// ── Graceful Shutdown ───────────────────────────────────
 async function shutdown(signal) {
-    console.log(`\n⏳ 收到 ${signal}，正在优雅关闭…`);
+    console.log(`\nReceived ${signal}, shutting down gracefully...`);
     server.close(async () => {
         try {
             await knex.destroy();
-            console.log('✅ 数据库连接已关闭');
+            console.log('Database connection closed');
         } catch (err) {
-            console.error('❌ 关闭数据库连接失败:', err);
+            console.error('Failed to close database connection', err);
         }
         process.exit(0);
     });
 
-    // 超时强制退出
     setTimeout(() => {
-        console.error('⚠️ 强制退出（超时 10 秒）');
+        console.error('Force exit after timeout (10s)');
         process.exit(1);
     }, 10_000);
 }

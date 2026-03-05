@@ -21,24 +21,22 @@ import orgRoutes from './modules/org/org.routes.js';
 const app = express();
 
 function getCorsOrigin() {
+    const cloudOrigins = ['http://47.251.107.41:8080', 'http://www.xquareliu.com:8080'];
+
     if (process.env.NODE_ENV !== 'production') {
-        // Local dev ports:
-        // - 5173: door web (Vite)
-        // - 5174: tool web/electron (Vite)
-        // - 3000: optional dev server
-        return ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
+        // Keep local dev origins and allow cloud endpoints for remote testing.
+        return ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', ...cloudOrigins];
     }
 
-    // 生产环境支持逗号分隔的多 origin: "https://a.com,https://b.com"
+    // Production supports comma-separated origins: "https://a.com,https://b.com"
     const raw = process.env.CORS_ORIGIN;
-    if (!raw) return undefined;
+    if (!raw) return cloudOrigins;
 
-    const list = raw.split(',').map(s => s.trim()).filter(Boolean);
-    if (list.length === 0) return undefined;
+    const list = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (list.length === 0) return cloudOrigins;
     return list.length === 1 ? list[0] : list;
 }
 
-// ── 中间件 ──────────────────────────────────────────────
 app.use(requestId);
 app.use(cors({
     origin: getCorsOrigin(),
@@ -46,12 +44,9 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 
-// ── 公开路由（无需认证）────────────────────────────────
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 
-// ── 受保护路由（需要认证）────────────────────────────
-// 统一入口校验 Token，并提供 authContext
 app.use(requireAuth);
 
 app.use('/api/jobs', jobRoutes);
@@ -67,7 +62,6 @@ app.use('/api/bib', bibRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/org', orgRoutes);
 
-// ── 统一错误处理 ────────────────────────────────────────
 app.use(errorHandler);
 
 export default app;
