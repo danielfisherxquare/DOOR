@@ -17,7 +17,6 @@ export async function listOrgs({ page = 1, limit = 20, keyword = '' }) {
         .offset((page - 1) * limit)
         .limit(limit);
 
-    // 附加每个机构的用户数和赛事数
     for (const org of items) {
         const [userCount] = await knex('users').where({ org_id: org.id }).count('* as count');
         const [raceCount] = await knex('races').where({ org_id: org.id }).count('* as count');
@@ -77,7 +76,7 @@ export async function listAllUsers({ page = 1, limit = 20, keyword = '', role = 
         .select(
             'users.id', 'users.username', 'users.email', 'users.role',
             'users.status', 'users.org_id', 'users.created_at',
-            'organizations.name as org_name'
+            'organizations.name as org_name',
         );
     if (keyword) {
         query.where(function () {
@@ -98,23 +97,49 @@ export async function listAllUsers({ page = 1, limit = 20, keyword = '', role = 
 }
 
 export async function updateUserByAdmin(userId, fields) {
-    const allowed = ['role', 'status'];
-    const data = {};
-    for (const key of allowed) {
-        if (fields[key] !== undefined) data[key] = fields[key];
-    }
-    if (Object.keys(data).length === 0) {
+    const user = await knex('users').where({ id: userId }).first();
+    if (!user) throw Object.assign(new Error('用户不存在'), { status: 404, expose: true });
+
+    const hasRole = fields.role !== undefined;
+    const hasStatus = fields.status !== undefined;
+    const hasOrgId = fields.orgId !== undefined;
+    if (!hasRole && !hasStatus && !hasOrgId) {
         throw Object.assign(new Error('无有效字段'), { status: 400, expose: true });
     }
+
+    const nextRole = hasRole ? fields.role : user.role;
+    let nextOrgId = hasOrgId ? fields.orgId : user.org_id;
+
+    if (nextRole === 'super_admin') {
+        nextOrgId = null;
+    } else if (!nextOrgId) {
+        throw Object.assign(new Error('非 super_admin 用户必须绑定机构（请提供 orgId）'), { status: 400, expose: true });
+    }
+
+    if (nextOrgId) {
+        const org = await knex('organizations').where({ id: nextOrgId }).first();
+        if (!org) {
+            throw Object.assign(new Error('机构不存在'), { status: 404, expose: true });
+        }
+    }
+
+    const data = {};
+    if (hasRole) data.role = fields.role;
+    if (hasStatus) data.status = fields.status;
+    if (hasOrgId || nextRole === 'super_admin') data.org_id = nextOrgId;
+
+    if (hasOrgId && user.org_id !== nextOrgId) {
+        await knex('user_race_permissions').where({ user_id: userId }).del();
+    }
+
     const [row] = await knex('users')
         .where({ id: userId })
         .update({ ...data, updated_at: knex.fn.now() })
         .returning(['id', 'username', 'email', 'role', 'status', 'org_id']);
-    if (!row) throw Object.assign(new Error('用户不存在'), { status: 404, expose: true });
     return row;
 }
 
-export async function resetUserPassword(userId, operatorId) {
+export async function resetUserPassword(userId) {
     const tempPassword = 'Abc123456';
     const passwordHash = await bcrypt.hash(tempPassword, 10);
     await knex('users')

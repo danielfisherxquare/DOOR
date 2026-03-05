@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import adminApi from '../../api/adminApi'
 
 function MemberCreatePage() {
     const navigate = useNavigate()
+    const [searchParams] = useSearchParams()
+    const orgId = searchParams.get('orgId') || undefined
     const [username, setUsername] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('Abc123456')
@@ -16,7 +18,7 @@ function MemberCreatePage() {
         if (!username.trim() || !email.trim()) return
         setLoading(true); setError('')
         try {
-            const res = await adminApi.createOrgUser({ username: username.trim(), email: email.trim(), password, role })
+            const res = await adminApi.createOrgUser({ username: username.trim(), email: email.trim(), password, role }, orgId)
             if (res.success) {
                 navigate('/admin/members')
             }

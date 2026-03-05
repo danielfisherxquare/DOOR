@@ -3,6 +3,7 @@ import adminApi from '../../api/adminApi'
 
 function UserListPage() {
     const [users, setUsers] = useState([])
+    const [orgs, setOrgs] = useState([])
     const [loading, setLoading] = useState(true)
     const [keyword, setKeyword] = useState('')
     const [roleFilter, setRoleFilter] = useState('')
@@ -14,22 +15,41 @@ function UserListPage() {
         setLoading(true)
         adminApi.getAllUsers({ page, limit, keyword, role: roleFilter })
             .then(res => {
-                if (res.success) { setUsers(res.data.items); setTotal(res.data.total) }
+                if (res.success) {
+                    setUsers(res.data.items)
+                    setTotal(res.data.total)
+                }
             })
             .catch(() => { })
             .finally(() => setLoading(false))
     }
 
-    useEffect(() => { fetchUsers() }, [page, roleFilter])
+    useEffect(() => {
+        fetchUsers()
+    }, [page, roleFilter])
 
-    const handleSearch = (e) => { e.preventDefault(); setPage(1); fetchUsers() }
+    useEffect(() => {
+        adminApi.getOrgs({ limit: 200 })
+            .then((res) => {
+                if (res.success) setOrgs(res.data.items || [])
+            })
+            .catch(() => { })
+    }, [])
+
+    const handleSearch = (e) => {
+        e.preventDefault()
+        if (page !== 1) setPage(1)
+        else fetchUsers()
+    }
 
     const handleToggleStatus = async (user) => {
         const newStatus = user.status === 'active' ? 'disabled' : 'active'
         try {
             await adminApi.updateUser(user.id, { status: newStatus })
             fetchUsers()
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            alert(err.message)
+        }
     }
 
     const handleResetPassword = async (user) => {
@@ -37,7 +57,21 @@ function UserListPage() {
         try {
             const res = await adminApi.resetUserPassword(user.id)
             if (res.success) alert(res.data.message)
-        } catch (err) { alert(err.message) }
+        } catch (err) {
+            alert(err.message)
+        }
+    }
+
+    const handleOrgChange = async (user, newOrgId) => {
+        if (user.role === 'super_admin') return
+        if (!newOrgId) return
+
+        try {
+            await adminApi.updateUser(user.id, { orgId: newOrgId })
+            fetchUsers()
+        } catch (err) {
+            alert(err.message)
+        }
     }
 
     const roleLabels = { super_admin: '超管', org_admin: '机构管理', race_editor: '编辑', race_viewer: '只读' }
@@ -45,7 +79,7 @@ function UserListPage() {
 
     return (
         <div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>👥 用户管理</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>👤 用户管理</h1>
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                 <form onSubmit={handleSearch} style={{ display: 'flex', gap: 8 }}>
@@ -87,7 +121,22 @@ function UserListPage() {
                                                 {roleLabels[u.role] || u.role}
                                             </span>
                                         </td>
-                                        <td style={tdStyle}>{u.org_name || '-'}</td>
+                                        <td style={tdStyle}>
+                                            {u.role === 'super_admin' ? (
+                                                <span style={{ color: '#999' }}>平台级</span>
+                                            ) : (
+                                                <select
+                                                    value={u.org_id || ''}
+                                                    onChange={(e) => handleOrgChange(u, e.target.value)}
+                                                    style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13, minWidth: 150 }}
+                                                >
+                                                    <option value="" disabled>请选择机构</option>
+                                                    {orgs.map((org) => (
+                                                        <option key={org.id} value={org.id}>{org.name}</option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                        </td>
                                         <td style={tdStyle}>
                                             <span style={{ color: u.status === 'active' ? '#16a34a' : '#ef4444', fontWeight: 600, fontSize: 13 }}>
                                                 {u.status === 'active' ? '✅ 正常' : '🚫 禁用'}

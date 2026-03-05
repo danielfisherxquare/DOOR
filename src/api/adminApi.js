@@ -21,14 +21,14 @@ export const adminApi = {
 
     // ── Org Admin: 成员管理 ──────────────────────────
     getOrgUsers: (params) => request.get('/org/users', { params }),
-    createOrgUser: (data) => request.post('/org/users', data),
+    createOrgUser: (data, orgId) => request.post(`/org/users${orgId ? `?orgId=${orgId}` : ''}`, data),
     getOrgUser: (userId, params) => request.get(`/org/users/${userId}`, { params }),
-    updateOrgUser: (userId, data) => request.patch(`/org/users/${userId}`, data),
-    resetOrgUserPassword: (userId) => request.post(`/org/users/${userId}/reset-password`),
+    updateOrgUser: (userId, data, orgId) => request.patch(`/org/users/${userId}${orgId ? `?orgId=${orgId}` : ''}`, data),
+    resetOrgUserPassword: (userId, orgId) => request.post(`/org/users/${userId}/reset-password${orgId ? `?orgId=${orgId}` : ''}`),
 
     // ── Org Admin: 赛事权限管理 ──────────────────────
     getUserRacePermissions: (userId, params) => request.get(`/org/users/${userId}/race-permissions`, { params }),
-    setUserRacePermissions: (userId, data) => request.put(`/org/users/${userId}/race-permissions`, data),
+    setUserRacePermissions: (userId, data, orgId) => request.put(`/org/users/${userId}/race-permissions${orgId ? `?orgId=${orgId}` : ''}`, data),
 }
 
 export default adminApi

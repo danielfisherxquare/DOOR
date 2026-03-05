@@ -146,10 +146,9 @@ docker compose exec app node scripts/diagnose-auth.js
 不应对外暴露：
 
 - `5173`（Vite dev）
-- `5432/15432`（数据库）
+- `5432`（数据库）
 
 ## 参考
 
 - 后端部署与命令：`door/server/docs/deployment.md`
 - 后端权限模型与角色说明：`door/server/README.md`
-

@@ -5,6 +5,12 @@
 import knex from '../../db/knex.js';
 import { recordMapper } from '../../db/mappers/records.js';
 
+// super_admin 的 orgId 为 null，此时不加 org_id 过滤
+function scopeOrg(qb, orgId) {
+    if (orgId) qb.where({ org_id: orgId });
+    return qb;
+}
+
 // ── 字段白名单（防 SQL 注入）──────────────────────────
 const ALLOWED_FILTER_FIELDS = new Set([
     'name', 'name_pinyin', 'phone', 'country', 'id_type', 'id_number',
@@ -83,7 +89,7 @@ function applyFilters(qb, filters) {
 // ── 综合查询 ──────────────────────────────────────────
 
 export async function query(orgId, raceId, { keyword, filters, offset = 0, limit = 50, sort } = {}) {
-    const base = knex('records').where({ org_id: orgId });
+    const base = scopeOrg(knex('records'), orgId);
     if (raceId) base.where({ race_id: raceId });
 
     // 关键词搜索
@@ -119,7 +125,7 @@ export async function query(orgId, raceId, { keyword, filters, offset = 0, limit
 // ── 数据库分析统计 ────────────────────────────────────
 
 export async function analysis(orgId, raceId, { keyword, filters } = {}) {
-    const base = knex('records').where({ org_id: orgId });
+    const base = scopeOrg(knex('records'), orgId);
     if (raceId) base.where({ race_id: raceId });
 
     if (keyword?.trim()) {
@@ -208,7 +214,7 @@ export async function uniqueValues(orgId, raceId, field, limit = 500) {
         throw err;
     }
 
-    const base = knex('records').where({ org_id: orgId });
+    const base = scopeOrg(knex('records'), orgId);
     if (raceId) base.where({ race_id: raceId });
 
     const rows = await base
@@ -224,7 +230,7 @@ export async function uniqueValues(orgId, raceId, field, limit = 500) {
 // ── 首页快速统计 ──────────────────────────────────────
 
 export async function quickStats(orgId, raceId, winnerStatuses = []) {
-    const base = knex('records').where({ org_id: orgId, race_id: raceId });
+    const base = scopeOrg(knex('records'), orgId).where({ race_id: raceId });
 
     const [{ count: totalRows }] = await base.clone().count('* as count');
 
@@ -255,7 +261,7 @@ export async function quickStats(orgId, raceId, winnerStatuses = []) {
 // ── 记录总数 ──────────────────────────────────────────
 
 export async function count(orgId, raceId) {
-    const base = knex('records').where({ org_id: orgId });
+    const base = scopeOrg(knex('records'), orgId);
     if (raceId) base.where({ race_id: raceId });
     const [{ count }] = await base.count('* as count');
     return parseInt(count, 10);
@@ -265,10 +271,9 @@ export async function count(orgId, raceId) {
 
 export async function updateById(orgId, recordId, data) {
     const row = recordMapper.toDbUpdate(data);
-    const [updated] = await knex('records')
-        .where({ org_id: orgId, id: recordId })
-        .update(row)
-        .returning('*');
+    const query = knex('records').where({ id: recordId });
+    if (orgId) query.andWhere({ org_id: orgId });
+    const [updated] = await query.update(row).returning('*');
     return updated ? recordMapper.fromDbRow(updated) : null;
 }
 
@@ -286,9 +291,9 @@ export async function bulkUpdate(orgId, updates) {
             const row = recordMapper.toDbUpdate(item?.data || {});
             if (Object.keys(row).length === 0) continue;
 
-            const count = await trx('records')
-                .where({ org_id: orgId, id: recordId })
-                .update(row);
+            const q = trx('records').where({ id: recordId });
+            if (orgId) q.andWhere({ org_id: orgId });
+            const count = await q.update(row);
             updated += count;
         }
     });
@@ -299,18 +304,17 @@ export async function bulkUpdate(orgId, updates) {
 // ── 清空赛事数据 ──────────────────────────────────────
 
 export async function deleteByRaceId(orgId, raceId) {
-    return knex('records')
-        .where({ org_id: orgId, race_id: raceId })
-        .delete();
+    const query = knex('records').where({ race_id: raceId });
+    if (orgId) query.andWhere({ org_id: orgId });
+    return query.delete();
 }
 
 // ── 流式导出（返回 Knex stream 用于 NDJSON）──────────
 
 export function streamByRaceId(orgId, raceId) {
-    return knex('records')
-        .where({ org_id: orgId, race_id: raceId })
-        .orderBy('id', 'asc')
-        .stream();
+    const query = knex('records').where({ race_id: raceId });
+    if (orgId) query.andWhere({ org_id: orgId });
+    return query.orderBy('id', 'asc').stream();
 }
 
 // ── 校验成绩导入 ──────────────────────────────────────
@@ -359,8 +363,9 @@ export async function importVerificationResults(orgId, raceId, results) {
             for (let i = 0; i < ids.length; i += BATCH) {
                 const batch = ids.slice(i, i + BATCH);
                 for (const idNum of batch) {
-                    const cnt = await trx('records')
-                        .where({ org_id: orgId, race_id: safeRaceId, id_number: idNum })
+                    const fullQ = trx('records').where({ race_id: safeRaceId, id_number: idNum });
+                    if (orgId) fullQ.andWhere({ org_id: orgId });
+                    const cnt = await fullQ
                         .update({
                             personal_best_full: fullMap.get(idNum),
                             updated_at: knex.fn.now(),
@@ -377,8 +382,9 @@ export async function importVerificationResults(orgId, raceId, results) {
             for (let i = 0; i < ids.length; i += BATCH) {
                 const batch = ids.slice(i, i + BATCH);
                 for (const idNum of batch) {
-                    const cnt = await trx('records')
-                        .where({ org_id: orgId, race_id: safeRaceId, id_number: idNum })
+                    const halfQ = trx('records').where({ race_id: safeRaceId, id_number: idNum });
+                    if (orgId) halfQ.andWhere({ org_id: orgId });
+                    const cnt = await halfQ
                         .update({
                             personal_best_half: halfMap.get(idNum),
                             updated_at: knex.fn.now(),

@@ -1,54 +1,92 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import adminApi from '../../api/adminApi'
+import useAuthStore from '../../stores/authStore'
 
 function RacePermissionsPage() {
+    const { user } = useAuthStore()
+    const isSuperAdmin = user?.role === 'super_admin'
+
     const [searchParams] = useSearchParams()
     const preselectedUserId = searchParams.get('userId')
     const preselectedUsername = searchParams.get('username')
+    const orgId = searchParams.get('orgId') || undefined
 
     const [members, setMembers] = useState([])
     const [selectedUser, setSelectedUser] = useState(preselectedUserId || null)
     const [selectedUsername, setSelectedUsername] = useState(preselectedUsername || '')
     const [allRaces, setAllRaces] = useState([])
-    const [currentPermissions, setCurrentPermissions] = useState([])
     const [editedPermissions, setEditedPermissions] = useState({}) // { raceId: { checked, accessLevel } }
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [message, setMessage] = useState('')
 
-    // 加载成员列表
     useEffect(() => {
-        adminApi.getOrgUsers({ limit: 200 })
-            .then(res => { if (res.success) setMembers(res.data.items) })
-            .catch(() => { })
-            .finally(() => setLoading(false))
-    }, [])
+        setMessage('')
+        setSelectedUser(preselectedUserId || null)
+        setSelectedUsername(preselectedUsername || '')
+        setAllRaces([])
+        setEditedPermissions({})
 
-    // 当选中用户变化时加载其权限
-    useEffect(() => {
-        if (!selectedUser) return
+        if (isSuperAdmin && !orgId) {
+            setMembers([])
+            setLoading(false)
+            return
+        }
+
         setLoading(true)
-        adminApi.getUserRacePermissions(selectedUser)
+        adminApi.getOrgUsers({ limit: 200, orgId })
             .then(res => {
-                if (res.success) {
-                    setAllRaces(res.data.allRaces || [])
-                    setCurrentPermissions(res.data.permissions || [])
-                    // 初始化编辑状态
-                    const edited = {}
-                    for (const race of res.data.allRaces || []) {
-                        const perm = (res.data.permissions || []).find(p => p.race_id === race.id)
-                        edited[race.id] = {
-                            checked: !!perm,
-                            accessLevel: perm?.access_level || 'editor',
-                        }
-                    }
-                    setEditedPermissions(edited)
+                if (!res.success) return
+
+                const nextMembers = res.data.items || []
+                setMembers(nextMembers)
+
+                const selectedFromUrl = preselectedUserId && nextMembers.find(m => m.id === preselectedUserId)
+                if (!selectedFromUrl && preselectedUserId) {
+                    setSelectedUser(null)
+                    setSelectedUsername('')
                 }
             })
             .catch(() => { })
             .finally(() => setLoading(false))
-    }, [selectedUser])
+    }, [orgId, isSuperAdmin, preselectedUserId, preselectedUsername])
+
+    useEffect(() => {
+        if (!selectedUser) {
+            setAllRaces([])
+            setEditedPermissions({})
+            return
+        }
+
+        if (isSuperAdmin && !orgId) {
+            setAllRaces([])
+            setEditedPermissions({})
+            return
+        }
+
+        setLoading(true)
+        adminApi.getUserRacePermissions(selectedUser, { orgId })
+            .then(res => {
+                if (!res.success) return
+
+                const nextAllRaces = res.data.allRaces || []
+                const permissions = res.data.permissions || []
+                setAllRaces(nextAllRaces)
+
+                const edited = {}
+                for (const race of nextAllRaces) {
+                    const perm = permissions.find(p => p.race_id === race.id)
+                    edited[race.id] = {
+                        checked: !!perm,
+                        accessLevel: perm?.access_level || 'editor',
+                    }
+                }
+                setEditedPermissions(edited)
+            })
+            .catch(() => { })
+            .finally(() => setLoading(false))
+    }, [selectedUser, orgId, isSuperAdmin])
 
     const handleUserSelect = (member) => {
         setSelectedUser(member.id)
@@ -59,27 +97,35 @@ function RacePermissionsPage() {
     const handleToggleRace = (raceId) => {
         setEditedPermissions(prev => ({
             ...prev,
-            [raceId]: { ...prev[raceId], checked: !prev[raceId]?.checked }
+            [raceId]: { ...prev[raceId], checked: !prev[raceId]?.checked },
         }))
     }
 
     const handleAccessChange = (raceId, level) => {
         setEditedPermissions(prev => ({
             ...prev,
-            [raceId]: { ...prev[raceId], accessLevel: level }
+            [raceId]: { ...prev[raceId], accessLevel: level },
         }))
     }
 
     const handleSave = async () => {
-        setSaving(true); setMessage('')
+        if (!selectedUser) return
+
+        setSaving(true)
+        setMessage('')
+
         const permissions = Object.entries(editedPermissions)
             .filter(([, v]) => v.checked)
             .map(([raceId, v]) => ({ raceId: Number(raceId), accessLevel: v.accessLevel }))
+
         try {
-            const res = await adminApi.setUserRacePermissions(selectedUser, { permissions })
+            const res = await adminApi.setUserRacePermissions(selectedUser, { permissions }, orgId)
             if (res.success) setMessage(res.data.message || '保存成功')
-        } catch (err) { setMessage('❌ ' + err.message) }
-        finally { setSaving(false) }
+        } catch (err) {
+            setMessage(`❌ ${err.message}`)
+        } finally {
+            setSaving(false)
+        }
     }
 
     const handleSelectAll = () => {
@@ -95,6 +141,12 @@ function RacePermissionsPage() {
         <div>
             <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>🔑 赛事授权</h1>
 
+            {isSuperAdmin && !orgId && (
+                <div style={{ padding: '12px 16px', marginBottom: 16, borderRadius: 10, background: 'rgba(245,158,11,0.1)', color: '#b45309', fontSize: 14 }}>
+                    请先在左侧选择机构，再进行赛事授权。
+                </div>
+            )}
+
             {message && (
                 <div style={{ padding: '12px 16px', borderRadius: 8, background: message.startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', color: message.startsWith('❌') ? '#ef4444' : '#16a34a', fontSize: 14, marginBottom: 16 }}>
                     {message}
@@ -102,7 +154,6 @@ function RacePermissionsPage() {
             )}
 
             <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
-                {/* 左侧：成员列表 */}
                 <div style={{ width: 260, flexShrink: 0, background: 'white', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
                     <div style={{ padding: '12px 16px', background: '#fafafa', borderBottom: '1px solid #e5e7eb', fontWeight: 600, fontSize: 14 }}>
                         选择成员
@@ -113,10 +164,12 @@ function RacePermissionsPage() {
                                 key={m.id}
                                 onClick={() => handleUserSelect(m)}
                                 style={{
-                                    padding: '10px 16px', cursor: 'pointer',
+                                    padding: '10px 16px',
+                                    cursor: 'pointer',
                                     background: selectedUser === m.id ? 'var(--color-accent, #6366f1)' : 'white',
                                     color: selectedUser === m.id ? 'white' : 'inherit',
-                                    borderBottom: '1px solid #f0f0f0', transition: 'background 100ms',
+                                    borderBottom: '1px solid #f0f0f0',
+                                    transition: 'background 100ms',
                                 }}
                             >
                                 <div style={{ fontWeight: 600, fontSize: 14 }}>{m.username}</div>
@@ -129,12 +182,9 @@ function RacePermissionsPage() {
                     </div>
                 </div>
 
-                {/* 右侧：赛事权限 */}
                 <div style={{ flex: 1, background: 'white', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                     {!selectedUser ? (
-                        <div style={{ padding: 40, textAlign: 'center', color: '#999' }}>
-                            ← 请先选择一个成员
-                        </div>
+                        <div style={{ padding: 40, textAlign: 'center', color: '#999' }}>← 请先选择一个成员</div>
                     ) : loading ? (
                         <div style={{ padding: 40, textAlign: 'center', color: '#999' }}>加载中...</div>
                     ) : (
@@ -161,12 +211,7 @@ function RacePermissionsPage() {
                                     {allRaces.map(race => {
                                         const perm = editedPermissions[race.id] || { checked: false, accessLevel: 'editor' }
                                         return (
-                                            <div key={race.id} style={{
-                                                display: 'flex', alignItems: 'center', gap: 12,
-                                                padding: '10px 12px', borderRadius: 8,
-                                                background: perm.checked ? 'rgba(99,102,241,0.04)' : 'transparent',
-                                                transition: 'background 100ms',
-                                            }}>
+                                            <div key={race.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 8, background: perm.checked ? 'rgba(99,102,241,0.04)' : 'transparent', transition: 'background 100ms' }}>
                                                 <input
                                                     type="checkbox"
                                                     checked={perm.checked}
@@ -176,7 +221,8 @@ function RacePermissionsPage() {
                                                 <div style={{ flex: 1 }}>
                                                     <div style={{ fontWeight: 600, fontSize: 14 }}>{race.name}</div>
                                                     <div style={{ fontSize: 12, color: '#999' }}>
-                                                        {race.date ? new Date(race.date).toLocaleDateString() : ''}{race.location ? ` · ${race.location}` : ''}
+                                                        {race.date ? new Date(race.date).toLocaleDateString() : ''}
+                                                        {race.location ? ` · ${race.location}` : ''}
                                                     </div>
                                                 </div>
                                                 {perm.checked && (

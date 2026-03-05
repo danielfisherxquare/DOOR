@@ -22,7 +22,11 @@ const app = express();
 
 function getCorsOrigin() {
     if (process.env.NODE_ENV !== 'production') {
-        return ['http://localhost:5173', 'http://localhost:3000'];
+        // Local dev ports:
+        // - 5173: door web (Vite)
+        // - 5174: tool web/electron (Vite)
+        // - 3000: optional dev server
+        return ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
     }
 
     // 生产环境支持逗号分隔的多 origin: "https://a.com,https://b.com"

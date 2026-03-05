@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import adminApi from '../../api/adminApi'
 import useAuthStore from '../../stores/authStore'
 
@@ -9,24 +9,34 @@ function AdminDashboard() {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        if (!isSuperAdmin) { setLoading(false); return; }
+        if (!isSuperAdmin) {
+            setLoading(false)
+            return
+        }
+
         adminApi.getDashboardStats()
-            .then(res => { if (res.success) setStats(res.data) })
-            .catch(() => { })
+            .then((res) => {
+                if (res.success) setStats(res.data)
+            })
+            .catch(() => {})
             .finally(() => setLoading(false))
     }, [isSuperAdmin])
 
     const cardStyle = {
-        background: 'white', borderRadius: 12, padding: '24px 28px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06)', flex: '1 1 200px',
+        background: 'white',
+        borderRadius: 12,
+        padding: '24px 28px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+        flex: '1 1 200px',
     }
+
     const numStyle = { fontSize: 32, fontWeight: 700, color: 'var(--color-accent, #6366f1)' }
     const labelStyle = { fontSize: 13, color: 'var(--color-text-secondary, #666)', marginTop: 4 }
 
     return (
         <div>
             <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>
-                👋 欢迎回来，{user?.username}
+                欢迎回来，{user?.username}
             </h1>
 
             {isSuperAdmin && !loading && stats && (
@@ -56,10 +66,11 @@ function AdminDashboard() {
                     {isSuperAdmin && (
                         <>
                             <a href="/admin/orgs" className="btn btn--primary">🏢 管理机构</a>
-                            <a href="/admin/users" className="btn btn--secondary">👥 管理用户</a>
+                            <a href="/admin/users" className="btn btn--secondary">👤 管理用户</a>
                         </>
                     )}
-                    <a href="/admin/members" className="btn btn--secondary">👤 管理成员</a>
+                    <a href="/admin/members" className="btn btn--secondary">👥 管理成员</a>
+                    <a href="/admin/races" className="btn btn--secondary">🏁 赛事管理</a>
                     <a href="/admin/race-permissions" className="btn btn--secondary">🔑 赛事授权</a>
                 </div>
             </div>

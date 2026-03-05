@@ -53,8 +53,8 @@ export function requireRaceAccess(resolveRaceId) {
             }
 
             // 被分配的人，要进一步校验 access_level 和请求类型
-            // viewer: 只允许 GET
-            if (permission.access_level === 'viewer' && req.method !== 'GET') {
+            // viewer: 只允许读取类请求 (GET, OPTIONS, HEAD), 拒绝写入、修改和删除 (POST, PUT, PATCH, DELETE)
+            if (permission.access_level === 'viewer' && !['GET', 'OPTIONS', 'HEAD'].includes(req.method)) {
                 return res.status(403).json({ success: false, message: '只读权限，不可执行写入、计算或删除等操作' });
             }
 

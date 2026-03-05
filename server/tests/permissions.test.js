@@ -16,7 +16,7 @@ const { default: app } = await import('../src/app.js');
 
 let server, baseUrl;
 const tokens = {}; // { super_admin, org_admin, race_editor, race_viewer }
-let testOrgId, testRaceId;
+let testOrgId, testRaceId, testOrg2Id, testRace2Id, editorUserId;
 
 async function api(path, options = {}) {
     const res = await fetch(`${baseUrl}${path}`, {
@@ -45,10 +45,14 @@ describe('权限场景全覆盖测试', () => {
         // 创建测试机构
         const [org] = await knex('organizations').insert({ name: '权限测试机构', slug: 'perm-test' }).returning('*');
         testOrgId = org.id;
+        const [org2] = await knex('organizations').insert({ name: '权限测试机构B', slug: 'perm-test-b' }).returning('*');
+        testOrg2Id = org2.id;
 
         // 创建测试赛事
         const [race] = await knex('races').insert({ name: '测试赛事', org_id: testOrgId }).returning('*');
         testRaceId = race.id;
+        const [race2] = await knex('races').insert({ name: '测试赛事B', org_id: testOrg2Id }).returning('*');
+        testRace2Id = race2.id;
 
         // 启动服务
         server = app.listen(0);
@@ -76,6 +80,7 @@ describe('权限场景全覆盖测试', () => {
             password_hash: editorHash, role: 'race_editor', org_id: testOrgId,
             status: 'active', must_change_password: false,
         }).returning('*');
+        editorUserId = editor.id;
 
         // 创建 race_viewer（属于 testOrg）
         const viewerHash = await bcrypt.default.hash('viewer123', 10);
@@ -148,6 +153,16 @@ describe('权限场景全覆盖测试', () => {
         assert.equal(res.status, 200);
     });
 
+    it('super_admin GET /api/org/users (missing orgId) → 400', async () => {
+        const res = await api('/api/org/users', { headers: authHeader('super_admin') });
+        assert.equal(res.status, 400);
+    });
+
+    it('super_admin GET /api/org/users?orgId=... → 200', async () => {
+        const res = await api(`/api/org/users?orgId=${testOrgId}`, { headers: authHeader('super_admin') });
+        assert.equal(res.status, 200);
+    });
+
     // ── 场景 4: org_admin 访问 admin API → 403 ──────
     it('org_admin GET /api/admin/dashboard → 403', async () => {
         const res = await api('/api/admin/dashboard', { headers: authHeader('org_admin') });
@@ -198,5 +213,36 @@ describe('权限场景全覆盖测试', () => {
         assert.ok(data.status, '应含 status');
         assert.ok(Array.isArray(data.permissions), '应含 permissions 数组');
         assert.ok(Array.isArray(data.assignedRaceIds), '应含 assignedRaceIds 数组');
+    });
+
+    it('super_admin 可调整用户机构，并清理旧赛事权限', async () => {
+        const res = await api(`/api/admin/users/${editorUserId}`, {
+            method: 'PATCH',
+            headers: authHeader('super_admin'),
+            body: JSON.stringify({ orgId: testOrg2Id }),
+        });
+        assert.equal(res.status, 200);
+        assert.equal(res.body.data.org_id, testOrg2Id);
+
+        const perms = await knex('user_race_permissions').where({ user_id: editorUserId });
+        assert.equal(perms.length, 0);
+    });
+
+    it('super_admin 可为任意用户分配其机构内赛事（无 orgId 查询参数）', async () => {
+        const res = await api(`/api/org/users/${editorUserId}/race-permissions`, {
+            method: 'PUT',
+            headers: authHeader('super_admin'),
+            body: JSON.stringify({ permissions: [{ raceId: testRace2Id, accessLevel: 'editor' }] }),
+        });
+        assert.equal(res.status, 200);
+    });
+
+    it('super_admin 给用户分配非其机构赛事会被拒绝', async () => {
+        const res = await api(`/api/org/users/${editorUserId}/race-permissions`, {
+            method: 'PUT',
+            headers: authHeader('super_admin'),
+            body: JSON.stringify({ permissions: [{ raceId: testRaceId, accessLevel: 'editor' }] }),
+        });
+        assert.equal(res.status, 400);
     });
 });

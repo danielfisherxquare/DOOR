@@ -24,13 +24,13 @@ export async function listOrgUsers(orgId, { page = 1, limit = 20, keyword = '' }
 }
 
 export async function getOrgUser(orgId, userId) {
-    const user = await knex('users')
-        .where({ id: userId, org_id: orgId })
-        .select('id', 'username', 'email', 'role', 'status', 'must_change_password', 'created_at')
+    const query = knex('users').where({ id: userId });
+    if (orgId) query.andWhere({ org_id: orgId });
+    const user = await query
+        .select('id', 'username', 'email', 'role', 'status', 'must_change_password', 'created_at', 'org_id')
         .first();
     if (!user) throw Object.assign(new Error('用户不存在或不属于本机构'), { status: 404, expose: true });
 
-    // 附加赛事权限
     const permissions = await knex('user_race_permissions')
         .where({ user_id: userId })
         .leftJoin('races', 'user_race_permissions.race_id', 'races.id')
@@ -60,8 +60,9 @@ export async function createOrgUser(orgId, operatorId, { username, email, passwo
 }
 
 export async function updateOrgUser(orgId, userId, fields) {
-    // 确保用户属于本机构
-    const user = await knex('users').where({ id: userId, org_id: orgId }).first();
+    const uQuery = knex('users').where({ id: userId });
+    if (orgId) uQuery.andWhere({ org_id: orgId });
+    const user = await uQuery.first();
     if (!user) throw Object.assign(new Error('用户不存在或不属于本机构'), { status: 404, expose: true });
 
     const allowed = ['role', 'status'];
@@ -69,13 +70,14 @@ export async function updateOrgUser(orgId, userId, fields) {
     for (const key of allowed) {
         if (fields[key] !== undefined) data[key] = fields[key];
     }
-    // 限制角色修改范围
+
     if (data.role && !['race_editor', 'race_viewer'].includes(data.role)) {
         throw Object.assign(new Error('只能设置 race_editor 或 race_viewer 角色'), { status: 400, expose: true });
     }
     if (Object.keys(data).length === 0) {
         throw Object.assign(new Error('无有效字段'), { status: 400, expose: true });
     }
+
     const [row] = await knex('users')
         .where({ id: userId })
         .update({ ...data, updated_at: knex.fn.now() })
@@ -86,18 +88,23 @@ export async function updateOrgUser(orgId, userId, fields) {
 // ── 赛事权限管理 ─────────────────────────────────────
 
 export async function getUserRacePermissions(orgId, userId) {
-    // 确保用户属于本机构
-    const user = await knex('users').where({ id: userId, org_id: orgId }).first();
+    const uQuery = knex('users').where({ id: userId });
+    if (orgId) uQuery.andWhere({ org_id: orgId });
+    const user = await uQuery.first();
     if (!user) throw Object.assign(new Error('用户不存在或不属于本机构'), { status: 404, expose: true });
 
+    const scopedOrgId = orgId || user.org_id || null;
+    if (!scopedOrgId) {
+        throw Object.assign(new Error('目标用户未绑定机构，无法配置赛事权限'), { status: 400, expose: true });
+    }
+
     const permissions = await knex('user_race_permissions')
-        .where({ user_id: userId })
+        .where({ user_id: userId, org_id: scopedOrgId })
         .leftJoin('races', 'user_race_permissions.race_id', 'races.id')
         .select('user_race_permissions.race_id', 'user_race_permissions.access_level', 'races.name as race_name');
 
-    // 获取本机构所有赛事供前端使用
     const allRaces = await knex('races')
-        .where({ org_id: orgId })
+        .where({ org_id: scopedOrgId })
         .select('id', 'name', 'date', 'location')
         .orderBy('created_at', 'desc');
 
@@ -105,28 +112,48 @@ export async function getUserRacePermissions(orgId, userId) {
 }
 
 export async function setUserRacePermissions(orgId, userId, operatorId, permissionsList) {
-    // 确保用户属于本机构
-    const user = await knex('users').where({ id: userId, org_id: orgId }).first();
+    const uQuery = knex('users').where({ id: userId });
+    if (orgId) uQuery.andWhere({ org_id: orgId });
+    const user = await uQuery.first();
     if (!user) throw Object.assign(new Error('用户不存在或不属于本机构'), { status: 404, expose: true });
 
-    // 验证所有赛事都属于本机构
-    const raceIds = permissionsList.map(p => p.raceId);
+    const scopedOrgId = orgId || user.org_id || null;
+    if (!scopedOrgId) {
+        throw Object.assign(new Error('目标用户未绑定机构，无法配置赛事权限'), { status: 400, expose: true });
+    }
+
+    for (const item of permissionsList) {
+        if (!['editor', 'viewer'].includes(item.accessLevel || 'editor')) {
+            throw Object.assign(new Error(`赛事 ${item.raceId} 的 accessLevel 无效`), { status: 400, expose: true });
+        }
+    }
+
+    const raceIds = [...new Set(permissionsList.map(p => p.raceId))];
+    const raceOrgById = new Map();
     if (raceIds.length > 0) {
-        const validRaces = await knex('races').where({ org_id: orgId }).whereIn('id', raceIds).select('id');
-        const validIds = validRaces.map(r => r.id);
-        const invalid = raceIds.filter(id => !validIds.includes(id));
+        const races = await knex('races')
+            .whereIn('id', raceIds)
+            .select('id', 'org_id');
+
+        for (const race of races) raceOrgById.set(race.id, race.org_id);
+
+        const missing = raceIds.filter(id => !raceOrgById.has(id));
+        if (missing.length > 0) {
+            throw Object.assign(new Error(`赛事 ${missing.join(',')} 不存在`), { status: 400, expose: true });
+        }
+
+        const invalid = raceIds.filter(id => raceOrgById.get(id) !== scopedOrgId);
         if (invalid.length > 0) {
             throw Object.assign(new Error(`赛事 ${invalid.join(',')} 不属于本机构`), { status: 400, expose: true });
         }
     }
 
-    // 事务：先删除现有权限，再批量插入新权限
     await knex.transaction(async trx => {
         await trx('user_race_permissions').where({ user_id: userId }).del();
         if (permissionsList.length > 0) {
             const rows = permissionsList.map(p => ({
                 user_id: userId,
-                org_id: orgId,
+                org_id: raceOrgById.get(p.raceId) || scopedOrgId,
                 race_id: p.raceId,
                 access_level: p.accessLevel || 'editor',
                 created_by: operatorId,
@@ -141,7 +168,9 @@ export async function setUserRacePermissions(orgId, userId, operatorId, permissi
 // ── 成员密码重置 ─────────────────────────────────────
 
 export async function resetOrgUserPassword(orgId, userId) {
-    const user = await knex('users').where({ id: userId, org_id: orgId }).first();
+    const uQuery = knex('users').where({ id: userId });
+    if (orgId) uQuery.andWhere({ org_id: orgId });
+    const user = await uQuery.first();
     if (!user) throw Object.assign(new Error('用户不存在或不属于本机构'), { status: 404, expose: true });
 
     const tempPassword = 'Abc123456';
