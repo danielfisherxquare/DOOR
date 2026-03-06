@@ -28,14 +28,17 @@ export async function findAllAllowed(orgId, userId, role, options = {}) {
             .where(function whereVisible() {
                 this.where('races.org_id', orgId).orWhereNotNull('grp.org_id');
             });
-    } else {
-        // race-level users: only assigned races
+    } else if (orgId) {
+        // race-level users inherit the races visible to their organization
         query = query
-            .innerJoin('user_race_permissions', 'races.id', 'user_race_permissions.race_id')
-            .where('user_race_permissions.user_id', userId);
-        if (orgId) {
-            query = query.andWhere('user_race_permissions.org_id', orgId);
-        }
+            .leftJoin('org_race_permissions as grp', function joinOrgRacePermissions() {
+                this.on('races.id', '=', 'grp.race_id').andOnVal('grp.org_id', '=', orgId);
+            })
+            .where(function whereVisible() {
+                this.where('races.org_id', orgId).orWhereNotNull('grp.org_id');
+            });
+    } else {
+        query = query.whereRaw('1 = 0');
     }
 
     const rows = await query.distinct('races.*');

@@ -3,7 +3,7 @@
  */
 import bcrypt from 'bcryptjs';
 import knex from '../../db/knex.js';
-import { listVisibleRacesForOrg } from '../races/race-access.service.js';
+import { listEffectiveRacePermissionsForUser, listVisibleRacesForOrg } from '../races/race-access.service.js';
 
 // ── 成员管理 ─────────────────────────────────────────
 
@@ -128,18 +128,17 @@ export async function getUserRacePermissions(orgId, userId) {
     }
 
     const allRaces = await listVisibleRacesForOrg(scopedOrgId);
-    const raceIds = allRaces.map((race) => race.id);
-
-    const permissionsQuery = knex('user_race_permissions')
-        .where({ user_id: userId, org_id: scopedOrgId })
-        .leftJoin('races', 'user_race_permissions.race_id', 'races.id')
-        .select('user_race_permissions.race_id', 'user_race_permissions.access_level', 'races.name as race_name');
-    if (raceIds.length > 0) {
-        permissionsQuery.whereIn('user_race_permissions.race_id', raceIds);
-    } else {
-        permissionsQuery.whereRaw('1 = 0');
-    }
-    const permissions = await permissionsQuery;
+    const raceNameMap = new Map(allRaces.map((race) => [Number(race.id), race.name]));
+    const permissions = (await listEffectiveRacePermissionsForUser({
+        userId: user.id,
+        role: user.role,
+        orgId: scopedOrgId,
+    })).map((row) => ({
+        race_id: row.raceId,
+        access_level: row.accessLevel,
+        race_name: raceNameMap.get(Number(row.raceId)) || null,
+        source: row.source,
+    }));
 
     return { permissions, allRaces };
 }

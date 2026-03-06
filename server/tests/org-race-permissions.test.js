@@ -1,4 +1,4 @@
-import { describe, it, before, after } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
 
@@ -13,24 +13,23 @@ let baseUrl;
 let orgAId;
 let orgBId;
 let raceAId;
-let orgAdminBId;
 let raceEditorBId;
 const tokens = {};
 
 async function api(path, options = {}) {
-    const res = await fetch(`${baseUrl}${path}`, {
+    const response = await fetch(`${baseUrl}${path}`, {
         ...options,
         headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     });
-    const body = await res.json().catch(() => null);
-    return { status: res.status, body };
+    const body = await response.json().catch(() => null);
+    return { status: response.status, body };
 }
 
 function authHeader(role) {
     return { Authorization: `Bearer ${tokens[role]}` };
 }
 
-describe('机构赛事授权', () => {
+describe('organization race permissions', () => {
     before(async () => {
         await knex.migrate.latest();
 
@@ -41,44 +40,46 @@ describe('机构赛事授权', () => {
         await knex('races').del();
         await knex('organizations').del();
 
-        const [orgA] = await knex('organizations').insert({ name: '机构A', slug: 'org-a' }).returning('*');
-        const [orgB] = await knex('organizations').insert({ name: '机构B', slug: 'org-b' }).returning('*');
+        const [orgA] = await knex('organizations').insert({ name: 'Org A', slug: 'org-a' }).returning('*');
+        const [orgB] = await knex('organizations').insert({ name: 'Org B', slug: 'org-b' }).returning('*');
         orgAId = orgA.id;
         orgBId = orgB.id;
 
-        const [raceA] = await knex('races').insert({ org_id: orgAId, name: 'A机构赛事' }).returning('*');
+        const [raceA] = await knex('races').insert({ org_id: orgAId, name: 'Org A Race' }).returning('*');
         raceAId = raceA.id;
 
-        const [superAdmin] = await knex('users').insert({
-            org_id: null,
-            username: 'org_perm_super',
-            email: 'org_perm_super@test.com',
-            password_hash: await bcrypt.hash('pass123', 10),
-            role: 'super_admin',
-            status: 'active',
-            must_change_password: false,
-        }).returning('*');
+        await knex('users').insert([
+            {
+                org_id: null,
+                username: 'org_perm_super',
+                email: 'org_perm_super@test.com',
+                password_hash: await bcrypt.hash('pass123', 10),
+                role: 'super_admin',
+                status: 'active',
+                must_change_password: false,
+            },
+            {
+                org_id: orgBId,
+                username: 'org_perm_admin_b',
+                email: 'org_perm_admin_b@test.com',
+                password_hash: await bcrypt.hash('pass123', 10),
+                role: 'org_admin',
+                status: 'active',
+                must_change_password: false,
+            },
+        ]);
 
-        const [orgAdminB] = await knex('users').insert({
-            org_id: orgBId,
-            username: 'org_perm_admin_b',
-            email: 'org_perm_admin_b@test.com',
-            password_hash: await bcrypt.hash('pass123', 10),
-            role: 'org_admin',
-            status: 'active',
-            must_change_password: false,
-        }).returning('*');
-        orgAdminBId = orgAdminB.id;
-
-        const [editorB] = await knex('users').insert({
-            org_id: orgBId,
-            username: 'org_perm_editor_b',
-            email: 'org_perm_editor_b@test.com',
-            password_hash: await bcrypt.hash('pass123', 10),
-            role: 'race_editor',
-            status: 'active',
-            must_change_password: false,
-        }).returning('*');
+        const [editorB] = await knex('users')
+            .insert({
+                org_id: orgBId,
+                username: 'org_perm_editor_b',
+                email: 'org_perm_editor_b@test.com',
+                password_hash: await bcrypt.hash('pass123', 10),
+                role: 'race_editor',
+                status: 'active',
+                must_change_password: false,
+            })
+            .returning('*');
         raceEditorBId = editorB.id;
 
         server = app.listen(0);
@@ -89,12 +90,12 @@ describe('机构赛事授权', () => {
             ['org_admin_b', 'org_perm_admin_b'],
             ['race_editor_b', 'org_perm_editor_b'],
         ]) {
-            const res = await api('/api/auth/login', {
+            const response = await api('/api/auth/login', {
                 method: 'POST',
                 body: JSON.stringify({ login, password: 'pass123' }),
             });
-            assert.equal(res.status, 200);
-            tokens[role] = res.body.data.accessToken;
+            assert.equal(response.status, 200);
+            tokens[role] = response.body.data.accessToken;
         }
     });
 
@@ -109,67 +110,73 @@ describe('机构赛事授权', () => {
         await knex.destroy();
     });
 
-    it('super_admin 可给机构授予 viewer 赛事权限', async () => {
-        const res = await api(`/api/admin/orgs/${orgBId}/race-permissions`, {
+    it('lets super_admin grant viewer access to another org', async () => {
+        const response = await api(`/api/admin/orgs/${orgBId}/race-permissions`, {
             method: 'PUT',
             headers: authHeader('super_admin'),
             body: JSON.stringify({ permissions: [{ raceId: raceAId, accessLevel: 'viewer' }] }),
         });
-        assert.equal(res.status, 200);
+        assert.equal(response.status, 200);
     });
 
-    it('org_admin 可看到被授权赛事，但 viewer 无法写入', async () => {
-        const listRes = await api('/api/races', {
-            headers: authHeader('org_admin_b'),
-        });
-        assert.equal(listRes.status, 200);
-        assert.ok(listRes.body.data.find((race) => Number(race.id) === Number(raceAId)));
+    it('lets org_admin see granted races but blocks viewer writes', async () => {
+        const listResponse = await api('/api/races', { headers: authHeader('org_admin_b') });
+        assert.equal(listResponse.status, 200);
+        assert.ok(listResponse.body.data.find((race) => Number(race.id) === Number(raceAId)));
 
-        const updateRes = await api(`/api/races/${raceAId}`, {
+        const updateResponse = await api(`/api/races/${raceAId}`, {
             method: 'PUT',
             headers: authHeader('org_admin_b'),
-            body: JSON.stringify({ name: '不应写入成功' }),
+            body: JSON.stringify({ name: 'viewer grant should not write' }),
         });
-        assert.equal(updateRes.status, 403);
+        assert.equal(updateResponse.status, 403);
     });
 
-    it('切换为 editor 后，org_admin 可写入被授权赛事', async () => {
-        const grantRes = await api(`/api/admin/orgs/${orgBId}/race-permissions`, {
+    it('lets super_admin upgrade granted access to editor', async () => {
+        const response = await api(`/api/admin/orgs/${orgBId}/race-permissions`, {
             method: 'PUT',
             headers: authHeader('super_admin'),
             body: JSON.stringify({ permissions: [{ raceId: raceAId, accessLevel: 'editor' }] }),
         });
-        assert.equal(grantRes.status, 200);
-
-        const updateRes = await api(`/api/races/${raceAId}`, {
-            method: 'PUT',
-            headers: authHeader('org_admin_b'),
-            body: JSON.stringify({ location: '授权后可编辑' }),
-        });
-        assert.equal(updateRes.status, 200);
+        assert.equal(response.status, 200);
     });
 
-    it('超管可给机构成员分配被授权赛事权限', async () => {
-        const setRes = await api(`/api/org/users/${raceEditorBId}/race-permissions`, {
+    it('lets org members inherit editor access from the organization grant', async () => {
+        const listResponse = await api('/api/races', { headers: authHeader('race_editor_b') });
+        assert.equal(listResponse.status, 200);
+        assert.ok(listResponse.body.data.find((race) => Number(race.id) === Number(raceAId)));
+
+        const updateResponse = await api(`/api/races/${raceAId}`, {
+            method: 'PUT',
+            headers: authHeader('race_editor_b'),
+            body: JSON.stringify({ location: 'inherited org grant can edit' }),
+        });
+        assert.equal(updateResponse.status, 200);
+    });
+
+    it('lets explicit user viewer assignment downgrade inherited editor access', async () => {
+        const setResponse = await api(`/api/org/users/${raceEditorBId}/race-permissions`, {
             method: 'PUT',
             headers: authHeader('super_admin'),
             body: JSON.stringify({
                 permissions: [{ raceId: raceAId, accessLevel: 'viewer' }],
             }),
         });
-        assert.equal(setRes.status, 200);
+        assert.equal(setResponse.status, 200);
 
-        const listRes = await api('/api/races', {
-            headers: authHeader('race_editor_b'),
-        });
-        assert.equal(listRes.status, 200);
-        assert.ok(listRes.body.data.find((race) => Number(race.id) === Number(raceAId)));
+        const meResponse = await api('/api/auth/me', { headers: authHeader('race_editor_b') });
+        assert.equal(meResponse.status, 200);
+        assert.ok(
+            meResponse.body.data.racePermissions.some(
+                (item) => Number(item.raceId) === Number(raceAId) && item.accessLevel === 'viewer',
+            ),
+        );
 
-        const updateRes = await api(`/api/races/${raceAId}`, {
+        const updateResponse = await api(`/api/races/${raceAId}`, {
             method: 'PUT',
             headers: authHeader('race_editor_b'),
-            body: JSON.stringify({ name: '成员viewer不应写入成功' }),
+            body: JSON.stringify({ name: 'downgraded viewer should fail to write' }),
         });
-        assert.equal(updateRes.status, 403);
+        assert.equal(updateResponse.status, 403);
     });
 });

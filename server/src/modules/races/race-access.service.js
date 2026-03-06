@@ -1,6 +1,10 @@
 import knex from '../../db/knex.js';
 
 const READ_ONLY_METHODS = new Set(['GET', 'OPTIONS', 'HEAD']);
+const ACCESS_LEVEL_WEIGHT = {
+    viewer: 1,
+    editor: 2,
+};
 
 function badRequest(message) {
     return Object.assign(new Error(message), { status: 400, expose: true });
@@ -14,17 +18,41 @@ function notFound(message) {
     return Object.assign(new Error(message), { status: 404, expose: true });
 }
 
+function normalizeAccessLevel(accessLevel) {
+    if (accessLevel === 'editor') return 'editor';
+    if (accessLevel === 'viewer') return 'viewer';
+    return null;
+}
+
+function capAccessLevelByRole(role, accessLevel) {
+    const normalized = normalizeAccessLevel(accessLevel);
+    if (!normalized) return null;
+    if (role === 'race_viewer') return 'viewer';
+    return normalized;
+}
+
+function pickStricterAccessLevel(left, right) {
+    const normalizedLeft = normalizeAccessLevel(left);
+    const normalizedRight = normalizeAccessLevel(right);
+    const leftWeight = normalizedLeft ? ACCESS_LEVEL_WEIGHT[normalizedLeft] : 0;
+    const rightWeight = normalizedRight ? ACCESS_LEVEL_WEIGHT[normalizedRight] : 0;
+
+    if (!leftWeight) return normalizedRight;
+    if (!rightWeight) return normalizedLeft;
+    return leftWeight <= rightWeight ? normalizedLeft : normalizedRight;
+}
+
 export function normalizeRaceId(rawRaceId) {
     const raceId = Number(rawRaceId);
     if (!Number.isFinite(raceId) || raceId <= 0) {
-        throw badRequest('无效 raceId');
+        throw badRequest('Invalid raceId');
     }
     return raceId;
 }
 
 export async function getRaceOwnerOrgId(raceId) {
     const race = await knex('races').where({ id: raceId }).first('id', 'org_id');
-    if (!race) throw notFound('目标赛事不存在');
+    if (!race) throw notFound('Target race not found');
     return race.org_id;
 }
 
@@ -60,10 +88,100 @@ export async function listVisibleRacesForOrg(orgId) {
     }));
 }
 
+async function getOrgRaceAccess(orgId, raceId, ownerOrgId = null) {
+    if (!orgId) {
+        return { accessLevel: null, source: 'none' };
+    }
+
+    const resolvedOwnerOrgId = ownerOrgId ?? await getRaceOwnerOrgId(raceId);
+    if (resolvedOwnerOrgId === orgId) {
+        return { accessLevel: 'editor', source: 'own_org' };
+    }
+
+    const row = await knex('org_race_permissions')
+        .where({ org_id: orgId, race_id: raceId })
+        .first('access_level');
+
+    return {
+        accessLevel: normalizeAccessLevel(row?.access_level),
+        source: row ? 'org_grant' : 'none',
+    };
+}
+
+async function getExplicitUserRaceAccess(userId, orgId, raceId) {
+    if (!userId || !orgId) return null;
+
+    const row = await knex('user_race_permissions')
+        .where({ user_id: userId, org_id: orgId, race_id: raceId })
+        .first('access_level');
+
+    return normalizeAccessLevel(row?.access_level);
+}
+
+export async function listEffectiveRacePermissionsForUser(authContext) {
+    const { userId, role, orgId } = authContext || {};
+    if (!userId || !role) return [];
+
+    if (role === 'super_admin') {
+        const rows = await knex('races')
+            .select('id')
+            .orderBy('created_at', 'desc');
+
+        return rows.map((row) => ({
+            raceId: row.id,
+            accessLevel: 'editor',
+            source: 'super_admin',
+        }));
+    }
+
+    if (!orgId) return [];
+
+    const visibleRaces = await listVisibleRacesForOrg(orgId);
+    if (visibleRaces.length === 0) return [];
+
+    if (role === 'org_admin') {
+        return visibleRaces.map((race) => ({
+            raceId: race.id,
+            accessLevel: race.orgAccessLevel,
+            source: race.source,
+        }));
+    }
+
+    const explicitRows = await knex('user_race_permissions')
+        .where({ user_id: userId, org_id: orgId })
+        .whereIn('race_id', visibleRaces.map((race) => race.id))
+        .select('race_id', 'access_level');
+    const explicitMap = new Map(
+        explicitRows.map((row) => [Number(row.race_id), normalizeAccessLevel(row.access_level)]),
+    );
+
+    return visibleRaces
+        .map((race) => {
+            const inheritedAccessLevel = capAccessLevelByRole(role, race.orgAccessLevel);
+            const explicitAccessLevel = capAccessLevelByRole(role, explicitMap.get(Number(race.id)) || null);
+            const effectiveAccessLevel = explicitAccessLevel
+                ? pickStricterAccessLevel(explicitAccessLevel, inheritedAccessLevel)
+                : inheritedAccessLevel;
+
+            if (!effectiveAccessLevel) {
+                return null;
+            }
+
+            return {
+                raceId: race.id,
+                accessLevel: effectiveAccessLevel,
+                source: explicitAccessLevel ? 'user_assignment' : race.source,
+                inheritedAccessLevel,
+                explicitAccessLevel,
+            };
+        })
+        .filter(Boolean);
+}
+
 export async function resolveRaceAccess(authContext, rawRaceId, method) {
     const { userId, role, orgId: userOrgId } = authContext || {};
     if (!userId || !role) {
-        throw Object.assign(new Error('未授权'), { status: 401, expose: true });
+        throw Object.assign(new Error('Unauthorized'), { status: 401, expose: true });
     }
 
     const raceId = normalizeRaceId(rawRaceId);
@@ -79,61 +197,53 @@ export async function resolveRaceAccess(authContext, rawRaceId, method) {
     }
 
     if (!userOrgId) {
-        throw forbidden('当前账号未绑定机构，无法操作赛事');
+        throw forbidden('Current account is not bound to an organization');
     }
 
+    const orgRaceAccess = await getOrgRaceAccess(userOrgId, raceId, operatorOrgId);
+
     if (role === 'org_admin') {
-        let accessLevel = null;
-        let source = 'none';
-
-        if (operatorOrgId === userOrgId) {
-            accessLevel = 'editor';
-            source = 'own_org';
-        } else {
-            const orgRacePermission = await knex('org_race_permissions')
-                .where({ org_id: userOrgId, race_id: raceId })
-                .first('access_level');
-            accessLevel = orgRacePermission?.access_level || null;
-            source = orgRacePermission ? 'org_grant' : 'none';
+        if (!orgRaceAccess.accessLevel) {
+            throw forbidden('No access to this race');
         }
 
-        if (!accessLevel) {
-            throw forbidden('无权操作该赛事');
-        }
-
-        if (accessLevel === 'viewer' && !READ_ONLY_METHODS.has(method)) {
-            throw forbidden('机构赛事权限为只读，当前操作被拒绝');
+        if (orgRaceAccess.accessLevel === 'viewer' && !READ_ONLY_METHODS.has(method)) {
+            throw forbidden('Organization race access is read-only');
         }
 
         return {
             raceId,
             operatorOrgId,
-            effectiveAccessLevel: accessLevel,
-            source,
+            effectiveAccessLevel: orgRaceAccess.accessLevel,
+            source: orgRaceAccess.source,
         };
     }
 
-    const query = knex('user_race_permissions')
-        .where({ user_id: userId, race_id: raceId });
-    if (userOrgId) query.andWhere({ org_id: userOrgId });
-    const userRacePermission = await query.first('access_level');
-    if (!userRacePermission) {
-        throw forbidden('您未被授予该赛事权限');
+    if (!orgRaceAccess.accessLevel) {
+        throw forbidden('No access to this race');
     }
 
-    let accessLevel = userRacePermission.access_level || 'viewer';
-    if (role === 'race_viewer') {
-        accessLevel = 'viewer';
+    const inheritedAccessLevel = capAccessLevelByRole(role, orgRaceAccess.accessLevel);
+    const explicitUserAccessLevel = capAccessLevelByRole(
+        role,
+        await getExplicitUserRaceAccess(userId, userOrgId, raceId),
+    );
+    const effectiveAccessLevel = explicitUserAccessLevel
+        ? pickStricterAccessLevel(explicitUserAccessLevel, inheritedAccessLevel)
+        : inheritedAccessLevel;
+
+    if (!effectiveAccessLevel) {
+        throw forbidden('No access to this race');
     }
 
-    if (accessLevel === 'viewer' && !READ_ONLY_METHODS.has(method)) {
-        throw forbidden('只读权限，不可执行写入或删除操作');
+    if (effectiveAccessLevel === 'viewer' && !READ_ONLY_METHODS.has(method)) {
+        throw forbidden('Read-only race access cannot perform write operations');
     }
 
     return {
         raceId,
         operatorOrgId,
-        effectiveAccessLevel: accessLevel,
-        source: 'user_assignment',
+        effectiveAccessLevel,
+        source: explicitUserAccessLevel ? 'user_assignment' : orgRaceAccess.source,
     };
 }

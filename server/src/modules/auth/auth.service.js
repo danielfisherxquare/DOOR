@@ -7,7 +7,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { env } from '../../config/env.js';
 import * as authRepo from './auth.repository.js';
 import { userMapper } from '../../db/mappers/auth.js';
-import { listVisibleRacesForOrg } from '../races/race-access.service.js';
+import { listEffectiveRacePermissionsForUser, listVisibleRacesForOrg } from '../races/race-access.service.js';
 
 const ACCESS_TOKEN_EXPIRES = '15m';
 const REFRESH_TOKEN_DAYS = 30;
@@ -199,17 +199,21 @@ export async function getMe(userId) {
     }
 
     const org = user.org_id ? await authRepo.findOrgById(user.org_id) : null;
-    const racePermissions = await authRepo.findRacePermissions(userId);
+    const racePermissions = await listEffectiveRacePermissionsForUser({
+        userId: user.id,
+        role: user.role,
+        orgId: user.org_id || null,
+    });
 
     return {
         ...userMapper.toApiResponse(user),
         status: user.status,
         mustChangePassword: user.must_change_password || false,
         org: org ? { id: org.id, name: org.name, slug: org.slug } : null,
-        assignedRaceIds: racePermissions.map(p => p.race_id),
+        assignedRaceIds: racePermissions.map(p => p.raceId),
         racePermissions: racePermissions.map(p => ({
-            raceId: p.race_id,
-            accessLevel: p.access_level,
+            raceId: p.raceId,
+            accessLevel: p.accessLevel,
         })),
         permissions: buildPermissions(user.role),
     };
