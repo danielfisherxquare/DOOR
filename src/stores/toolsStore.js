@@ -21,100 +21,13 @@ const mockTools = [
     component: 'MechanicalClock3D'
   },
   {
-    id: 'json-formatter',
-    name: 'JSON 格式化',
-    description: 'JSON 数据格式化、压缩、校验工具',
-    icon: '📋',
+    id: 'app-download',
+    name: '应用下载',
+    description: '下载相关应用程序',
+    icon: '📥',
     status: 'online',
-    apiEndpoint: '/api/tools/json-formatter'
-  },
-  {
-    id: 'base64-encoder',
-    name: 'Base64 编解码',
-    description: 'Base64 编码与解码工具',
-    icon: '🔐',
-    status: 'online',
-    apiEndpoint: '/api/tools/base64-encoder'
-  },
-  {
-    id: 'qrcode-generator',
-    name: '二维码生成',
-    description: '生成自定义二维码图片',
-    icon: '📱',
-    status: 'online',
-    apiEndpoint: '/api/tools/qrcode-generator'
-  },
-  {
-    id: 'color-picker',
-    name: '颜色选择器',
-    description: '颜色选取、转换、调色板生成',
-    icon: '🎨',
-    status: 'online',
-    apiEndpoint: '/api/tools/color-picker'
-  },
-  {
-    id: 'timestamp-converter',
-    name: '时间戳转换',
-    description: '时间戳与日期时间格式互转',
-    icon: '⏰',
-    status: 'online',
-    apiEndpoint: '/api/tools/timestamp-converter'
-  },
-  {
-    id: 'image-compressor',
-    name: '图片压缩',
-    description: '在线图片压缩优化工具',
-    icon: '🖼️',
-    status: 'maintenance',
-    apiEndpoint: '/api/tools/image-compressor'
-  },
-  {
-    id: 'diff-checker',
-    name: '文本对比',
-    description: '两段文本差异对比分析',
-    icon: '📝',
-    status: 'online',
-    apiEndpoint: '/api/tools/diff-checker'
-  },
-  {
-    id: 'regex-tester',
-    name: '正则测试',
-    description: '正则表达式在线测试工具',
-    icon: '🔍',
-    status: 'online',
-    apiEndpoint: '/api/tools/regex-tester'
-  },
-  {
-    id: 'uuid-generator',
-    name: 'UUID 生成器',
-    description: '批量生成 UUID/GUID',
-    icon: '🔑',
-    status: 'online',
-    apiEndpoint: '/api/tools/uuid-generator'
-  },
-  {
-    id: 'markdown-editor',
-    name: 'Markdown 编辑器',
-    description: 'Markdown 在线编辑与预览',
-    icon: '📄',
-    status: 'offline',
-    apiEndpoint: '/api/tools/markdown-editor'
-  },
-  {
-    id: 'api-tester',
-    name: 'API 测试',
-    description: 'HTTP API 在线测试调试工具',
-    icon: '🌐',
-    status: 'online',
-    apiEndpoint: '/api/tools/api-tester'
-  },
-  {
-    id: 'sql-formatter',
-    name: 'SQL 格式化',
-    description: 'SQL 语句格式化美化工具',
-    icon: '🗃️',
-    status: 'online',
-    apiEndpoint: '/api/tools/sql-formatter'
+    apiEndpoint: '/api/tools/app-download',
+    component: 'AppDownload'
   }
 ]
 

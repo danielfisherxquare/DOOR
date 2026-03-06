@@ -147,7 +147,7 @@ function RacePermissionsPage() {
             <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>🔑 赛事授权</h1>
 
             {isGlobalSuperAdmin && (
-                <div style={{ padding: '12px 16px', marginBottom: 16, borderRadius: 10, background: 'rgba(245,158,11,0.1)', color: '#b45309', fontSize: 14 }}>
+                <div style={{ padding: '12px 16px', marginBottom: 16, borderRadius: 10, background: 'rgba(245,158,11,0.1)', color: 'var(--badge-yellow-text)', fontSize: 14 }}>
                     未选择机构：当前可为全平台用户分配赛事权限，权限范围将按目标用户所属机构自动限制。
                 </div>
             )}
@@ -158,7 +158,7 @@ function RacePermissionsPage() {
                         padding: '12px 16px',
                         borderRadius: 8,
                         background: message.startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
-                        color: message.startsWith('❌') ? '#ef4444' : '#16a34a',
+                        color: message.startsWith('❌') ? 'var(--color-danger)' : 'var(--color-success)',
                         fontSize: 14,
                         marginBottom: 16,
                     }}

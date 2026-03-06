@@ -89,7 +89,7 @@ function OrgListPage() {
                                         <td style={tdStyle}>{org.raceCount ?? '-'}</td>
                                         <td style={tdStyle}>{org.created_at ? new Date(org.created_at).toLocaleDateString() : '-'}</td>
                                         <td style={tdStyle}>
-                                            <button className="btn btn--ghost btn--sm" onClick={() => handleDeleteOrg(org)} style={{ color: '#dc2626' }}>
+                                            <button className="btn btn--ghost btn--sm" onClick={() => handleDeleteOrg(org)} style={{ color: 'var(--color-danger)' }}>
                                                 删除
                                             </button>
                                         </td>

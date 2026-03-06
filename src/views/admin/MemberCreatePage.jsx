@@ -79,7 +79,7 @@ function MemberCreatePage() {
             <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>+ 新建成员</h1>
 
             {error && (
-                <div style={{ padding: '12px 16px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: 14, marginBottom: 16, maxWidth: 520 }}>
+                <div style={{ padding: '12px 16px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', color: 'var(--color-danger)', fontSize: 14, marginBottom: 16, maxWidth: 520 }}>
                     {error}
                 </div>
             )}

@@ -17,6 +17,7 @@ import pipelineRoutes from './modules/pipeline/pipeline-config.routes.js';
 import bibRoutes from './modules/bib/bib.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import orgRoutes from './modules/org/org.routes.js';
+import toolsRoutes from './modules/tools/tools.routes.js';
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use(express.json({ limit: '50mb' }));
 
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/tools', toolsRoutes);
 
 app.use(requireAuth);
 

@@ -211,7 +211,7 @@ export const lotteryWeightMapper = {
             race_id: data.raceId,
             target_group: data.targetGroup ?? 'ALL',
             weight_type: data.weightType ?? 'gender',
-            enabled: data.enabled ?? 0,
+            enabled: data.enabled ? 1 : 0,
             weight_config: serializeJsonb(data.weightConfig, {}),
             priority: data.priority ?? 0,
         };
@@ -221,7 +221,7 @@ export const lotteryWeightMapper = {
         const row = {};
         if (data.targetGroup !== undefined) row.target_group = data.targetGroup;
         if (data.weightType !== undefined) row.weight_type = data.weightType;
-        if (data.enabled !== undefined) row.enabled = data.enabled;
+        if (data.enabled !== undefined) row.enabled = data.enabled ? 1 : 0;
         if (data.weightConfig !== undefined) row.weight_config = serializeJsonb(data.weightConfig, {});
         if (data.priority !== undefined) row.priority = data.priority;
         row.updated_at = new Date();

@@ -5,11 +5,13 @@ import useToolsStore from '../stores/toolsStore'
 // 导入工具组件
 import MechanicalClock from '../components/tools/MechanicalClock'
 import MechanicalClock3D from '../components/tools/MechanicalClock3D'
+import AppDownload from '../components/tools/AppDownload'
 
 // 工具组件映射
 const TOOL_COMPONENTS = {
   'MechanicalClock': MechanicalClock,
   'MechanicalClock3D': MechanicalClock3D,
+  'AppDownload': AppDownload,
 }
 
 function ToolDetail() {

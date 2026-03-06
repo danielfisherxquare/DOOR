@@ -148,7 +148,7 @@ function UserListPage() {
                                             )}
                                         </td>
                                         <td style={tdStyle}>
-                                            <span style={{ color: u.status === 'active' ? '#16a34a' : '#ef4444', fontWeight: 600, fontSize: 13 }}>
+                                            <span style={{ color: u.status === 'active' ? 'var(--color-success)' : 'var(--color-danger)', fontWeight: 600, fontSize: 13 }}>
                                                 {u.status === 'active' ? '✅ 正常' : '🚫 禁用'}
                                             </span>
                                         </td>
@@ -158,7 +158,7 @@ function UserListPage() {
                                                     {u.status === 'active' ? '禁用' : '启用'}
                                                 </button>
                                                 <button className="btn btn--ghost btn--sm" onClick={() => handleResetPassword(u)}>重置密码</button>
-                                                <button className="btn btn--ghost btn--sm" onClick={() => handleDeleteUser(u)} style={{ color: '#dc2626' }}>
+                                                <button className="btn btn--ghost btn--sm" onClick={() => handleDeleteUser(u)} style={{ color: 'var(--color-danger)' }}>
                                                     删除
                                                 </button>
                                             </div>

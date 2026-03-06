@@ -116,7 +116,7 @@ function MemberListPage() {
             </div>
 
             {isGlobalSuperAdmin && (
-                <div style={{ padding: '12px 16px', marginBottom: 16, borderRadius: 10, background: 'rgba(245,158,11,0.1)', color: '#b45309', fontSize: 14 }}>
+                <div style={{ padding: '12px 16px', marginBottom: 16, borderRadius: 10, background: 'rgba(245,158,11,0.1)', color: 'var(--badge-yellow-text)', fontSize: 14 }}>
                     未选择机构：当前显示全平台用户，可直接进行用户管理与赛事权限分配。
                 </div>
             )}
@@ -181,7 +181,7 @@ function MemberListPage() {
                                         </td>
                                         {isGlobalSuperAdmin && <td style={tdStyle}>{m.org_name || m.org_id || '-'}</td>}
                                         <td style={tdStyle}>
-                                            <span style={{ color: m.status === 'active' ? '#16a34a' : '#ef4444', fontWeight: 600, fontSize: 13 }}>
+                                            <span style={{ color: m.status === 'active' ? 'var(--color-success)' : 'var(--color-danger)', fontWeight: 600, fontSize: 13 }}>
                                                 {m.status === 'active' ? '正常' : '禁用'}
                                             </span>
                                         </td>
@@ -199,7 +199,7 @@ function MemberListPage() {
                                                         赛事授权
                                                     </Link>
                                                 )}
-                                                <button className="btn btn--ghost btn--sm" onClick={() => handleDeleteMember(m)} style={{ color: '#dc2626' }}>
+                                                <button className="btn btn--ghost btn--sm" onClick={() => handleDeleteMember(m)} style={{ color: 'var(--color-danger)' }}>
                                                     删除
                                                 </button>
                                             </div>

@@ -5,6 +5,30 @@
 import { Router } from 'express';
 import { requireRoles } from '../../middleware/require-roles.js';
 import * as adminService from './admin.service.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const UPLOADS_DIR = path.resolve(__dirname, '../../../uploads/apps');
+
+// 确保上传目录存在
+if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// multer 配置：保存为固定文件名 管理器.exe
+const storage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
+    filename: (_req, _file, cb) => cb(null, '管理器.exe'),
+});
+
+const upload = multer({
+    storage,
+    limits: { fileSize: 500 * 1024 * 1024 }, // 500MB
+});
 
 const router = Router();
 
@@ -149,6 +173,67 @@ router.get('/dashboard', async (req, res, next) => {
         const stats = await adminService.getDashboardStats();
         res.json({ success: true, data: stats });
     } catch (err) { next(err); }
+});
+
+// ── 应用/客户端管理 ──────────────────────────────────
+
+// POST /api/admin/tools/upload-app — 上传客户端安装包
+router.post('/tools/upload-app', upload.single('file'), async (req, res, next) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: '请选择要上传的文件' });
+        }
+        const stat = fs.statSync(req.file.path);
+        res.json({
+            success: true,
+            data: {
+                filename: req.file.filename,
+                size: stat.size,
+                updatedAt: stat.mtime.toISOString(),
+            },
+            message: '安装包上传成功',
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET /api/admin/tools/app-info — 获取当前安装包信息
+router.get('/tools/app-info', async (req, res, next) => {
+    try {
+        const filePath = path.join(UPLOADS_DIR, '管理器.exe');
+        if (!fs.existsSync(filePath)) {
+            return res.json({
+                success: true,
+                data: { available: false, filename: '管理器.exe', size: 0, updatedAt: null },
+            });
+        }
+        const stat = fs.statSync(filePath);
+        res.json({
+            success: true,
+            data: {
+                available: true,
+                filename: '管理器.exe',
+                size: stat.size,
+                updatedAt: stat.mtime.toISOString(),
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// DELETE /api/admin/tools/delete-app — 删除客户端安装包
+router.delete('/tools/delete-app', async (req, res, next) => {
+    try {
+        const filePath = path.join(UPLOADS_DIR, '管理器.exe');
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+        res.json({ success: true, message: '安装包已删除' });
+    } catch (err) {
+        next(err);
+    }
 });
 
 export default router;

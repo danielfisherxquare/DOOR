@@ -230,7 +230,7 @@ function RaceManagementPage() {
             {isSuperAdmin && !selectedOrgId && (
                 <div style={{
                     padding: '12px 16px', marginBottom: 16, borderRadius: 10,
-                    background: 'rgba(245,158,11,0.1)', color: '#b45309', fontSize: 14,
+                    background: 'rgba(245,158,11,0.1)', color: 'var(--badge-yellow-text)', fontSize: 14,
                 }}>
                     未选择机构：当前显示全平台赛事。创建赛事时请在表单中选择目标机构。
                 </div>
@@ -243,7 +243,7 @@ function RaceManagementPage() {
                     borderRadius: 10,
                     fontSize: 14,
                     background: message.includes('失败') ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
-                    color: message.includes('失败') ? '#dc2626' : '#15803d',
+                    color: message.includes('失败') ? 'var(--color-danger)' : 'var(--color-success)',
                 }}>
                     {message}
                 </div>
@@ -404,7 +404,7 @@ function RaceManagementPage() {
                                         <td style={tdStyle}>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <button className="btn btn--ghost btn--sm" onClick={() => handleEdit(race)}>编辑</button>
-                                                <button className="btn btn--ghost btn--sm" onClick={() => handleDelete(race)} style={{ color: '#dc2626' }}>删除</button>
+                                                <button className="btn btn--ghost btn--sm" onClick={() => handleDelete(race)} style={{ color: 'var(--color-danger)' }}>删除</button>
                                             </div>
                                         </td>
                                     </tr>
