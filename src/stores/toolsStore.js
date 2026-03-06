@@ -3,15 +3,6 @@ import { create } from 'zustand'
 // 模拟工具数据（实际项目中从后台API获取）
 const mockTools = [
   {
-    id: 'mechanical-clock',
-    name: '机械计时钟',
-    description: '具有物理翻转动画效果的机械式计时器，模拟真实电磁翻板显示器',
-    icon: '⏱️',
-    status: 'online',
-    apiEndpoint: '/api/tools/mechanical-clock',
-    component: 'MechanicalClock'  // 指定前端组件名称
-  },
-  {
     id: 'mechanical-clock-3d',
     name: '3D 机械计时钟',
     description: '真正的3D段式翻转时钟，每个笔画都是立体六面体，翻转时可见金属侧面',
@@ -23,7 +14,7 @@ const mockTools = [
   {
     id: 'app-download',
     name: '应用下载',
-    description: '下载相关应用程序',
+    description: '下载本地马拉松报名数据管理器客户端',
     icon: '📥',
     status: 'online',
     apiEndpoint: '/api/tools/app-download',

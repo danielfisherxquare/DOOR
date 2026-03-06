@@ -99,6 +99,42 @@ npm ci
 npm run dev
 ```
 
+### 3. 更新与发布（生产环境）
+
+当功能更新后（例如增加了“应用下载”和管理页面），需要更新远程环境：
+
+#### 方法 A. 如果使用 Docker 部署（推荐）
+
+在 `door/server` 目录重新构建镜像并重启容器：
+
+```bash
+cd door/server
+docker compose up -d --build
+docker compose exec app npm run migrate  # （可选）如果有需要执行的数据迁移
+```
+
+#### 方法 B. 如果使用手动部署（非 Docker 环境）
+
+**更新并构建前端：**
+
+```bash
+cd door
+npm install
+npm run build
+# 构建完成后，将生成的 `dist/` 目录的内容上传到目标云服务器供 Nginx 等托管
+```
+
+**更新并重启后端：**
+
+```bash
+cd door/server
+npm install          # 下拉新代码后，安装可能有新增加的依赖（例如 multer 等）
+npm run migrate      # 执行可能的新数据库迁移
+
+# 使用 pm2 等工具重启应用
+pm2 restart door-api # 根据 pm2 配置重启名称
+```
+
 ## 编码约定（必须）
 
 - 所有源码统一 `UTF-8`（无 BOM）+ `LF`。

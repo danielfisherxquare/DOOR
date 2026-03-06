@@ -4,43 +4,43 @@ const STORAGE_KEY = 'mechanical_clock_sound_config'
 
 export const DEFAULT_CONFIG = {
     // 层1: 卡扣释放 (Trigger Click)
-    triggerFreq: 1500,
-    triggerVol: 0.3,
-    triggerDuration: 0.015,
+    triggerFreq: 1250,
+    triggerVol: 1,
+    triggerDuration: 0.1,
 
     // 层2: 沉重沉寂的物理落地 (Heavy Thud)
-    thudStartFreq: 80,
-    thudEndFreq: 20,
-    thudVol: 1.5,
-    thudDuration: 0.1,
+    thudStartFreq: 30,
+    thudEndFreq: 5,
+    thudVol: 0.1,
+    thudDuration: 0.05,
 
     // 层3: 厚重金属碰撞 (Thick Metal Clack)
-    clackFilterFreq: 400,
-    clackVol: 0.8,
-    clackDuration: 0.06,
+    clackFilterFreq: 1350,
+    clackVol: 1.6,
+    clackDuration: 0.3,
 
     // 层4: 机箱内部低频余震 (Casing Resonance)
-    resStartFreq: 150,
-    resEndFreq: 80,
-    resVol: 0.4,
-    resDuration: 0.2,
+    resStartFreq: 30,
+    resEndFreq: 10,
+    resVol: 0,
+    resDuration: 0.05,
 
     // 层5: 金属质感 (Metallic Ping)
     metalFreq: 4000,
-    metalEndFreq: 1500,
-    metalVol: 0.15,
-    metalDuration: 0.04,
-    metalDetune: 30,
+    metalEndFreq: 5000,
+    metalVol: 0.1,
+    metalDuration: 0.05,
+    metalDetune: 50,
 
     // 层6: 空洞现场回声 (Hall Echo)
-    echoDelay: 0.08,
-    echoDecay: 0.4,
-    echoIterations: 4,
-    echoVol: 0.25,
-    echoFilterFreq: 2000,
+    echoDelay: 0.05,
+    echoDecay: 0.15,
+    echoIterations: 1,
+    echoVol: 0.1,
+    echoFilterFreq: 1100,
 
     // 全局设定
-    globalVolume: 0.5,
+    globalVolume: 1.5,
 }
 
 // 获取合并后的声音配置，保证有新增字段时不会崩溃
