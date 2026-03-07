@@ -95,16 +95,52 @@ export async function getDataset(orgId, raceId) {
 }
 
 export async function getExecutionDataset(orgId, raceId) {
-    return knex('records')
+    // 1. 查询可参与排号的记录，必须包含排号引擎所需的全部驼峰命名关键字段
+    const eligibleRecords = await knex('records')
         .where({ org_id: orgId, race_id: raceId })
         .whereRaw("(lottery_status = '中签' OR is_locked = 1)")
         .select(
             'id', 'name', 'event', 'gender',
-            'bib_number', 'bag_window_no', 'bag_no',
-            'expo_window_no', 'bib_color',
-            'runner_category'
+            'bib_number AS bibNumber',
+            'bag_window_no AS bagWindowNo',
+            'bag_no AS bagNo',
+            'expo_window_no AS expoWindowNo',
+            'bib_color AS bibColor',
+            'runner_category AS runnerCategory',
+            'lottery_status AS lotteryStatus',
+            'lottery_zone AS lotteryZone',
+            'personal_best_full AS personalBestFull',
+            'personal_best_half AS personalBestHalf',
+            'id_number AS idNumber',
+            '_imported_at AS _importedAt'
         )
-        .orderBy('id');
+        .orderBy('id', 'asc');
+
+    // 2. 查询不参与排号的记录 ID（用于清理原有已被排号的数据）
+    const skippedRows = await knex('records')
+        .where({ org_id: orgId, race_id: raceId })
+        .whereRaw("NOT (lottery_status = '中签' OR is_locked = 1)")
+        .whereRaw("(bib_number IS NOT NULL AND bib_number <> '')")
+        .select('id');
+    const skippedIds = skippedRows.map(r => r.id);
+
+    // 3. 统计各 lottery_status 的数量分布（用于前端展示汇总信息）
+    const statusSummary = await knex('records')
+        .where({ org_id: orgId, race_id: raceId })
+        .select(knex.raw("COALESCE(NULLIF(lottery_status, ''), '空状态') AS status"))
+        .count('* as count')
+        .groupBy(knex.raw("COALESCE(NULLIF(lottery_status, ''), '空状态')"))
+        .orderBy('count', 'desc');
+
+    return {
+        eligibleRecords,
+        skippedIds,
+        eligibleCount: eligibleRecords.length,
+        statusSummary: statusSummary.map(r => ({
+            status: r.status,
+            count: Number(r.count),
+        })),
+    };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
