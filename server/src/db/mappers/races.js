@@ -19,6 +19,7 @@ export const raceMapper = {
             routeData: row.route_data,
             mapFeaturesData: row.map_features_data,
             createAt: row.created_at,
+            lotteryModeDefault: row.lottery_mode_default ?? 'lottery',
             createdAt: row.created_at,
             updatedAt: row.updated_at,
         };
@@ -36,11 +37,13 @@ export const raceMapper = {
             location_lng: data.locationLng ?? null,
             route_data: data.routeData ?? null,
             map_features_data: data.mapFeaturesData ?? null,
+            lottery_mode_default: data.lotteryModeDefault ?? 'lottery',
         };
     },
 
     toDbUpdate(data) {
         const row = {};
+        if (data.lotteryModeDefault !== undefined) row.lottery_mode_default = data.lotteryModeDefault;
         if (data.name !== undefined) row.name = data.name;
         if (data.date !== undefined) row.date = data.date;
         if (data.location !== undefined) row.location = data.location;

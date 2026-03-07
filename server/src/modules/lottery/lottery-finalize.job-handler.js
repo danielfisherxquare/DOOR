@@ -62,6 +62,13 @@ registerHandler('lottery:finalize', async (job, { knex, heartbeat }) => {
         const capacities = await knex('race_capacity')
             .where({ org_id: orgId, race_id: raceId });
 
+        // 读取赛事默认抽签模式
+        const raceRow = await knex('races')
+            .where({ id: raceId, org_id: orgId })
+            .select('lottery_mode_default')
+            .first();
+        const raceDefaultMode = raceRow?.lottery_mode_default || 'lottery';
+
         const candidates = await knex('records')
             .where({ org_id: orgId, race_id: raceId })
             .where(function () {
@@ -79,10 +86,10 @@ registerHandler('lottery:finalize', async (job, { knex, heartbeat }) => {
             .where({ org_id: orgId, race_id: raceId, enabled: 1 })
             .orderBy('priority', 'asc');
 
-        // ── 4. 执行加权抽签 ─────────────────────────────────
-        await heartbeat(35, '执行加权抽签');
+        // ── 4. 执行抽签/直通 ─────────────────────────────────
+        await heartbeat(35, '执行抽签/直通确认');
 
-        // 按 event 分组，每组独立抽签
+        // 按 event 分组，每组独立处理
         const byEvent = new Map();
         for (const c of candidates) {
             const event = c.event || '';
@@ -97,34 +104,55 @@ registerHandler('lottery:finalize', async (job, { knex, heartbeat }) => {
         let drawOrder = 0;
         for (const [event, group] of byEvent) {
             const cap = capacities.find(c => c.event === event);
-            const targetCount = cap ? Math.floor(Number(cap.target_count) * Number(cap.draw_ratio)) : group.length;
 
-            // Fisher-Yates 洗牌（加权版）
-            const shuffled = [...group];
-            for (let i = shuffled.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-            }
+            // 解析项目生效模式: override 优先，否则继承赛事默认
+            const modeOverride = cap?.lottery_mode_override;
+            const effectiveMode = (modeOverride === 'lottery' || modeOverride === 'direct')
+                ? modeOverride
+                : raceDefaultMode;
 
-            // 截取中签/未中签
-            for (let i = 0; i < shuffled.length; i++) {
-                const isWinner = i < targetCount;
-                drawOrder++;
-                allResults.push({
-                    recordId: shuffled[i].id,
-                    resultStatus: isWinner ? 'winner' : 'loser',
-                    bucketName: event,
-                    drawOrder,
-                });
-                if (isWinner) {
-                    winnerIds.push(shuffled[i].id);
-                } else {
-                    loserIds.push(shuffled[i].id);
+            if (effectiveMode === 'direct') {
+                // ── 直通模式：全部标为中签 ──
+                console.log(`[lottery:finalize] 项目 "${event}"：直通模式，${group.length} 人全部中签`);
+                for (const candidate of group) {
+                    drawOrder++;
+                    allResults.push({
+                        recordId: candidate.id,
+                        resultStatus: 'winner',
+                        bucketName: event,
+                        drawOrder,
+                    });
+                    winnerIds.push(candidate.id);
+                }
+            } else {
+                // ── 抽签模式：Fisher-Yates 随机洗牌 ──
+                const targetCount = cap ? Math.floor(Number(cap.target_count) * Number(cap.draw_ratio)) : group.length;
+
+                const shuffled = [...group];
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+
+                for (let i = 0; i < shuffled.length; i++) {
+                    const isWinner = i < targetCount;
+                    drawOrder++;
+                    allResults.push({
+                        recordId: shuffled[i].id,
+                        resultStatus: isWinner ? 'winner' : 'loser',
+                        bucketName: event,
+                        drawOrder,
+                    });
+                    if (isWinner) {
+                        winnerIds.push(shuffled[i].id);
+                    } else {
+                        loserIds.push(shuffled[i].id);
+                    }
                 }
             }
         }
 
-        await heartbeat(55, `抽签完成: 中签 ${winnerIds.length}, 未中签 ${loserIds.length}, 写入结果`);
+        await heartbeat(55, `完成: 中签 ${winnerIds.length}, 未中签 ${loserIds.length}, 写入结果`);
 
         // ── 5. 批量写入 lottery_results ──────────────────────
         // 先清空旧结果

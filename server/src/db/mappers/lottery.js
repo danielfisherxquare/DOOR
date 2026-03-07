@@ -16,6 +16,7 @@ export const raceCapacityMapper = {
             targetCount: Number(row.target_count),
             drawRatio: Number(row.draw_ratio),
             reservedRatio: Number(row.reserved_ratio),
+            lotteryModeOverride: row.lottery_mode_override ?? 'inherit',
             createdAt: row.created_at,
             updatedAt: row.updated_at,
         };
@@ -29,11 +30,13 @@ export const raceCapacityMapper = {
             target_count: data.targetCount ?? 0,
             draw_ratio: data.drawRatio ?? 0.85,
             reserved_ratio: data.reservedRatio ?? 0.15,
+            lottery_mode_override: data.lotteryModeOverride ?? 'inherit',
         };
     },
 
     toDbUpdate(data) {
         const row = {};
+        if (data.lotteryModeOverride !== undefined) row.lottery_mode_override = data.lotteryModeOverride;
         if (data.event !== undefined) row.event = data.event;
         if (data.targetCount !== undefined) row.target_count = data.targetCount;
         if (data.drawRatio !== undefined) row.draw_ratio = data.drawRatio;

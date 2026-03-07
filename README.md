@@ -165,6 +165,18 @@ npm run migrate
 
 如果未迁移，机构赛事授权等接口会报错（例如缺少 `org_race_permissions` 表）。
 
+### 数据库迁移变更记录
+
+| 迁移文件 | 日期 | 变更内容 |
+|---|---|---|
+| `20260302000001` ~ `000006` | 2026-03-02 | 初始表结构（jobs, auth, races, records, column_mappings, import_sessions） |
+| `20260303000001` | 2026-03-03 | Phase 5: 抽签/审核/服装库存表 |
+| `20260304000001` (auth) | 2026-03-04 | 权限模型改版 |
+| `20260304000001` (phase6) | 2026-03-04 | Phase 6: lottery_results, snapshots, bib 表 |
+| `20260305000001` | 2026-03-05 | org_race_permissions 表 |
+| `20260307000001` | 2026-03-07 | Bib Tracking 物资追踪表 |
+| `20260307000002` | 2026-03-07 | **新增** `races.lottery_mode_default`（赛事默认抽签/直通模式）和 `race_capacity.lottery_mode_override`（项目级模式覆盖），支持 direct（直通）模式跳过随机抽签 |
+
 ### 1. 超管初始化组织与用户
 
 1. 使用超管账号登录 `/admin`。
