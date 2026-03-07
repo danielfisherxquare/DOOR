@@ -169,7 +169,14 @@ registerHandler('lottery:finalize', async (job, { knex, heartbeat }) => {
                 bucket_name: r.bucketName,
                 draw_order: r.drawOrder,
             }));
-            await knex('lottery_results').insert(batch);
+            await knex('lottery_results')
+                .insert(batch)
+                .onConflict(['org_id', 'race_id', 'record_id'])
+                .merge({
+                    result_status: knex.raw('EXCLUDED.result_status'),
+                    bucket_name: knex.raw('EXCLUDED.bucket_name'),
+                    draw_order: knex.raw('EXCLUDED.draw_order'),
+                });
         }
 
         await heartbeat(70, '更新 records 状态');

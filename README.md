@@ -177,6 +177,21 @@ npm run migrate
 | `20260307000001` | 2026-03-07 | Bib Tracking 物资追踪表 |
 | `20260307000002` | 2026-03-07 | **新增** `races.lottery_mode_default`（赛事默认抽签/直通模式）和 `race_capacity.lottery_mode_override`（项目级模式覆盖），支持 direct（直通）模式跳过随机抽签 |
 
+> [!IMPORTANT]
+> **`20260307000002` 迁移注意事项**
+>
+> 此迁移新增了两个列，必须在后端服务重启前执行，否则 `lottery:finalize` 会因读取不存在的 `lottery_mode_default` 列而报错。
+>
+> ```bash
+> # Docker 环境
+> docker compose exec app npm run migrate
+>
+> # 本地环境
+> cd door/server && npx knex migrate:latest
+> ```
+>
+> 同时，`lottery-finalize.job-handler.js` 已将 `lottery_results` 的写入从裸 `INSERT` 改为 `INSERT ... ON CONFLICT MERGE`，修复了因非事务执行时中途失败导致唯一约束冲突（`23505`）的问题。
+
 ### 1. 超管初始化组织与用户
 
 1. 使用超管账号登录 `/admin`。
