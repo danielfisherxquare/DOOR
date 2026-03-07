@@ -99,6 +99,21 @@ router.post('/configs/:raceId', requireRaceAccess('raceId'), async (req, res, ne
     } catch (err) { next(err); }
 });
 
+// DELETE /api/lottery/configs/entry/:id — 删除单条容量配置
+router.delete('/configs/entry/:id', requireRaceAccess(async (req) => {
+    const id = normalizePositiveInt(req.params.id, '容量配置 ID');
+    const row = await knex('race_capacity').where({ id }).first('race_id');
+    if (!row) throw Object.assign(new Error('容量配置不存在'), { status: 404, expose: true });
+    return row.race_id;
+}), async (req, res, next) => {
+    try {
+        const deleted = await lotteryRepo.deleteRaceCapacity(
+            req.raceAccess.operatorOrgId, Number(req.params.id));
+        if (!deleted) return res.status(404).json({ success: false, message: '容量配置不存在' });
+        res.json({ success: true });
+    } catch (err) { next(err); }
+});
+
 // ═══════════════════════════════════════════════════════════════════════
 //  lottery_lists
 // ═══════════════════════════════════════════════════════════════════════
