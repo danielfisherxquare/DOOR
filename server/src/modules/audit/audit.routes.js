@@ -61,7 +61,7 @@ async function enqueueAuditStep(req, res, next, stepNumber, stepName) {
                 stepName,
                 ...req.body,   // 可能包含 raceDate 等额外参数
             },
-            `audit:${stepName}:${raceId}`,   // idempotency key
+            `audit:${stepName}:${raceId}:${run.id}`,   // idempotency key (含 runId 以支持重试)
             userId,
             raceId,
         );
