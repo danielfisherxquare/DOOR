@@ -264,7 +264,7 @@ router.post('/finalize/:raceId', requireRaceAccess('raceId'), async (req, res, n
         const { userId } = req.authContext;
         const orgId = req.raceAccess.operatorOrgId;
         const raceId = Number(req.params.raceId);
-        const idempotencyKey = `lottery:finalize:${raceId}`;
+        const idempotencyKey = `lottery:finalize:${raceId}:${Date.now()}`;
         const job = await jobRepo.enqueue(orgId, 'lottery:finalize', { raceId }, idempotencyKey, userId, raceId);
         res.json({ success: true, data: { jobId: job.id } });
     } catch (err) { next(err); }
