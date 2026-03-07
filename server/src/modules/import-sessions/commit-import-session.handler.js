@@ -88,6 +88,7 @@ function mapRowToDbRecord(row, orgId, raceId, now) {
         runner_category: row.runnerCategory || null,
         lottery_status: row.lotteryStatus || null,
         duplicate_count: row.duplicateCount || 0,
+        audit_status: 'pending',
     };
 }
 
