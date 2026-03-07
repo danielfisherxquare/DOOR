@@ -71,6 +71,22 @@ docker compose exec \
 | `race_editor` | 被授权赛事可读写 |
 | `race_viewer` | 被授权赛事只读 |
 
+## 重大更新部署说明
+
+### Event Normalization (2026-03-07 更新)
+
+本次更新将所有历史项目名称统一规范化为“马拉松”与“半程马拉松”。部署此版本时必须严格按以下顺序执行数据库结构与数据清洗迁移，以防止数据读取中断：
+
+1. **执行数据清洗迁移**（清洗 `records.event` 字段和 `races.events` JSONB 字段）：
+   ```bash
+   # 本地模式
+   npm run migrate
+
+   # Docker 模式
+   docker compose exec app npm run migrate
+   ```
+2. **前后端同时重启部署**（前后端的 Event Tools 函数已解耦独立，但通信枚举已严格统一，必须一同上线以免 UI 异常）。
+
 ## 常见问题
 
 1. `ECONNREFUSED 127.0.0.1:15432`  
