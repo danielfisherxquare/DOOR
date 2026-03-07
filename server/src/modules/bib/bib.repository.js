@@ -1,52 +1,75 @@
-/**
- * Bib Repository — 排号配置、数据集、批量分配、清空
- *
- * 多租户隔离：所有查询必须带 org_id
- *
- * ⚠️ bulk-assign 分批处理绕过 PG 65535 参数限制
- */
 import knex from '../../db/knex.js';
 import { bibConfigMapper, bibAssignmentMapper } from '../../db/mappers/bib.js';
 import * as snapshotRepo from '../pipeline/snapshot.repository.js';
 
 const BATCH_SIZE = 1000;
+const DEFAULT_EVENT_LABEL = '\u672a\u5206\u9879\u76ee';
+const EMPTY_STATUS_LABEL = '\u7a7a\u72b6\u6001';
+const BIB_ELIGIBLE_STATUS_LIST = [
+    '\u4e2d\u7b7e',
+    '\u5df2\u4e2d\u7b7e',
+    '\u76f4\u901a\u540d\u989d',
+    '\u76f4\u901a',
+];
+const BIB_ELIGIBLE_CONDITION = `(lottery_status IN (${BIB_ELIGIBLE_STATUS_LIST.map(status => `'${status}'`).join(', ')}) OR is_locked = 1)`;
+const NON_S_ZONE_CONDITION = "UPPER(TRIM(COALESCE(lottery_zone, ''))) <> 'S'";
+const EVENT_LABEL_SQL = `COALESCE(NULLIF(TRIM(event), ''), '${DEFAULT_EVENT_LABEL}')`;
 
-// ═══════════════════════════════════════════════════════════════════════
-//  Overview
-// ═══════════════════════════════════════════════════════════════════════
-
-export async function getOverview(orgId, raceId) {
-    const stats = await knex('records')
-        .where({ org_id: orgId, race_id: raceId })
-        .select(
-            knex.raw('COUNT(*)::int AS total'),
-            knex.raw("COUNT(*) FILTER (WHERE lottery_status = '中签' OR is_locked = 1)::int AS eligible"),
-            knex.raw("COUNT(*) FILTER (WHERE bib_number IS NOT NULL AND bib_number <> '')::int AS assigned")
-        )
-        .first();
-
-    const byEvent = await knex('records')
-        .where({ org_id: orgId, race_id: raceId })
-        .whereRaw("(lottery_status = '中签' OR is_locked = 1)")
-        .groupBy('event')
-        .select(
-            'event',
-            knex.raw('COUNT(*)::int AS eligible'),
-            knex.raw("COUNT(*) FILTER (WHERE bib_number IS NOT NULL AND bib_number <> '')::int AS assigned")
-        )
-        .orderBy('event');
-
-    return {
-        total: stats?.total || 0,
-        eligible: stats?.eligible || 0,
-        assigned: stats?.assigned || 0,
-        byEvent,
-    };
+function recordsForRace(orgId, raceId) {
+    return knex('records').where({ org_id: orgId, race_id: raceId });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  bib_numbering_configs CRUD
-// ═══════════════════════════════════════════════════════════════════════
+export async function getOverview(orgId, raceId) {
+    const [
+        totalRow,
+        eligibleRow,
+        assignedRow,
+        eligibleByEventRows,
+        eligibleByEventExcludingSRows,
+        latestAssignedRows,
+    ] = await Promise.all([
+        recordsForRace(orgId, raceId).count('* as total').first(),
+        recordsForRace(orgId, raceId).whereRaw(BIB_ELIGIBLE_CONDITION).count('* as eligible').first(),
+        recordsForRace(orgId, raceId).whereRaw("TRIM(COALESCE(bib_number, '')) <> ''").count('* as assigned').first(),
+        recordsForRace(orgId, raceId)
+            .whereRaw(BIB_ELIGIBLE_CONDITION)
+            .select(knex.raw(`${EVENT_LABEL_SQL} AS event`))
+            .count('* as count')
+            .groupByRaw(EVENT_LABEL_SQL)
+            .orderBy([{ column: 'count', order: 'desc' }, { column: 'event', order: 'asc' }]),
+        recordsForRace(orgId, raceId)
+            .whereRaw(BIB_ELIGIBLE_CONDITION)
+            .whereRaw(NON_S_ZONE_CONDITION)
+            .select(knex.raw(`${EVENT_LABEL_SQL} AS event`))
+            .count('* as count')
+            .groupByRaw(EVENT_LABEL_SQL)
+            .orderBy([{ column: 'count', order: 'desc' }, { column: 'event', order: 'asc' }]),
+        recordsForRace(orgId, raceId)
+            .whereRaw("TRIM(COALESCE(bib_number, '')) <> ''")
+            .select('id', 'name', knex.raw('bib_number AS "bibNumber"'))
+            .orderBy('id', 'desc')
+            .limit(8),
+    ]);
+
+    return {
+        total: Number(totalRow?.total || 0),
+        eligible: Number(eligibleRow?.eligible || 0),
+        assigned: Number(assignedRow?.assigned || 0),
+        eligibleByEvent: eligibleByEventRows.map(row => ({
+            event: String(row.event || DEFAULT_EVENT_LABEL),
+            count: Number(row.count || 0),
+        })),
+        eligibleByEventExcludingS: eligibleByEventExcludingSRows.map(row => ({
+            event: String(row.event || DEFAULT_EVENT_LABEL),
+            count: Number(row.count || 0),
+        })),
+        latestAssigned: latestAssignedRows.map(row => ({
+            id: Number(row.id || 0),
+            name: String(row.name || ''),
+            bibNumber: String(row.bibNumber || ''),
+        })),
+    };
+}
 
 export async function getTemplates(orgId, raceId) {
     const rows = await knex('bib_numbering_configs')
@@ -77,28 +100,22 @@ export async function deleteTemplate(orgId, templateId) {
         .del();
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  Dataset
-// ═══════════════════════════════════════════════════════════════════════
-
 export async function getDataset(orgId, raceId) {
-    return knex('records')
-        .where({ org_id: orgId, race_id: raceId })
-        .whereRaw("(lottery_status = '中签' OR is_locked = 1)")
+    return recordsForRace(orgId, raceId)
+        .whereRaw(BIB_ELIGIBLE_CONDITION)
         .select(
             'id', 'name', 'event', 'gender',
             'bib_number', 'bag_window_no', 'bag_no',
             'expo_window_no', 'bib_color',
-            'clothing_size', 'runner_category'
+            'clothing_size', 'runner_category',
         )
         .orderBy('id');
 }
 
 export async function getExecutionDataset(orgId, raceId) {
-    // 1. 查询可参与排号的记录，必须包含排号引擎所需的全部驼峰命名关键字段
-    const eligibleRecords = await knex('records')
-        .where({ org_id: orgId, race_id: raceId })
-        .whereRaw("(lottery_status = '中签' OR is_locked = 1)")
+    const eligibleRecords = await recordsForRace(orgId, raceId)
+        .whereRaw(BIB_ELIGIBLE_CONDITION)
+        .whereRaw(NON_S_ZONE_CONDITION)
         .select(
             'id', 'name', 'event', 'gender',
             'bib_number AS bibNumber',
@@ -112,50 +129,40 @@ export async function getExecutionDataset(orgId, raceId) {
             'personal_best_full AS personalBestFull',
             'personal_best_half AS personalBestHalf',
             'id_number AS idNumber',
-            '_imported_at AS _importedAt'
+            '_imported_at AS _importedAt',
         )
         .orderBy('id', 'asc');
 
-    // 2. 查询不参与排号的记录 ID（用于清理原有已被排号的数据）
-    const skippedRows = await knex('records')
-        .where({ org_id: orgId, race_id: raceId })
-        .whereRaw("NOT (lottery_status = '中签' OR is_locked = 1)")
-        .whereRaw("(bib_number IS NOT NULL AND bib_number <> '')")
+    const skippedRows = await recordsForRace(orgId, raceId)
+        .whereRaw(`(NOT ${BIB_ELIGIBLE_CONDITION} OR NOT (${NON_S_ZONE_CONDITION}))`)
+        .whereNotNull('id')
         .select('id');
-    const skippedIds = skippedRows.map(r => r.id);
 
-    // 3. 统计各 lottery_status 的数量分布（用于前端展示汇总信息）
-    const statusSummary = await knex('records')
-        .where({ org_id: orgId, race_id: raceId })
-        .select(knex.raw("COALESCE(NULLIF(lottery_status, ''), '空状态') AS status"))
+    const statusSummary = await recordsForRace(orgId, raceId)
+        .select(knex.raw(`COALESCE(NULLIF(TRIM(lottery_status), ''), '${EMPTY_STATUS_LABEL}') AS status`))
         .count('* as count')
-        .groupBy(knex.raw("COALESCE(NULLIF(lottery_status, ''), '空状态')"))
-        .orderBy('count', 'desc');
+        .groupBy(knex.raw(`COALESCE(NULLIF(TRIM(lottery_status), ''), '${EMPTY_STATUS_LABEL}')`))
+        .orderBy([{ column: 'count', order: 'desc' }, { column: 'status', order: 'asc' }]);
 
     return {
         eligibleRecords,
-        skippedIds,
+        skippedIds: skippedRows.map(row => row.id),
         eligibleCount: eligibleRecords.length,
-        statusSummary: statusSummary.map(r => ({
-            status: r.status,
-            count: Number(r.count),
+        statusSummary: statusSummary.map(row => ({
+            status: row.status,
+            count: Number(row.count),
         })),
     };
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  Snapshot
-// ═══════════════════════════════════════════════════════════════════════
-
 export async function createBibSnapshot(orgId, raceId) {
-    // 防重检查
     const running = await knex('pipeline_executions')
         .where({ org_id: orgId, race_id: raceId, execution_type: 'bib_numbering', status: 'running' })
         .first();
     if (running) {
         throw Object.assign(
-            new Error(`存在正在执行的 bib_numbering 任务 (id=${running.id})`),
-            { code: 'CONCURRENT_EXECUTION', statusCode: 409 }
+            new Error(`existing bib_numbering execution is running (id=${running.id})`),
+            { code: 'CONCURRENT_EXECUTION', statusCode: 409 },
         );
     }
 
@@ -168,12 +175,7 @@ export async function hasBibSnapshot(orgId, raceId) {
     return snapshotRepo.hasSnapshot(orgId, raceId, 'pre_bib');
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  Bulk Assign — 分批处理
-// ═══════════════════════════════════════════════════════════════════════
-
 /**
- * 批量写入排号结果
  * @param {string} orgId
  * @param {number} raceId
  * @param {Array<{recordId, bibNumber, bagWindowNo?, bagNo?, expoWindowNo?, bibColor?}>} assignments
@@ -181,18 +183,16 @@ export async function hasBibSnapshot(orgId, raceId) {
 export async function bulkAssign(orgId, raceId, assignments) {
     if (!assignments.length) return { updated: 0 };
 
-    // 防重检查
     const running = await knex('pipeline_executions')
         .where({ org_id: orgId, race_id: raceId, execution_type: 'bib_numbering', status: 'running' })
         .first();
     if (running) {
         throw Object.assign(
-            new Error(`存在正在执行的 bib_numbering 任务 (id=${running.id})`),
-            { code: 'CONCURRENT_EXECUTION', statusCode: 409 }
+            new Error(`existing bib_numbering execution is running (id=${running.id})`),
+            { code: 'CONCURRENT_EXECUTION', statusCode: 409 },
         );
     }
 
-    // 写执行日志
     const [exec] = await knex('pipeline_executions')
         .insert({
             org_id: orgId,
@@ -206,13 +206,10 @@ export async function bulkAssign(orgId, raceId, assignments) {
     try {
         let updated = 0;
 
-        // 分批更新 records
         for (let i = 0; i < assignments.length; i += BATCH_SIZE) {
             const batch = assignments.slice(i, i + BATCH_SIZE);
-
-            // 构建 VALUES 列表，用 UPDATE FROM 方案绕过参数限制
-            const values = batch.map((a) =>
-                `(${a.recordId}, '${(a.bibNumber || '').replace(/'/g, "''")}', '${(a.bagWindowNo || '').replace(/'/g, "''")}', '${(a.bagNo || '').replace(/'/g, "''")}', '${(a.expoWindowNo || '').replace(/'/g, "''")}', '${(a.bibColor || '').replace(/'/g, "''")}')`
+            const values = batch.map((assignment) =>
+                `(${assignment.recordId}, '${(assignment.bibNumber || '').replace(/'/g, "''")}', '${(assignment.bagWindowNo || '').replace(/'/g, "''")}', '${(assignment.bagNo || '').replace(/'/g, "''")}', '${(assignment.expoWindowNo || '').replace(/'/g, "''")}', '${(assignment.bibColor || '').replace(/'/g, "''")}')`,
             ).join(',\n');
 
             const result = await knex.raw(`
@@ -232,15 +229,14 @@ export async function bulkAssign(orgId, raceId, assignments) {
             updated += result.rowCount || batch.length;
         }
 
-        // 分批 UPSERT bib_assignments
         for (let i = 0; i < assignments.length; i += BATCH_SIZE) {
             const batch = assignments.slice(i, i + BATCH_SIZE)
-                .filter(a => a.bibNumber)
-                .map(a => ({
+                .filter(assignment => assignment.bibNumber)
+                .map(assignment => ({
                     org_id: orgId,
                     race_id: raceId,
-                    record_id: a.recordId,
-                    bib_number: a.bibNumber,
+                    record_id: assignment.recordId,
+                    bib_number: assignment.bibNumber,
                 }));
 
             if (batch.length > 0) {
@@ -251,7 +247,6 @@ export async function bulkAssign(orgId, raceId, assignments) {
             }
         }
 
-        // 更新执行日志
         await knex('pipeline_executions')
             .where({ id: execId })
             .update({
@@ -261,7 +256,6 @@ export async function bulkAssign(orgId, raceId, assignments) {
             });
 
         return { updated };
-
     } catch (err) {
         await knex('pipeline_executions')
             .where({ id: execId })
@@ -273,10 +267,6 @@ export async function bulkAssign(orgId, raceId, assignments) {
         throw err;
     }
 }
-
-// ═══════════════════════════════════════════════════════════════════════
-//  Clear — 一键清空
-// ═══════════════════════════════════════════════════════════════════════
 
 export async function clearBib(orgId, raceId) {
     return knex.transaction(async (trx) => {
