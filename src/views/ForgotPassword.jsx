@@ -51,7 +51,7 @@ function ForgotPassword() {
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="2" style={{ margin: '0 auto 12px' }}>
                 <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
               </svg>
-              <p style={{ color: 'var(--color-text)', marginBottom: 8 }}>
+              <p style={{ color: 'var(--color-text-primary)', marginBottom: 8 }}>
                 如果该邮箱已注册，您将收到密码重置邮件
               </p>
             </div>

@@ -167,7 +167,7 @@ function OrgRacePermissionsPage() {
                     borderRadius: 8,
                     marginBottom: 16,
                     background: message.startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
-                    color: message.startsWith('❌') ? '#ef4444' : '#16a34a',
+                    color: message.startsWith('❌') ? 'var(--color-danger)' : 'var(--color-success)',
                     fontSize: 14,
                 }}>
                     {message}

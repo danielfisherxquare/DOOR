@@ -145,7 +145,7 @@ function AppManagerPage() {
                                 width: 48,
                                 height: 48,
                                 borderRadius: 12,
-                                background: 'linear-gradient(135deg, var(--color-accent, #39ff14), #00e676)',
+                                background: 'linear-gradient(135deg, var(--color-accent, #E2FF66), #00e676)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -168,14 +168,14 @@ function AppManagerPage() {
                             style={{
                                 padding: '8px 16px',
                                 borderRadius: 8,
-                                border: '1px solid #ef4444',
+                                border: '1px solid var(--color-danger)',
                                 background: 'transparent',
-                                color: '#ef4444',
+                                color: 'var(--color-danger)',
                                 fontSize: 13,
                                 cursor: 'pointer',
                                 transition: 'all 150ms',
                             }}
-                            onMouseOver={(e) => { e.currentTarget.style.background = '#fef2f2' }}
+                            onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.05)' }}
                             onMouseOut={(e) => { e.currentTarget.style.background = 'transparent' }}
                         >
                             🗑️ 删除
@@ -212,7 +212,7 @@ function AppManagerPage() {
                         background: uploading ? 'var(--color-bg-secondary, #f5f5f5)' : 'transparent',
                     }}
                     onMouseOver={(e) => {
-                        if (!uploading) e.currentTarget.style.borderColor = 'var(--color-accent, #39ff14)'
+                        if (!uploading) e.currentTarget.style.borderColor = 'var(--color-accent, #E2FF66)'
                     }}
                     onMouseOut={(e) => {
                         e.currentTarget.style.borderColor = 'var(--color-border, #d1d5db)'
@@ -224,7 +224,7 @@ function AppManagerPage() {
                                 width: 40,
                                 height: 40,
                                 border: '3px solid var(--color-bg-secondary, #e5e7eb)',
-                                borderTopColor: 'var(--color-accent, #39ff14)',
+                                borderTopColor: 'var(--color-accent, #E2FF66)',
                                 borderRadius: '50%',
                                 animation: 'spin 0.8s linear infinite',
                                 margin: '0 auto 16px',

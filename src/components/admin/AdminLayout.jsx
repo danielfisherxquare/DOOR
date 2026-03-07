@@ -244,9 +244,10 @@ function AdminLayout() {
                     margin-bottom: 2px;
                 }
                 .admin-nav-item:hover { background: var(--color-bg-secondary, #f3f4f6); }
+                .admin-nav-item:focus-visible { outline: 2px solid var(--color-purple, #6366f1); outline-offset: -2px; }
                 .admin-nav-item--active {
-                    background: var(--color-accent, #6366f1) !important;
-                    color: #fff !important;
+                    background: var(--color-primary) !important;
+                    color: var(--color-text-on-dark) !important;
                     font-weight: 600;
                 }
                 .admin-nav-item__icon { font-size: 18px; flex-shrink: 0; }
@@ -272,8 +273,8 @@ function AdminLayout() {
                     width: 32px;
                     height: 32px;
                     border-radius: 50%;
-                    background: var(--color-accent, #6366f1);
-                    color: #fff;
+                    background: var(--color-primary);
+                    color: var(--color-text-on-dark);
                     display: flex;
                     align-items: center;
                     justify-content: center;

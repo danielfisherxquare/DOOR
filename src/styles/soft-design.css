@@ -13,7 +13,7 @@
   /* 文字色 */
   --color-text-primary: #27272A;
   --color-text-secondary: #6B7280;
-  --color-text-muted: #9CA3AF;
+  --color-text-muted: #71717A;
   --color-text-on-dark: #FFFFFF;
 
   /* 主色 - 深灰 */
@@ -35,6 +35,15 @@
 
   /* 边框 */
   --border-color: #E5E7EB;
+  --color-border: #E5E7EB;
+
+  /* 危险色 Badge */
+  --badge-red-bg: #FEE2E2;
+  --badge-red-text: #991B1B;
+
+  /* 阴影辅助 */
+  --color-shadow-dark: #d1d5db;
+  --color-shadow-light: #ffffff;
 
   /* 圆角 - rem 响应式 */
   --radius-sm: 0.5rem;
@@ -760,5 +769,29 @@ select.input {
   .tool-detail__header {
     flex-direction: column;
     text-align: center;
+  }
+}
+
+/* ========================================
+   可访问性 - Focus 状态
+   ======================================== */
+.btn:focus-visible,
+.input:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-purple);
+  outline-offset: 2px;
+}
+
+/* ========================================
+   可访问性 - 减少动效偏好
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

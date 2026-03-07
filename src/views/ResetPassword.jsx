@@ -8,7 +8,7 @@ function ResetPassword() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [success, setSuccess] = useState(false)
   const navigate = useNavigate()
-  
+
   const { resetPassword, isLoading, error, clearError } = useAuthStore()
 
   useEffect(() => {
@@ -17,7 +17,7 @@ function ResetPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!password.trim() || password.length < 6) {
       return
     }
@@ -47,21 +47,21 @@ function ResetPassword() {
 
         {success ? (
           <div style={{ textAlign: 'center' }}>
-            <div style={{ 
-              padding: '24px', 
-              borderRadius: 'var(--radius-lg)', 
+            <div style={{
+              padding: '24px',
+              borderRadius: 'var(--radius-lg)',
               background: 'rgba(34, 197, 94, 0.1)',
               marginBottom: 16
             }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" strokeWidth="2" style={{ margin: '0 auto 12px' }}>
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22,4 12,14.01 9,11.01"/>
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22,4 12,14.01 9,11.01" />
               </svg>
-              <p style={{ color: 'var(--color-text)' }}>
+              <p style={{ color: 'var(--color-text-primary)' }}>
                 密码重置成功！请使用新密码登录
               </p>
             </div>
-            
+
             <Link to="/login" className="btn btn--primary btn--large" style={{ display: 'block', textDecoration: 'none' }}>
               前往登录
             </Link>
@@ -69,10 +69,10 @@ function ResetPassword() {
         ) : (
           <form className="login-card__form" onSubmit={handleSubmit}>
             {error && (
-              <div style={{ 
-                padding: '12px 16px', 
-                borderRadius: 'var(--radius-md)', 
-                background: 'rgba(239, 68, 68, 0.1)', 
+              <div style={{
+                padding: '12px 16px',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(239, 68, 68, 0.1)',
                 color: 'var(--color-danger)',
                 fontSize: 'var(--font-size-sm)'
               }}>
@@ -112,8 +112,8 @@ function ResetPassword() {
               />
             </div>
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="btn btn--primary btn--large"
               disabled={isLoading}
               style={{ marginTop: 8 }}
@@ -121,11 +121,11 @@ function ResetPassword() {
               {isLoading ? '重置中...' : '重置密码'}
             </button>
 
-            <p style={{ 
-              marginTop: 16, 
-              textAlign: 'center', 
-              fontSize: 'var(--font-size-sm)', 
-              color: 'var(--color-text-secondary)' 
+            <p style={{
+              marginTop: 16,
+              textAlign: 'center',
+              fontSize: 'var(--font-size-sm)',
+              color: 'var(--color-text-secondary)'
             }}>
               <Link to="/login" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>
                 返回登录

@@ -34,7 +34,7 @@ function AppDownload() {
                 background: 'var(--color-bg-primary, #ffffff)',
                 borderRadius: 20,
                 padding: '48px 40px',
-                boxShadow: '8px 8px 20px var(--color-shadow-dark, #d1d5db), -8px -8px 20px var(--color-shadow-light, #ffffff)',
+                boxShadow: 'var(--shadow-md)',
                 textAlign: 'center',
             }}>
                 {/* 应用图标 */}
@@ -42,13 +42,13 @@ function AppDownload() {
                     width: 88,
                     height: 88,
                     borderRadius: 22,
-                    background: 'linear-gradient(135deg, var(--color-accent, #39ff14) 0%, #00e676 100%)',
+                    background: 'linear-gradient(135deg, var(--color-accent, #E2FF66) 0%, #00e676 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: 42,
                     margin: '0 auto 24px',
-                    boxShadow: '0 8px 24px rgba(57, 255, 20, 0.3)',
+                    boxShadow: '0 8px 24px rgba(226, 255, 102, 0.3)',
                 }}>
                     🏃
                 </div>
@@ -121,8 +121,8 @@ function AppDownload() {
                                 padding: '14px 40px',
                                 borderRadius: 14,
                                 border: 'none',
-                                background: 'linear-gradient(135deg, var(--color-accent, #39ff14) 0%, #00e676 100%)',
-                                color: '#111',
+                                background: 'linear-gradient(135deg, var(--color-accent, #E2FF66) 0%, #00e676 100%)',
+                                color: 'var(--color-accent-text)',
                                 fontWeight: 700,
                                 fontSize: 16,
                                 cursor: 'pointer',
@@ -131,11 +131,11 @@ function AppDownload() {
                             }}
                             onMouseOver={(e) => {
                                 e.currentTarget.style.transform = 'translateY(-2px)'
-                                e.currentTarget.style.boxShadow = '0 8px 24px rgba(57, 255, 20, 0.45)'
+                                e.currentTarget.style.boxShadow = '0 8px 24px rgba(226, 255, 102, 0.45)'
                             }}
                             onMouseOut={(e) => {
                                 e.currentTarget.style.transform = 'translateY(0)'
-                                e.currentTarget.style.boxShadow = '0 4px 16px rgba(57, 255, 20, 0.35)'
+                                e.currentTarget.style.boxShadow = '0 4px 16px rgba(226, 255, 102, 0.35)'
                             }}
                         >
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
