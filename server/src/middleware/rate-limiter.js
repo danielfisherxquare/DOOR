@@ -29,3 +29,29 @@ export const registerLimiter = rateLimit({
     validate: { ip: false, xForwardedForHeader: false },
     skip: () => isTest,
 });
+
+function resolveRequesterKey(req) {
+    return req.authContext?.userId || req.headers['x-forwarded-for'] || req.ip || '127.0.0.1';
+}
+
+export const scanResolveLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: '扫码请求过于频繁，请稍后再试' },
+    keyGenerator: (req) => resolveRequesterKey(req),
+    validate: { ip: false, xForwardedForHeader: false },
+    skip: () => isTest,
+});
+
+export const scanPickupLimiter = rateLimit({
+    windowMs: 5 * 1000,
+    max: 1,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: '请勿重复提交领取操作' },
+    keyGenerator: (req) => `${resolveRequesterKey(req)}:${String(req.body?.qrToken || '')}`,
+    validate: { ip: false, xForwardedForHeader: false },
+    skip: () => isTest,
+});

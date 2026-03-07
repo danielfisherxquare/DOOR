@@ -9,7 +9,30 @@ import ResetPassword from './views/ResetPassword'
 import ToolDetail from './views/ToolDetail'
 import AdminProtectedRoute from './components/AdminProtectedRoute'
 import AdminLayout from './components/admin/AdminLayout'
+import ScanProtectedRoute from './components/ScanProtectedRoute'
+import ScanLayout from './components/scan/ScanLayout'
+import ScanLogin from './views/scan/ScanLogin'
+import ScanHome from './views/scan/ScanHome'
+import ScanResult from './views/scan/ScanResult'
 import useAuthStore from './stores/authStore'
+
+function PortalLayout() {
+  return (
+    <>
+      <Navbar />
+      <main className="main-content">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/tool/:id" element={<ToolDetail />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
+        </Routes>
+      </main>
+      <Footer />
+    </>
+  )
+}
 
 function App() {
   const bootstrapAuth = useAuthStore(state => state.bootstrapAuth)
@@ -21,29 +44,28 @@ function App() {
   return (
     <div className="app">
       <Routes>
-        {/* 管理后台 — 独立 layout，不含 Navbar/Footer */}
         <Route path="/admin/*" element={
           <AdminProtectedRoute>
             <AdminLayout />
           </AdminProtectedRoute>
         } />
 
-        {/* 门户区 — 含 Navbar/Footer */}
-        <Route path="*" element={
-          <>
-            <Navbar />
-            <main className="main-content">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/tool/:id" element={<ToolDetail />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/forgot-password" element={<ForgotPassword />} />
-                <Route path="/reset-password/:token" element={<ResetPassword />} />
-              </Routes>
-            </main>
-            <Footer />
-          </>
+        <Route path="/scan/login" element={
+          <ScanLayout>
+            <ScanLogin />
+          </ScanLayout>
         } />
+
+        <Route path="/scan/*" element={
+          <ScanProtectedRoute>
+            <ScanLayout />
+          </ScanProtectedRoute>
+        }>
+          <Route index element={<ScanHome />} />
+          <Route path="result" element={<ScanResult />} />
+        </Route>
+
+        <Route path="*" element={<PortalLayout />} />
       </Routes>
     </div>
   )

@@ -15,6 +15,7 @@ import auditRoutes from './modules/audit/audit.routes.js';
 import clothingRoutes from './modules/clothing/clothing.routes.js';
 import pipelineRoutes from './modules/pipeline/pipeline-config.routes.js';
 import bibRoutes from './modules/bib/bib.routes.js';
+import bibTrackingRoutes from './modules/bib-tracking/bib-tracking.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import orgRoutes from './modules/org/org.routes.js';
 import toolsRoutes from './modules/tools/tools.routes.js';
@@ -61,6 +62,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/clothing', clothingRoutes);
 app.use('/api/pipeline', pipelineRoutes);
 app.use('/api/bib', bibRoutes);
+app.use('/api/bib-tracking', bibTrackingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/org', orgRoutes);
 
