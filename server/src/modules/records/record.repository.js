@@ -3,6 +3,7 @@
  * 支持综合查询、统计分析、字段唯一值、快速统计
  */
 import knex from '../../db/knex.js';
+import { isHalfEvent } from '../../utils/event-normalizer.js';
 import { recordMapper } from '../../db/mappers/records.js';
 
 // super_admin 的 orgId 为 null，此时不加 org_id 过滤
@@ -347,7 +348,7 @@ export async function importVerificationResults(orgId, raceId, results) {
             date: res.raceDate || '',
         });
 
-        const isHalf = res.event === 'Half' || res.event === '半马' || res.event === '半程';
+        const isHalf = isHalfEvent(res.event);
         const target = isHalf ? halfMap : fullMap;
         // 同一 idNumber 后面的覆盖前面的
         target.set(res.idNumber.trim(), pbJson);

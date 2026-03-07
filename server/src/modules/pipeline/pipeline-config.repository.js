@@ -3,6 +3,7 @@
  * 多租户隔离：所有查询必须带 org_id
  */
 import knex from '../../db/knex.js';
+import { isHalfEvent } from '../../utils/event-normalizer.js';
 import { startZoneMapper, performanceRuleMapper } from '../../db/mappers/pipeline.js';
 import { raceCapacityMapper } from '../../db/mappers/lottery.js';
 
@@ -172,13 +173,7 @@ function timeToSeconds(str) {
     return 0;
 }
 
-/**
- * 判断项目是否为半程
- */
-function isHalfEvent(event) {
-    if (!event) return false;
-    return event.includes('半') || event.toLowerCase().includes('half');
-}
+
 
 /**
  * 执行成绩筛选

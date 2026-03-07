@@ -8,6 +8,7 @@
  */
 import { registerHandler } from '../jobs/job.handlers.js';
 import { importSessionRepository } from '../import-sessions/import-session.repository.js';
+import { normalizeEvent } from '../../utils/event-normalizer.js';
 
 // ── 辅助函数 ─────────────────────────────────────────────
 
@@ -62,7 +63,7 @@ function mapRowToDbRecord(row, orgId, raceId, now) {
         gender: row.gender || '',
         age: row.age || '',
         birthday: row.birthday || '',
-        event: row.event || '',
+        event: normalizeEvent(row.event),
         source: row.source || '',
         clothing_size: row.clothingSize || '',
         province: row.province || '',

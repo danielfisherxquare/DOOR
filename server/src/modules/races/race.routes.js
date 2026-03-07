@@ -6,6 +6,7 @@ import * as raceRepo from './race.repository.js';
 import { requireRoles } from '../../middleware/require-roles.js';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import knex from '../../db/knex.js';
+import { normalizeEvent } from '../../utils/event-normalizer.js';
 
 const router = Router();
 
@@ -31,7 +32,7 @@ function normalizeEvents(events) {
             throw Object.assign(new Error(`events[${index}] must be an object`), { status: 400, expose: true });
         }
 
-        const name = typeof item.name === 'string' ? item.name.trim() : '';
+        const name = normalizeEvent(item.name);
         if (!name) {
             throw Object.assign(new Error(`events[${index}].name is required`), { status: 400, expose: true });
         }

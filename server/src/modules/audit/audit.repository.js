@@ -12,55 +12,32 @@ import { auditRunMapper } from '../../db/mappers/audit.js';
 // ─── 审核准备统计 ────────────────────────────────────────────────────
 // 基于 lotteryStatus（中文枚举值）聚合统计，与 sqliteService.getAuditPrepStats 逻辑一致
 export async function getPrepStats(orgId, raceId) {
-    const result = await knex('records')
+    const rows = await knex('records')
         .where({ org_id: orgId, race_id: raceId })
+        .groupBy('event')
         .select(
-            knex.raw(`
-                -- 全程统计
-                SUM(CASE WHEN event NOT ILIKE '%半程%' AND event NOT ILIKE '%half%'
-                    AND lottery_status = '参与抽签' THEN 1 ELSE 0 END)::int AS full_participate,
-                SUM(CASE WHEN event NOT ILIKE '%半程%' AND event NOT ILIKE '%half%'
-                    AND lottery_status IN ('直通名额','直通','强制保签') THEN 1 ELSE 0 END)::int AS full_direct,
-                SUM(CASE WHEN event NOT ILIKE '%半程%' AND event NOT ILIKE '%half%'
-                    AND lottery_status IN ('不予通过','模糊剔除','未成年剔除','精英资质存疑','强制剔除') THEN 1 ELSE 0 END)::int AS full_denied,
-                SUM(CASE WHEN event NOT ILIKE '%半程%' AND event NOT ILIKE '%half%'
-                    AND (lottery_status IS NULL OR lottery_status = ''
-                         OR lottery_status NOT IN ('参与抽签','直通名额','直通','强制保签','不予通过','模糊剔除','未成年剔除','精英资质存疑','强制剔除'))
-                    THEN 1 ELSE 0 END)::int AS full_pending,
-
-                -- 半程统计
-                SUM(CASE WHEN (event ILIKE '%半程%' OR event ILIKE '%half%')
-                    AND lottery_status = '参与抽签' THEN 1 ELSE 0 END)::int AS half_participate,
-                SUM(CASE WHEN (event ILIKE '%半程%' OR event ILIKE '%half%')
-                    AND lottery_status IN ('直通名额','直通','强制保签') THEN 1 ELSE 0 END)::int AS half_direct,
-                SUM(CASE WHEN (event ILIKE '%半程%' OR event ILIKE '%half%')
-                    AND lottery_status IN ('不予通过','模糊剔除','未成年剔除','精英资质存疑','强制剔除') THEN 1 ELSE 0 END)::int AS half_denied,
-                SUM(CASE WHEN (event ILIKE '%半程%' OR event ILIKE '%half%')
-                    AND (lottery_status IS NULL OR lottery_status = ''
-                         OR lottery_status NOT IN ('参与抽签','直通名额','直通','强制保签','不予通过','模糊剔除','未成年剔除','精英资质存疑','强制剔除'))
-                    THEN 1 ELSE 0 END)::int AS half_pending,
-
-                -- 总数
-                COUNT(*)::int AS total
-            `)
+            'event',
+            knex.raw("SUM(CASE WHEN lottery_status = '参与抽签' THEN 1 ELSE 0 END)::int AS participate"),
+            knex.raw("SUM(CASE WHEN lottery_status IN ('直通名额','直通','强制保签') THEN 1 ELSE 0 END)::int AS direct"),
+            knex.raw("SUM(CASE WHEN lottery_status IN ('不予通过','模糊剔除','未成年剔除','精英资质存疑','强制剔除') THEN 1 ELSE 0 END)::int AS denied"),
+            knex.raw("SUM(CASE WHEN lottery_status IS NULL OR lottery_status = '' OR lottery_status NOT IN ('参与抽签','直通名额','直通','强制保签','不予通过','模糊剔除','未成年剔除','精英资质存疑','强制剔除') THEN 1 ELSE 0 END)::int AS pending"),
+            knex.raw("COUNT(*)::int AS subtotal"),
         )
-        .first();
+        .orderBy('event');
 
-    return {
-        full: {
-            participate: result.full_participate || 0,
-            direct: result.full_direct || 0,
-            denied: result.full_denied || 0,
-            pending: result.full_pending || 0,
-        },
-        half: {
-            participate: result.half_participate || 0,
-            direct: result.half_direct || 0,
-            denied: result.half_denied || 0,
-            pending: result.half_pending || 0,
-        },
-        total: result.total || 0,
-    };
+    const byEvent = {};
+    let total = 0;
+    for (const r of rows) {
+        byEvent[r.event || '(未知)'] = {
+            participate: r.participate || 0,
+            direct: r.direct || 0,
+            denied: r.denied || 0,
+            pending: r.pending || 0,
+            subtotal: r.subtotal || 0,
+        };
+        total += r.subtotal || 0;
+    }
+    return { byEvent, total };
 }
 
 // ─── 审核重置（含叠加保护逻辑）─────────────────────────────────────
