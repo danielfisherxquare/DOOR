@@ -68,6 +68,15 @@ registerHandler('lottery:finalize', async (job, { knex, heartbeat }) => {
             .select('lottery_mode_default')
             .first();
         const raceDefaultMode = raceRow?.lottery_mode_default || 'lottery';
+        const effectiveModeByEvent = new Map(
+            capacities.map(cap => [
+                cap.event || '',
+                (cap.lottery_mode_override === 'direct' || cap.lottery_mode_override === 'lottery')
+                    ? cap.lottery_mode_override
+                    : raceDefaultMode,
+            ]),
+        );
+        const isDirectEvent = (event) => (effectiveModeByEvent.get(event || '') || raceDefaultMode) === 'direct';
 
         const candidates = await knex('records')
             .where({ org_id: orgId, race_id: raceId })
@@ -211,6 +220,7 @@ registerHandler('lottery:finalize', async (job, { knex, heartbeat }) => {
         const deductMap = new Map();
         let needDeductCount = 0;
         for (const w of winnerRecords) {
+            if (isDirectEvent(w.event)) continue;
             if (!w.clothing_size) continue;
             const event = w.event || 'ALL';
             const gender = w.gender || 'U';

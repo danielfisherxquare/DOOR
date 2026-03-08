@@ -220,4 +220,30 @@ describe('bib routes', () => {
         assert.equal(statusMap.get(STATUS_PENDING), 1);
         assert.equal(statusMap.get(STATUS_LOSE), 1);
     });
+
+    it('creates and queries bib snapshot independently from lottery snapshot', async () => {
+        const beforeResponse = await api(`/api/bib/has-snapshot/${raceId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        assert.equal(beforeResponse.status, 200);
+        assert.equal(beforeResponse.body.data.hasSnapshot, false);
+
+        const createResponse = await api(`/api/bib/snapshot/${raceId}`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        assert.equal(createResponse.status, 200);
+
+        const afterResponse = await api(`/api/bib/has-snapshot/${raceId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        assert.equal(afterResponse.status, 200);
+        assert.equal(afterResponse.body.data.hasSnapshot, true);
+
+        const lotterySnapshotResponse = await api(`/api/lottery/has-snapshot/${raceId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        assert.equal(lotterySnapshotResponse.status, 200);
+        assert.equal(lotterySnapshotResponse.body.data.hasSnapshot, false);
+    });
 });

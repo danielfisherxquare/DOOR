@@ -62,6 +62,24 @@ export async function rollbackLottery(orgId, raceId) {
         const execId = typeof exec === 'object' ? exec.id : exec;
 
         try {
+            const raceRow = await trx('races')
+                .where({ id: raceId, org_id: orgId })
+                .select('lottery_mode_default')
+                .first();
+            const raceDefaultMode = raceRow?.lottery_mode_default || 'lottery';
+            const capacities = await trx('race_capacity')
+                .where({ org_id: orgId, race_id: raceId })
+                .select('event', 'lottery_mode_override');
+            const effectiveModeByEvent = new Map(
+                capacities.map(cap => [
+                    cap.event || '',
+                    (cap.lottery_mode_override === 'direct' || cap.lottery_mode_override === 'lottery')
+                        ? cap.lottery_mode_override
+                        : raceDefaultMode,
+                ]),
+            );
+            const isDirectEvent = (event) => (effectiveModeByEvent.get(event || '') || raceDefaultMode) === 'direct';
+
             // 1. 还原 clothing_limits：先计算中签者的库存增量，再逆向还原
             const winners = await trx('lottery_results')
                 .where({ 'lottery_results.org_id': orgId, 'lottery_results.race_id': raceId, 'lottery_results.result_status': 'winner' })
@@ -80,6 +98,7 @@ export async function rollbackLottery(orgId, raceId) {
             // 按 event:gender:size 聚合
             const restoreMap = new Map();
             for (const w of winners) {
+                if (isDirectEvent(w.event)) continue;
                 const key = `${w.event || 'ALL'}|${w.gender || 'U'}|${w.clothing_size}`;
                 restoreMap.set(key, (restoreMap.get(key) || 0) + 1);
             }

@@ -295,6 +295,24 @@ registerHandler('audit:direct_lock', async (job, { knex, heartbeat }) => {
         .whereIn('runner_category', ['Elite', 'Permanent', 'Pacer', 'Medic', 'Sponsor'])
         .select('id', 'event', 'gender', 'clothing_size');
 
+    const raceRow = await knex('races')
+        .where({ id: raceId, org_id: orgId })
+        .select('lottery_mode_default')
+        .first();
+    const raceDefaultMode = raceRow?.lottery_mode_default || 'lottery';
+    const capacities = await knex('race_capacity')
+        .where({ org_id: orgId, race_id: raceId })
+        .select('event', 'lottery_mode_override');
+    const effectiveModeByEvent = new Map(
+        capacities.map(cap => [
+            cap.event || '',
+            (cap.lottery_mode_override === 'direct' || cap.lottery_mode_override === 'lottery')
+                ? cap.lottery_mode_override
+                : raceDefaultMode,
+        ]),
+    );
+    const isDirectEvent = (event) => (effectiveModeByEvent.get(event || '') || raceDefaultMode) === 'direct';
+
     await heartbeat(20, `发现 ${directRunners.length} 名直通选手，正在锁定`);
 
     // 批量更新状态
@@ -321,6 +339,7 @@ registerHandler('audit:direct_lock', async (job, { knex, heartbeat }) => {
     const overstockWarnings = [];
 
     for (const runner of directRunners) {
+        if (isDirectEvent(runner.event)) continue;
         const eventKey = runner.event || 'ALL';
         const genderKey = runner.gender || 'U';
         const sizeKey = runner.clothing_size || '';

@@ -79,6 +79,14 @@ router.post('/snapshot/:raceId', requireRaceAccess('raceId'), async (req, res, n
     } catch (err) { next(err); }
 });
 
+// GET /api/bib/has-snapshot/:raceId — 查询是否有排号快照
+router.get('/has-snapshot/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
+    try {
+        const hasSnapshot = await bibRepo.hasBibSnapshot(req.raceAccess.operatorOrgId, Number(req.params.raceId));
+        res.json({ success: true, data: { hasSnapshot } });
+    } catch (err) { next(err); }
+});
+
 // POST /api/bib/rollback/:raceId — 回滚排号
 router.post('/rollback/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
