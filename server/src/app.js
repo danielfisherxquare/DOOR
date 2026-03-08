@@ -23,7 +23,7 @@ import toolsRoutes from './modules/tools/tools.routes.js';
 const app = express();
 
 function getCorsOrigin() {
-    const cloudOrigins = ['http://47.251.107.41', 'http://www.xquareliu.com'];
+    const cloudOrigins = ['http://47.251.107.41', 'http://www.xquareliu.com', 'http://xquareliu.com'];
 
     if (process.env.NODE_ENV !== 'production') {
         // Keep local dev origins and allow cloud endpoints for remote testing.
