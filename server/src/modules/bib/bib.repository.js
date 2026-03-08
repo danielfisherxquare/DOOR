@@ -183,6 +183,32 @@ export async function hasBibSnapshot(orgId, raceId) {
 export async function bulkAssign(orgId, raceId, assignments) {
     if (!assignments.length) return { updated: 0 };
 
+    const normalizedAssignments = assignments.map((assignment) => ({
+        recordId: Number(assignment.recordId),
+        bibNumber: String(assignment.bibNumber || '').trim(),
+        bagWindowNo: String(assignment.bagWindowNo || '').trim(),
+        bagNo: String(assignment.bagNo || '').trim(),
+        expoWindowNo: String(assignment.expoWindowNo || '').trim(),
+        bibColor: String(assignment.bibColor || '').trim(),
+    })).filter((assignment) => Number.isFinite(assignment.recordId) && assignment.recordId > 0);
+    if (!normalizedAssignments.length) return { updated: 0 };
+
+    const duplicateBibMap = new Map();
+    for (const assignment of normalizedAssignments) {
+        if (!assignment.bibNumber) continue;
+        const owners = duplicateBibMap.get(assignment.bibNumber) || [];
+        owners.push(assignment.recordId);
+        duplicateBibMap.set(assignment.bibNumber, owners);
+    }
+    const duplicateBibEntry = Array.from(duplicateBibMap.entries()).find(([, owners]) => owners.length > 1);
+    if (duplicateBibEntry) {
+        const [bibNumber, owners] = duplicateBibEntry;
+        throw Object.assign(
+            new Error(`排号结果存在重复 bib 号: ${bibNumber}（records: ${owners.join(', ')}）`),
+            { status: 400, expose: true },
+        );
+    }
+
     const running = await knex('pipeline_executions')
         .where({ org_id: orgId, race_id: raceId, execution_type: 'bib_numbering', status: 'running' })
         .first();
@@ -204,48 +230,59 @@ export async function bulkAssign(orgId, raceId, assignments) {
     const execId = typeof exec === 'object' ? exec.id : exec;
 
     try {
-        let updated = 0;
+        const updated = await knex.transaction(async (trx) => {
+            let updatedCount = 0;
 
-        for (let i = 0; i < assignments.length; i += BATCH_SIZE) {
-            const batch = assignments.slice(i, i + BATCH_SIZE);
-            const values = batch.map((assignment) =>
-                `(${assignment.recordId}, '${(assignment.bibNumber || '').replace(/'/g, "''")}', '${(assignment.bagWindowNo || '').replace(/'/g, "''")}', '${(assignment.bagNo || '').replace(/'/g, "''")}', '${(assignment.expoWindowNo || '').replace(/'/g, "''")}', '${(assignment.bibColor || '').replace(/'/g, "''")}')`,
-            ).join(',\n');
+            for (let i = 0; i < normalizedAssignments.length; i += BATCH_SIZE) {
+                const batch = normalizedAssignments.slice(i, i + BATCH_SIZE);
+                const values = batch.map((assignment) =>
+                    `(${assignment.recordId}, '${assignment.bibNumber.replace(/'/g, "''")}', '${assignment.bagWindowNo.replace(/'/g, "''")}', '${assignment.bagNo.replace(/'/g, "''")}', '${assignment.expoWindowNo.replace(/'/g, "''")}', '${assignment.bibColor.replace(/'/g, "''")}')`,
+                ).join(',\n');
 
-            const result = await knex.raw(`
-                UPDATE records AS r
-                SET bib_number = v.bib_number,
-                    bag_window_no = v.bag_window_no,
-                    bag_no = v.bag_no,
-                    expo_window_no = v.expo_window_no,
-                    bib_color = v.bib_color
-                FROM (VALUES ${values})
-                    AS v(record_id, bib_number, bag_window_no, bag_no, expo_window_no, bib_color)
-                WHERE r.id = v.record_id::int
-                  AND r.org_id = ?
-                  AND r.race_id = ?
-            `, [orgId, raceId]);
+                const result = await trx.raw(`
+                    UPDATE records AS r
+                    SET bib_number = v.bib_number,
+                        bag_window_no = v.bag_window_no,
+                        bag_no = v.bag_no,
+                        expo_window_no = v.expo_window_no,
+                        bib_color = v.bib_color
+                    FROM (VALUES ${values})
+                        AS v(record_id, bib_number, bag_window_no, bag_no, expo_window_no, bib_color)
+                    WHERE r.id = v.record_id::int
+                      AND r.org_id = ?
+                      AND r.race_id = ?
+                `, [orgId, raceId]);
 
-            updated += result.rowCount || batch.length;
-        }
-
-        for (let i = 0; i < assignments.length; i += BATCH_SIZE) {
-            const batch = assignments.slice(i, i + BATCH_SIZE)
-                .filter(assignment => assignment.bibNumber)
-                .map(assignment => ({
-                    org_id: orgId,
-                    race_id: raceId,
-                    record_id: assignment.recordId,
-                    bib_number: assignment.bibNumber,
-                }));
-
-            if (batch.length > 0) {
-                await knex('bib_assignments')
-                    .insert(batch)
-                    .onConflict(['org_id', 'race_id', 'record_id'])
-                    .merge({ bib_number: knex.raw('EXCLUDED.bib_number') });
+                updatedCount += result.rowCount || batch.length;
             }
-        }
+
+            for (let i = 0; i < normalizedAssignments.length; i += BATCH_SIZE) {
+                const recordIds = normalizedAssignments
+                    .slice(i, i + BATCH_SIZE)
+                    .map((assignment) => assignment.recordId);
+                await trx('bib_assignments')
+                    .where({ org_id: orgId, race_id: raceId })
+                    .whereIn('record_id', recordIds)
+                    .del();
+            }
+
+            for (let i = 0; i < normalizedAssignments.length; i += BATCH_SIZE) {
+                const batch = normalizedAssignments.slice(i, i + BATCH_SIZE)
+                    .filter((assignment) => assignment.bibNumber)
+                    .map((assignment) => ({
+                        org_id: orgId,
+                        race_id: raceId,
+                        record_id: assignment.recordId,
+                        bib_number: assignment.bibNumber,
+                    }));
+
+                if (batch.length > 0) {
+                    await trx('bib_assignments').insert(batch);
+                }
+            }
+
+            return updatedCount;
+        });
 
         await knex('pipeline_executions')
             .where({ id: execId })

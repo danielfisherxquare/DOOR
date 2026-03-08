@@ -13,6 +13,9 @@ let baseUrl;
 let token;
 let orgId;
 let raceId;
+let winnerFullId;
+let winnerHalfId;
+let lockedRunnerId;
 let skippedDirectId;
 let skippedLoserId;
 
@@ -144,7 +147,13 @@ describe('bib routes', () => {
         ]);
 
         const directRow = await knex('records').where({ org_id: orgId, race_id: raceId, name: 'Direct S' }).first('id');
+        const winnerFullRow = await knex('records').where({ org_id: orgId, race_id: raceId, name: 'Winner Full' }).first('id');
+        const winnerHalfRow = await knex('records').where({ org_id: orgId, race_id: raceId, name: 'Winner Half' }).first('id');
+        const lockedRunnerRow = await knex('records').where({ org_id: orgId, race_id: raceId, name: 'Locked Runner' }).first('id');
         const loserRow = await knex('records').where({ org_id: orgId, race_id: raceId, name: 'Loser' }).first('id');
+        winnerFullId = Number(winnerFullRow.id);
+        winnerHalfId = Number(winnerHalfRow.id);
+        lockedRunnerId = Number(lockedRunnerRow.id);
         skippedDirectId = Number(directRow.id);
         skippedLoserId = Number(loserRow.id);
 
@@ -245,5 +254,50 @@ describe('bib routes', () => {
         });
         assert.equal(lotterySnapshotResponse.status, 200);
         assert.equal(lotterySnapshotResponse.body.data.hasSnapshot, false);
+    });
+
+    it('bulk assign can rerun without hitting stale bib assignment unique conflicts', async () => {
+        const firstRun = await api(`/api/bib/bulk-assign/${raceId}`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+                assignments: [
+                    { recordId: winnerFullId, bibNumber: 'A1001', bagWindowNo: '01', bagNo: '001', expoWindowNo: '01', bibColor: '#111111' },
+                    { recordId: winnerHalfId, bibNumber: 'B2001', bagWindowNo: '02', bagNo: '001', expoWindowNo: '02', bibColor: '#222222' },
+                    { recordId: lockedRunnerId, bibNumber: 'C3001', bagWindowNo: '03', bagNo: '001', expoWindowNo: '03', bibColor: '#333333' },
+                    { recordId: skippedDirectId, bibNumber: '', bagWindowNo: '', bagNo: '', expoWindowNo: '', bibColor: '' },
+                    { recordId: skippedLoserId, bibNumber: '', bagWindowNo: '', bagNo: '', expoWindowNo: '', bibColor: '' },
+                ],
+            }),
+        });
+        assert.equal(firstRun.status, 200);
+
+        const secondRun = await api(`/api/bib/bulk-assign/${raceId}`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+                assignments: [
+                    { recordId: winnerFullId, bibNumber: 'A1002', bagWindowNo: '01', bagNo: '002', expoWindowNo: '01', bibColor: '#111111' },
+                    { recordId: winnerHalfId, bibNumber: 'B2002', bagWindowNo: '02', bagNo: '002', expoWindowNo: '02', bibColor: '#222222' },
+                    { recordId: lockedRunnerId, bibNumber: '', bagWindowNo: '', bagNo: '', expoWindowNo: '', bibColor: '' },
+                    { recordId: skippedDirectId, bibNumber: '', bagWindowNo: '', bagNo: '', expoWindowNo: '', bibColor: '' },
+                    { recordId: skippedLoserId, bibNumber: '', bagWindowNo: '', bagNo: '', expoWindowNo: '', bibColor: '' },
+                ],
+            }),
+        });
+        assert.equal(secondRun.status, 200);
+        assert.equal(secondRun.body.data.updated, 5);
+
+        const assignmentRows = await knex('bib_assignments')
+            .where({ org_id: orgId, race_id: raceId })
+            .orderBy('record_id', 'asc')
+            .select('record_id', 'bib_number');
+        assert.deepEqual(
+            assignmentRows.map((row) => ({ recordId: Number(row.record_id), bibNumber: String(row.bib_number) })),
+            [
+                { recordId: winnerFullId, bibNumber: 'A1002' },
+                { recordId: winnerHalfId, bibNumber: 'B2002' },
+            ],
+        );
     });
 });
