@@ -13,38 +13,38 @@
 | DOOR 后端 API | `3001` | `http://localhost:3001/api/...` |
 | DOOR 前端 dev | `5173` | Vite dev server，`/api` 代理到 `3001` |
 | TOOL 前端 dev | `5174` | Vite dev server，`/api` 代理到 `3001` |
-| Nginx 网关 | `8080` | Docker 部署入口，`/api` 反代到 `app:3001` |
+| Nginx 网关 | `80` | Docker 部署入口，`/api` 反代到 `app:3001` |
 | PostgreSQL | `5432` | Docker 映射 `5432:5432` |
 
 说明：`15432` 已废弃，不再作为默认端口使用。
 
 ## 云端部署配置（DOOR 生产）
 
-已确认你的 DOOR 项目部署在云服务器 `http://47.251.107.41`（阿里云），且服务器不开放 `80/443`，因此统一使用 `8080` 作为对外入口端口。
+DOOR 项目部署在云服务器 `http://47.251.107.41`（阿里云），使用标准 HTTP `80` 端口作为对外入口。
 
-- 主入口（IP）：`http://47.251.107.41:8080`
-- 域名入口（可选）：`http://www.xquareliu.com:8080`
+- 主入口（IP）：`http://47.251.107.41`
+- 域名入口（可选）：`http://www.xquareliu.com`
 
 需要确保以下配置一致：
 
 1. 前端（`door/.env`）
 
 ```env
-VITE_API_BASE_URL=http://47.251.107.41:8080/api
+VITE_API_BASE_URL=http://47.251.107.41/api
 ```
 
 2. 后端（`door/server/.env`）
 
 ```env
 PORT=3001
-PUBLIC_BASE_URL=http://47.251.107.41:8080
-CORS_ORIGIN=http://47.251.107.41:8080,http://www.xquareliu.com:8080
+PUBLIC_BASE_URL=http://47.251.107.41
+CORS_ORIGIN=http://47.251.107.41,http://www.xquareliu.com
 ```
 
 3. 网关（`door/server/nginx.conf`）
 
 ```nginx
-listen 8080;
+listen 80;
 server_name 47.251.107.41 www.xquareliu.com;
 ```
 
@@ -53,7 +53,7 @@ server_name 47.251.107.41 www.xquareliu.com;
 ```yaml
 nginx:
   ports:
-    - "8080:8080"
+    - "80:80"
 ```
 
 ## 启动方式
@@ -72,7 +72,7 @@ docker compose exec app npm run migrate
 健康检查：
 
 ```bash
-curl -i http://127.0.0.1:8080/api/health/ready
+curl -i http://127.0.0.1/api/health/ready
 curl -i http://127.0.0.1:3001/api/health/ready
 ```
 
@@ -123,6 +123,32 @@ npm install
 npm run build
 # 构建完成后，将生成的 `dist/` 目录的内容上传到目标云服务器供 Nginx 等托管
 ```
+
+> [!WARNING]
+> **单页应用 (SPA) 路由 Fallback 配置**
+> 
+> 由于本前端使用 React Router (BrowserRouter)，打包产物只有一个 `index.html`。
+> 直接访问深层链接（如 `http://域名/scan`）时，若服务器未配置路由 Fallback，会尝试寻找物理文件 `/scan/index.html` 导致 **404 或白屏**。
+>
+> 必须在你的 Web 服务器（如 Nginx）中增加 `try_files` 配置，将所有未知请求重定向到 `index.html`：
+>
+> **Nginx 配置示例：**
+> ```nginx
+> server {
+>     listen 80;
+>     server_name yourdomain.com;
+>     root /path/to/your/door/dist;
+>     index index.html;
+>
+>     location / {
+>         # 核心：找不到特定文件或目录时，返回 index.html 交付前端路由处理
+>         try_files $uri $uri/ /index.html;
+>     }
+> }
+> ```
+> 
+> **Vercel 等 Serverless 部署：**
+> 需在项目根目录添加 `vercel.json` 包含 `{"rewrites": [{"source": "/(.*)", "destination": "/index.html"}]}`。
 
 **更新并重启后端：**
 
@@ -254,9 +280,9 @@ npm run migrate
 - 门户（dev）：`http://localhost:5173`
 - 工具（dev）：`http://localhost:5174`
 - API（直连）：`http://localhost:3001`
-- 网关（Docker）：`http://localhost:8080`
-- DOOR 云端入口（IP）：`http://47.251.107.41:8080`
-- DOOR 云端入口（域名）：`http://www.xquareliu.com:8080`
+- 网关（Docker）：`http://localhost`（端口 80）
+- DOOR 云端入口（IP）：`http://47.251.107.41`
+- DOOR 云端入口（域名）：`http://www.xquareliu.com`
 
 ## 参考
 

@@ -4,7 +4,7 @@
 
 - API 服务：`3001`
 - PostgreSQL：`5432`
-- Nginx（在 `docker-compose.yml` 中）：`8080 -> app:3001`
+- Nginx（在 `docker-compose.yml` 中）：`80 -> app:3001`
 
 默认数据库连接（代码兜底）：
 
@@ -48,7 +48,7 @@ docker compose exec app npm run migrate
 健康检查：
 
 ```bash
-curl http://localhost:8080/api/health/ready
+curl http://localhost/api/health/ready
 curl http://localhost:3001/api/health/ready
 ```
 

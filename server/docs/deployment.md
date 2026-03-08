@@ -4,7 +4,7 @@
 
 - API：`3001`
 - PostgreSQL：`5432`
-- Nginx 网关：`8080`（反代到 `app:3001`）
+- Nginx 网关：`80`（反代到 `app:3001`）
 
 说明：`15432` 已废弃。
 
@@ -37,7 +37,7 @@ docker compose exec \
 ```bash
 curl http://localhost:3001/api/health/live
 curl http://localhost:3001/api/health/ready
-curl http://localhost:8080/api/health/ready
+curl http://localhost/api/health/ready
 ```
 
 ## 2. 常规更新
