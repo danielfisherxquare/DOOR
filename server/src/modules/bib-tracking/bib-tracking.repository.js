@@ -22,6 +22,28 @@ export async function findActiveByRecord(trx, { orgId, raceId, recordId }) {
         .first();
 }
 
+export async function findByRecordForUpdate(trx, { orgId, raceId, recordId }) {
+    return trx('bib_tracking_items')
+        .where({
+            org_id: orgId,
+            race_id: raceId,
+            record_id: recordId,
+        })
+        .forUpdate()
+        .first();
+}
+
+export async function findByBibNumberForUpdate(trx, { orgId, raceId, bibNumber }) {
+    return trx('bib_tracking_items')
+        .where({
+            org_id: orgId,
+            race_id: raceId,
+            bib_number: bibNumber,
+        })
+        .forUpdate()
+        .first();
+}
+
 export async function insertItem(trx, payload) {
     const [row] = await trx('bib_tracking_items').insert(payload).returning('*');
     return row;

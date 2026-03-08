@@ -67,6 +67,17 @@ function serializeResolveItem(item) {
     };
 }
 
+async function ensureBibNumberAvailable(trx, { orgId, raceId, bibNumber, currentItemId = null }) {
+    const existing = await repo.findByBibNumberForUpdate(trx, {
+        orgId,
+        raceId,
+        bibNumber,
+    });
+    if (existing && Number(existing.id) !== Number(currentItemId)) {
+        throw badRequest(`bibNumber ${bibNumber} already registered for another record`);
+    }
+}
+
 async function requireRecordBelongsToRace(orgId, raceId, recordId, bibNumber, trx = knex) {
     const row = await trx('records')
         .where({
@@ -105,13 +116,19 @@ export async function registerTrackingItems(authContext, rawRaceId, body) {
 
             await requireRecordBelongsToRace(access.operatorOrgId, raceId, recordId, bibNumber, trx);
 
-            let item = await repo.findActiveByRecord(trx, {
+            let item = await repo.findByRecordForUpdate(trx, {
                 orgId: access.operatorOrgId,
                 raceId,
                 recordId,
             });
 
             if (!item) {
+                await ensureBibNumberAvailable(trx, {
+                    orgId: access.operatorOrgId,
+                    raceId,
+                    bibNumber,
+                });
+
                 item = await repo.insertItem(trx, {
                     org_id: access.operatorOrgId,
                     race_id: raceId,
@@ -122,6 +139,39 @@ export async function registerTrackingItems(authContext, rawRaceId, body) {
                     status: 'receipt_printed',
                     receipt_printed_at: trx.fn.now(),
                     external_sync_payload: {},
+                });
+            } else if (item.invalidated_at) {
+                await ensureBibNumberAvailable(trx, {
+                    orgId: access.operatorOrgId,
+                    raceId,
+                    bibNumber,
+                    currentItemId: item.id,
+                });
+
+                item = await repo.updateItemById(trx, item.id, {
+                    bib_number: bibNumber,
+                    qr_token: crypto.randomUUID(),
+                    qr_version: Number(item.qr_version || 1) + 1,
+                    status: 'receipt_printed',
+                    receipt_printed_at: trx.fn.now(),
+                    picked_up_at: null,
+                    checked_in_at: null,
+                    finished_at: null,
+                    last_scan_at: null,
+                    last_scan_by: null,
+                    invalidated_at: null,
+                    external_sync_payload: {},
+                });
+            } else if (String(item.bib_number || '') !== bibNumber) {
+                await ensureBibNumberAvailable(trx, {
+                    orgId: access.operatorOrgId,
+                    raceId,
+                    bibNumber,
+                    currentItemId: item.id,
+                });
+
+                item = await repo.updateItemById(trx, item.id, {
+                    bib_number: bibNumber,
                 });
             }
 

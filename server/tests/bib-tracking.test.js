@@ -182,6 +182,85 @@ describe('bib tracking routes', () => {
         assert.equal(events.length, 2);
     });
 
+    it('updates active tracking item bib number on re-register', async () => {
+        const before = await knex('bib_tracking_items').where({ record_id: recordOne.id }).first();
+        await knex('records').where({ id: recordOne.id }).update({ bib_number: 'A1999' });
+
+        const response = await api(`/api/bib-tracking/register/${raceId}`, {
+            method: 'POST',
+            headers: authHeader('editor'),
+            body: JSON.stringify({
+                records: [{ recordId: Number(recordOne.id), bibNumber: 'A1999' }],
+            }),
+        });
+        assert.equal(response.status, 200);
+        assert.equal(response.body.data.items[0].qrToken, before.qr_token);
+        assert.equal(response.body.data.items[0].bibNumber, 'A1999');
+
+        const after = await knex('bib_tracking_items').where({ record_id: recordOne.id }).first();
+        assert.equal(after.bib_number, 'A1999');
+        assert.equal(after.qr_token, before.qr_token);
+        assert.equal(Number(after.qr_version), Number(before.qr_version));
+    });
+
+    it('re-registers invalidated item by rotating qr token and version', async () => {
+        const before = await knex('bib_tracking_items').where({ record_id: recordOne.id }).first();
+        await knex('bib_tracking_items')
+            .where({ id: before.id })
+            .update({ invalidated_at: knex.fn.now() });
+
+        const response = await api(`/api/bib-tracking/register/${raceId}`, {
+            method: 'POST',
+            headers: authHeader('editor'),
+            body: JSON.stringify({
+                records: [{ recordId: Number(recordOne.id), bibNumber: 'A1999' }],
+            }),
+        });
+        assert.equal(response.status, 200);
+
+        const after = await knex('bib_tracking_items').where({ record_id: recordOne.id }).first();
+        assert.equal(after.invalidated_at, null);
+        assert.equal(after.bib_number, 'A1999');
+        assert.notEqual(after.qr_token, before.qr_token);
+        assert.equal(Number(after.qr_version), Number(before.qr_version) + 1);
+        assert.equal(response.body.data.items[0].qrToken, after.qr_token);
+    });
+
+    it('rejects bib reuse when occupied by another invalidated item', async () => {
+        const register = await api(`/api/bib-tracking/register/${raceId}`, {
+            method: 'POST',
+            headers: authHeader('editor'),
+            body: JSON.stringify({
+                records: [{ recordId: Number(recordTwo.id), bibNumber: 'A1002' }],
+            }),
+        });
+        assert.equal(register.status, 200);
+
+        const recordTwoItem = await knex('bib_tracking_items').where({ record_id: recordTwo.id }).first();
+        await knex('bib_tracking_items')
+            .where({ id: recordTwoItem.id })
+            .update({ invalidated_at: knex.fn.now() });
+        await knex('records').where({ id: recordOne.id }).update({ bib_number: 'A1002' });
+
+        const response = await api(`/api/bib-tracking/register/${raceId}`, {
+            method: 'POST',
+            headers: authHeader('editor'),
+            body: JSON.stringify({
+                records: [{ recordId: Number(recordOne.id), bibNumber: 'A1002' }],
+            }),
+        });
+        assert.equal(response.status, 400);
+        assert.match(response.body.error?.message || '', /already registered/);
+
+        const recordOneItem = await knex('bib_tracking_items').where({ record_id: recordOne.id }).first();
+        assert.equal(recordOneItem.bib_number, 'A1999');
+
+        await knex('records').where({ id: recordOne.id }).update({ bib_number: 'A1999' });
+        await knex('bib_tracking_items')
+            .where({ id: recordTwoItem.id })
+            .update({ invalidated_at: null });
+    });
+
     it('resolves a valid active token', async () => {
         const item = await knex('bib_tracking_items').where({ record_id: recordOne.id }).first();
         const response = await api('/api/bib-tracking/scan/resolve', {
