@@ -35,7 +35,7 @@ function AdminLayout() {
             .then((res) => {
                 if (res.success) setOrgs(res.data.items || [])
             })
-            .catch(() => {})
+            .catch(() => { })
     }, [isSuperAdmin])
 
     const handleOrgChange = (event) => {
@@ -76,7 +76,6 @@ function AdminLayout() {
 
     const orgAdminMenus = [
         { path: '/members', label: '成员管理', icon: 'M' },
-        { path: '/races', label: '赛事管理', icon: 'R' },
         { path: '/bib-tracking', label: '号码布状态', icon: '#' },
         { path: '/org-race-permissions', label: '机构赛事授权', icon: 'G', superOnly: true },
         { path: '/race-permissions', label: '赛事授权', icon: 'P' },
@@ -102,6 +101,7 @@ function AdminLayout() {
                     <Link
                         to="/admin"
                         className={`admin-nav-item ${location.pathname === '/admin' ? 'admin-nav-item--active' : ''}`}
+                        data-tooltip="仪表盘"
                     >
                         <span className="admin-nav-item__icon">D</span>
                         {!sidebarCollapsed && <span>仪表盘</span>}
@@ -115,6 +115,7 @@ function AdminLayout() {
                                     key={menu.path}
                                     to={`/admin${menu.path}`}
                                     className={`admin-nav-item ${isActive(menu.path) ? 'admin-nav-item--active' : ''}`}
+                                    data-tooltip={menu.label}
                                 >
                                     <span className="admin-nav-item__icon">{menu.icon}</span>
                                     {!sidebarCollapsed && <span>{menu.label}</span>}
@@ -156,6 +157,7 @@ function AdminLayout() {
                                         key={menu.path}
                                         to={`/admin${menu.path}${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`}
                                         className={`admin-nav-item ${isActive(menu.path) ? 'admin-nav-item--active' : ''}`}
+                                        data-tooltip={menu.label}
                                     >
                                         <span className="admin-nav-item__icon">{menu.icon}</span>
                                         {!sidebarCollapsed && <span>{menu.label}</span>}
@@ -310,6 +312,73 @@ function AdminLayout() {
                     min-height: 100vh;
                 }
                 .btn--sm { padding: 4px 8px; font-size: 14px; }
+
+                /* 移动端适配 */
+                @media (max-width: 768px) {
+                    .admin-layout {
+                        flex-direction: column;
+                    }
+                    .admin-sidebar {
+                        width: 100%;
+                        height: auto;
+                        position: fixed;
+                        bottom: 0;
+                        left: 0;
+                        right: 0;
+                        z-index: 100;
+                        border-right: none;
+                        border-top: 1px solid var(--color-border, #e5e7eb);
+                        flex-direction: row;
+                        padding: 0;
+                    }
+                    .admin-sidebar--collapsed {
+                        width: 100%;
+                    }
+                    .admin-sidebar__header {
+                        display: none;
+                    }
+                    .admin-sidebar__nav {
+                        display: flex;
+                        flex-direction: row;
+                        overflow-x: auto;
+                        padding: 8px;
+                        gap: 4px;
+                        -webkit-overflow-scrolling: touch;
+                        scrollbar-width: none;
+                    }
+                    .admin-sidebar__nav::-webkit-scrollbar {
+                        display: none;
+                    }
+                    .admin-nav-item {
+                        flex-shrink: 0;
+                        padding: 8px 12px;
+                        margin-bottom: 0;
+                    }
+                    .admin-nav-item span:not(.admin-nav-item__icon) {
+                        display: none;
+                    }
+                    .admin-nav-divider {
+                        display: none;
+                    }
+                    .admin-sidebar__footer {
+                        display: none;
+                    }
+                    .admin-main {
+                        padding: 16px;
+                        padding-bottom: 80px;
+                        min-height: auto;
+                    }
+                }
+
+                @media (max-width: 480px) {
+                    .admin-main {
+                        padding: 12px;
+                        padding-bottom: 72px;
+                    }
+                    .admin-nav-item {
+                        padding: 6px 10px;
+                    }
+                }
             `}</style>
         </div>
     )

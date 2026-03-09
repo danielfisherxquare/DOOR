@@ -2,12 +2,27 @@ import { useEffect } from 'react'
 import ToolCard from '../components/ToolCard'
 import useToolsStore from '../stores/toolsStore'
 
+// 骨架屏卡片组件
+function SkeletonCard() {
+  return (
+    <div className="skeleton-card">
+      <div className="skeleton skeleton--icon"></div>
+      <div className="skeleton skeleton--text" style={{ width: '60%' }}></div>
+      <div className="skeleton skeleton--text-sm"></div>
+      <div className="skeleton skeleton--text" style={{ width: '40%', height: '24px', borderRadius: '9999px' }}></div>
+    </div>
+  )
+}
+
 function Home() {
   const { tools, isLoading, error, fetchTools } = useToolsStore()
 
   useEffect(() => {
     fetchTools()
   }, [fetchTools])
+
+  // 统计在线工具数量
+  const onlineCount = tools.filter(t => t.status === 'online').length
 
   return (
     <div className="home">
@@ -31,25 +46,27 @@ function Home() {
         }}>
           选择您需要使用的工具
         </p>
+
+        {/* 统计徽章 */}
+        {!isLoading && !error && tools.length > 0 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: 'var(--spacing-sm)',
+            marginTop: 'var(--spacing-md)'
+          }}>
+            <span className="pill pill--purple">{tools.length} 个工具</span>
+            <span className="pill pill--green">{onlineCount} 个在线</span>
+          </div>
+        )}
       </div>
 
-      {/* 加载状态 */}
+      {/* 骨架屏加载状态 */}
       {isLoading && (
-        <div style={{
-          textAlign: 'center',
-          padding: 'var(--spacing-2xl)',
-          color: 'var(--color-text-secondary)'
-        }}>
-          <div style={{
-            width: 40,
-            height: 40,
-            border: '3px solid var(--color-bg-card)',
-            borderTopColor: 'var(--color-accent)',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-            margin: '0 auto var(--spacing-md)'
-          }}></div>
-          加载中...
+        <div className="skeleton-grid">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <SkeletonCard key={i} />
+          ))}
         </div>
       )}
 
@@ -91,20 +108,6 @@ function Home() {
           <p style={{ color: 'var(--color-text-secondary)' }}>
             暂无可用工具
           </p>
-        </div>
-      )}
-
-      {/* 统计信息 */}
-      {!isLoading && !error && tools.length > 0 && (
-        <div style={{
-          marginTop: 'var(--spacing-xl)',
-          textAlign: 'center',
-          color: 'var(--color-text-muted)',
-          fontSize: 'var(--font-size-sm)'
-        }}>
-          共 {tools.length} 个工具 · {
-            tools.filter(t => t.status === 'online').length
-          } 个在线
         </div>
       )}
 
