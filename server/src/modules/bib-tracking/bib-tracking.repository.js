@@ -11,6 +11,19 @@ function activeItemScope(orgId) {
     return baseItemScope(orgId).whereNull('bti.invalidated_at');
 }
 
+function latestStatusAtSelect() {
+    return knex.raw(`
+        GREATEST(
+            COALESCE(bti.receipt_printed_at, bti.created_at),
+            COALESCE(bti.picked_up_at, bti.created_at),
+            COALESCE(bti.checked_in_at, bti.created_at),
+            COALESCE(bti.finished_at, bti.created_at),
+            COALESCE(bti.last_scan_at, bti.created_at),
+            bti.created_at
+        )
+    `);
+}
+
 export async function findActiveByRecord(trx, { orgId, raceId, recordId }) {
     return trx('bib_tracking_items')
         .where({
@@ -114,9 +127,19 @@ export async function listItems(orgId, raceId, { status, keyword, page = 1, limi
     }
 
     if (keyword?.trim()) {
-        const term = `%${keyword.trim()}%`;
+        const term = keyword.trim();
+        const likeTerm = `%${term}%`;
         base.andWhere((qb) => {
-            qb.whereILike('r.name', term).orWhereILike('bti.bib_number', term);
+            qb.whereILike('bti.bib_number', likeTerm)
+                .orWhereRaw(
+                    `
+                        to_tsvector(
+                            'simple',
+                            coalesce(r.name, '') || ' ' || coalesce(r.id_number, '') || ' ' || coalesce(r.phone, '')
+                        ) @@ plainto_tsquery('simple', ?)
+                    `,
+                    [term],
+                );
         });
     }
 
@@ -126,6 +149,8 @@ export async function listItems(orgId, raceId, { status, keyword, page = 1, limi
             'bti.id as item_id',
             'bti.record_id',
             'r.name',
+            'r.phone',
+            'r.id_number',
             'bti.bib_number',
             'bti.status',
             'bti.qr_version',
@@ -135,8 +160,10 @@ export async function listItems(orgId, raceId, { status, keyword, page = 1, limi
             'bti.checked_in_at',
             'bti.finished_at',
             'bti.last_scan_at',
+            { latest_status_at: latestStatusAtSelect() },
         )
-        .orderBy('bti.id', 'asc')
+        .orderBy('latest_status_at', 'desc')
+        .orderBy('bti.id', 'desc')
         .offset((safePage - 1) * safeLimit)
         .limit(safeLimit);
 
@@ -146,6 +173,55 @@ export async function listItems(orgId, raceId, { status, keyword, page = 1, limi
         limit: safeLimit,
         items: rows,
     };
+}
+
+export async function getItemDetail(orgId, raceId, itemId) {
+    return activeItemScope(orgId)
+        .leftJoin('records as r', 'r.id', 'bti.record_id')
+        .leftJoin('races as race', 'race.id', 'bti.race_id')
+        .leftJoin('users as scanner', 'scanner.id', 'bti.last_scan_by')
+        .where('bti.race_id', raceId)
+        .andWhere('bti.id', itemId)
+        .select(
+            'bti.id as item_id',
+            'bti.race_id',
+            'race.name as race_name',
+            'bti.record_id',
+            'r.name',
+            'r.phone',
+            'r.id_number',
+            'bti.bib_number',
+            'bti.status',
+            'bti.qr_version',
+            'bti.invalidated_at',
+            'bti.receipt_printed_at',
+            'bti.picked_up_at',
+            'bti.checked_in_at',
+            'bti.finished_at',
+            'bti.last_scan_at',
+            'bti.last_scan_by',
+            'scanner.username as last_scan_by_name',
+            { latest_status_at: latestStatusAtSelect() },
+        )
+        .first();
+}
+
+export async function listItemTimeline(itemId) {
+    return knex('bib_tracking_events as bte')
+        .leftJoin('users as u', 'u.id', 'bte.operator_user_id')
+        .where('bte.tracking_item_id', itemId)
+        .select(
+            'bte.id',
+            'bte.event_type',
+            'bte.from_status',
+            'bte.to_status',
+            'bte.source',
+            'bte.created_at',
+            'bte.operator_user_id',
+            'u.username as operator_name',
+        )
+        .orderBy('bte.created_at', 'desc')
+        .orderBy('bte.id', 'desc');
 }
 
 export async function getStats(orgId, raceId) {

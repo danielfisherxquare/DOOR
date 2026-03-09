@@ -10,6 +10,13 @@ const STATUS_ORDER = {
     finished: 4,
 };
 
+const STATUS_LABELS = {
+    receipt_printed: '已出回执',
+    picked_up: '已领取',
+    checked_in: '已检录',
+    finished: '已完赛',
+};
+
 function badRequest(message) {
     return Object.assign(new Error(message), { status: 400, expose: true });
 }
@@ -34,6 +41,14 @@ function normalizeRecordId(rawRecordId) {
     return recordId;
 }
 
+function normalizeItemId(rawItemId) {
+    const itemId = Number(rawItemId);
+    if (!Number.isFinite(itemId) || itemId <= 0) {
+        throw badRequest('Invalid itemId');
+    }
+    return itemId;
+}
+
 function ensureEditorAccess(access) {
     if (access?.effectiveAccessLevel === 'viewer') {
         throw Object.assign(new Error('Read-only race access cannot perform write operations'), {
@@ -41,6 +56,30 @@ function ensureEditorAccess(access) {
             expose: true,
         });
     }
+}
+
+function maskPhone(value) {
+    const input = String(value || '').trim();
+    if (!input) return '';
+    if (/^\d{11}$/.test(input)) {
+        return `${input.slice(0, 3)}****${input.slice(-4)}`;
+    }
+    if (input.length <= 5) {
+        return `${input.slice(0, 1)}*${input.slice(-1)}`;
+    }
+    return `${input.slice(0, 3)}${'*'.repeat(Math.max(1, input.length - 5))}${input.slice(-2)}`;
+}
+
+function maskIdNumber(value) {
+    const input = String(value || '').trim();
+    if (!input) return '';
+    if (input.length >= 8) {
+        return `${input.slice(0, 4)}${'*'.repeat(Math.max(1, input.length - 8))}${input.slice(-4)}`;
+    }
+    if (input.length <= 4) {
+        return `${input.slice(0, 1)}*${input.slice(-1)}`;
+    }
+    return `${input.slice(0, 2)}${'*'.repeat(Math.max(1, input.length - 4))}${input.slice(-2)}`;
 }
 
 function serializeItem(item) {
@@ -65,6 +104,84 @@ function serializeResolveItem(item) {
         invalidatedAt: item.invalidated_at,
         allowedAction: item.status === 'receipt_printed' ? 'pickup' : 'none',
     };
+}
+
+function serializeListItem(item) {
+    return {
+        itemId: Number(item.item_id),
+        recordId: Number(item.record_id),
+        name: item.name || '',
+        bibNumber: item.bib_number,
+        phoneMasked: maskPhone(item.phone),
+        idNumberMasked: maskIdNumber(item.id_number),
+        status: item.status,
+        statusLabel: STATUS_LABELS[item.status] || item.status,
+        qrVersion: Number(item.qr_version),
+        invalidatedAt: item.invalidated_at,
+        receiptPrintedAt: item.receipt_printed_at,
+        pickedUpAt: item.picked_up_at,
+        checkedInAt: item.checked_in_at,
+        finishedAt: item.finished_at,
+        lastScanAt: item.last_scan_at,
+        latestStatusAt: item.latest_status_at,
+    };
+}
+
+function serializeDetailItem(item) {
+    return {
+        itemId: Number(item.item_id),
+        raceId: Number(item.race_id),
+        raceName: item.race_name || '',
+        recordId: Number(item.record_id),
+        name: item.name || '',
+        bibNumber: item.bib_number,
+        phone: item.phone || '',
+        phoneMasked: maskPhone(item.phone),
+        idNumber: item.id_number || '',
+        idNumberMasked: maskIdNumber(item.id_number),
+        status: item.status,
+        statusLabel: STATUS_LABELS[item.status] || item.status,
+        receiptPrintedAt: item.receipt_printed_at,
+        pickedUpAt: item.picked_up_at,
+        checkedInAt: item.checked_in_at,
+        finishedAt: item.finished_at,
+        lastScanAt: item.last_scan_at,
+        latestStatusAt: item.latest_status_at,
+        lastScanBy: item.last_scan_by,
+        lastScanByName: item.last_scan_by_name || '',
+    };
+}
+
+function findLatestTimelineEvent(events, status) {
+    if (status === 'receipt_printed') {
+        return events.find((event) => event.event_type === 'registered_for_export') || null;
+    }
+    if (status === 'picked_up') {
+        return events.find((event) => event.event_type === 'picked_up_by_scan') || null;
+    }
+    return events.find((event) => event.event_type === status) || null;
+}
+
+function buildTimeline(item, events) {
+    const definitions = [
+        { status: 'receipt_printed', occurredAt: item.receipt_printed_at },
+        { status: 'picked_up', occurredAt: item.picked_up_at },
+        { status: 'checked_in', occurredAt: item.checked_in_at },
+        { status: 'finished', occurredAt: item.finished_at },
+    ];
+
+    return definitions
+        .filter((entry) => entry.occurredAt)
+        .map((entry) => {
+            const event = findLatestTimelineEvent(events, entry.status);
+            return {
+                status: entry.status,
+                label: STATUS_LABELS[entry.status] || entry.status,
+                occurredAt: entry.occurredAt,
+                operatorName: event?.operator_name || '',
+                source: event?.source || '',
+            };
+        });
 }
 
 async function ensureBibNumberAvailable(trx, { orgId, raceId, bibNumber, currentItemId = null }) {
@@ -264,20 +381,7 @@ export async function listTrackingItems(authContext, rawRaceId, query) {
     const data = await repo.listItems(access.operatorOrgId, raceId, query);
     return {
         ...data,
-        items: data.items.map((item) => ({
-            itemId: Number(item.item_id),
-            recordId: Number(item.record_id),
-            name: item.name || '',
-            bibNumber: item.bib_number,
-            status: item.status,
-            qrVersion: Number(item.qr_version),
-            invalidatedAt: item.invalidated_at,
-            receiptPrintedAt: item.receipt_printed_at,
-            pickedUpAt: item.picked_up_at,
-            checkedInAt: item.checked_in_at,
-            finishedAt: item.finished_at,
-            lastScanAt: item.last_scan_at,
-        })),
+        items: data.items.map(serializeListItem),
     };
 }
 
@@ -285,6 +389,22 @@ export async function getTrackingStats(authContext, rawRaceId) {
     const raceId = normalizeRaceId(rawRaceId);
     const access = await resolveRaceAccess(authContext, raceId, 'GET');
     return repo.getStats(access.operatorOrgId, raceId);
+}
+
+export async function getTrackingItemDetail(authContext, rawRaceId, rawItemId) {
+    const raceId = normalizeRaceId(rawRaceId);
+    const itemId = normalizeItemId(rawItemId);
+    const access = await resolveRaceAccess(authContext, raceId, 'GET');
+
+    const item = await repo.getItemDetail(access.operatorOrgId, raceId, itemId);
+    if (!item) throw notFound('Tracking item not found');
+
+    const events = await repo.listItemTimeline(itemId);
+
+    return {
+        item: serializeDetailItem(item),
+        timeline: buildTimeline(item, events),
+    };
 }
 
 export async function syncTrackingStatuses(authContext, rawRaceId, body) {

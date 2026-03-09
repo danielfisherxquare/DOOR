@@ -1,22 +1,23 @@
-import { useState, useEffect } from 'react'
-import { Routes, Route, Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import useAuthStore from '../../stores/authStore'
+import { useEffect, useState } from 'react'
+import { Link, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import adminApi from '../../api/adminApi'
+import useAuthStore from '../../stores/authStore'
 
 import AdminDashboard from '../../views/admin/AdminDashboard'
-import OrgListPage from '../../views/admin/OrgListPage'
-import OrgCreatePage from '../../views/admin/OrgCreatePage'
-import UserListPage from '../../views/admin/UserListPage'
-import MemberListPage from '../../views/admin/MemberListPage'
+import AppManagerPage from '../../views/admin/AppManagerPage'
+import BibTrackingPage from '../../views/admin/BibTrackingPage'
 import MemberCreatePage from '../../views/admin/MemberCreatePage'
+import MemberListPage from '../../views/admin/MemberListPage'
+import OrgCreatePage from '../../views/admin/OrgCreatePage'
+import OrgListPage from '../../views/admin/OrgListPage'
+import OrgRacePermissionsPage from '../../views/admin/OrgRacePermissionsPage'
 import RaceManagementPage from '../../views/admin/RaceManagementPage'
 import RacePermissionsPage from '../../views/admin/RacePermissionsPage'
-import OrgRacePermissionsPage from '../../views/admin/OrgRacePermissionsPage'
-import AppManagerPage from '../../views/admin/AppManagerPage'
+import UserListPage from '../../views/admin/UserListPage'
 
 function AdminLayout() {
     const { user, logout } = useAuthStore()
-    const canAccessAdmin = useAuthStore((s) => s.canAccessAdmin)
+    const canAccessAdmin = useAuthStore((state) => state.canAccessAdmin)
     const isSuperAdmin = user?.role === 'super_admin'
 
     const location = useLocation()
@@ -34,15 +35,27 @@ function AdminLayout() {
             .then((res) => {
                 if (res.success) setOrgs(res.data.items || [])
             })
-            .catch(() => { })
+            .catch(() => {})
     }, [isSuperAdmin])
 
-    const handleOrgChange = (e) => {
-        const orgId = e.target.value
+    const handleOrgChange = (event) => {
+        const orgId = event.target.value
+
+        if (location.pathname.startsWith('/admin/bib-tracking')) {
+            const nextParams = new URLSearchParams(searchParams)
+            if (orgId) nextParams.set('orgId', orgId)
+            else nextParams.delete('orgId')
+            nextParams.delete('raceId')
+            nextParams.delete('page')
+            setSearchParams(nextParams)
+            return
+        }
+
         if (orgId) {
             setSearchParams({ orgId })
             return
         }
+
         searchParams.delete('orgId')
         setSearchParams(searchParams)
     }
@@ -55,17 +68,18 @@ function AdminLayout() {
     const isActive = (path) => location.pathname === `/admin${path}` || location.pathname.startsWith(`/admin${path}/`)
 
     const superAdminMenus = [
-        { path: '/orgs', label: '机构管理', icon: '🏢' },
-        { path: '/users', label: '用户管理', icon: '👤' },
-        { path: '/races', label: '赛事管理', icon: '🏁' },
-        { path: '/app-manager', label: '应用管理', icon: '📥' },
+        { path: '/orgs', label: '机构管理', icon: 'O' },
+        { path: '/users', label: '用户管理', icon: 'U' },
+        { path: '/races', label: '赛事管理', icon: 'R' },
+        { path: '/app-manager', label: '应用管理', icon: 'A' },
     ]
 
     const orgAdminMenus = [
-        { path: '/members', label: '成员管理', icon: '👥' },
-        { path: '/races', label: '赛事管理', icon: '🏁' },
-        { path: '/org-race-permissions', label: '机构赛事授权', icon: '🏢', superOnly: true },
-        { path: '/race-permissions', label: '赛事授权', icon: '🔑' },
+        { path: '/members', label: '成员管理', icon: 'M' },
+        { path: '/races', label: '赛事管理', icon: 'R' },
+        { path: '/bib-tracking', label: '号码布状态', icon: '#' },
+        { path: '/org-race-permissions', label: '机构赛事授权', icon: 'G', superOnly: true },
+        { path: '/race-permissions', label: '赛事授权', icon: 'P' },
     ]
 
     return (
@@ -73,14 +87,14 @@ function AdminLayout() {
             <aside className={`admin-sidebar ${sidebarCollapsed ? 'admin-sidebar--collapsed' : ''}`}>
                 <div className="admin-sidebar__header">
                     <Link to="/admin" className="admin-sidebar__brand">
-                        {sidebarCollapsed ? <span>⚙️</span> : <span>⚙️ 管理后台</span>}
+                        {sidebarCollapsed ? <span>DA</span> : <span>DOOR 管理后台</span>}
                     </Link>
                     <button
                         className="admin-sidebar__toggle"
-                        onClick={() => setSidebarCollapsed((v) => !v)}
+                        onClick={() => setSidebarCollapsed((value) => !value)}
                         title={sidebarCollapsed ? '展开' : '收起'}
                     >
-                        {sidebarCollapsed ? '›' : '‹'}
+                        {sidebarCollapsed ? '>' : '<'}
                     </button>
                 </div>
 
@@ -89,21 +103,21 @@ function AdminLayout() {
                         to="/admin"
                         className={`admin-nav-item ${location.pathname === '/admin' ? 'admin-nav-item--active' : ''}`}
                     >
-                        <span className="admin-nav-item__icon">📊</span>
+                        <span className="admin-nav-item__icon">D</span>
                         {!sidebarCollapsed && <span>仪表盘</span>}
                     </Link>
 
                     {isSuperAdmin && (
                         <>
                             <div className="admin-nav-divider">{!sidebarCollapsed && '平台管理'}</div>
-                            {superAdminMenus.map((m) => (
+                            {superAdminMenus.map((menu) => (
                                 <Link
-                                    key={m.path}
-                                    to={`/admin${m.path}`}
-                                    className={`admin-nav-item ${isActive(m.path) ? 'admin-nav-item--active' : ''}`}
+                                    key={menu.path}
+                                    to={`/admin${menu.path}`}
+                                    className={`admin-nav-item ${isActive(menu.path) ? 'admin-nav-item--active' : ''}`}
                                 >
-                                    <span className="admin-nav-item__icon">{m.icon}</span>
-                                    {!sidebarCollapsed && <span>{m.label}</span>}
+                                    <span className="admin-nav-item__icon">{menu.icon}</span>
+                                    {!sidebarCollapsed && <span>{menu.label}</span>}
                                 </Link>
                             ))}
                         </>
@@ -128,23 +142,23 @@ function AdminLayout() {
                                         }}
                                     >
                                         <option value="">自动选择机构</option>
-                                        {orgs.map((o) => (
-                                            <option key={o.id} value={o.id}>{o.name}</option>
+                                        {orgs.map((org) => (
+                                            <option key={org.id} value={org.id}>{org.name}</option>
                                         ))}
                                     </select>
                                 </div>
                             )}
 
                             {orgAdminMenus
-                                .filter((m) => !m.superOnly || isSuperAdmin)
-                                .map((m) => (
+                                .filter((menu) => !menu.superOnly || isSuperAdmin)
+                                .map((menu) => (
                                     <Link
-                                        key={m.path}
-                                        to={`/admin${m.path}${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`}
-                                        className={`admin-nav-item ${isActive(m.path) ? 'admin-nav-item--active' : ''}`}
+                                        key={menu.path}
+                                        to={`/admin${menu.path}${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`}
+                                        className={`admin-nav-item ${isActive(menu.path) ? 'admin-nav-item--active' : ''}`}
                                     >
-                                        <span className="admin-nav-item__icon">{m.icon}</span>
-                                        {!sidebarCollapsed && <span>{m.label}</span>}
+                                        <span className="admin-nav-item__icon">{menu.icon}</span>
+                                        {!sidebarCollapsed && <span>{menu.label}</span>}
                                     </Link>
                                 ))}
                         </>
@@ -166,8 +180,8 @@ function AdminLayout() {
                         </div>
                     )}
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <Link to="/" className="btn btn--ghost btn--sm" title="返回门户">🏠</Link>
-                        <button className="btn btn--ghost btn--sm" onClick={handleLogout} title="退出登录">⏻</button>
+                        <Link to="/" className="btn btn--ghost btn--sm" title="返回门户">首页</Link>
+                        <button className="btn btn--ghost btn--sm" onClick={handleLogout} title="退出登录">退出</button>
                     </div>
                 </div>
             </aside>
@@ -181,6 +195,7 @@ function AdminLayout() {
                     <Route path="members" element={<MemberListPage />} />
                     <Route path="members/new" element={<MemberCreatePage />} />
                     <Route path="races" element={<RaceManagementPage />} />
+                    <Route path="bib-tracking" element={<BibTrackingPage />} />
                     <Route path="org-race-permissions" element={<OrgRacePermissionsPage />} />
                     <Route path="race-permissions" element={<RacePermissionsPage />} />
                     <Route path="app-manager" element={<AppManagerPage />} />
@@ -244,13 +259,19 @@ function AdminLayout() {
                     margin-bottom: 2px;
                 }
                 .admin-nav-item:hover { background: var(--color-bg-secondary, #f3f4f6); }
-                .admin-nav-item:focus-visible { outline: 2px solid var(--color-purple, #6366f1); outline-offset: -2px; }
+                .admin-nav-item:focus-visible { outline: 2px solid var(--color-primary, #2563eb); outline-offset: -2px; }
                 .admin-nav-item--active {
                     background: var(--color-primary) !important;
                     color: var(--color-text-on-dark) !important;
                     font-weight: 600;
                 }
-                .admin-nav-item__icon { font-size: 18px; flex-shrink: 0; }
+                .admin-nav-item__icon {
+                    font-size: 18px;
+                    flex-shrink: 0;
+                    width: 18px;
+                    text-align: center;
+                    font-weight: 700;
+                }
                 .admin-nav-divider {
                     font-size: 11px;
                     font-weight: 600;

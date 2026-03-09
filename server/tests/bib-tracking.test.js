@@ -18,6 +18,8 @@ let otherRaceId;
 let editorUserId;
 let recordOne;
 let recordTwo;
+let trackedItemOneId;
+let trackedItemTwoId;
 
 async function api(path, options = {}) {
     const response = await fetch(`${baseUrl}${path}`, {
@@ -104,6 +106,20 @@ describe('bib tracking routes', () => {
         });
         editorUserId = editor.id;
         await createUser({
+            username: 'bib_org_admin',
+            email: 'bib_org_admin@test.com',
+            password: 'orgadmin123',
+            role: 'org_admin',
+            userOrgId: orgId,
+        });
+        await createUser({
+            username: 'bib_super_admin',
+            email: 'bib_super_admin@test.com',
+            password: 'superadmin123',
+            role: 'super_admin',
+            userOrgId: null,
+        });
+        await createUser({
             username: 'bib_viewer',
             email: 'bib_viewer@test.com',
             password: 'viewer123',
@@ -128,6 +144,8 @@ describe('bib tracking routes', () => {
 
         const credentials = [
             ['editor', { login: 'bib_editor', password: 'editor123' }],
+            ['orgAdmin', { login: 'bib_org_admin', password: 'orgadmin123' }],
+            ['superAdmin', { login: 'bib_super_admin', password: 'superadmin123' }],
             ['viewer', { login: 'bib_viewer', password: 'viewer123' }],
             ['outsider', { login: 'bib_other_editor', password: 'other123' }],
         ];
@@ -224,6 +242,7 @@ describe('bib tracking routes', () => {
         assert.notEqual(after.qr_token, before.qr_token);
         assert.equal(Number(after.qr_version), Number(before.qr_version) + 1);
         assert.equal(response.body.data.items[0].qrToken, after.qr_token);
+        trackedItemOneId = Number(after.id);
     });
 
     it('rejects bib reuse when occupied by another invalidated item', async () => {
@@ -336,6 +355,7 @@ describe('bib tracking routes', () => {
 
     it('rejects pickup for user without race access', async () => {
         const item = await knex('bib_tracking_items').where({ record_id: recordTwo.id }).first();
+        trackedItemTwoId = Number(item.id);
         const response = await api('/api/bib-tracking/scan/pickup', {
             method: 'POST',
             headers: authHeader('outsider'),
@@ -392,19 +412,93 @@ describe('bib tracking routes', () => {
         assert.equal(item.status, 'finished');
     });
 
-    it('returns tracking stats and item list', async () => {
+    it('returns tracking stats and item list for org admin', async () => {
         const stats = await api(`/api/bib-tracking/stats/${raceId}`, {
-            headers: authHeader('viewer'),
+            headers: authHeader('orgAdmin'),
         });
         assert.equal(stats.status, 200);
         assert.equal(stats.body.data.pickedUp, 1);
         assert.equal(stats.body.data.finished, 1);
 
         const list = await api(`/api/bib-tracking/items/${raceId}?status=finished`, {
-            headers: authHeader('viewer'),
+            headers: authHeader('orgAdmin'),
         });
         assert.equal(list.status, 200);
         assert.equal(list.body.data.items.length, 1);
         assert.equal(list.body.data.items[0].bibNumber, 'A1002');
+        assert.equal(list.body.data.items[0].phone, undefined);
+        assert.equal(list.body.data.items[0].idNumber, undefined);
+        assert.match(list.body.data.items[0].phoneMasked, /\*/);
+        assert.match(list.body.data.items[0].idNumberMasked, /\*/);
+        assert.ok(list.body.data.items[0].latestStatusAt);
+    });
+
+    it('allows super admin to search by name, bib number, phone, and id number', async () => {
+        await knex('records').where({ id: recordTwo.id }).update({ phone: '13800138000' });
+
+        const byName = await api(`/api/bib-tracking/items/${raceId}?keyword=Bob`, {
+            headers: authHeader('superAdmin'),
+        });
+        assert.equal(byName.status, 200);
+        assert.equal(byName.body.data.items.length, 1);
+
+        const byBib = await api(`/api/bib-tracking/items/${raceId}?keyword=A1002`, {
+            headers: authHeader('superAdmin'),
+        });
+        assert.equal(byBib.status, 200);
+        assert.equal(byBib.body.data.items.length, 1);
+
+        const byPhone = await api(`/api/bib-tracking/items/${raceId}?keyword=13800138000`, {
+            headers: authHeader('superAdmin'),
+        });
+        assert.equal(byPhone.status, 200);
+        assert.equal(byPhone.body.data.items.length, 1);
+
+        const byIdNumber = await api(`/api/bib-tracking/items/${raceId}?keyword=ID002`, {
+            headers: authHeader('superAdmin'),
+        });
+        assert.equal(byIdNumber.status, 200);
+        assert.equal(byIdNumber.body.data.items.length, 1);
+    });
+
+    it('returns tracking item detail with full pii and timeline for admins only', async () => {
+        const response = await api(`/api/bib-tracking/items/${raceId}/${trackedItemTwoId}`, {
+            headers: authHeader('orgAdmin'),
+        });
+        assert.equal(response.status, 200);
+        assert.equal(response.body.data.item.itemId, trackedItemTwoId);
+        assert.equal(response.body.data.item.phone, '13800138000');
+        assert.equal(response.body.data.item.idNumber, 'ID002');
+        assert.equal(response.body.data.item.phoneMasked, '138****8000');
+        assert.ok(Array.isArray(response.body.data.timeline));
+        assert.deepEqual(
+            response.body.data.timeline.map((entry) => entry.status),
+            ['receipt_printed', 'picked_up', 'checked_in', 'finished'],
+        );
+        assert.equal(response.body.data.timeline[0].source, 'tool_export');
+    });
+
+    it('rejects list, stats, and detail for non-admin readers', async () => {
+        const stats = await api(`/api/bib-tracking/stats/${raceId}`, {
+            headers: authHeader('viewer'),
+        });
+        assert.equal(stats.status, 403);
+
+        const list = await api(`/api/bib-tracking/items/${raceId}`, {
+            headers: authHeader('viewer'),
+        });
+        assert.equal(list.status, 403);
+
+        const detail = await api(`/api/bib-tracking/items/${raceId}/${trackedItemOneId}`, {
+            headers: authHeader('viewer'),
+        });
+        assert.equal(detail.status, 403);
+    });
+
+    it('returns 404 for missing tracking item detail', async () => {
+        const response = await api(`/api/bib-tracking/items/${raceId}/999999`, {
+            headers: authHeader('orgAdmin'),
+        });
+        assert.equal(response.status, 404);
     });
 });
