@@ -255,6 +255,18 @@ export async function findActiveByBibNumberForUpdate(trx, { orgId, raceId, bibNu
         .first();
 }
 
+export async function findActiveByIdForUpdate(trx, { orgId, raceId, itemId }) {
+    return trx('bib_tracking_items')
+        .where({
+            org_id: orgId,
+            race_id: raceId,
+            id: itemId,
+        })
+        .whereNull('invalidated_at')
+        .forUpdate()
+        .first();
+}
+
 export async function listItems(orgId, raceId, { status, keyword, page = 1, limit = 50 } = {}) {
     const safePage = Math.max(1, Number(page) || 1);
     const safeLimit = Math.max(1, Math.min(200, Number(limit) || 50));
@@ -345,6 +357,7 @@ export async function listItemTimeline(itemId) {
             'bte.to_status',
             'bte.source',
             'bte.created_at',
+            'bte.payload',
             'bte.operator_user_id',
             'u.username as operator_name',
         )

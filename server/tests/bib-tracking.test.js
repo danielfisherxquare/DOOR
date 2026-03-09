@@ -16,6 +16,7 @@ let otherOrgId;
 let raceId;
 let otherRaceId;
 let editorUserId;
+let orgAdminUserId;
 let recordOne;
 let recordTwo;
 let trackedItemOneId;
@@ -105,13 +106,14 @@ describe('bib tracking routes', () => {
             userOrgId: orgId,
         });
         editorUserId = editor.id;
-        await createUser({
+        const orgAdmin = await createUser({
             username: 'bib_org_admin',
             email: 'bib_org_admin@test.com',
             password: 'orgadmin123',
             role: 'org_admin',
             userOrgId: orgId,
         });
+        orgAdminUserId = orgAdmin.id;
         await createUser({
             username: 'bib_super_admin',
             email: 'bib_super_admin@test.com',
@@ -486,6 +488,41 @@ describe('bib tracking routes', () => {
             ['receipt_printed', 'picked_up', 'checked_in', 'finished'],
         );
         assert.equal(response.body.data.timeline[0].source, 'tool_export');
+        assert.equal(response.body.data.rollbackAction.canRollback, true);
+        assert.equal(response.body.data.rollbackAction.targetStatus, 'checked_in');
+        assert.equal(response.body.data.lastRollback, null);
+    });
+
+    it('allows org admin to rollback one status step and records operator', async () => {
+        const rollback = await api(`/api/bib-tracking/items/${raceId}/${trackedItemTwoId}/rollback`, {
+            method: 'POST',
+            headers: authHeader('orgAdmin'),
+            body: JSON.stringify({
+                reason: '完赛状态误同步',
+            }),
+        });
+        assert.equal(rollback.status, 200);
+        assert.equal(rollback.body.data.item.status, 'checked_in');
+        assert.equal(rollback.body.data.rollbackAction.canRollback, true);
+        assert.equal(rollback.body.data.rollbackAction.targetStatus, 'picked_up');
+        assert.equal(rollback.body.data.lastRollback.operatorName, 'bib_org_admin');
+        assert.equal(rollback.body.data.lastRollback.reason, '完赛状态误同步');
+        assert.deepEqual(
+            rollback.body.data.timeline.map((entry) => entry.status),
+            ['receipt_printed', 'picked_up', 'checked_in'],
+        );
+        assert.equal(rollback.body.data.rollbackHistory.length, 1);
+
+        const item = await knex('bib_tracking_items').where({ id: trackedItemTwoId }).first();
+        assert.equal(item.status, 'checked_in');
+        assert.equal(item.finished_at, null);
+
+        const rollbackEvent = await knex('bib_tracking_events')
+            .where({ tracking_item_id: trackedItemTwoId, event_type: 'status_rollback' })
+            .first();
+        assert.equal(rollbackEvent.from_status, 'finished');
+        assert.equal(rollbackEvent.to_status, 'checked_in');
+        assert.equal(Number(rollbackEvent.operator_user_id), Number(orgAdminUserId));
     });
 
     it('rejects list, stats, and detail for non-admin readers', async () => {
@@ -503,6 +540,13 @@ describe('bib tracking routes', () => {
             headers: authHeader('viewer'),
         });
         assert.equal(detail.status, 403);
+
+        const rollback = await api(`/api/bib-tracking/items/${raceId}/${trackedItemOneId}/rollback`, {
+            method: 'POST',
+            headers: authHeader('viewer'),
+            body: JSON.stringify({ reason: 'viewer should not rollback' }),
+        });
+        assert.equal(rollback.status, 403);
     });
 
     it('returns 404 for missing tracking item detail', async () => {

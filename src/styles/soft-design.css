@@ -737,15 +737,31 @@ select.input {
 /* ========================================
    响应式设计
    ======================================== */
+
+/* 平板设备 (768px - 1024px) */
+@media (max-width: 1024px) {
+  .main-content {
+    padding: var(--spacing-lg);
+  }
+}
+
+/* 小平板和大屏手机 (768px 以下) */
 @media (max-width: 768px) {
   :root {
     --spacing-lg: 1rem;
     --spacing-xl: 1.5rem;
     --spacing-2xl: 2rem;
+    --font-size-3xl: 1.75rem;
+    --font-size-2xl: 1.25rem;
+  }
+
+  .main-content {
+    padding: var(--spacing-md);
   }
 
   .grid--tools {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--spacing-md);
   }
 
   .navbar {
@@ -756,19 +772,238 @@ select.input {
     display: none;
   }
 
+  .navbar__user {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    gap: var(--spacing-xs);
+  }
+
+  .navbar__user span {
+    display: none;
+  }
+
+  .navbar__avatar {
+    width: 28px;
+    height: 28px;
+    font-size: var(--font-size-xs);
+  }
+
   .login-card {
     padding: var(--spacing-lg);
+    margin: var(--spacing-md);
+  }
+
+  .tool-card {
+    padding: var(--spacing-lg);
+  }
+
+  .tool-card__icon {
+    width: 56px;
+    height: 56px;
+    font-size: var(--font-size-xl);
+  }
+
+  .tool-detail__header {
+    gap: var(--spacing-md);
+  }
+
+  .tool-detail__icon {
+    width: 64px;
+    height: 64px;
+    font-size: var(--font-size-2xl);
+  }
+
+  .tool-detail__info h1 {
+    font-size: var(--font-size-xl);
+  }
+
+  /* 沉浸式时钟返回按钮优化 */
+  .clock-back-btn,
+  button[title="返回首页"] {
+    top: 16px !important;
+    left: 16px !important;
+    width: 40px !important;
+    height: 40px !important;
   }
 }
 
+/* 手机设备 (480px 以下) */
 @media (max-width: 480px) {
+  :root {
+    --spacing-md: 0.875rem;
+    --spacing-lg: 0.875rem;
+    --spacing-xl: 1rem;
+    --spacing-2xl: 1.5rem;
+    --font-size-3xl: 1.5rem;
+    --font-size-2xl: 1.125rem;
+    --font-size-xl: 1rem;
+  }
+
+  .main-content {
+    padding: var(--spacing-sm);
+  }
+
+  /* 首页标题响应式 */
+  .home__header {
+    padding-top: var(--spacing-sm) !important;
+    margin-bottom: var(--spacing-lg) !important;
+  }
+
+  .home__title {
+    font-size: var(--font-size-2xl) !important;
+  }
+
+  .home__subtitle {
+    font-size: var(--font-size-sm) !important;
+  }
+
   .grid--tools {
     grid-template-columns: 1fr;
+    gap: var(--spacing-sm);
+  }
+
+  .navbar {
+    padding: var(--spacing-xs) var(--spacing-sm);
+  }
+
+  .navbar__logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  .navbar__menu {
+    gap: var(--spacing-sm);
+  }
+
+  .login-card {
+    padding: var(--spacing-md);
+    margin: var(--spacing-sm);
+    border-radius: var(--radius-lg);
+  }
+
+  .login-card__header {
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .login-card__title {
+    font-size: var(--font-size-xl);
+  }
+
+  .login-card__subtitle {
+    font-size: var(--font-size-sm);
+  }
+
+  .tool-card {
+    padding: var(--spacing-md);
+    gap: var(--spacing-sm);
+  }
+
+  .tool-card__icon {
+    width: 48px;
+    height: 48px;
+    font-size: var(--font-size-lg);
+  }
+
+  .tool-card__name {
+    font-size: var(--font-size-md);
+  }
+
+  .tool-card__desc {
+    font-size: var(--font-size-xs);
+  }
+
+  .tool-detail {
+    gap: var(--spacing-md);
   }
 
   .tool-detail__header {
     flex-direction: column;
     text-align: center;
+    gap: var(--spacing-sm);
+  }
+
+  .tool-detail__icon {
+    width: 56px;
+    height: 56px;
+    font-size: var(--font-size-xl);
+  }
+
+  .tool-detail__info h1 {
+    font-size: var(--font-size-lg);
+  }
+
+  .tool-detail__info p {
+    font-size: var(--font-size-sm);
+  }
+
+  .tool-detail__content {
+    padding: var(--spacing-md);
+  }
+
+  /* 登录页面记住我和忘记密码布局 */
+  .login-card__form>div[style*="justify-content: space-between"],
+  .login-card__form .login-options-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  /* 按钮在小屏的优化 */
+  .btn--large {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    font-size: var(--font-size-md);
+  }
+
+  /* 输入框触摸优化 */
+  .input {
+    font-size: 16px;
+    /* 防止 iOS 自动缩放 */
+    padding: 0.875rem 1rem;
+  }
+}
+
+/* 超小屏幕 (360px 以下) */
+@media (max-width: 360px) {
+  :root {
+    --font-size-3xl: 1.25rem;
+    --font-size-2xl: 1rem;
+  }
+
+  .navbar__logo {
+    width: 32px;
+    height: 32px;
+    font-size: 10px;
+  }
+
+  .navbar__avatar {
+    width: 24px;
+    height: 24px;
+  }
+
+  .login-card {
+    padding: var(--spacing-sm);
+  }
+
+  .tool-card {
+    padding: var(--spacing-sm);
+  }
+
+  .tool-card__icon {
+    width: 40px;
+    height: 40px;
+    font-size: var(--font-size-md);
+  }
+}
+
+/* 横屏手机优化 */
+@media (max-width: 896px) and (orientation: landscape) {
+  .login-page {
+    min-height: auto;
+    padding: var(--spacing-md);
+  }
+
+  .login-card {
+    max-width: 480px;
+    margin: 0 auto;
   }
 }
 

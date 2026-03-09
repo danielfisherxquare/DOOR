@@ -48,6 +48,20 @@ router.get(
     },
 );
 
+router.post(
+    '/items/:raceId/:itemId/rollback',
+    requireRoles('org_admin', 'super_admin'),
+    requireRaceAccess('raceId'),
+    async (req, res, next) => {
+        try {
+            const data = await service.rollbackTrackingItem(buildRequestContext(req), req.params.raceId, req.params.itemId, req.body);
+            res.json({ success: true, data });
+        } catch (err) {
+            next(err);
+        }
+    },
+);
+
 router.get('/items/:raceId', requireRoles('org_admin', 'super_admin'), requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await service.listTrackingItems(buildRequestContext(req), req.params.raceId, req.query);

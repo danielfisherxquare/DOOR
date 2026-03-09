@@ -23,6 +23,24 @@ const STATUS_LABELS = {
     finished: '已完赛',
 };
 
+const ROLLBACK_CONFIG = {
+    picked_up: {
+        targetStatus: 'receipt_printed',
+        actionLabel: '撤回到已出回执',
+        clearFields: ['picked_up_at', 'checked_in_at', 'finished_at', 'last_scan_at', 'last_scan_by'],
+    },
+    checked_in: {
+        targetStatus: 'picked_up',
+        actionLabel: '撤回到已领取',
+        clearFields: ['checked_in_at', 'finished_at'],
+    },
+    finished: {
+        targetStatus: 'checked_in',
+        actionLabel: '撤回到已检录',
+        clearFields: ['finished_at'],
+    },
+};
+
 const ACTION_REASON_BY_STATUS = {
     receipt_printed: 'ready_for_pickup',
     picked_up: 'already_picked_up',
@@ -179,6 +197,29 @@ function serializeDetailItem(item) {
     };
 }
 
+function serializeRollbackAction(item) {
+    const config = item ? ROLLBACK_CONFIG[item.status] : null;
+    if (!config) {
+        return {
+            canRollback: false,
+            fromStatus: item?.status || null,
+            fromStatusLabel: item ? (STATUS_LABELS[item.status] || item.status) : '',
+            targetStatus: null,
+            targetStatusLabel: '',
+            actionLabel: '',
+        };
+    }
+
+    return {
+        canRollback: true,
+        fromStatus: item.status,
+        fromStatusLabel: STATUS_LABELS[item.status] || item.status,
+        targetStatus: config.targetStatus,
+        targetStatusLabel: STATUS_LABELS[config.targetStatus] || config.targetStatus,
+        actionLabel: config.actionLabel,
+    };
+}
+
 function findLatestTimelineEvent(events, status) {
     if (status === 'receipt_printed') {
         return events.find((event) => event.event_type === 'registered_for_export') || null;
@@ -209,6 +250,39 @@ function buildTimeline(item, events) {
                 source: event?.source || '',
             };
         });
+}
+
+function buildRollbackHistory(events) {
+    return events
+        .filter((event) => event.event_type === 'status_rollback')
+        .map((event) => ({
+            id: Number(event.id),
+            occurredAt: event.created_at,
+            operatorUserId: event.operator_user_id ? Number(event.operator_user_id) : null,
+            operatorName: event.operator_name || '',
+            source: event.source || '',
+            fromStatus: event.from_status || '',
+            fromStatusLabel: STATUS_LABELS[event.from_status] || event.from_status || '',
+            toStatus: event.to_status || '',
+            toStatusLabel: STATUS_LABELS[event.to_status] || event.to_status || '',
+            reason: String(event.payload?.reason || '').trim(),
+        }));
+}
+
+async function buildTrackingItemDetail(orgId, raceId, itemId) {
+    const item = await repo.getItemDetail(orgId, raceId, itemId);
+    if (!item) throw notFound('Tracking item not found');
+
+    const events = await repo.listItemTimeline(itemId);
+    const rollbackHistory = buildRollbackHistory(events);
+
+    return {
+        item: serializeDetailItem(item),
+        timeline: buildTimeline(item, events),
+        rollbackAction: serializeRollbackAction(item),
+        rollbackHistory,
+        lastRollback: rollbackHistory[0] || null,
+    };
 }
 
 function chunk(items, size) {
@@ -250,6 +324,15 @@ async function requireRecordBelongsToRace(orgId, raceId, recordId, bibNumber, tr
     if (bibNumber && String(row.bib_number || '') && String(row.bib_number) !== String(bibNumber)) {
         throw badRequest(`bibNumber mismatch for record ${recordId}`);
     }
+}
+
+function normalizeRollbackReason(rawReason) {
+    const reason = String(rawReason || '').trim();
+    if (!reason) return '';
+    if (reason.length > 200) {
+        throw badRequest('rollback reason must be 200 characters or fewer');
+    }
+    return reason;
 }
 
 export async function registerTrackingItems(authContext, rawRaceId, body) {
@@ -552,16 +635,61 @@ export async function getTrackingItemDetail(authContext, rawRaceId, rawItemId) {
     const raceId = normalizeRaceId(rawRaceId);
     const itemId = normalizeItemId(rawItemId);
     const access = await resolveRaceAccess(authContext, raceId, 'GET');
+    return buildTrackingItemDetail(access.operatorOrgId, raceId, itemId);
+}
 
-    const item = await repo.getItemDetail(access.operatorOrgId, raceId, itemId);
-    if (!item) throw notFound('Tracking item not found');
+export async function rollbackTrackingItem(authContext, rawRaceId, rawItemId, body) {
+    const raceId = normalizeRaceId(rawRaceId);
+    const itemId = normalizeItemId(rawItemId);
+    const access = await resolveRaceAccess(authContext, raceId, 'POST');
+    ensureEditorAccess(access);
 
-    const events = await repo.listItemTimeline(itemId);
+    const reason = normalizeRollbackReason(body?.reason);
 
-    return {
-        item: serializeDetailItem(item),
-        timeline: buildTimeline(item, events),
-    };
+    await knex.transaction(async (trx) => {
+        const item = await repo.findActiveByIdForUpdate(trx, {
+            orgId: access.operatorOrgId,
+            raceId,
+            itemId,
+        });
+        if (!item) {
+            throw notFound('Tracking item not found');
+        }
+
+        const rollback = serializeRollbackAction(item);
+        if (!rollback.canRollback) {
+            throw badRequest('Current status does not support rollback');
+        }
+
+        const patch = {
+            status: rollback.targetStatus,
+            latest_status_at: trx.fn.now(),
+        };
+
+        for (const field of ROLLBACK_CONFIG[item.status].clearFields) {
+            patch[field] = null;
+        }
+
+        await repo.updateItemById(trx, item.id, patch);
+        await repo.insertEvent(trx, {
+            tracking_item_id: item.id,
+            org_id: item.org_id,
+            race_id: item.race_id,
+            record_id: item.record_id,
+            event_type: 'status_rollback',
+            from_status: item.status,
+            to_status: rollback.targetStatus,
+            operator_user_id: authContext.userId,
+            source: 'admin_console',
+            payload: {
+                reason: reason || null,
+                rollbackFrom: item.status,
+                rollbackTo: rollback.targetStatus,
+            },
+        });
+    });
+
+    return buildTrackingItemDetail(access.operatorOrgId, raceId, itemId);
 }
 
 export async function syncTrackingStatuses(authContext, rawRaceId, body) {

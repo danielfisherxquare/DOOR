@@ -91,11 +91,14 @@ function BibTrackingPage() {
     const [loadingRaces, setLoadingRaces] = useState(true)
     const [loadingData, setLoadingData] = useState(false)
     const [loadingDetail, setLoadingDetail] = useState(false)
+    const [rollingBack, setRollingBack] = useState(false)
     const [message, setMessage] = useState('')
     const [draftKeyword, setDraftKeyword] = useState(keywordParam)
     const [draftStatus, setDraftStatus] = useState(statusParam)
     const [detail, setDetail] = useState(null)
     const [detailOpen, setDetailOpen] = useState(false)
+    const [detailNotice, setDetailNotice] = useState(null)
+    const [rollbackReason, setRollbackReason] = useState('')
 
     useEffect(() => {
         setDraftKeyword(keywordParam)
@@ -200,6 +203,13 @@ function BibTrackingPage() {
         setSearchParams(nextParams)
     }
 
+    const closeDetail = () => {
+        setDetailOpen(false)
+        setDetail(null)
+        setDetailNotice(null)
+        setRollbackReason('')
+    }
+
     const handleRaceChange = (event) => {
         const raceId = event.target.value
         applyParams((params) => {
@@ -207,8 +217,7 @@ function BibTrackingPage() {
             else params.delete('raceId')
             params.delete('page')
         })
-        setDetail(null)
-        setDetailOpen(false)
+        closeDetail()
     }
 
     const handleSearch = (event) => {
@@ -268,10 +277,8 @@ function BibTrackingPage() {
         })
     }
 
-    const handleOpenDetail = async (itemId) => {
-        if (!selectedRaceId) return
+    const loadDetail = async (itemId) => {
         setLoadingDetail(true)
-        setDetailOpen(true)
         setDetail(null)
         try {
             const res = await bibTrackingApi.getItemDetail(selectedRaceId, itemId)
@@ -282,6 +289,62 @@ function BibTrackingPage() {
             })
         } finally {
             setLoadingDetail(false)
+        }
+    }
+
+    const handleOpenDetail = async (itemId) => {
+        if (!selectedRaceId) return
+        setDetailNotice(null)
+        setRollbackReason('')
+        setDetailOpen(true)
+        await loadDetail(itemId)
+    }
+
+    const handleRollback = async () => {
+        if (!selectedRaceId || !detail?.item?.itemId || !detail?.rollbackAction?.canRollback) return
+
+        setRollingBack(true)
+        setDetailNotice(null)
+        try {
+            const res = await bibTrackingApi.rollbackStatus(selectedRaceId, detail.item.itemId, {
+                reason: rollbackReason.trim() || undefined,
+            })
+            if (res.success) {
+                setDetail(res.data)
+                setRollbackReason('')
+                setDetailNotice({
+                    type: 'success',
+                    text: '状态已撤回，已记录撤回时间和操作账号。',
+                })
+            }
+
+            setLoadingData(true)
+            try {
+                const [statsRes, listRes] = await Promise.all([
+                    bibTrackingApi.getStats(selectedRaceId),
+                    bibTrackingApi.listItems(selectedRaceId, {
+                        status: statusParam || undefined,
+                        keyword: keywordParam || undefined,
+                        page: currentPage,
+                        limit: PAGE_LIMIT,
+                    }),
+                ])
+                if (statsRes.success) setStats(statsRes.data || EMPTY_STATS)
+                if (listRes.success) {
+                    setItems(listRes.data.items || [])
+                    setTotal(Number(listRes.data.total || 0))
+                }
+            } catch (refreshErr) {
+                setMessage(`撤回后刷新列表失败：${refreshErr.message}`)
+            }
+        } catch (err) {
+            setDetailNotice({
+                type: 'error',
+                text: `撤回失败：${err.message}`,
+            })
+        } finally {
+            setRollingBack(false)
+            setLoadingData(false)
         }
     }
 
@@ -471,14 +534,14 @@ function BibTrackingPage() {
             )}
 
             {detailOpen && (
-                <div className="bib-tracking-drawer-overlay" onClick={() => { setDetailOpen(false); setDetail(null) }}>
+                <div className="bib-tracking-drawer-overlay" onClick={closeDetail}>
                     <aside className="bib-tracking-drawer" onClick={(event) => event.stopPropagation()}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                             <div>
                                 <div style={{ fontSize: 12, color: 'var(--color-text-secondary, #666)' }}>号码布详情</div>
                                 <div style={{ fontSize: 22, fontWeight: 700 }}>{detail?.item?.bibNumber || '-'}</div>
                             </div>
-                            <button type="button" className="btn btn--ghost bib-tracking-focusable" onClick={() => { setDetailOpen(false); setDetail(null) }}>
+                            <button type="button" className="btn btn--ghost bib-tracking-focusable" onClick={closeDetail}>
                                 关闭
                             </button>
                         </div>
@@ -491,6 +554,12 @@ function BibTrackingPage() {
 
                         {!loadingDetail && detail?.item && (
                             <>
+                                {detailNotice && (
+                                    <div style={detailNotice.type === 'error' ? errorStyle : successStyle}>
+                                        {detailNotice.text}
+                                    </div>
+                                )}
+
                                 <div className="bib-tracking-detail-grid">
                                     <DetailField label="姓名" value={detail.item.name || '-'} />
                                     <DetailField label="状态" value={statusLabel(detail.item.status)} />
@@ -502,6 +571,78 @@ function BibTrackingPage() {
                                     <DetailField label="完赛" value={formatDateTime(detail.item.finishedAt)} />
                                     <DetailField label="最近状态时间" value={formatDateTime(detail.item.latestStatusAt)} />
                                     <DetailField label="最近扫码人" value={detail.item.lastScanByName || '-'} />
+                                    <DetailField label="最近撤回时间" value={formatDateTime(detail.lastRollback?.occurredAt)} />
+                                    <DetailField label="最近撤回人" value={detail.lastRollback?.operatorName || '-'} />
+                                </div>
+
+                                <div style={{ marginTop: 20 }}>
+                                    <div style={{ ...panelStyle, padding: 16, boxShadow: 'none', border: '1px solid var(--color-border, #e5e7eb)' }}>
+                                        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>状态管理</div>
+                                        <div style={{ fontSize: 13, color: 'var(--color-text-secondary, #666)', marginBottom: 12 }}>
+                                            仅支持按状态回退一步，用于撤回误扫描。每次撤回都会记录操作时间和账号。
+                                        </div>
+
+                                        {detail.rollbackAction?.canRollback ? (
+                                            <>
+                                                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>
+                                                    当前可从“{detail.rollbackAction.fromStatusLabel}”撤回到“{detail.rollbackAction.targetStatusLabel}”
+                                                </div>
+                                                <label style={labelStyle} htmlFor="bib-rollback-reason">撤回原因（选填）</label>
+                                                <textarea
+                                                    id="bib-rollback-reason"
+                                                    value={rollbackReason}
+                                                    maxLength={200}
+                                                    onChange={(event) => setRollbackReason(event.target.value)}
+                                                    placeholder="例如：窗口误扫、重复检录、完赛枪误同步"
+                                                    style={textareaStyle}
+                                                />
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
+                                                    <div style={{ fontSize: 12, color: 'var(--color-text-secondary, #666)' }}>
+                                                        {rollbackReason.trim().length}/200
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn--primary bib-tracking-focusable"
+                                                        onClick={handleRollback}
+                                                        disabled={rollingBack}
+                                                    >
+                                                        {rollingBack ? '撤回中...' : detail.rollbackAction.actionLabel}
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div style={infoStyle}>
+                                                当前状态不能继续撤回。
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div style={{ marginTop: 20 }}>
+                                    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>撤回记录</div>
+                                    <div style={{ display: 'grid', gap: 12 }}>
+                                        {(detail.rollbackHistory || []).map((entry) => (
+                                            <div key={entry.id} style={{ border: '1px solid var(--color-border, #e5e7eb)', borderRadius: 12, padding: 14 }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                                                    <div style={{ fontSize: 14, fontWeight: 700 }}>
+                                                        {entry.fromStatusLabel} → {entry.toStatusLabel}
+                                                    </div>
+                                                    <span style={{ fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>
+                                                        {formatDateTime(entry.occurredAt)}
+                                                    </span>
+                                                </div>
+                                                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>
+                                                    操作人：{entry.operatorName || '-'} · 来源：{entry.source || '-'}
+                                                </div>
+                                                <div style={{ marginTop: 6, fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>
+                                                    原因：{entry.reason || '-'}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {(!detail.rollbackHistory || detail.rollbackHistory.length === 0) && (
+                                            <div style={{ fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>暂无撤回记录</div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div style={{ marginTop: 20 }}>
@@ -656,6 +797,23 @@ const errorStyle = {
     fontSize: 14,
 }
 
+const successStyle = {
+    padding: '12px 16px',
+    marginBottom: 16,
+    borderRadius: 10,
+    background: 'rgba(34,197,94,0.12)',
+    color: 'var(--badge-green-text, #166534)',
+    fontSize: 14,
+}
+
+const infoStyle = {
+    padding: '12px 16px',
+    borderRadius: 10,
+    background: 'var(--color-bg-secondary, #f8fafc)',
+    color: 'var(--color-text-secondary, #475569)',
+    fontSize: 14,
+}
+
 const labelStyle = {
     display: 'block',
     fontSize: 13,
@@ -678,6 +836,17 @@ const tdStyle = {
     fontSize: 14,
     verticalAlign: 'top',
     whiteSpace: 'nowrap',
+}
+
+const textareaStyle = {
+    width: '100%',
+    minHeight: 88,
+    padding: '10px 12px',
+    borderRadius: 10,
+    border: '1px solid var(--color-border, #d1d5db)',
+    fontSize: 14,
+    resize: 'vertical',
+    boxSizing: 'border-box',
 }
 
 export default BibTrackingPage

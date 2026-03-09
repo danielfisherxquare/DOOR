@@ -118,7 +118,7 @@ function Login() {
             />
           </div>
 
-          <div style={{
+          <div className="login-options-row" style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',

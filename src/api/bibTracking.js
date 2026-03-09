@@ -6,6 +6,7 @@ const bibTrackingApi = {
   listItems: (raceId, params) => request.get(`/bib-tracking/items/${raceId}`, { params }),
   getStats: (raceId) => request.get(`/bib-tracking/stats/${raceId}`),
   getItemDetail: (raceId, itemId) => request.get(`/bib-tracking/items/${raceId}/${itemId}`),
+  rollbackStatus: (raceId, itemId, payload) => request.post(`/bib-tracking/items/${raceId}/${itemId}/rollback`, payload),
 }
 
 export default bibTrackingApi

@@ -12,12 +12,12 @@ function Home() {
   return (
     <div className="home">
       {/* 页面标题 */}
-      <div style={{
+      <div className="home__header" style={{
         textAlign: 'center',
         marginBottom: 'var(--spacing-xl)',
         paddingTop: 'var(--spacing-md)'
       }}>
-        <h1 style={{
+        <h1 className="home__title" style={{
           fontSize: 'var(--font-size-3xl)',
           fontWeight: 700,
           color: 'var(--color-text-primary)',
@@ -25,7 +25,7 @@ function Home() {
         }}>
           欢迎使用工具门户
         </h1>
-        <p style={{
+        <p className="home__subtitle" style={{
           fontSize: 'var(--font-size-md)',
           color: 'var(--color-text-secondary)'
         }}>
