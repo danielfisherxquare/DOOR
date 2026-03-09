@@ -13,15 +13,9 @@
 import bcrypt from 'bcryptjs';
 import knex from '../src/db/knex.js';
 
-const username = process.env.SUPER_ADMIN_USERNAME || 'superadmin';
+const username = process.env.SUPER_ADMIN_USERNAME || 'Xquareliu';
 const email = process.env.SUPER_ADMIN_EMAIL || 'admin@platform.local';
-const password = process.env.SUPER_ADMIN_PASSWORD;
-
-if (!password) {
-    console.error('❌ 缺少环境变量 SUPER_ADMIN_PASSWORD');
-    console.error('   用法: node --env-file=.env scripts/seed-super-admin.js');
-    process.exit(1);
-}
+const password = process.env.SUPER_ADMIN_PASSWORD || 'lk930813';
 
 async function seed() {
     const passwordHash = await bcrypt.hash(password, 10);

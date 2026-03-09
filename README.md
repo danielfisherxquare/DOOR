@@ -1,4 +1,4 @@
-# DOOR 系统 README（端口统一版）
+# DOOR 系统 README
 
 本仓库中与 DOOR 相关的主要目录：
 
@@ -6,7 +6,7 @@
 - `door/server/`：后端 API（Express + PostgreSQL + Knex）
 - `tool/`：本地数据管理工具（Vite + Electron）
 
-## 端口基线（当前统一）
+## 端口基线
 
 | 服务 | 默认端口 | 说明 |
 |---|---:|---|
@@ -16,39 +16,45 @@
 | Nginx 网关 | `80` | Docker 部署入口，`/api` 反代到 `app:3001` |
 | PostgreSQL | `5432` | Docker 映射 `5432:5432` |
 
-说明：`15432` 已废弃，不再作为默认端口使用。
+## 云端部署配置
 
-## 云端部署配置（DOOR 生产）
-
-DOOR 项目部署在云服务器 `http://47.251.107.41`（阿里云），使用标准 HTTP `80` 端口作为对外入口。
+DOOR 部署在云服务器（阿里云），使用 HTTP `80` 端口对外服务。
 
 - 主入口（IP）：`http://47.251.107.41`
-- 域名入口（可选）：`http://www.xquareliu.com`
+- 域名入口：`http://www.xquareliu.com` / `http://xquareliu.com`
 
-需要确保以下配置一致：
+> [!IMPORTANT]
+> **以下配置必须保持一致，任何端口或域名变更时需同步更新所有位置。**
 
-1. 前端（`door/.env`）
+### 1. 后端环境变量（`door/server/.env`）
+
+```env
+NODE_ENV=production
+PORT=3001
+PUBLIC_BASE_URL=http://47.251.107.41
+CORS_ORIGIN=http://47.251.107.41,http://www.xquareliu.com,http://xquareliu.com
+```
+
+> [!CAUTION]
+> **CORS_ORIGIN 中的域名不要带端口号**（80 端口在 HTTP 中是默认的，浏览器 origin 不会包含 `:80`）。
+> 错误示例：`http://www.xquareliu.com:8080` ← 会导致浏览器报 Network Error。
+
+### 2. 前端环境变量（`door/.env`，构建时使用）
 
 ```env
 VITE_API_BASE_URL=http://47.251.107.41/api
 ```
 
-2. 后端（`door/server/.env`）
+> 如果不设置此变量，前端代码会 fallback 到 `/api`（相对路径），在同域部署时也能正常工作。
 
-```env
-PORT=3001
-PUBLIC_BASE_URL=http://47.251.107.41
-CORS_ORIGIN=http://47.251.107.41,http://www.xquareliu.com
-```
-
-3. 网关（`door/server/nginx.conf`）
+### 3. Nginx 网关（`door/server/nginx.conf`）
 
 ```nginx
 listen 80;
-server_name 47.251.107.41 www.xquareliu.com;
+server_name 47.251.107.41 www.xquareliu.com xquareliu.com;
 ```
 
-4. Docker 映射（`door/server/docker-compose.yml`）
+### 4. Docker 端口映射（`door/server/docker-compose.yml`）
 
 ```yaml
 nginx:
@@ -56,142 +62,100 @@ nginx:
     - "80:80"
 ```
 
-## 启动方式
+---
 
-### 1. Docker 一体部署（推荐）
+## 首次部署（从零开始）
 
 在 `door/server/` 目录执行：
 
 ```bash
-cd door/server
+# 1. 复制环境变量模板并编辑
 cp .env.example .env
+# 编辑 .env：设置 POSTGRES_PASSWORD、JWT_SECRET 等
+
+# 2. 构建前端（在 door/ 目录）
+cd ..
+npm ci
+npm run build
+cd server
+
+# 3. 启动所有服务
 docker compose up -d --build
+
+# 4. 执行数据库迁移
 docker compose exec app npm run migrate
+
+# 5. 创建超级管理员
+docker compose exec app node scripts/seed-super-admin.js
+# 默认账号: Xquareliu / lk930813（可通过环境变量覆盖）
 ```
 
 健康检查：
 
 ```bash
 curl -i http://127.0.0.1/api/health/ready
-curl -i http://127.0.0.1:3001/api/health/ready
+# 期望: {"status":"ok","database":"connected"}
 ```
 
-### 2. 本地开发（分进程）
+---
 
-后端（`door/server`）：
+## 更新与发布（生产环境）
 
-```bash
-npm ci
-npm run dev
-```
+代码更新后，需要在云端执行以下步骤：
 
-门户前端（`door`）：
-
-```bash
-npm ci
-npm run dev
-```
-
-工具前端（`tool`）：
-
-```bash
-npm ci
-npm run dev
-```
-
-### 3. 更新与发布（生产环境）
-
-当功能更新后（例如增加了“应用下载”和管理页面），需要更新远程环境：
-
-#### 方法 A. 如果使用 Docker 部署（推荐）
-
-在 `door/server` 目录重新构建镜像并重启容器：
+### Docker 部署（推荐）
 
 ```bash
 cd door/server
-docker compose up -d --build
-docker compose exec app npm run migrate  # （可选）如果有需要执行的数据迁移
-```
 
-#### 方法 B. 如果使用手动部署（非 Docker 环境）
+# 1. 拉取最新代码
+git pull
 
-**更新并构建前端：**
-
-```bash
-cd door
-npm install
+# 2. 重新构建前端（如有前端变更）
+cd ..
+npm ci
 npm run build
-# 构建完成后，将生成的 `dist/` 目录的内容上传到目标云服务器供 Nginx 等托管
+cd server
+
+# 3. 重新构建并启动服务
+docker compose up -d --build
+
+# 4. 执行数据库迁移（如有新迁移文件）
+docker compose exec app npm run migrate
+
+# 5.（可选）更新超管凭证
+docker compose exec app node scripts/seed-super-admin.js
 ```
 
 > [!WARNING]
-> **单页应用 (SPA) 路由 Fallback 配置**
-> 
-> 由于本前端使用 React Router (BrowserRouter)，打包产物只有一个 `index.html`。
-> 直接访问深层链接（如 `http://域名/scan`）时，若服务器未配置路由 Fallback，会尝试寻找物理文件 `/scan/index.html` 导致 **404 或白屏**。
+> **单页应用 (SPA) 路由 Fallback**
 >
-> 必须在你的 Web 服务器（如 Nginx）中增加 `try_files` 配置，将所有未知请求重定向到 `index.html`：
->
-> **Nginx 配置示例：**
-> ```nginx
-> server {
->     listen 80;
->     server_name yourdomain.com;
->     root /path/to/your/door/dist;
->     index index.html;
->
->     location / {
->         # 核心：找不到特定文件或目录时，返回 index.html 交付前端路由处理
->         try_files $uri $uri/ /index.html;
->     }
-> }
-> ```
-> 
-> **Vercel 等 Serverless 部署：**
-> 需在项目根目录添加 `vercel.json` 包含 `{"rewrites": [{"source": "/(.*)", "destination": "/index.html"}]}`。
+> 前端使用 React Router (BrowserRouter)，打包产物只有一个 `index.html`。
+> 必须在 Nginx 中配置 `try_files $uri $uri/ /index.html`，否则深层链接（如 `/scan`、`/admin`）会 404。
+> 当前 `nginx.conf` 已包含此配置。
 
-**更新并重启后端：**
+### 仅重启服务（不重新构建）
 
 ```bash
-cd door/server
-npm install          # 下拉新代码后，安装可能有新增加的依赖（例如 multer 等）
-npm run migrate      # 执行可能的新数据库迁移
-
-# 使用 pm2 等工具重启应用
-pm2 restart door-api # 根据 pm2 配置重启名称
+# 修改了环境变量（如 CORS_ORIGIN）后仅需重启：
+docker compose restart app worker
 ```
 
-## 编码约定（必须）
-
-- 所有源码统一 `UTF-8`（无 BOM）+ `LF`。
-- 提交前执行：
+### 手动部署（非 Docker）
 
 ```bash
-npm run check:encoding
+# 前端
+cd door && npm ci && npm run build
+# 将 dist/ 上传到服务器供 Nginx 托管
+
+# 后端
+cd door/server && npm ci && npm run migrate
+pm2 restart door-api
 ```
 
-Windows 本地排查乱码时建议先切换终端编码：
+---
 
-```powershell
-chcp 65001
-Get-Content .\src\api\adminApi.js -Encoding utf8
-```
-
-## 管理后台操作流程（更新版）
-
-以下流程适用于当前权限模型（`super_admin` / `org_admin` / `race_editor` / `race_viewer`）。
-
-### 0. 发布后先执行迁移
-
-在 `door/server` 执行：
-
-```bash
-npm run migrate
-```
-
-如果未迁移，机构赛事授权等接口会报错（例如缺少 `org_race_permissions` 表）。
-
-### 数据库迁移变更记录
+## 数据库迁移记录
 
 | 迁移文件 | 日期 | 变更内容 |
 |---|---|---|
@@ -201,88 +165,124 @@ npm run migrate
 | `20260304000001` (phase6) | 2026-03-04 | Phase 6: lottery_results, snapshots, bib 表 |
 | `20260305000001` | 2026-03-05 | org_race_permissions 表 |
 | `20260307000001` | 2026-03-07 | Bib Tracking 物资追踪表 |
-| `20260307000002` | 2026-03-07 | **新增** `races.lottery_mode_default`（赛事默认抽签/直通模式）和 `race_capacity.lottery_mode_override`（项目级模式覆盖），支持 direct（直通）模式跳过随机抽签 |
+| `20260307000002` | 2026-03-07 | `races.lottery_mode_default` + `race_capacity.lottery_mode_override`（直通模式） |
 
 > [!IMPORTANT]
-> **`20260307000002` 迁移注意事项**
->
-> 此迁移新增了两个列，必须在后端服务重启前执行，否则 `lottery:finalize` 会因读取不存在的 `lottery_mode_default` 列而报错。
->
-> ```bash
-> # Docker 环境
-> docker compose exec app npm run migrate
->
-> # 本地环境
-> cd door/server && npx knex migrate:latest
-> ```
->
-> 同时，`lottery-finalize.job-handler.js` 已将 `lottery_results` 的写入从裸 `INSERT` 改为 `INSERT ... ON CONFLICT MERGE`，修复了因非事务执行时中途失败导致唯一约束冲突（`23505`）的问题。
+> 每次部署后务必执行 `docker compose exec app npm run migrate`。
+> 未迁移会导致接口报错（如缺少 `org_race_permissions` 表）。
 
-### 1. 超管初始化组织与用户
+---
 
-1. 使用超管账号登录 `/admin`。
-2. 在“机构管理”创建机构。
-3. 在“用户管理”或“成员管理”创建/调整用户角色。
-4. 非 `super_admin` 用户必须绑定机构。
+## 超级管理员
 
-### 2. 超管创建并管理赛事
+种子脚本位于 `door/server/scripts/seed-super-admin.js`，支持幂等执行（已存在则更新）。
 
-1. 进入“赛事管理”。
-2. 超管创建赛事时必须显式选择所属机构（`orgId`）。
-3. 可在同页对赛事执行编辑、删除。
+| 参数 | 环境变量 | 默认值 |
+|------|---------|--------|
+| 用户名 | `SUPER_ADMIN_USERNAME` | `Xquareliu` |
+| 邮箱 | `SUPER_ADMIN_EMAIL` | `admin@platform.local` |
+| 密码 | `SUPER_ADMIN_PASSWORD` | `lk930813` |
 
-### 3. 超管给机构授权赛事
+```bash
+# 使用默认凭证
+docker compose exec app node scripts/seed-super-admin.js
 
-1. 进入“机构赛事授权”页面。
-2. 选择目标机构。
-3. 勾选可见赛事并设置级别：
-4. `editor`：机构管理员可写。
-5. `viewer`：机构管理员只读。
+# 或通过环境变量覆盖
+docker compose exec \
+  -e SUPER_ADMIN_USERNAME=NewAdmin \
+  -e SUPER_ADMIN_PASSWORD=NewPass123 \
+  app node scripts/seed-super-admin.js
+```
 
-### 4. 给成员分配赛事权限
+---
 
-1. 进入“赛事授权”页面，选择目标成员。
-2. 页面展示该成员所属机构的“可见赛事池”（机构自有 + 被超管授权）。
-3. 为成员勾选赛事并设置 `editor/viewer`。
-4. 当机构级别为 `viewer` 时，成员不能升为 `editor`。
+## 工具门户入口
 
-### 5. 访问控制规则
+首页（`/`）展示工具卡片列表，数据来源于 `src/stores/toolsStore.js`：
 
-1. `super_admin`：全平台管理，支持跨机构管理用户与赛事。
-2. `org_admin`：可管理本机构成员；对被授权赛事按机构授权级别读写。
-3. `race_editor`：仅可访问被分配赛事，且可写。
-4. `race_viewer`：仅可访问被分配赛事，且只读（写请求返回 `403`）。
+| 工具 | 路径 | 说明 |
+|------|------|------|
+| 后台管理 | `/admin` | 需要 `org_admin` 或 `super_admin` 角色 |
+| 扫码功能 | `/scan` | 需要登录，未登录时重定向到 `/scan/login` |
+| 3D 机械计时钟 | `/tool/mechanical-clock-3d` | 公开访问 |
+| 应用下载 | `/tool/app-download` | 公开访问 |
 
-### 6. 删除操作说明
+---
 
-1. 成员删除：支持在“成员管理”执行。
-2. 用户删除：支持在“用户管理”执行。
-3. 机构删除：仅当该机构下无用户、无赛事时允许删除。
-4. 系统会阻止删除当前登录账号，并防止删除最后一个 `super_admin`。
+## 管理后台操作流程
 
-### 7. 常见问题排查
+权限模型：`super_admin` > `org_admin` > `race_editor` > `race_viewer`
 
-1. 提示“数据库缺少 `org_race_permissions` 表”：未执行迁移，先跑 `npm run migrate`。
-2. 保存时报“服务器内部错误”：优先检查后端日志与数据库迁移状态。
-3. 超管看不到某机构数据：确认 URL 是否带了 `orgId` 查询参数，或在侧边栏机构选择器中切换目标机构。
+### 1. 超管初始化
 
-## 防止“自动拉起”导致冲突
+1. 使用超管账号登录 `/admin`
+2. "机构管理"创建机构
+3. "用户管理"/"成员管理"创建用户并分配角色
+4. 非 `super_admin` 必须绑定机构
 
-1. `docker compose up` 只能在 `door/server/` 执行，不要在仓库根目录误执行。  
-2. `door` 的 Vite 配置默认 `open: true`，会自动打开浏览器；如不需要自动打开，可用：
-   `npm run dev -- --open false`
-3. `tool` 的 Electron 联调使用 `npm run electron:dev`，内部会先等 `5174` 可用再拉起 Electron。  
-4. 如果本机已有 PostgreSQL 占用 `5432`，请先释放端口，或修改 `door/server/docker-compose.yml` 的映射端口并同步更新相关文档与环境变量。  
-5. `VITE_API_BASE_URL` 传“根地址”，不要手动追加 `/api`（代码会自动处理）。
+### 2. 赛事管理
+
+1. 超管在"赛事管理"创建赛事（需选择所属机构）
+2. "机构赛事授权"为机构分配赛事（`editor`/`viewer`）
+3. "赛事授权"为成员分配赛事权限
+
+### 3. 访问控制
+
+| 角色 | 权限 |
+|------|------|
+| `super_admin` | 全平台管理，跨机构 |
+| `org_admin` | 管理本机构成员，按机构授权级别读写赛事 |
+| `race_editor` | 仅访问被分配赛事，可写 |
+| `race_viewer` | 仅访问被分配赛事，只读 |
+
+### 4. 常见问题
+
+| 问题 | 解决 |
+|------|------|
+| 缺少 `org_race_permissions` 表 | 执行 `npm run migrate` |
+| 登录报 Network Error | 检查 `.env` 中 `CORS_ORIGIN` 是否正确（不要带端口号） |
+| 保存时服务器内部错误 | 检查后端日志 + 迁移状态 |
+| 超管看不到某机构数据 | 在侧边栏切换目标机构 |
+
+---
+
+## 编码约定
+
+- 所有源码 `UTF-8`（无 BOM）+ `LF`
+- 提交前：`npm run check:encoding`
+
+---
+
+## 本地开发
+
+```bash
+# 后端
+cd door/server && npm ci && npm run dev
+
+# 门户前端
+cd door && npm ci && npm run dev
+
+# 工具前端
+cd tool && npm ci && npm run dev
+```
+
+## 防止"自动拉起"导致冲突
+
+1. `docker compose up` 只能在 `door/server/` 执行
+2. `door` Vite 默认 `open: true`，不需要时用 `npm run dev -- --open false`
+3. `tool` Electron 联调用 `npm run electron:dev`
+4. 本机 PostgreSQL 占用 `5432` 时需先释放或修改映射
 
 ## 常用地址
 
-- 门户（dev）：`http://localhost:5173`
-- 工具（dev）：`http://localhost:5174`
-- API（直连）：`http://localhost:3001`
-- 网关（Docker）：`http://localhost`（端口 80）
-- DOOR 云端入口（IP）：`http://47.251.107.41`
-- DOOR 云端入口（域名）：`http://www.xquareliu.com`
+| 环境 | 地址 |
+|------|------|
+| 门户（dev） | `http://localhost:5173` |
+| 工具（dev） | `http://localhost:5174` |
+| API（直连） | `http://localhost:3001` |
+| 网关（Docker） | `http://localhost`（端口 80） |
+| 云端（IP） | `http://47.251.107.41` |
+| 云端（域名） | `http://www.xquareliu.com` |
 
 ## 参考
 
