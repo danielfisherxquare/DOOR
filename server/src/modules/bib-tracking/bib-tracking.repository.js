@@ -91,11 +91,7 @@ export async function findActiveByToken(qrToken) {
 
 export async function findActiveByTokenForUpdate(trx, qrToken) {
     return trx('bib_tracking_items as bti')
-        .leftJoin('records as r', 'r.id', 'bti.record_id')
-        .select(
-            'bti.*',
-            'r.name',
-        )
+        .select('bti.*')
         .where('bti.qr_token', qrToken)
         .whereNull('bti.invalidated_at')
         .forUpdate()
