@@ -8,7 +8,7 @@ export default defineConfig({
     open: true,
     proxy: {
       '/api': {
-        target: 'http://47.251.107.41',
+        target: 'https://xquareliu.com',
         changeOrigin: true
       }
     }
