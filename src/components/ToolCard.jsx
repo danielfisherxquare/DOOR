@@ -10,7 +10,7 @@ function ToolCard({ tool }) {
   }
 
   return (
-    <Link to={`/tool/${id}`} className="tool-card">
+    <Link to={tool.path || `/tool/${id}`} className="tool-card">
       <div className="tool-card__icon">
         {icon || '🔧'}
       </div>

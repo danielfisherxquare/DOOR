@@ -3,6 +3,22 @@ import { create } from 'zustand'
 // 模拟工具数据（实际项目中从后台API获取）
 const mockTools = [
   {
+    id: 'admin-portal',
+    name: '后台管理',
+    description: '机构、用户、赛事与授权综合管理平台',
+    icon: '⚙️',
+    status: 'online',
+    path: '/admin'
+  },
+  {
+    id: 'scan-tool',
+    name: '扫码功能',
+    description: '扫码/输入 token 查询号码布发放状态',
+    icon: '📸',
+    status: 'online',
+    path: '/scan'
+  },
+  {
     id: 'mechanical-clock-3d',
     name: '3D 机械计时钟',
     description: '真正的3D段式翻转时钟，每个笔画都是立体六面体，翻转时可见金属侧面',
