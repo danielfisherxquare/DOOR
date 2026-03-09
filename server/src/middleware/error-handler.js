@@ -15,6 +15,14 @@ function normalizeDatabaseError(err) {
         };
     }
 
+    if (err.code === '42703') {
+        return {
+            status: 500,
+            message: '数据库字段缺失，请先执行后端迁移 (npm run migrate)',
+            expose: true,
+        };
+    }
+
     if (err.code === '23505') {
         return {
             status: 409,

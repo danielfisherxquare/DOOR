@@ -1,5 +1,9 @@
 import knex from '../../db/knex.js';
 
+function isMissingUpdatedAtColumnError(err) {
+    return err?.code === '42703' && String(err.message || '').includes('updated_at');
+}
+
 function baseItemScope(orgId) {
     return knex('bib_tracking_items as bti')
         .modify((qb) => {
@@ -63,14 +67,31 @@ export async function insertItem(trx, payload) {
 }
 
 export async function updateItemById(trx, id, patch) {
-    const [row] = await trx('bib_tracking_items')
-        .where({ id })
-        .update({
-            ...patch,
-            updated_at: trx.fn.now(),
-        })
-        .returning('*');
-    return row;
+    const payload = {
+        ...patch,
+        updated_at: trx.fn.now(),
+    };
+
+    try {
+        const [row] = await trx('bib_tracking_items')
+            .where({ id })
+            .update(payload)
+            .returning('*');
+        return row;
+    } catch (err) {
+        // Compatibility fallback for environments where old bib_tracking tables
+        // were created without the audit column. A repair migration will add it.
+        if (!isMissingUpdatedAtColumnError(err)) {
+            throw err;
+        }
+
+        const fallbackPayload = { ...patch };
+        const [row] = await trx('bib_tracking_items')
+            .where({ id })
+            .update(fallbackPayload)
+            .returning('*');
+        return row;
+    }
 }
 
 export async function insertEvent(trx, payload) {
