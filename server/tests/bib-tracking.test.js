@@ -197,7 +197,7 @@ describe('bib tracking routes', () => {
         assert.equal(second.body.data.items[0].qrToken, first.body.data.items[0].qrToken);
 
         const events = await knex('bib_tracking_events').where({ record_id: recordOne.id, event_type: 'registered_for_export' });
-        assert.equal(events.length, 2);
+        assert.equal(events.length, 1);
     });
 
     it('updates active tracking item bib number on re-register', async () => {
@@ -290,9 +290,11 @@ describe('bib tracking routes', () => {
         assert.equal(response.status, 200);
         assert.equal(response.body.data.name, 'Alice Runner');
         assert.equal(response.body.data.allowedAction, 'pickup');
+        assert.equal(response.body.data.nextAction, 'pickup');
+        assert.equal(response.body.data.actionReason, 'ready_for_pickup');
     });
 
-    it('returns 404 for invalidated token', async () => {
+    it('returns an invalidated state for invalidated token', async () => {
         await knex('bib_tracking_items')
             .where({ record_id: recordOne.id })
             .update({ invalidated_at: knex.fn.now() });
@@ -303,7 +305,10 @@ describe('bib tracking routes', () => {
             headers: authHeader('viewer'),
             body: JSON.stringify({ qrToken: item.qr_token }),
         });
-        assert.equal(response.status, 404);
+        assert.equal(response.status, 200);
+        assert.equal(response.body.data.actionReason, 'invalidated');
+        assert.equal(response.body.data.nextAction, null);
+        assert.equal(response.body.data.invalidatedAt !== null, true);
 
         await knex('bib_tracking_items')
             .where({ record_id: recordOne.id })
@@ -320,6 +325,9 @@ describe('bib tracking routes', () => {
         });
         assert.equal(first.status, 200);
         assert.equal(first.body.data.status, 'picked_up');
+        assert.equal(first.body.data.result, 'picked_up_now');
+        assert.equal(first.body.data.actionReason, 'already_picked_up');
+        assert.equal(first.body.data.nextAction, null);
         assert.equal(first.body.data.lastScanBy, editorUserId);
 
         const second = await api('/api/bib-tracking/scan/pickup', {
@@ -329,6 +337,8 @@ describe('bib tracking routes', () => {
         });
         assert.equal(second.status, 200);
         assert.equal(second.body.data.status, 'picked_up');
+        assert.equal(second.body.data.result, 'already_picked_up');
+        assert.equal(second.body.data.actionReason, 'already_picked_up');
 
         const events = await knex('bib_tracking_events').where({ record_id: recordOne.id, event_type: 'picked_up_by_scan' });
         assert.equal(events.length, 1);

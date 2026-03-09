@@ -14,6 +14,14 @@ services:
       interval: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    command: [ "redis-server", "--save", "", "--appendonly", "no" ]
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      retries: 5
+
   app:
     build: .
     command: [ "node", "src/index.js" ]
@@ -23,12 +31,15 @@ services:
       DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
       NODE_ENV: ${NODE_ENV:-development}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       # Optional runtime config (recommended in production)
       CORS_ORIGIN: ${CORS_ORIGIN:-}
       DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-false}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://www.xquareliu.com}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   worker:
@@ -38,10 +49,13 @@ services:
       DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
       NODE_ENV: ${NODE_ENV:-development}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-false}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://www.xquareliu.com}
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   nginx:

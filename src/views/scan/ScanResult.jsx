@@ -9,6 +9,33 @@ const STATUS_LABELS = {
   finished: '已完赛',
 }
 
+const INFO_STYLES = {
+  success: { color: '#166534', background: '#DCFCE7', border: '1px solid #86EFAC' },
+  neutral: { color: '#334155', background: '#F8FAFC', border: '1px solid #CBD5E1' },
+  error: { color: '#991B1B', background: '#FEF2F2', border: '1px solid #FECACA' },
+}
+
+function getInfoState(item) {
+  if (!item) return null
+
+  if (item.result === 'picked_up_now') {
+    return { tone: 'success', message: '已确认领取。' }
+  }
+
+  switch (item.actionReason) {
+    case 'already_picked_up':
+      return { tone: 'success', message: '该号码布已领取，无需重复操作。' }
+    case 'already_checked_in':
+      return { tone: 'neutral', message: '该号码布已检录，不能再做领取确认。' }
+    case 'already_finished':
+      return { tone: 'neutral', message: '该号码布已完赛，不能再做领取确认。' }
+    case 'invalidated':
+      return { tone: 'error', message: '该二维码已失效，请联系工作人员重新生成。' }
+    default:
+      return null
+  }
+}
+
 function ScanResult() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -16,25 +43,29 @@ function ScanResult() {
   const [item, setItem] = useState(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
+  const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
     if (!token) {
+      setItem(null)
       setLoading(false)
-      setError('缺少二维码 token')
+      setLoadError('缺少二维码 token')
       return
     }
 
     let cancelled = false
     setLoading(true)
-    setError('')
+    setItem(null)
+    setLoadError('')
+    setSubmitError('')
 
     bibTrackingApi.resolveScan(token)
       .then((response) => {
         if (!cancelled) setItem(response.data)
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message || '二维码无效或已失效')
+        if (!cancelled) setLoadError(err.message || '二维码无效或已失效')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -47,16 +78,18 @@ function ScanResult() {
 
   const handlePickup = async () => {
     setSubmitting(true)
-    setError('')
+    setSubmitError('')
     try {
       const response = await bibTrackingApi.pickup(token)
-      setItem((current) => current ? { ...current, ...response.data, allowedAction: 'none' } : current)
+      setItem((current) => current ? { ...current, ...response.data } : current)
     } catch (err) {
-      setError(err.message || '领取更新失败')
+      setSubmitError(err.message || '领取更新失败')
     } finally {
       setSubmitting(false)
     }
   }
+
+  const infoState = getInfoState(item)
 
   return (
     <div style={{ background: '#fff', borderRadius: 24, padding: 20, boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)', display: 'grid', gap: 16 }}>
@@ -66,7 +99,7 @@ function ScanResult() {
       </div>
 
       {loading && <div>正在读取二维码状态...</div>}
-      {!loading && error && <div style={{ color: '#DC2626' }}>{error}</div>}
+      {!loading && loadError && <div style={{ color: '#DC2626' }}>{loadError}</div>}
 
       {!loading && item && (
         <>
@@ -87,13 +120,19 @@ function ScanResult() {
             </div>
           </div>
 
-          {item.allowedAction === 'pickup' ? (
+          {submitError && <div style={{ color: '#DC2626' }}>{submitError}</div>}
+
+          {infoState && (
+            <div style={{ borderRadius: 14, padding: '12px 14px', fontSize: 14, ...INFO_STYLES[infoState.tone] }}>
+              {infoState.message}
+            </div>
+          )}
+
+          {item.nextAction === 'pickup' ? (
             <button className="btn btn--primary" onClick={handlePickup} disabled={submitting}>
               {submitting ? '提交中...' : '确认已领取'}
             </button>
-          ) : (
-            <div style={{ color: '#475569', fontSize: 14 }}>当前状态不允许执行领取操作。</div>
-          )}
+          ) : null}
         </>
       )}
 

@@ -66,6 +66,7 @@ function ScanHome() {
   const readerRef = useRef(null)
   const controlsRef = useRef(null)
   const scanningRef = useRef(false)
+  const lastDetectedRef = useRef({ token: '', at: 0 })
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [manualToken, setManualToken] = useState(searchParams.get('t') || '')
@@ -78,7 +79,9 @@ function ScanHome() {
     const preset = searchParams.get('t')
     if (preset) {
       navigate(`/scan/result?t=${encodeURIComponent(preset)}`, { replace: true })
+      return
     }
+    scanningRef.current = false
   }, [navigate, searchParams])
 
   // 清理：组件卸载时停止扫码
@@ -87,6 +90,7 @@ function ScanHome() {
       controlsRef.current?.stop()
       readerRef.current = null
       controlsRef.current = null
+      scanningRef.current = false
     }
   }, [])
 
@@ -94,9 +98,27 @@ function ScanHome() {
     controlsRef.current?.stop()
     controlsRef.current = null
     readerRef.current = null
+    scanningRef.current = false
     setCameraState('idle')
     setCameraError('')
   }, [])
+
+  const handleDetectedToken = useCallback((token) => {
+    if (!token) return
+
+    const now = Date.now()
+    const lastDetected = lastDetectedRef.current
+    if (lastDetected.token === token && now - lastDetected.at < 1000) {
+      return
+    }
+
+    lastDetectedRef.current = { token, at: now }
+    scanningRef.current = true
+    controlsRef.current?.stop()
+    controlsRef.current = null
+    readerRef.current = null
+    navigate(`/scan/result?t=${encodeURIComponent(token)}`)
+  }, [navigate])
 
   const startScanning = useCallback(async () => {
     // 环境检测
@@ -109,6 +131,7 @@ function ScanHome() {
 
     setCameraState('requesting')
     setCameraError('')
+    scanningRef.current = false
 
     try {
       // @zxing/browser 内部会自己调用 getUserMedia，
@@ -120,12 +143,10 @@ function ScanHome() {
       const controls = await reader.decodeFromVideoDevice(
         undefined,           // deviceId: undefined = 让库自己选择（优先后置摄像头）
         videoRef.current,    // 已经挂载好的 video 元素
-        (result, error) => {
+        (result) => {
           if (result && !scanningRef.current) {
             const token = extractToken(result.getText())
-            if (!token) return
-            scanningRef.current = true
-            navigate(`/scan/result?t=${encodeURIComponent(token)}`)
+            handleDetectedToken(token)
           }
           // NotFoundException 是正常的"当前帧未识别到二维码"，忽略即可
         }
@@ -146,9 +167,7 @@ function ScanHome() {
           const controls = await reader.decodeFromStream(stream, videoRef.current, (result) => {
             if (result && !scanningRef.current) {
               const token = extractToken(result.getText())
-              if (!token) return
-              scanningRef.current = true
-              navigate(`/scan/result?t=${encodeURIComponent(token)}`)
+              handleDetectedToken(token)
             }
           })
           controlsRef.current = controls
@@ -165,7 +184,7 @@ function ScanHome() {
       setCameraState('error')
       setCameraError(getCameraErrorMessage(err))
     }
-  }, [navigate])
+  }, [handleDetectedToken])
 
   const handleManualSubmit = (event) => {
     event.preventDefault()
@@ -253,12 +272,6 @@ function ScanHome() {
           )}
         </div>
 
-        {/* 调试信息（生产环境可删除） */}
-        <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 8, fontFamily: 'monospace' }}>
-          状态: {cameraState}
-          {' | '}安全上下文: {typeof window !== 'undefined' ? String(window.isSecureContext) : '?'}
-          {' | '}协议: {typeof location !== 'undefined' ? location.protocol : '?'}
-        </div>
       </div>
 
       <form onSubmit={handleManualSubmit} style={{ background: '#fff', borderRadius: 24, padding: 16, boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)', display: 'grid', gap: 12 }}>
