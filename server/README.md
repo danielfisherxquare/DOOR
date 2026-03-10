@@ -87,6 +87,21 @@ docker compose exec \
    ```
 2. **前后端同时重启部署**（前后端的 Event Tools 函数已解耦独立，但通信枚举已严格统一，必须一同上线以免 UI 异常）。
 
+### Schedule Management (2026-03-09 更新)
+
+本次引入了全平台的行程与任务管理功能（包含大屏里程碑提醒和管理后台 OmniOutliner 视图）。涉及新表的前置创建，未执行迁移将引发 `Project not found` 或类似外键依赖的报错。
+
+1. **执行建表迁移**（新增 `projects` 与 `project_tasks` 关联表）：
+   ```bash
+   # 本地模式
+   npm run migrate
+
+   # Docker 模式
+   docker compose exec app npm run migrate
+   ```
+2. **验证创建**：
+   在执行后，管理后台“项目计划”菜单应能正常打开并支持保存。
+
 ## 常见问题
 
 1. `ECONNREFUSED 127.0.0.1:15432`  

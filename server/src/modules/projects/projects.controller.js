@@ -18,7 +18,7 @@ export async function getProjects(req, res, next) {
 export async function getProjectById(req, res, next) {
     try {
         const project = await knex('projects').where({ id: req.params.id }).first();
-        if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+        if (!project) return res.status(404).json({ success: false, message: 'Project not found' });
         res.json({ success: true, data: project });
     } catch (err) {
         next(err);
@@ -28,12 +28,12 @@ export async function getProjectById(req, res, next) {
 export async function createProject(req, res, next) {
     try {
         const { name, description, race_id } = req.body;
-        if (!name) return res.status(400).json({ success: false, error: 'Name is required' });
+        if (!name) return res.status(400).json({ success: false, message: '名称是必填项' });
 
         const [project] = await knex('projects').insert({
             name,
             description,
-            race_id
+            race_id: race_id || null
         }).returning('*');
         res.status(201).json({ success: true, data: project });
     } catch (err) {
@@ -46,9 +46,9 @@ export async function updateProject(req, res, next) {
         const { name, description, race_id } = req.body;
         const [project] = await knex('projects')
             .where({ id: req.params.id })
-            .update({ name, description, race_id, updated_at: knex.fn.now() })
+            .update({ name, description, race_id: race_id || null, updated_at: knex.fn.now() })
             .returning('*');
-        if (!project) return res.status(404).json({ success: false, error: 'Project not found' });
+        if (!project) return res.status(404).json({ success: false, message: '项目未找到' });
         res.json({ success: true, data: project });
     } catch (err) {
         next(err);
@@ -58,7 +58,7 @@ export async function updateProject(req, res, next) {
 export async function deleteProject(req, res, next) {
     try {
         const deleted = await knex('projects').where({ id: req.params.id }).del();
-        if (!deleted) return res.status(404).json({ success: false, error: 'Project not found' });
+        if (!deleted) return res.status(404).json({ success: false, message: '项目未找到' });
         res.json({ success: true, data: null });
     } catch (err) {
         next(err);
@@ -82,7 +82,7 @@ export async function createTask(req, res, next) {
     try {
         const { title, parent_id, status, start_date, end_date, is_milestone, notes, sort_order } = req.body;
         const project_id = req.params.projectId;
-        if (!title) return res.status(400).json({ success: false, error: 'Title is required' });
+        if (!title) return res.status(400).json({ success: false, message: '标题是必填项' });
 
         const [task] = await knex('project_tasks').insert({
             project_id,
@@ -120,7 +120,7 @@ export async function updateTask(req, res, next) {
             .update(updateData)
             .returning('*');
 
-        if (!task) return res.status(404).json({ success: false, error: 'Task not found' });
+        if (!task) return res.status(404).json({ success: false, message: '任务未找到' });
         res.json({ success: true, data: task });
     } catch (err) {
         next(err);
@@ -132,7 +132,7 @@ export async function deleteTask(req, res, next) {
         const deleted = await knex('project_tasks')
             .where({ id: req.params.taskId, project_id: req.params.projectId })
             .del();
-        if (!deleted) return res.status(404).json({ success: false, error: 'Task not found' });
+        if (!deleted) return res.status(404).json({ success: false, message: '任务未找到' });
         res.json({ success: true, data: null });
     } catch (err) {
         next(err);

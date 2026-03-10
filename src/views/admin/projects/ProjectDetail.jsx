@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
 import TreeGrid from '../../../components/projects/TreeGrid';
+import racesApi from '../../../api/races';
 
 export default function ProjectDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
     const [project, setProject] = useState(null);
     const [saving, setSaving] = useState(false);
+    const [availableRaces, setAvailableRaces] = useState([]);
 
     useEffect(() => {
         if (id !== 'new') {
@@ -19,6 +21,12 @@ export default function ProjectDetail() {
         } else {
             setProject({ name: '', description: '', race_id: '' });
         }
+
+        racesApi.getAll().then(res => {
+            if (res.success) {
+                setAvailableRaces(res.data || []);
+            }
+        }).catch(err => console.error('Failed to load races', err));
     }, [id]);
 
     const handleSave = async () => {
@@ -39,7 +47,7 @@ export default function ProjectDetail() {
                     navigate(`/admin/projects/${data.data.id}`);
                 }
             } else {
-                alert('保存失败: ' + data.error);
+                alert('保存失败: ' + (data.message || data.error || '未知错误'));
             }
         } catch (err) {
             console.error(err);
@@ -70,14 +78,18 @@ export default function ProjectDetail() {
                     />
                 </div>
                 <div style={{ marginBottom: 24 }}>
-                    <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: '#374151' }}>关联赛事ID (选填)</label>
-                    <input
+                    <label style={{ display: 'block', marginBottom: 8, fontWeight: 500, color: '#374151' }}>关联赛事 (选填)</label>
+                    <select
                         className="input"
                         value={project.race_id || ''}
                         onChange={e => setProject({ ...project, race_id: e.target.value })}
                         style={{ width: '100%', maxWidth: 400, padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }}
-                        placeholder="输入关联赛事的ID，用于日历同步"
-                    />
+                    >
+                        <option value="">-- 请选择关联赛事 --</option>
+                        {availableRaces.map(race => (
+                            <option key={race.id} value={race.id}>{race.name}</option>
+                        ))}
+                    </select>
                 </div>
 
                 <button
