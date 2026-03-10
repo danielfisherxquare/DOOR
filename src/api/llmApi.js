@@ -1,7 +1,7 @@
 import axios from 'axios'
 import useAuthStore from '../stores/authStore'
 
-const API_BASE = import.meta.env.VITE_API_URL || ''
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 function getAuthHeaders() {
     const token = useAuthStore.getState().token
@@ -17,7 +17,7 @@ export async function uploadPdfTemplate(file) {
     const formData = new FormData()
     formData.append('file', file)
 
-    const res = await axios.post(`${API_BASE}/api/llm/upload-template`, formData, {
+    const res = await axios.post(`${API_BASE}/llm/upload-template`, formData, {
         headers: {
             ...getAuthHeaders(),
             'Content-Type': 'multipart/form-data',
@@ -39,11 +39,11 @@ export async function generateMarathonData(year, model, templateId, onProgress) 
     const token = useAuthStore.getState().token
 
     return new Promise((resolve, reject) => {
-        fetch(`${API_BASE}/api/llm/generate-marathon-data?stream=true`, {
+        fetch(`${API_BASE}/llm/generate-marathon-data?stream=true`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
+                ...getAuthHeaders(),
                 'Accept': 'text/event-stream',
             },
             body: JSON.stringify({ year, model, templateId }),
@@ -90,9 +90,8 @@ export async function generateMarathonData(year, model, templateId, onProgress) 
  * 下载 Word 文件
  */
 export async function downloadWordFile(fileName) {
-    const token = useAuthStore.getState().token
-    const res = await fetch(`${API_BASE}/api/llm/download/${encodeURIComponent(fileName)}`, {
-        headers: { Authorization: `Bearer ${token}` },
+    const res = await fetch(`${API_BASE}/llm/download/${encodeURIComponent(fileName)}`, {
+        headers: getAuthHeaders(),
     })
     if (!res.ok) throw new Error('下载失败')
     const blob = await res.blob()

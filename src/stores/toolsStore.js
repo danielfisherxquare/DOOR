@@ -24,7 +24,7 @@ const mockTools = [
     description: '真正的3D段式翻转时钟，每个笔画都是立体六面体，翻转时可见金属侧面',
     icon: '🕰️',
     status: 'online',
-    apiEndpoint: '/api/tools/mechanical-clock-3d',
+    apiEndpoint: '/tools/mechanical-clock-3d',
     component: 'MechanicalClock3D'
   },
   {
@@ -33,7 +33,7 @@ const mockTools = [
     description: '下载本地马拉松报名数据管理器客户端',
     icon: '📥',
     status: 'online',
-    apiEndpoint: '/api/tools/app-download',
+    apiEndpoint: '/tools/app-download',
     component: 'AppDownload'
   }
 ]
