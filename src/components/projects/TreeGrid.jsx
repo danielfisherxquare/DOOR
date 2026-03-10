@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import projectsApi from '../../../api/projects';
 
 const emptyTask = (projectId, parentId = null) => ({
     title: '',
@@ -18,8 +19,7 @@ export default function TreeGrid({ projectId }) {
 
     const fetchTasks = useCallback(async () => {
         try {
-            const res = await fetch(`/api/projects/${projectId}/tasks`, { credentials: 'include' });
-            const data = await res.json();
+            const data = await projectsApi.getTasks(projectId);
             if (data.success) {
                 setTasks(buildTree(data.data));
             }
@@ -48,13 +48,8 @@ export default function TreeGrid({ projectId }) {
 
     const handleCreateTask = async (parentId = null) => {
         try {
-            const res = await fetch(`/api/projects/${projectId}/tasks`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...emptyTask(projectId, parentId), title: '新任务' }),
-                credentials: 'include'
-            });
-            if (res.ok) {
+            const data = await projectsApi.createTask(projectId, { ...emptyTask(projectId, parentId), title: '新任务' });
+            if (data.success) {
                 fetchTasks();
             }
         } catch (err) {
@@ -64,12 +59,7 @@ export default function TreeGrid({ projectId }) {
 
     const handleUpdateTask = async (taskId, updates) => {
         try {
-            await fetch(`/api/projects/${projectId}/tasks/${taskId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updates),
-                credentials: 'include'
-            });
+            await projectsApi.updateTask(projectId, taskId, updates);
             // Optmistic update
             const updateNode = (list) => {
                 return list.map(t => {
@@ -87,11 +77,8 @@ export default function TreeGrid({ projectId }) {
     const handleDeleteTask = async (taskId) => {
         if (!window.confirm('确定要删除此任务及其子任务吗？')) return;
         try {
-            const res = await fetch(`/api/projects/${projectId}/tasks/${taskId}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-            if (res.ok) fetchTasks();
+            const data = await projectsApi.removeTask(projectId, taskId);
+            if (data.success) fetchTasks();
         } catch (err) {
             console.error(err);
         }

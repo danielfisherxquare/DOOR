@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 
 import TreeGrid from '../../../components/projects/TreeGrid';
 import racesApi from '../../../api/races';
+import projectsApi from '../../../api/projects';
 
 export default function ProjectDetail() {
     const { id } = useParams();
@@ -13,8 +14,7 @@ export default function ProjectDetail() {
 
     useEffect(() => {
         if (id !== 'new') {
-            fetch(`/api/projects/${id}`, { credentials: 'include' })
-                .then(res => res.json())
+            projectsApi.getById(id)
                 .then(data => {
                     if (data.success) setProject(data.data);
                 });
@@ -31,17 +31,11 @@ export default function ProjectDetail() {
 
     const handleSave = async () => {
         setSaving(true);
-        const method = id === 'new' ? 'POST' : 'PUT';
-        const url = id === 'new' ? '/api/projects' : `/api/projects/${id}`;
-
         try {
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(project),
-                credentials: 'include'
-            });
-            const data = await res.json();
+            const data = id === 'new'
+                ? await projectsApi.create(project)
+                : await projectsApi.update(id, project);
+
             if (data.success) {
                 if (id === 'new') {
                     navigate(`/admin/projects/${data.data.id}`);
