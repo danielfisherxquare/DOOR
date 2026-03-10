@@ -14,6 +14,8 @@ import OrgRacePermissionsPage from '../../views/admin/OrgRacePermissionsPage'
 import RaceManagementPage from '../../views/admin/RaceManagementPage'
 import RacePermissionsPage from '../../views/admin/RacePermissionsPage'
 import UserListPage from '../../views/admin/UserListPage'
+import ProjectListPage from '../../views/admin/projects/ProjectListPage'
+import ProjectDetail from '../../views/admin/projects/ProjectDetail'
 
 function AdminLayout() {
     const { user, logout } = useAuthStore()
@@ -71,6 +73,7 @@ function AdminLayout() {
         { path: '/orgs', label: '机构管理', icon: 'O' },
         { path: '/users', label: '用户管理', icon: 'U' },
         { path: '/races', label: '赛事管理', icon: 'R' },
+        { path: '/projects', label: '项目计划', icon: 'P' },
         { path: '/app-manager', label: '应用管理', icon: 'A' },
     ]
 
@@ -197,6 +200,8 @@ function AdminLayout() {
                     <Route path="members" element={<MemberListPage />} />
                     <Route path="members/new" element={<MemberCreatePage />} />
                     <Route path="races" element={<RaceManagementPage />} />
+                    <Route path="projects" element={<ProjectListPage />} />
+                    <Route path="projects/:id" element={<ProjectDetail />} />
                     <Route path="bib-tracking" element={<BibTrackingPage />} />
                     <Route path="org-race-permissions" element={<OrgRacePermissionsPage />} />
                     <Route path="race-permissions" element={<RacePermissionsPage />} />
