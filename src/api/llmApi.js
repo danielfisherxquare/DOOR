@@ -1,9 +1,10 @@
 import axios from 'axios'
+import useAuthStore from '../stores/authStore'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
 function getAuthHeaders() {
-    const token = localStorage.getItem('token')
+    const token = useAuthStore.getState().token
     return { Authorization: `Bearer ${token}` }
 }
 
@@ -35,7 +36,7 @@ export async function uploadPdfTemplate(file) {
  * @returns {Promise<Object>}
  */
 export async function generateMarathonData(year, model, templateId, onProgress) {
-    const token = localStorage.getItem('token')
+    const token = useAuthStore.getState().token
 
     return new Promise((resolve, reject) => {
         fetch(`${API_BASE}/api/llm/generate-marathon-data?stream=true`, {
@@ -89,7 +90,7 @@ export async function generateMarathonData(year, model, templateId, onProgress) 
  * 下载 Word 文件
  */
 export async function downloadWordFile(fileName) {
-    const token = localStorage.getItem('token')
+    const token = useAuthStore.getState().token
     const res = await fetch(`${API_BASE}/api/llm/download/${encodeURIComponent(fileName)}`, {
         headers: { Authorization: `Bearer ${token}` },
     })
