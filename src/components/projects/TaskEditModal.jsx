@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import projectsApi from '../../../api/projects';
+import projectsApi from '../../api/projects';
 
 export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess }) {
     const [payload, setPayload] = useState({

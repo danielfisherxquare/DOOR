@@ -16,6 +16,7 @@ import RacePermissionsPage from '../../views/admin/RacePermissionsPage'
 import UserListPage from '../../views/admin/UserListPage'
 import ProjectListPage from '../../views/admin/projects/ProjectListPage'
 import ProjectDetail from '../../views/admin/projects/ProjectDetail'
+import ReportGeneratorPage from '../../views/admin/ReportGeneratorPage'
 
 function AdminLayout() {
     const { user, logout } = useAuthStore()
@@ -75,6 +76,7 @@ function AdminLayout() {
         { path: '/races', label: '赛事管理', icon: 'R' },
         { path: '/projects', label: '项目计划', icon: 'P' },
         { path: '/app-manager', label: '应用管理', icon: 'A' },
+        { path: '/report-generator', label: '报告生成', icon: 'E' },
     ]
 
     const orgAdminMenus = [
@@ -206,6 +208,7 @@ function AdminLayout() {
                     <Route path="org-race-permissions" element={<OrgRacePermissionsPage />} />
                     <Route path="race-permissions" element={<RacePermissionsPage />} />
                     <Route path="app-manager" element={<AppManagerPage />} />
+                    <Route path="report-generator" element={<ReportGeneratorPage />} />
                 </Routes>
             </main>
 

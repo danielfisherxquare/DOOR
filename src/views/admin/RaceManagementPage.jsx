@@ -350,8 +350,8 @@ function RaceManagementPage() {
                                 value={form.conflictRule}
                                 onChange={(event) => setForm((prev) => ({ ...prev, conflictRule: event.target.value }))}
                             >
-                                <option value="strict">严格 (strict)</option>
-                                <option value="permissive">宽松 (permissive)</option>
+                                <option value="strict">严格</option>
+                                <option value="permissive">宽松</option>
                             </select>
                         </div>
 
@@ -400,7 +400,7 @@ function RaceManagementPage() {
                                         <td style={tdStyle}>{race.location || '-'}</td>
                                         <td style={tdStyle}>{eventCount(race)}</td>
                                         <td style={tdStyle}>{eventTargetTotal(race).toLocaleString()}</td>
-                                        <td style={tdStyle}>{race.conflictRule || 'strict'}</td>
+                                        <td style={tdStyle}>{race.conflictRule === 'permissive' ? '宽松' : '严格'}</td>
                                         <td style={tdStyle}>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <button className="btn btn--ghost btn--sm" onClick={() => handleEdit(race)}>编辑</button>

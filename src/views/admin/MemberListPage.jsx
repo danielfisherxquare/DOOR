@@ -162,13 +162,13 @@ function MemberListPage() {
                                             >
                                                 {isGlobalSuperAdmin ? (
                                                     m.role === 'super_admin'
-                                                        ? <option value="super_admin">super_admin</option>
+                                                        ? <option value="super_admin">超级管理员</option>
                                                         : (
                                                             <>
-                                                                <option value="org_admin">org_admin</option>
-                                                                <option value="race_editor">race_editor</option>
-                                                                <option value="race_viewer">race_viewer</option>
-                                                                <option value="super_admin">super_admin</option>
+                                                                <option value="org_admin">机构管理员</option>
+                                                                <option value="race_editor">赛事编辑</option>
+                                                                <option value="race_viewer">赛事只读</option>
+                                                                <option value="super_admin">超级管理员</option>
                                                             </>
                                                         )
                                                 ) : (

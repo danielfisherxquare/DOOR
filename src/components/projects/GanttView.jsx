@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import projectsApi from '../../../api/projects';
+import projectsApi from '../../api/projects';
 import TaskEditModal from './TaskEditModal';
 
 export default function GanttView({ projectId }) {

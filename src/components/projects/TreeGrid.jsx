@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import projectsApi from '../../../api/projects';
+import projectsApi from '../../api/projects';
 
 const emptyTask = (projectId, parentId = null) => ({
     title: '',
@@ -172,7 +172,7 @@ export default function TreeGrid({ projectId }) {
                             <th style={{ padding: '12px', width: '12%' }}>开始日期</th>
                             <th style={{ padding: '12px', width: '12%' }}>结束日期</th>
                             <th style={{ padding: '12px', width: '5%', textAlign: 'center' }}>里程碑</th>
-                            <th style={{ padding: '12px', width: '18%' }}>时间轴 (Gantt)</th>
+                            <th style={{ padding: '12px', width: '18%' }}>时间轴</th>
                             <th style={{ padding: '12px', width: '10%', textAlign: 'right' }}>操作</th>
                         </tr>
                     </thead>

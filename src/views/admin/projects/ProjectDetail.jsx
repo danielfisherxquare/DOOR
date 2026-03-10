@@ -107,13 +107,13 @@ export default function ProjectDetail() {
                                 onClick={() => setViewMode('list')}
                                 style={{ padding: '6px 16px', borderRadius: 4, border: 'none', background: viewMode === 'list' ? '#fff' : 'transparent', color: viewMode === 'list' ? '#111827' : '#6b7280', fontSize: 14, fontWeight: viewMode === 'list' ? 600 : 400, cursor: 'pointer', boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}
                             >
-                                列表试图 (List)
+                                列表视图
                             </button>
                             <button
                                 onClick={() => setViewMode('gantt')}
                                 style={{ padding: '6px 16px', borderRadius: 4, border: 'none', background: viewMode === 'gantt' ? '#fff' : 'transparent', color: viewMode === 'gantt' ? '#111827' : '#6b7280', fontSize: 14, fontWeight: viewMode === 'gantt' ? 600 : 400, cursor: 'pointer', boxShadow: viewMode === 'gantt' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}
                             >
-                                甘特图 (Gantt)
+                                甘特图
                             </button>
                         </div>
                     </div>
