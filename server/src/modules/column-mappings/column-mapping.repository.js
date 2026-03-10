@@ -1,55 +1,122 @@
-/**
- * Column Mappings Repository — 列映射数据访问层（多租户隔离）
- */
 import knex from '../../db/knex.js';
 import { columnMappingMapper } from '../../db/mappers/column-mappings.js';
 
-/**
- * 获取组织全部映射
- */
-export async function findAllByOrg(orgId) {
-    const rows = await knex('column_mappings')
-        .where({ org_id: orgId })
-        .orderBy('updated_at', 'desc');
+function mapRows(rows) {
     return rows.map(columnMappingMapper.fromDbRow);
 }
 
-/**
- * 批量 UPSERT — ON CONFLICT (org_id, source_column) 更新 target_field_id
- */
-export async function upsertBatch(orgId, mappings) {
-    if (!mappings || mappings.length === 0) return [];
+export async function findByUserScope(orgId, userId) {
+    if (!orgId || !userId) return [];
+    const rows = await knex('column_mappings')
+        .where({ org_id: orgId, user_id: userId })
+        .orderBy([{ column: 'updated_at', order: 'desc' }, { column: 'source_column', order: 'asc' }]);
+    return mapRows(rows);
+}
 
-    const rows = mappings.map((m) => columnMappingMapper.toDbInsert({ ...m, orgId }));
+export async function findByOrgScope(orgId) {
+    if (!orgId) return [];
+    const rows = await knex('column_mappings')
+        .where({ org_id: orgId })
+        .whereNull('user_id')
+        .orderBy([{ column: 'updated_at', order: 'desc' }, { column: 'source_column', order: 'asc' }]);
+    return mapRows(rows);
+}
 
-    // Knex onConflict().merge() 实现 UPSERT
+export async function findEffective(orgId, userId) {
+    if (!orgId) return [];
+
+    let query = knex('column_mappings')
+        .where({ org_id: orgId })
+        .orderByRaw('CASE WHEN user_id IS NULL THEN 1 ELSE 0 END ASC')
+        .orderBy([{ column: 'updated_at', order: 'desc' }, { column: 'source_column', order: 'asc' }]);
+
+    if (userId) {
+        query = query.where(function applyEffectiveScope() {
+            this.where({ user_id: userId }).orWhereNull('user_id');
+        });
+    } else {
+        query = query.whereNull('user_id');
+    }
+
+    const rows = await query;
+    const deduped = [];
+    const seen = new Set();
+    for (const row of rows) {
+        if (seen.has(row.source_column)) continue;
+        seen.add(row.source_column);
+        deduped.push(row);
+    }
+    return mapRows(deduped);
+}
+
+export async function upsertUserBatch(orgId, userId, mappings) {
+    if (!orgId || !userId || !mappings || mappings.length === 0) return [];
+
+    const rows = mappings.map((mapping) => columnMappingMapper.toDbInsert({
+        ...mapping,
+        orgId,
+        userId,
+    }));
+
     await knex('column_mappings')
         .insert(rows)
-        .onConflict(['org_id', 'source_column'])
+        .onConflict(knex.raw('(org_id, user_id, source_column) WHERE user_id IS NOT NULL'))
         .merge({
             target_field_id: knex.raw('EXCLUDED.target_field_id'),
             updated_at: knex.fn.now(),
         });
 
-    return findAllByOrg(orgId);
+    return findByUserScope(orgId, userId);
 }
 
-/**
- * 按 ID 批量删除（带组织隔离）
- */
-export async function deleteByIds(orgId, ids) {
-    if (!ids || ids.length === 0) return 0;
+export async function upsertOrgBatch(orgId, mappings) {
+    if (!orgId || !mappings || mappings.length === 0) return [];
+
+    const rows = mappings.map((mapping) => columnMappingMapper.toDbInsert({
+        ...mapping,
+        orgId,
+        userId: null,
+    }));
+
+    await knex('column_mappings')
+        .insert(rows)
+        .onConflict(knex.raw('(org_id, source_column) WHERE user_id IS NULL'))
+        .merge({
+            target_field_id: knex.raw('EXCLUDED.target_field_id'),
+            updated_at: knex.fn.now(),
+        });
+
+    return findByOrgScope(orgId);
+}
+
+export async function deleteUserByIds(orgId, userId, ids) {
+    if (!orgId || !userId || !ids || ids.length === 0) return 0;
     return knex('column_mappings')
-        .where({ org_id: orgId })
+        .where({ org_id: orgId, user_id: userId })
         .whereIn('id', ids)
         .delete();
 }
 
-/**
- * 清空组织全部映射
- */
-export async function clearByOrg(orgId) {
+export async function deleteOrgByIds(orgId, ids) {
+    if (!orgId || !ids || ids.length === 0) return 0;
     return knex('column_mappings')
         .where({ org_id: orgId })
+        .whereNull('user_id')
+        .whereIn('id', ids)
+        .delete();
+}
+
+export async function clearUserScope(orgId, userId) {
+    if (!orgId || !userId) return 0;
+    return knex('column_mappings')
+        .where({ org_id: orgId, user_id: userId })
+        .delete();
+}
+
+export async function clearOrgScope(orgId) {
+    if (!orgId) return 0;
+    return knex('column_mappings')
+        .where({ org_id: orgId })
+        .whereNull('user_id')
         .delete();
 }
