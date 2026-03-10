@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
 import TreeGrid from '../../../components/projects/TreeGrid';
+import GanttView from '../../../components/projects/GanttView';
 import racesApi from '../../../api/races';
 import projectsApi from '../../../api/projects';
 
@@ -11,6 +12,7 @@ export default function ProjectDetail() {
     const [project, setProject] = useState(null);
     const [saving, setSaving] = useState(false);
     const [availableRaces, setAvailableRaces] = useState([]);
+    const [viewMode, setViewMode] = useState('list');
 
     useEffect(() => {
         if (id !== 'new') {
@@ -98,8 +100,24 @@ export default function ProjectDetail() {
 
             {id !== 'new' && (
                 <div className="neu-card" style={{ padding: 24, background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                    <h3 style={{ fontSize: 18, marginBottom: 16, borderBottom: '1px solid #e5e7eb', paddingBottom: 12 }}>任务管理 (OmniOutliner / Gantt)</h3>
-                    <TreeGrid projectId={id} />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', paddingBottom: 12, marginBottom: 16 }}>
+                        <h3 style={{ fontSize: 18, margin: 0 }}>任务管理</h3>
+                        <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 6, padding: 4 }}>
+                            <button
+                                onClick={() => setViewMode('list')}
+                                style={{ padding: '6px 16px', borderRadius: 4, border: 'none', background: viewMode === 'list' ? '#fff' : 'transparent', color: viewMode === 'list' ? '#111827' : '#6b7280', fontSize: 14, fontWeight: viewMode === 'list' ? 600 : 400, cursor: 'pointer', boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}
+                            >
+                                列表试图 (List)
+                            </button>
+                            <button
+                                onClick={() => setViewMode('gantt')}
+                                style={{ padding: '6px 16px', borderRadius: 4, border: 'none', background: viewMode === 'gantt' ? '#fff' : 'transparent', color: viewMode === 'gantt' ? '#111827' : '#6b7280', fontSize: 14, fontWeight: viewMode === 'gantt' ? 600 : 400, cursor: 'pointer', boxShadow: viewMode === 'gantt' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}
+                            >
+                                甘特图 (Gantt)
+                            </button>
+                        </div>
+                    </div>
+                    {viewMode === 'list' ? <TreeGrid projectId={id} /> : <GanttView projectId={id} />}
                 </div>
             )}
         </div>

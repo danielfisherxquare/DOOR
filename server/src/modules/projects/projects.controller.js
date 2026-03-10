@@ -80,7 +80,7 @@ export async function getTasksByProjectId(req, res, next) {
 
 export async function createTask(req, res, next) {
     try {
-        const { title, parent_id, status, start_date, end_date, is_milestone, notes, sort_order } = req.body;
+        const { title, parent_id, status, start_date, end_date, is_milestone, notes, sort_order, responsible_group } = req.body;
         const project_id = req.params.projectId;
         if (!title) return res.status(400).json({ success: false, message: '标题是必填项' });
 
@@ -93,7 +93,8 @@ export async function createTask(req, res, next) {
             end_date,
             is_milestone: is_milestone || false,
             notes,
-            sort_order: sort_order || 0
+            sort_order: sort_order || 0,
+            responsible_group: responsible_group || null
         }).returning('*');
         res.status(201).json({ success: true, data: task });
     } catch (err) {
@@ -103,7 +104,7 @@ export async function createTask(req, res, next) {
 
 export async function updateTask(req, res, next) {
     try {
-        const { title, parent_id, status, start_date, end_date, is_milestone, notes, sort_order } = req.body;
+        const { title, parent_id, status, start_date, end_date, is_milestone, notes, sort_order, responsible_group } = req.body;
         const updateData = { updated_at: knex.fn.now() };
 
         if (title !== undefined) updateData.title = title;
@@ -114,6 +115,7 @@ export async function updateTask(req, res, next) {
         if (is_milestone !== undefined) updateData.is_milestone = is_milestone;
         if (notes !== undefined) updateData.notes = notes;
         if (sort_order !== undefined) updateData.sort_order = sort_order;
+        if (responsible_group !== undefined) updateData.responsible_group = responsible_group || null;
 
         const [task] = await knex('project_tasks')
             .where({ id: req.params.taskId, project_id: req.params.projectId })

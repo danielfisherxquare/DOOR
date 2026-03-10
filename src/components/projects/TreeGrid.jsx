@@ -4,6 +4,7 @@ import projectsApi from '../../../api/projects';
 const emptyTask = (projectId, parentId = null) => ({
     title: '',
     status: 'TODO',
+    responsible_group: '',
     start_date: '',
     end_date: '',
     is_milestone: false,
@@ -165,13 +166,14 @@ export default function TreeGrid({ projectId }) {
                 <table style={{ minWidth: '1000px', width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 14 }}>
                     <thead>
                         <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                            <th style={{ padding: '12px', width: '30%' }}>任务名称</th>
-                            <th style={{ padding: '12px', width: '10%' }}>状态</th>
+                            <th style={{ padding: '12px', width: '25%' }}>任务名称</th>
+                            <th style={{ padding: '12px', width: '8%' }}>状态</th>
+                            <th style={{ padding: '12px', width: '10%' }}>责任组</th>
                             <th style={{ padding: '12px', width: '12%' }}>开始日期</th>
                             <th style={{ padding: '12px', width: '12%' }}>结束日期</th>
                             <th style={{ padding: '12px', width: '5%', textAlign: 'center' }}>里程碑</th>
-                            <th style={{ padding: '12px', width: '20%' }}>时间轴 (Gantt)</th>
-                            <th style={{ padding: '12px', width: '11%', textAlign: 'right' }}>操作</th>
+                            <th style={{ padding: '12px', width: '18%' }}>时间轴 (Gantt)</th>
+                            <th style={{ padding: '12px', width: '10%', textAlign: 'right' }}>操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -209,6 +211,17 @@ export default function TreeGrid({ projectId }) {
                                         <option value="DONE">已完成</option>
                                         <option value="CANCELLED">已取消</option>
                                     </select>
+                                </td>
+                                <td style={{ padding: '8px 12px' }}>
+                                    <input
+                                        className="input"
+                                        value={row.responsible_group || ''}
+                                        onChange={(e) => handleUpdateTask(row.id, { responsible_group: e.target.value })}
+                                        style={{ width: '100%', padding: '4px 8px', fontSize: 13, border: '1px solid transparent', background: 'transparent' }}
+                                        placeholder="分配给..."
+                                        onFocus={(e) => { e.target.style.background = '#fff'; e.target.style.borderColor = '#d1d5db'; }}
+                                        onBlur={(e) => { e.target.style.background = 'transparent'; e.target.style.borderColor = 'transparent'; }}
+                                    />
                                 </td>
                                 <td style={{ padding: '8px 12px' }}>
                                     <input
