@@ -305,9 +305,39 @@ export async function bulkUpdate(orgId, updates) {
 // ── 清空赛事数据 ──────────────────────────────────────
 
 export async function deleteByRaceId(orgId, raceId) {
-    const query = knex('records').where({ race_id: raceId });
-    if (orgId) query.andWhere({ org_id: orgId });
-    return query.delete();
+    return knex.transaction(async (trx) => {
+        // 1. 删除 Records
+        const recordsQuery = trx('records').where({ race_id: raceId });
+        if (orgId) recordsQuery.andWhere({ org_id: orgId });
+        const deletedRecordsCount = await recordsQuery.delete();
+
+        // 2. 删除 快照 (预抽签、预排号)
+        const snapshotsQuery = trx('pipeline_snapshots').where({ race_id: raceId });
+        if (orgId) snapshotsQuery.andWhere({ org_id: orgId });
+        await snapshotsQuery.delete(); // DB cascade will delete items
+
+        // 3. 删除 抽签结果
+        const lotteryResultsQuery = trx('lottery_results').where({ race_id: raceId });
+        if (orgId) lotteryResultsQuery.andWhere({ org_id: orgId });
+        await lotteryResultsQuery.delete();
+
+        // 4. 删除 排号结果
+        const bibAssignmentsQuery = trx('bib_assignments').where({ race_id: raceId });
+        if (orgId) bibAssignmentsQuery.andWhere({ org_id: orgId });
+        await bibAssignmentsQuery.delete();
+
+        // 5. 删除 名单 (黑白名单等)
+        const lotteryListsQuery = trx('lottery_lists').where({ race_id: raceId });
+        if (orgId) lotteryListsQuery.andWhere({ org_id: orgId });
+        await lotteryListsQuery.delete();
+
+        // 6. 重置 服装库存 (已用量归零，保留实际库存)
+        const clothingQuery = trx('clothing_limits').where({ race_id: raceId });
+        if (orgId) clothingQuery.andWhere({ org_id: orgId });
+        await clothingQuery.update({ used_count: 0 });
+
+        return deletedRecordsCount;
+    });
 }
 
 // ── 流式导出（返回 Knex stream 用于 NDJSON）──────────
