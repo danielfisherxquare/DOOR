@@ -48,29 +48,47 @@ export default function TreeGrid({ projectId }) {
 
     const handleCreateTask = async (parentId = null) => {
         try {
-            const data = await projectsApi.createTask(projectId, { ...emptyTask(projectId, parentId), title: '新任务' });
+            const payload = { ...emptyTask(projectId, parentId), title: '新任务' };
+            // Ensure empty strings for dates are sent as null or omitted to avoid DB type errors
+            if (!payload.start_date) delete payload.start_date;
+            if (!payload.end_date) delete payload.end_date;
+
+            const data = await projectsApi.createTask(projectId, payload);
             if (data.success) {
                 fetchTasks();
+            } else {
+                alert('添加任务失败: ' + (data.message || data.error || '未知错误'));
             }
         } catch (err) {
             console.error(err);
+            alert('添加任务时发生网络错误');
         }
     };
 
     const handleUpdateTask = async (taskId, updates) => {
         try {
-            await projectsApi.updateTask(projectId, taskId, updates);
-            // Optmistic update
-            const updateNode = (list) => {
-                return list.map(t => {
-                    if (t.id === taskId) return { ...t, ...updates };
-                    if (t.children) return { ...t, children: updateNode(t.children) };
-                    return t;
-                });
-            };
-            setTasks(updateNode(tasks));
+            const payload = { ...updates };
+            if (payload.start_date === '') payload.start_date = null;
+            if (payload.end_date === '') payload.end_date = null;
+
+            const data = await projectsApi.updateTask(projectId, taskId, payload);
+
+            if (data.success) {
+                // Optimistic update
+                const updateNode = (list) => {
+                    return list.map(t => {
+                        if (t.id === taskId) return { ...t, ...payload };
+                        if (t.children) return { ...t, children: updateNode(t.children) };
+                        return t;
+                    });
+                };
+                setTasks(updateNode(tasks));
+            } else {
+                alert('更新任务失败: ' + (data.message || data.error || '未知错误'));
+            }
         } catch (err) {
             console.error(err);
+            alert('更新任务时发生网络错误');
         }
     };
 
@@ -78,9 +96,14 @@ export default function TreeGrid({ projectId }) {
         if (!window.confirm('确定要删除此任务及其子任务吗？')) return;
         try {
             const data = await projectsApi.removeTask(projectId, taskId);
-            if (data.success) fetchTasks();
+            if (data.success) {
+                fetchTasks();
+            } else {
+                alert('删除失败: ' + (data.message || data.error || '未知错误'));
+            }
         } catch (err) {
             console.error(err);
+            alert('删除任务时发生网络错误');
         }
     };
 

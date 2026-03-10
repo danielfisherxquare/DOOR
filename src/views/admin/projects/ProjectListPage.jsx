@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import projectsApi from '../../../api/projects';
 
 export default function ProjectListPage() {
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch('/api/projects', { credentials: 'include' })
-            .then(res => res.json())
+        projectsApi.getAll()
             .then(data => {
                 if (data.success) setProjects(data.data);
                 setLoading(false);
             })
             .catch(err => {
-                console.error(err);
+                console.error('Failed to load projects:', err);
                 setLoading(false);
             });
     }, []);
