@@ -21,7 +21,6 @@ import orgRoutes from './modules/org/org.routes.js';
 import toolsRoutes from './modules/tools/tools.routes.js';
 import projectsRoutes from './modules/projects/projects.routes.js';
 import calendarRoutes from './modules/calendar/calendar.routes.js';
-import llmRoutes from './modules/llm/llm.routes.js';
 
 const app = express();
 
@@ -70,7 +69,6 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/org', orgRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/calendar', calendarRoutes);
-app.use('/api/llm', llmRoutes);
 
 app.use(errorHandler);
 
