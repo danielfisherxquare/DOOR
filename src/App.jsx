@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import Home from './views/Home'
+import ReimbursementView from './views/ReimbursementView'
 import Login from './views/Login'
 import ForgotPassword from './views/ForgotPassword'
 import ResetPassword from './views/ResetPassword'
@@ -23,6 +24,7 @@ function PortalLayout() {
       <main className="main-content">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/reimbursement" element={<ReimbursementView />} />
           <Route path="/tool/:id" element={<ToolDetail />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />

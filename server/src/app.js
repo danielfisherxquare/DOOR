@@ -70,6 +70,9 @@ app.use('/api/org', orgRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/calendar', calendarRoutes);
 
+import ocrRoutes from './modules/ocr/ocr.routes.js';
+app.use('/api/ocr', ocrRoutes);
+
 app.use(errorHandler);
 
 export default app;
