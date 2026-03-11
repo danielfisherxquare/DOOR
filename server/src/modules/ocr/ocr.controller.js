@@ -30,7 +30,9 @@ export async function processInvoice(req, res, next) {
 
         res.json({ success: true, data: result });
     } catch (error) {
-        next(error);
+        console.error('[OCR Invoice Error]', error?.response?.data || error.message, error.stack);
+        const detail = error?.response?.data?.error?.message || error?.response?.data?.message || error.message || String(error);
+        return res.status(502).json({ success: false, message: `发票识别 LLM 调用失败: ${detail}` });
     }
 }
 
@@ -55,6 +57,8 @@ export async function processPayment(req, res, next) {
 
         res.json({ success: true, data: result });
     } catch (error) {
-        next(error);
+        console.error('[OCR Payment Error]', error?.response?.data || error.message, error.stack);
+        const detail = error?.response?.data?.error?.message || error?.response?.data?.message || error.message || String(error);
+        return res.status(502).json({ success: false, message: `流水识别 LLM 调用失败: ${detail}` });
     }
 }
