@@ -1,22 +1,23 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+const generateId = () => `${Date.now().toString(36)}-${Math.random().toString(36).substr(2, 9)}`;
+
 export const useReimbursementStore = create(
     persist(
         (set, get) => ({
             llmConfig: {
                 provider: 'qwen',
                 baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-                apiKey: ''
+                apiKey: '',
+                modelName: 'qwen-vl-plus'
             },
             rows: [],
-            // A row structure is loosely based on the requested table columns:
-            // { id, index, paymentDate, category, subCategory, description, income, expense, balance, reporter, hasInvoice, invoiceFileUrl, paymentFileUrl, company, remarks }
 
             setLlmConfig: (config) => set({ llmConfig: config }),
 
             addRow: (rowData) => set((state) => ({
-                rows: [...state.rows, { ...rowData, id: Math.random().toString(36).substr(2, 9), index: state.rows.length + 1 }]
+                rows: [...state.rows, { ...rowData, id: generateId(), index: state.rows.length + 1 }]
             })),
 
             updateRow: (id, updates) => set((state) => ({
@@ -30,17 +31,39 @@ export const useReimbursementStore = create(
 
             clearRows: () => set({ rows: [] }),
 
-            // Auto match a newly uploaded payment record to an existing row based on amount and date proximity
             matchPaymentToRow: (paymentData, paymentFileUrl) => {
                 const { rows } = get();
-                // Extremely simple matching logic: exact amount match, or closest date
+                
+                if (paymentData.amount == null) {
+                    return;
+                }
+                
+                const paymentAmount = Number(paymentData.amount);
+                
+                if (isNaN(paymentAmount)) {
+                    return;
+                }
+
+                const candidates = rows.filter(r => 
+                    !r.paymentFileUrl && 
+                    Math.abs(Number(r.expense) - paymentAmount) < 0.01
+                );
+
                 let bestMatch = null;
-                if (paymentData.amount) {
-                    bestMatch = rows.find(r => r.expense === paymentData.amount && !r.paymentFileUrl);
+
+                if (candidates.length === 1) {
+                    bestMatch = candidates[0];
+                } else if (candidates.length > 1) {
+                    const paymentDate = paymentData.date ? new Date(paymentData.date) : new Date();
+                    candidates.sort((a, b) => {
+                        const diffA = Math.abs(new Date(a.paymentDate || 0) - paymentDate);
+                        const diffB = Math.abs(new Date(b.paymentDate || 0) - paymentDate);
+                        return diffA - diffB;
+                    });
+                    bestMatch = candidates[0];
                 }
 
                 if (bestMatch) {
-                    // Update existing row perfectly aligned with amount
                     set((state) => ({
                         rows: state.rows.map(row =>
                             row.id === bestMatch.id ? {
@@ -52,13 +75,12 @@ export const useReimbursementStore = create(
                         )
                     }));
                 } else {
-                    // No match found, create a new row for the payment
                     set((state) => ({
                         rows: [...state.rows, {
-                            id: Math.random().toString(36).substr(2, 9),
+                            id: generateId(),
                             index: state.rows.length + 1,
                             paymentDate: paymentData.date,
-                            expense: paymentData.amount,
+                            expense: paymentAmount,
                             description: paymentData.payee ? `支付给 ${paymentData.payee}` : '',
                             paymentFileUrl,
                             company: paymentData.payee,
@@ -72,8 +94,7 @@ export const useReimbursementStore = create(
             }
         }),
         {
-            name: 'reimbursement-storage', // unique name
-            // Only persist config, table data is session-based
+            name: 'reimbursement-storage',
             partialize: (state) => ({ llmConfig: state.llmConfig }),
         }
     )

@@ -1,8 +1,23 @@
 import React, { useState } from 'react';
-import { Modal, Form, Input, Select, Button, Typography } from 'antd';
+import { Modal, Form, Input, Select, Typography } from 'antd';
 import { useReimbursementStore } from '../stores/useReimbursementStore';
 
 const { Text } = Typography;
+
+const PROVIDER_DEFAULTS = {
+    qwen: {
+        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        modelName: 'qwen-vl-plus'
+    },
+    openai: {
+        baseUrl: 'https://api.openai.com/v1',
+        modelName: 'gpt-4o'
+    },
+    custom: {
+        baseUrl: '',
+        modelName: ''
+    }
+};
 
 export default function LLMConfigModal({ visible, onClose }) {
     const { llmConfig, setLlmConfig } = useReimbursementStore();
@@ -14,7 +29,8 @@ export default function LLMConfigModal({ visible, onClose }) {
             setLlmConfig({
                 provider: values.provider,
                 baseUrl: values.baseUrl,
-                apiKey: values.apiKey
+                apiKey: values.apiKey,
+                modelName: values.modelName
             });
             onClose();
         });
@@ -22,11 +38,11 @@ export default function LLMConfigModal({ visible, onClose }) {
 
     const onProviderChange = (value) => {
         setProvider(value);
-        if (value === 'qwen') {
-            form.setFieldsValue({ baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' });
-        } else if (value === 'openai') {
-            form.setFieldsValue({ baseUrl: 'https://api.openai.com/v1' });
-        }
+        const defaults = PROVIDER_DEFAULTS[value] || PROVIDER_DEFAULTS.custom;
+        form.setFieldsValue({
+            baseUrl: defaults.baseUrl,
+            modelName: defaults.modelName
+        });
     };
 
     return (
@@ -39,7 +55,7 @@ export default function LLMConfigModal({ visible, onClose }) {
         >
             <div style={{ marginBottom: 16 }}>
                 <Text type="secondary">
-                    发票整理工具依赖具备“视觉(Vision)”的大语言模型。<br />
+                    发票整理工具依赖具备"视觉(Vision)"的大语言模型。<br />
                     您的 API Key 仅保存在浏览器本地，每次调用随图片发往后端完成代理请求，绝不在服务器长期保存。
                 </Text>
             </div>
@@ -50,7 +66,8 @@ export default function LLMConfigModal({ visible, onClose }) {
                 initialValues={{
                     provider: llmConfig.provider,
                     baseUrl: llmConfig.baseUrl,
-                    apiKey: llmConfig.apiKey
+                    apiKey: llmConfig.apiKey,
+                    modelName: llmConfig.modelName
                 }}
             >
                 <Form.Item name="provider" label="模型提供商">
@@ -75,6 +92,14 @@ export default function LLMConfigModal({ visible, onClose }) {
                     rules={[{ required: true, message: '请提供 API Key 才能调用大模型' }]}
                 >
                     <Input.Password placeholder="sk-..." />
+                </Form.Item>
+
+                <Form.Item
+                    name="modelName"
+                    label="模型名称"
+                    rules={[{ required: true, message: '请输入模型名称' }]}
+                >
+                    <Input placeholder="如: qwen-vl-plus, gpt-4o, glm-4v" />
                 </Form.Item>
             </Form>
         </Modal>

@@ -20,21 +20,29 @@ export default function ReimbursementView() {
         }
 
         const wb = xlsx.utils.book_new();
-        // Simply strip UI internal fields like URLs before dumping
-        const exportData = rows.map((r, i) => ({
-            '序号': i + 1,
-            '支付日期': r.paymentDate,
-            '报销类别': r.category,
-            '报销大类': r.subCategory,
-            '报销明细说明': r.description,
-            '收入金额': r.income,
-            '支出金额': r.expense,
-            '结余': r.balance,
-            '报销人': r.reporter,
-            '是否有发票': r.hasInvoice,
-            '开票公司主体': r.company,
-            '备注': r.remarks
-        }));
+        
+        let balance = 0;
+        const exportData = rows.map((r, i) => {
+            const income = Number(r.income) || 0;
+            const expense = Number(r.expense) || 0;
+            balance += income - expense;
+            return {
+                '序号': i + 1,
+                '支付日期': r.paymentDate,
+                '报销类别': r.category,
+                '报销大类': r.subCategory,
+                '报销明细说明': r.description,
+                '收入金额': income || null,
+                '支出金额': expense || null,
+                '结余': balance.toFixed(2),
+                '报销人': r.reporter,
+                '是否有发票': r.hasInvoice,
+                '开票公司主体': r.company,
+                '备注': r.remarks,
+                '发票链接': r.invoiceFileUrl || '',
+                '水单链接': r.paymentFileUrl || ''
+            };
+        });
 
         const ws = xlsx.utils.json_to_sheet(exportData);
         xlsx.utils.book_append_sheet(wb, ws, '项目支出具体明细表');

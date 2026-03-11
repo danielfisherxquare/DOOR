@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload, message, Card, Row, Col, Typography, Spin } from 'antd';
 import { InboxOutlined, FilePdfOutlined, PictureOutlined } from '@ant-design/icons';
 import { processInvoiceRequest, processPaymentRequest } from '../api/ocr';
@@ -11,10 +11,17 @@ export default function UploadZone() {
     const { llmConfig, addRow, matchPaymentToRow } = useReimbursementStore();
     const [loadingInvoice, setLoadingInvoice] = useState(false);
     const [loadingPayment, setLoadingPayment] = useState(false);
+    const blobUrlsRef = useRef([]);
+
+    useEffect(() => {
+        return () => {
+            blobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+        };
+    }, []);
 
     const checkConfig = () => {
-        if (!llmConfig.apiKey || !llmConfig.baseUrl) {
-            message.warning('请先点击右上角配置大模型 API Key！');
+        if (!llmConfig.apiKey || !llmConfig.baseUrl || !llmConfig.modelName) {
+            message.warning('请先点击右上角配置大模型 API Key 和模型名称！');
             return false;
         }
         return true;
@@ -23,15 +30,16 @@ export default function UploadZone() {
     const handleInvoiceUpload = async (file) => {
         if (!checkConfig()) return false;
 
-        // Generate immediate local preview URL
         const fileUrl = URL.createObjectURL(file);
+        blobUrlsRef.current.push(fileUrl);
         setLoadingInvoice(true);
         try {
             const res = await processInvoiceRequest(file, llmConfig);
             if (res.success && res.data) {
                 const { amount, date, issuer, category, details } = res.data;
+                const numericAmount = amount != null ? Number(amount) : null;
                 addRow({
-                    expense: amount,
+                    expense: numericAmount,
                     income: null,
                     paymentDate: date,
                     company: issuer,
@@ -53,13 +61,14 @@ export default function UploadZone() {
         } finally {
             setLoadingInvoice(false);
         }
-        return false; // Prevent default antd upload
+        return false;
     };
 
     const handlePaymentUpload = async (file) => {
         if (!checkConfig()) return false;
 
         const fileUrl = URL.createObjectURL(file);
+        blobUrlsRef.current.push(fileUrl);
         setLoadingPayment(true);
         try {
             const res = await processPaymentRequest(file, llmConfig);

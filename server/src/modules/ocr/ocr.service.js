@@ -34,7 +34,7 @@ async function parsePdfText(fileBuffer) {
  * Common method to call the LLM API using OpenAI Chat Completion Format.
  * Supports passing either text or a base64 image URL to a Vision model.
  */
-async function askVlm(client, prompt, fileBuffer, mimeType, isPdf) {
+async function askVlm(client, prompt, fileBuffer, mimeType, isPdf, modelName) {
     let content = [];
 
     content.push({ type: 'text', text: prompt });
@@ -44,15 +44,9 @@ async function askVlm(client, prompt, fileBuffer, mimeType, isPdf) {
         if (extractedText && extractedText.trim().length > 0) {
             content.push({ type: 'text', text: `===== PDF TEXT CONTENT =====\n${extractedText}\n========================` });
         } else {
-            // Fallback to image if PDF contains no raw text (it might be a scanned image saved as PDF)
-            // However, true PDF-to-Image conversion implies heavy dependencies like Ghostscript.
-            // For lightweight, if text extraction fails, we might just warn or pass the raw base64 depending on vendor support.
-            // OpenAI vision API does NOT natively support PDF files directly in image_url without PDF specific models.
-            // Assuming user uses models like generic Qwen-VL or GPT4o, we enforce explicit images for vision.
             throw new Error('Could not extract text from the PDF. If it is a scanned image PDF, please convert it to PNG/JPG before uploading, or use an API that supports raw PDF uploads.');
         }
     } else if (fileBuffer) {
-        // Handle as image
         const base64Str = fileBuffer.toString('base64');
         const imageUrl = `data:${mimeType};base64,${base64Str}`;
         content.push({
@@ -62,16 +56,14 @@ async function askVlm(client, prompt, fileBuffer, mimeType, isPdf) {
     }
 
     const payload = {
-        model: "qwen-vl-plus", // Default fallback, usually overridden by API base url pointing to correct model or ignoring it. Let's make it configurable later if needed
+        model: modelName || 'qwen-vl-plus',
         messages: [
             {
                 role: "user",
                 content: content
             }
         ],
-        temperature: 0.1, // Low temperature for factual extraction
-        // response_format: { type: "json_object" } is generally helpful but not supported by all proxies. 
-        // We will rely on prompt engineering to get pure JSON.
+        temperature: 0.1
     };
 
     const response = await client.post('/chat/completions', payload);
@@ -101,14 +93,14 @@ function parseJsonOutput(text) {
     }
 }
 
-export async function extractFromInvoice({ fileBuffer, mimeType, filename, provider, baseUrl, apiKey }) {
+export async function extractFromInvoice({ fileBuffer, mimeType, filename, provider, baseUrl, apiKey, modelName }) {
     const prompt = `你是一个专业的财务发票识别助手。请识别提供的发票内容，并严格只输出一个 JSON 格式的对象。不要包含任何其他说明文字。
 需要提取的字段如下，若没有对应字段请填 null：
 {
   "amount": null, // 金额(数字，优先取价税合计小写，不带人民币符号)
   "date": null,   // 开票日期(字符串，格式 YYYY-MM-DD，若只有月日请补全今年，优先取票面明显的完整日期)
   "issuer": null, // 开票方公司全称/销售方名称(字符串)
-  "category": null, // 智能推断的报销类别(如“交通费”、“住宿费”、“餐饮费”、“办公用品”、“通讯费”等)
+  "category": null, // 智能推断的报销类别(如"交通费"、"住宿费"、"餐饮费"、"办公用品"、"通讯费"等)
   "details": null // 报销明细说明/商品名称(尽量简短)
 }
 
@@ -117,10 +109,10 @@ export async function extractFromInvoice({ fileBuffer, mimeType, filename, provi
     const client = createLlmClient(baseUrl, apiKey);
     const isPdf = mimeType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf');
 
-    return askVlm(client, prompt, fileBuffer, mimeType, isPdf);
+    return askVlm(client, prompt, fileBuffer, mimeType, isPdf, modelName);
 }
 
-export async function extractFromPayment({ fileBuffer, mimeType, filename, provider, baseUrl, apiKey }) {
+export async function extractFromPayment({ fileBuffer, mimeType, filename, provider, baseUrl, apiKey, modelName }) {
     const prompt = `你是一个专业的财务核对助手。请识别这份支付记录流水截图，并严格只输出一个 JSON 格式的对象。不要包含任何其他说明文字。
 需要提取的字段如下，若没有对应字段请填 null：
 {
@@ -135,5 +127,5 @@ export async function extractFromPayment({ fileBuffer, mimeType, filename, provi
     const client = createLlmClient(baseUrl, apiKey);
     const isPdf = mimeType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf');
 
-    return askVlm(client, prompt, fileBuffer, mimeType, isPdf);
+    return askVlm(client, prompt, fileBuffer, mimeType, isPdf, modelName);
 }

@@ -1,8 +1,13 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState, useMemo } from 'react';
 import { Table, Input, Form, InputNumber, Popconfirm, Select } from 'antd';
 import { useReimbursementStore } from '../stores/useReimbursementStore';
 
 const EditableContext = React.createContext(null);
+
+const formatCurrency = (v) => {
+    const num = Number(v);
+    return !isNaN(num) && v !== null ? `¥ ${num.toFixed(2)}` : null;
+};
 
 const EditableRow = ({ index, ...props }) => {
     const [form] = Form.useForm();
@@ -85,6 +90,16 @@ const EditableCell = ({
 export default function ReimbursementTable() {
     const { rows, updateRow, removeRow } = useReimbursementStore();
 
+    const rowsWithBalance = useMemo(() => {
+        let balance = 0;
+        return rows.map(row => {
+            const income = Number(row.income) || 0;
+            const expense = Number(row.expense) || 0;
+            balance += income - expense;
+            return { ...row, balance: balance.toFixed(2) };
+        });
+    }, [rows]);
+
     const handleSave = (row) => {
         updateRow(row.id, row);
     };
@@ -104,18 +119,24 @@ export default function ReimbursementTable() {
             dataIndex: 'income',
             width: 120,
             editable: true,
-            render: (v) => v ? `¥ ${Number(v).toFixed(2)}` : null
+            render: formatCurrency
         },
         {
             title: '支出金额',
             dataIndex: 'expense',
             width: 120,
             editable: true,
-            render: (v) => v ? `¥ ${Number(v).toFixed(2)}` : null
+            render: formatCurrency
         },
         { title: '结余', dataIndex: 'balance', width: 100, editable: false },
         { title: '报销人', dataIndex: 'reporter', width: 100, editable: true },
-        { title: '是否有发票', dataIndex: 'hasInvoice', width: 100, editable: true },
+        {
+            title: '是否有发票',
+            dataIndex: 'hasInvoice',
+            width: 100,
+            editable: true,
+            render: (v) => v || '-'
+        },
         {
             title: '附件',
             key: 'attachments',
@@ -168,7 +189,7 @@ export default function ReimbursementTable() {
                 components={components}
                 rowClassName={() => 'editable-row'}
                 bordered
-                dataSource={rows}
+                dataSource={rowsWithBalance}
                 columns={columns}
                 rowKey="id"
                 pagination={false}

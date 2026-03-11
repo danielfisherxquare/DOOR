@@ -1,15 +1,18 @@
 import { extractFromInvoice, extractFromPayment } from './ocr.service.js';
 
-function validateLLMConfig(provider, baseUrl, apiKey) {
+function validateLLMConfig(provider, baseUrl, apiKey, modelName) {
     if (!provider || !baseUrl || !apiKey) {
         throw new Error('Missing LLM configuration. Please provide provider, baseUrl, and apiKey.');
+    }
+    if (!modelName) {
+        throw new Error('Missing modelName. Please specify a vision model name.');
     }
 }
 
 export async function processInvoice(req, res, next) {
     try {
-        const { provider, baseUrl, apiKey } = req.body;
-        validateLLMConfig(provider, baseUrl, apiKey);
+        const { provider, baseUrl, apiKey, modelName } = req.body;
+        validateLLMConfig(provider, baseUrl, apiKey, modelName);
 
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
@@ -21,7 +24,8 @@ export async function processInvoice(req, res, next) {
             filename: req.file.originalname,
             provider,
             baseUrl,
-            apiKey
+            apiKey,
+            modelName
         });
 
         res.json({ success: true, data: result });
@@ -32,8 +36,8 @@ export async function processInvoice(req, res, next) {
 
 export async function processPayment(req, res, next) {
     try {
-        const { provider, baseUrl, apiKey } = req.body;
-        validateLLMConfig(provider, baseUrl, apiKey);
+        const { provider, baseUrl, apiKey, modelName } = req.body;
+        validateLLMConfig(provider, baseUrl, apiKey, modelName);
 
         if (!req.file) {
             return res.status(400).json({ error: 'No file uploaded' });
@@ -45,7 +49,8 @@ export async function processPayment(req, res, next) {
             filename: req.file.originalname,
             provider,
             baseUrl,
-            apiKey
+            apiKey,
+            modelName
         });
 
         res.json({ success: true, data: result });

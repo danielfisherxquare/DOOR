@@ -6,6 +6,7 @@ export const processInvoiceRequest = async (file, config) => {
     formData.append('provider', config.provider);
     formData.append('baseUrl', config.baseUrl);
     formData.append('apiKey', config.apiKey);
+    formData.append('modelName', config.modelName);
 
     const response = await request.post('/ocr/invoice', formData, {
         headers: {
@@ -21,6 +22,7 @@ export const processPaymentRequest = async (file, config) => {
     formData.append('provider', config.provider);
     formData.append('baseUrl', config.baseUrl);
     formData.append('apiKey', config.apiKey);
+    formData.append('modelName', config.modelName);
 
     const response = await request.post('/ocr/payment', formData, {
         headers: {
