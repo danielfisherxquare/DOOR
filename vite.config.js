@@ -6,10 +6,11 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
+    strictPort: true,
     open: true,
     proxy: {
       '/api': {
-        target: 'https://xquareliu.com',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true
       }
     }
