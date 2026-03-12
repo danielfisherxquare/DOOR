@@ -35,6 +35,14 @@ const mockTools = [
     status: 'online',
     apiEndpoint: '/tools/app-download',
     component: 'AppDownload'
+  },
+  {
+    id: 'interview-tool',
+    name: '面试评估系统',
+    description: '平面设计师面试评分与候选人对比工具',
+    icon: '🏅',
+    status: 'online',
+    path: '/interview'
   }
 ]
 

@@ -21,6 +21,7 @@ import orgRoutes from './modules/org/org.routes.js';
 import toolsRoutes from './modules/tools/tools.routes.js';
 import projectsRoutes from './modules/projects/projects.routes.js';
 import calendarRoutes from './modules/calendar/calendar.routes.js';
+import interviewRoutes from './modules/interview/interview.routes.js';
 
 const app = express();
 
@@ -51,6 +52,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/tools', toolsRoutes);
+app.use('/api/interview', interviewRoutes);
 
 app.use(requireAuth);
 

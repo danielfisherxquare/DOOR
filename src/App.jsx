@@ -15,6 +15,9 @@ import ScanLogin from './views/scan/ScanLogin'
 import ScanHome from './views/scan/ScanHome'
 import ScanResult from './views/scan/ScanResult'
 import useAuthStore from './stores/authStore'
+import InterviewForm from './views/interview/InterviewForm'
+import InterviewList from './views/interview/InterviewList'
+import InterviewCompare from './views/interview/InterviewCompare'
 
 function PortalLayout() {
   return (
@@ -27,6 +30,9 @@ function PortalLayout() {
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
+          <Route path="/interview" element={<InterviewForm />} />
+          <Route path="/interview/records" element={<InterviewList />} />
+          <Route path="/interview/compare" element={<InterviewCompare />} />
         </Routes>
       </main>
       <Footer />
