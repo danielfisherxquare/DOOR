@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import interviewApi from '../api/interview';
+import { getTodayInBeijing, normalizeInterviewDate } from '../utils/beijingDate';
 
 export const CRITERIA_DATA = [
     { 
@@ -123,7 +124,7 @@ const useInterviewStore = create((set, get) => ({
     scores: [0, 0, 0, 0, 0, 0, 0, 0],
     scenarioScores: [0, 0, 0, 0], // 4个场景题分数
     candidateName: '',
-    interviewDate: new Date().toISOString().split('T')[0],
+    interviewDate: getTodayInBeijing(),
     interviewer: '',
     notes: '',
     editingId: null,
@@ -173,7 +174,7 @@ const useInterviewStore = create((set, get) => ({
         scores: [0, 0, 0, 0, 0, 0, 0, 0],
         scenarioScores: [0, 0, 0, 0],
         candidateName: '',
-        interviewDate: new Date().toISOString().split('T')[0],
+        interviewDate: getTodayInBeijing(),
         interviewer: '',
         notes: '',
         editingId: null
@@ -184,7 +185,7 @@ const useInterviewStore = create((set, get) => ({
             scores: typeof interview.scores === 'string' ? JSON.parse(interview.scores) : interview.scores,
             scenarioScores: typeof interview.scenario_scores === 'string' ? JSON.parse(interview.scenario_scores) : (interview.scenario_scores || [0, 0, 0, 0]),
             candidateName: interview.candidate_name,
-            interviewDate: interview.interview_date,
+            interviewDate: normalizeInterviewDate(interview.interview_date),
             interviewer: interview.interviewer || '',
             notes: interview.notes || '',
             editingId: interview.id

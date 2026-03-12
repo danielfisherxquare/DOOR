@@ -1,4 +1,9 @@
 import InterviewRepository from './interview.repository.js';
+import {
+    normalizeInterviewDateInput,
+    serializeInterviewDate,
+    serializeInterviewRecord
+} from './interview-date.js';
 
 const CRITERIA_DATA = [
     { id: 0, type: 'core', title: '视觉基础与导视逻辑' },
@@ -75,13 +80,22 @@ function normalizeStoredJson(value, fallback) {
     return fallback;
 }
 
+function createInvalidInterviewDateError() {
+    const error = new Error('Invalid interview_date');
+    error.status = 400;
+    error.expose = true;
+    return error;
+}
+
 export const InterviewService = {
     async list(options = {}) {
-        return InterviewRepository.findAll(options);
+        const interviews = await InterviewRepository.findAll(options);
+        return interviews.map(serializeInterviewRecord);
     },
 
     async getById(id) {
-        return InterviewRepository.findById(id);
+        const interview = await InterviewRepository.findById(id);
+        return serializeInterviewRecord(interview);
     },
 
     async create(data) {
@@ -89,10 +103,15 @@ export const InterviewService = {
         const scenarioScores = normalizeScenarioScores(data.scenario_scores);
         const tier = calculateTier(scores, scenarioScores);
         const totalScore = calculateTotalScore(scores, scenarioScores);
+        const interviewDate = normalizeInterviewDateInput(data.interview_date);
 
-        return InterviewRepository.create({
+        if (!interviewDate) {
+            throw createInvalidInterviewDateError();
+        }
+
+        const created = await InterviewRepository.create({
             candidate_name: data.candidate_name,
-            interview_date: data.interview_date,
+            interview_date: interviewDate,
             interviewer: data.interviewer,
             scores: JSON.stringify(scores),
             scenario_scores: JSON.stringify(scenarioScores),
@@ -100,6 +119,8 @@ export const InterviewService = {
             tier,
             notes: data.notes
         });
+
+        return serializeInterviewRecord(created);
     },
 
     async update(id, data) {
@@ -109,12 +130,22 @@ export const InterviewService = {
         }
 
         const updateData = { ...data };
+        const normalizedInterviewDate = data.interview_date === undefined
+            ? undefined
+            : normalizeInterviewDateInput(data.interview_date);
         const scores = data.scores
             ? normalizeScores(data.scores)
             : normalizeScores(normalizeStoredJson(existing.scores, [0, 0, 0, 0, 0, 0, 0, 0]));
         const scenarioScores = data.scenario_scores
             ? normalizeScenarioScores(data.scenario_scores)
             : normalizeScenarioScores(normalizeStoredJson(existing.scenario_scores, [0, 0, 0, 0]));
+
+        if (data.interview_date !== undefined) {
+            if (!normalizedInterviewDate) {
+                throw createInvalidInterviewDateError();
+            }
+            updateData.interview_date = normalizedInterviewDate;
+        }
 
         if (data.scores) {
             updateData.scores = JSON.stringify(scores);
@@ -129,7 +160,8 @@ export const InterviewService = {
             updateData.total_score = calculateTotalScore(scores, scenarioScores);
         }
 
-        return InterviewRepository.update(id, updateData);
+        const updated = await InterviewRepository.update(id, updateData);
+        return serializeInterviewRecord(updated);
     },
 
     async delete(id) {
@@ -137,7 +169,8 @@ export const InterviewService = {
     },
 
     async compare(ids) {
-        return InterviewRepository.findByIds(ids);
+        const interviews = await InterviewRepository.findByIds(ids);
+        return interviews.map(serializeInterviewRecord);
     },
 
     getCriteriaData() {

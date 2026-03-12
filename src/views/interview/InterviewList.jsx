@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useInterviewStore from '../../stores/interviewStore';
+import { normalizeInterviewDate } from '../../utils/beijingDate';
 
 // 设计令牌
 const DESIGN_TOKENS = {
@@ -381,7 +382,7 @@ function InterviewList() {
                                         <div style={styles.cardHeader}>
                                             <div>
                                                 <h3 style={styles.candidateName}>{interview.candidate_name}</h3>
-                                                <p style={styles.interviewDate}>{interview.interview_date}</p>
+                                                <p style={styles.interviewDate}>{normalizeInterviewDate(interview.interview_date)}</p>
                                             </div>
                                             <span style={styles.tierBadge(interview.tier)}>
                                                 {tier.label}

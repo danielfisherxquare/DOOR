@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import useInterviewStore, { CRITERIA_DATA } from '../../stores/interviewStore';
 import { loadChartJs } from '../../utils/chartLoader';
+import { normalizeInterviewDate } from '../../utils/beijingDate';
 
 // 设计令牌
 const DESIGN_TOKENS = {
@@ -445,7 +446,7 @@ function InterviewCompare() {
                                                 </span>
                                             </div>
                                             <div style={styles.candidateMeta}>
-                                                {interview.total_score}分 · {interview.interview_date}
+                                                {interview.total_score}分 · {normalizeInterviewDate(interview.interview_date)}
                                             </div>
                                         </button>
                                     );
