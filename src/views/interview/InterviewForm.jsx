@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import useInterviewStore, { CRITERIA_DATA, SCENARIO_DATA } from '../../stores/interviewStore';
+import { loadChartJs } from '../../utils/chartLoader';
 
 // 设计令牌 - 对齐 soft-design.css
 const DESIGN_TOKENS = {
@@ -54,6 +55,20 @@ function InterviewForm() {
         const handleResize = () => setWindowWidth(window.innerWidth);
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        loadChartJs().then(Chart => {
+            if (!cancelled) {
+                window.Chart = Chart;
+            }
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     const isMobile = windowWidth < BREAKPOINTS.mobile;
@@ -119,6 +134,15 @@ function InterviewForm() {
         }
     }, [scores, isMobile]);
 
+    useEffect(() => {
+        return () => {
+            if (chartInstance.current) {
+                chartInstance.current.destroy();
+                chartInstance.current = null;
+            }
+        };
+    }, []);
+
     const handleSave = async () => {
         const result = await saveInterview();
         if (result.success) {
@@ -149,7 +173,7 @@ function InterviewForm() {
         container: {
             minHeight: '100vh',
             backgroundColor: DESIGN_TOKENS.bgPrimary,
-            fontFamily: "'Noto Sans SC', 'Inter', sans-serif",
+            fontFamily: 'var(--font-family)',
         },
         nav: {
             backgroundColor: DESIGN_TOKENS.bgCard,

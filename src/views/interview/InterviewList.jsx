@@ -88,7 +88,7 @@ function InterviewList() {
         container: {
             minHeight: '100vh',
             backgroundColor: DESIGN_TOKENS.bgPrimary,
-            fontFamily: "'Noto Sans SC', 'Inter', sans-serif",
+            fontFamily: 'var(--font-family)',
         },
         nav: {
             backgroundColor: DESIGN_TOKENS.bgCard,

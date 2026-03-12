@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import useInterviewStore, { CRITERIA_DATA } from '../../stores/interviewStore';
+import { loadChartJs } from '../../utils/chartLoader';
 
 // 设计令牌
 const DESIGN_TOKENS = {
@@ -69,6 +70,20 @@ function InterviewCompare() {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
+    useEffect(() => {
+        let cancelled = false;
+
+        loadChartJs().then(Chart => {
+            if (!cancelled) {
+                window.Chart = Chart;
+            }
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     const isMobile = windowWidth < BREAKPOINTS.mobile;
     const isTablet = windowWidth >= BREAKPOINTS.mobile && windowWidth < BREAKPOINTS.tablet;
     const isDesktop = windowWidth >= BREAKPOINTS.tablet;
@@ -130,6 +145,15 @@ function InterviewCompare() {
         }
     }, [compareData, isMobile]);
 
+    useEffect(() => {
+        return () => {
+            if (chartInstance.current) {
+                chartInstance.current.destroy();
+                chartInstance.current = null;
+            }
+        };
+    }, []);
+
     const handleSelect = (id) => {
         const interview = interviews.find(i => i.id === id);
         if (selectedIds.includes(id)) {
@@ -153,7 +177,7 @@ function InterviewCompare() {
         container: {
             minHeight: '100vh',
             backgroundColor: DESIGN_TOKENS.bgPrimary,
-            fontFamily: "'Noto Sans SC', 'Inter', sans-serif",
+            fontFamily: 'var(--font-family)',
         },
         nav: {
             backgroundColor: DESIGN_TOKENS.bgCard,
