@@ -36,7 +36,7 @@ router.get('/:id', async (req, res, next) => {
 
 router.post('/', async (req, res, next) => {
     try {
-        const { candidate_name, interview_date, interviewer, scores, notes } = req.body;
+        const { candidate_name, interview_date, interviewer, scores, scenario_scores, notes } = req.body;
         
         if (!candidate_name || !interview_date) {
             return res.status(400).json({ 
@@ -50,6 +50,7 @@ router.post('/', async (req, res, next) => {
             interview_date,
             interviewer,
             scores,
+            scenario_scores,
             notes
         });
         
@@ -61,13 +62,14 @@ router.post('/', async (req, res, next) => {
 
 router.put('/:id', async (req, res, next) => {
     try {
-        const { candidate_name, interview_date, interviewer, scores, notes } = req.body;
+        const { candidate_name, interview_date, interviewer, scores, scenario_scores, notes } = req.body;
         
         const interview = await InterviewService.update(req.params.id, {
             candidate_name,
             interview_date,
             interviewer,
             scores,
+            scenario_scores,
             notes
         });
         

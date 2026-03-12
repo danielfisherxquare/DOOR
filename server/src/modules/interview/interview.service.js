@@ -11,34 +11,68 @@ const CRITERIA_DATA = [
     { id: 7, type: 'bonus', title: '前沿AI辅助设计' }
 ];
 
-function calculateTier(scores) {
-    if (!scores || scores.every(s => s === 0)) return '?';
-    
-    let baseScore = 0;
-    let bonusScore = 0;
-    
-    scores.forEach((s, i) => {
-        if (CRITERIA_DATA[i].type === 'core') {
-            baseScore += s;
-        } else {
-            bonusScore += s;
-        }
-    });
-    
-    const total = baseScore + bonusScore;
-    let hasRedLine = false;
-    for (let i = 0; i < 6; i++) {
-        if (scores[i] > 0 && scores[i] <= 2) hasRedLine = true;
+function normalizeScores(scores) {
+    if (!Array.isArray(scores) || scores.length === 0) {
+        return [0, 0, 0, 0, 0, 0, 0, 0];
     }
-    
-    if (total >= 37 && baseScore === 30 && bonusScore >= 7) return 'S';
-    if (baseScore >= 24 && !hasRedLine) return 'A';
-    if (baseScore >= 18 && baseScore < 24) return 'B';
-    return 'C';
+
+    return scores.map((score) => Number(score) || 0);
 }
 
-function calculateTotalScore(scores) {
-    return scores ? scores.reduce((sum, s) => sum + (s || 0), 0) : 0;
+function normalizeScenarioScores(scenarioScores) {
+    if (!Array.isArray(scenarioScores) || scenarioScores.length === 0) {
+        return [0, 0, 0, 0];
+    }
+
+    return scenarioScores.map((score) => Number(score) || 0);
+}
+
+function calculateTier(scores, scenarioScores = [0, 0, 0, 0]) {
+    if (!scores || scores.every((score) => score === 0)) return '?';
+
+    let baseScore = 0;
+    let bonusScore = 0;
+    const scenarioTotal = scenarioScores.reduce((sum, score) => sum + (score || 0), 0);
+
+    scores.forEach((score, index) => {
+        if (CRITERIA_DATA[index].type === 'core') {
+            baseScore += score;
+        } else {
+            bonusScore += score;
+        }
+    });
+
+    const eightDimTotal = baseScore + bonusScore;
+    const grandTotal = eightDimTotal + scenarioTotal;
+
+    if (grandTotal >= 50 && eightDimTotal >= 35 && scenarioTotal >= 12) return 'S';
+    if (grandTotal >= 40 && eightDimTotal >= 28 && scenarioTotal >= 10) return 'A';
+    if (grandTotal >= 30 && eightDimTotal >= 21 && scenarioTotal >= 7) return 'B';
+    if (grandTotal > 0) return 'C';
+    return '?';
+}
+
+function calculateTotalScore(scores, scenarioScores = [0, 0, 0, 0]) {
+    const scoreTotal = scores ? scores.reduce((sum, score) => sum + (score || 0), 0) : 0;
+    const scenarioTotal = scenarioScores ? scenarioScores.reduce((sum, score) => sum + (score || 0), 0) : 0;
+    return scoreTotal + scenarioTotal;
+}
+
+function normalizeStoredJson(value, fallback) {
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : fallback;
+        } catch {
+            return fallback;
+        }
+    }
+
+    return fallback;
 }
 
 export const InterviewService = {
@@ -51,15 +85,17 @@ export const InterviewService = {
     },
 
     async create(data) {
-        const scores = data.scores || [0, 0, 0, 0, 0, 0, 0, 0];
-        const tier = calculateTier(scores);
-        const totalScore = calculateTotalScore(scores);
-        
+        const scores = normalizeScores(data.scores);
+        const scenarioScores = normalizeScenarioScores(data.scenario_scores);
+        const tier = calculateTier(scores, scenarioScores);
+        const totalScore = calculateTotalScore(scores, scenarioScores);
+
         return InterviewRepository.create({
             candidate_name: data.candidate_name,
             interview_date: data.interview_date,
             interviewer: data.interviewer,
             scores: JSON.stringify(scores),
+            scenario_scores: JSON.stringify(scenarioScores),
             total_score: totalScore,
             tier,
             notes: data.notes
@@ -67,14 +103,32 @@ export const InterviewService = {
     },
 
     async update(id, data) {
-        const updateData = { ...data };
-        
-        if (data.scores) {
-            updateData.scores = JSON.stringify(data.scores);
-            updateData.tier = calculateTier(data.scores);
-            updateData.total_score = calculateTotalScore(data.scores);
+        const existing = await InterviewRepository.findById(id);
+        if (!existing) {
+            return null;
         }
-        
+
+        const updateData = { ...data };
+        const scores = data.scores
+            ? normalizeScores(data.scores)
+            : normalizeScores(normalizeStoredJson(existing.scores, [0, 0, 0, 0, 0, 0, 0, 0]));
+        const scenarioScores = data.scenario_scores
+            ? normalizeScenarioScores(data.scenario_scores)
+            : normalizeScenarioScores(normalizeStoredJson(existing.scenario_scores, [0, 0, 0, 0]));
+
+        if (data.scores) {
+            updateData.scores = JSON.stringify(scores);
+        }
+
+        if (data.scenario_scores) {
+            updateData.scenario_scores = JSON.stringify(scenarioScores);
+        }
+
+        if (data.scores || data.scenario_scores) {
+            updateData.tier = calculateTier(scores, scenarioScores);
+            updateData.total_score = calculateTotalScore(scores, scenarioScores);
+        }
+
         return InterviewRepository.update(id, updateData);
     },
 
