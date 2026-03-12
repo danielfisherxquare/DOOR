@@ -1,45 +1,11 @@
 import { create } from 'zustand'
 
-// 模拟工具数据（实际项目中从后台API获取）
+// 只保留面试评估系统
 const mockTools = [
   {
-    id: 'admin-portal',
-    name: '后台管理',
-    description: '机构、用户、赛事与授权综合管理平台',
-    icon: '⚙️',
-    status: 'online',
-    path: '/admin'
-  },
-  {
-    id: 'scan-tool',
-    name: '扫码功能',
-    description: '扫码/输入 token 查询号码布发放状态',
-    icon: '📸',
-    status: 'online',
-    path: '/scan'
-  },
-  {
-    id: 'mechanical-clock-3d',
-    name: '3D 机械计时钟',
-    description: '真正的3D段式翻转时钟，每个笔画都是立体六面体，翻转时可见金属侧面',
-    icon: '🕰️',
-    status: 'online',
-    apiEndpoint: '/tools/mechanical-clock-3d',
-    component: 'MechanicalClock3D'
-  },
-  {
-    id: 'app-download',
-    name: '应用下载',
-    description: '下载本地马拉松报名数据管理器客户端',
-    icon: '📥',
-    status: 'online',
-    apiEndpoint: '/tools/app-download',
-    component: 'AppDownload'
-  },
-  {
     id: 'interview-tool',
-    name: '面试评估系统',
-    description: '平面设计师面试评分与候选人对比工具',
+    name: '数字化打分系统',
+    description: '体育赛事公司面试评分与候选人对比工具',
     icon: '🏅',
     status: 'online',
     path: '/interview'
