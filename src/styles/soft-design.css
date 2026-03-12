@@ -3,6 +3,9 @@
    统一设计语言 - 对齐 tool 项目
    ======================================== */
 
+/* Tailwind CSS v4 基础层 */
+@import "tailwindcss";
+
 /* CSS Variables - 设计令牌（对齐 tool index.css） */
 :root {
   /* 背景色 */

@@ -83,11 +83,12 @@ export const SCENARIO_DATA = [
     }
 ];
 
-function calculateTier(scores) {
+function calculateTier(scores, scenarioScores = [0, 0, 0, 0]) {
     if (!scores || scores.every(s => s === 0)) return '?';
     
     let baseScore = 0;
     let bonusScore = 0;
+    let scenarioTotal = scenarioScores.reduce((sum, s) => sum + s, 0);
     
     scores.forEach((s, i) => {
         if (CRITERIA_DATA[i].type === 'core') {
@@ -97,16 +98,20 @@ function calculateTier(scores) {
         }
     });
     
-    const total = baseScore + bonusScore;
+    const eightDimTotal = baseScore + bonusScore; // 8维总分 (40分制)
+    const grandTotal = eightDimTotal + scenarioTotal; // 综合总分 (60分制)
+    
     let hasRedLine = false;
     for (let i = 0; i < 6; i++) {
         if (scores[i] > 0 && scores[i] <= 2) hasRedLine = true;
     }
     
-    if (total >= 37 && baseScore === 30 && bonusScore >= 7) return 'S';
-    if (baseScore >= 24 && !hasRedLine) return 'A';
-    if (baseScore >= 18 && baseScore < 24) return 'B';
-    return 'C';
+    // 基于60分综合总分评级
+    if (grandTotal >= 50 && eightDimTotal >= 35 && scenarioTotal >= 12) return 'S';
+    if (grandTotal >= 40 && eightDimTotal >= 28 && scenarioTotal >= 10) return 'A';
+    if (grandTotal >= 30 && eightDimTotal >= 21 && scenarioTotal >= 7) return 'B';
+    if (grandTotal > 0) return 'C';
+    return '?';
 }
 
 const useInterviewStore = create((set, get) => ({
@@ -116,6 +121,7 @@ const useInterviewStore = create((set, get) => ({
     error: null,
     
     scores: [0, 0, 0, 0, 0, 0, 0, 0],
+    scenarioScores: [0, 0, 0, 0], // 4个场景题分数
     candidateName: '',
     interviewDate: new Date().toISOString().split('T')[0],
     interviewer: '',
@@ -128,14 +134,28 @@ const useInterviewStore = create((set, get) => ({
         set({ scores });
     },
 
+    setScenarioScore: (id, value) => {
+        const scenarioScores = [...get().scenarioScores];
+        scenarioScores[id] = value;
+        set({ scenarioScores });
+    },
+
     setCandidateName: (name) => set({ candidateName: name }),
     setInterviewDate: (date) => set({ interviewDate: date }),
     setInterviewer: (name) => set({ interviewer: name }),
     setNotes: (notes) => set({ notes }),
 
-    getTier: () => calculateTier(get().scores),
+    getTier: () => calculateTier(get().scores, get().scenarioScores),
     
     getTotalScore: () => get().scores.reduce((sum, s) => sum + s, 0),
+    
+    getScenarioTotal: () => get().scenarioScores.reduce((sum, s) => sum + s, 0),
+    
+    getGrandTotal: () => {
+        const eightDimTotal = get().scores.reduce((sum, s) => sum + s, 0);
+        const scenarioTotal = get().scenarioScores.reduce((sum, s) => sum + s, 0);
+        return eightDimTotal + scenarioTotal;
+    },
     
     getBaseScore: () => {
         return get().scores.reduce((sum, s, i) => {
@@ -151,6 +171,7 @@ const useInterviewStore = create((set, get) => ({
 
     resetForm: () => set({
         scores: [0, 0, 0, 0, 0, 0, 0, 0],
+        scenarioScores: [0, 0, 0, 0],
         candidateName: '',
         interviewDate: new Date().toISOString().split('T')[0],
         interviewer: '',
@@ -161,6 +182,7 @@ const useInterviewStore = create((set, get) => ({
     loadForEdit: (interview) => {
         set({
             scores: typeof interview.scores === 'string' ? JSON.parse(interview.scores) : interview.scores,
+            scenarioScores: typeof interview.scenario_scores === 'string' ? JSON.parse(interview.scenario_scores) : (interview.scenario_scores || [0, 0, 0, 0]),
             candidateName: interview.candidate_name,
             interviewDate: interview.interview_date,
             interviewer: interview.interviewer || '',
@@ -201,7 +223,7 @@ const useInterviewStore = create((set, get) => ({
     },
 
     saveInterview: async () => {
-        const { scores, candidateName, interviewDate, interviewer, notes, editingId } = get();
+        const { scores, scenarioScores, candidateName, interviewDate, interviewer, notes, editingId } = get();
         
         if (!candidateName || !interviewDate) {
             return { success: false, error: '请填写候选人姓名和面试日期' };
@@ -215,6 +237,7 @@ const useInterviewStore = create((set, get) => ({
                 interview_date: interviewDate,
                 interviewer,
                 scores,
+                scenario_scores: scenarioScores,
                 notes
             };
 
