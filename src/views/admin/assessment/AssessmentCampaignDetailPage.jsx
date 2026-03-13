@@ -21,12 +21,14 @@ function AssessmentCampaignDetailPage() {
 
   const loadDetail = async () => {
     setLoading(true)
+    setMessage('')
     try {
       const res = await assessmentAdminApi.getCampaignDetail(id)
       if (res.success) {
         setDetail((prev) => ({ ...prev, ...res.data }))
       }
     } catch (error) {
+      setDetail(null)
       setMessage(error.message)
     } finally {
       setLoading(false)
@@ -251,7 +253,7 @@ function AssessmentCampaignDetailPage() {
   }
 
   if (loading) return <div style={{ padding: 24 }}>加载中...</div>
-  if (!detail) return <div style={{ padding: 24 }}>未找到考评活动。</div>
+  if (!detail) return <div style={{ padding: 24 }}>{message || '未找到考评活动。'}</div>
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>

@@ -35,6 +35,11 @@ function forbidden(message) {
     return Object.assign(new Error(message), { status: 403, expose: true });
 }
 
+function getDefaultTemplateTitle(campaignName) {
+    const trimmedName = String(campaignName || '').trim();
+    return trimmedName ? `${trimmedName}考评表` : '赛事考评表';
+}
+
 function serializeCampaign(row) {
     if (!row) return null;
     return {
@@ -157,7 +162,24 @@ async function ensureCampaignEditable(campaignId) {
 }
 
 async function getCampaignTemplate(campaignId) {
-    const template = await repo.getLatestTemplateSnapshot(campaignId);
+    const campaign = await repo.findCampaignById(campaignId);
+    if (!campaign) throw notFound('Assessment campaign not found');
+
+    let template = await repo.getLatestTemplateSnapshot(campaignId);
+    if (!template) {
+        try {
+            template = await repo.createTemplateSnapshot({
+                campaign_id: campaignId,
+                version_no: 1,
+                title: getDefaultTemplateTitle(campaign.name),
+                instructions: '',
+                items_json: DEFAULT_TEMPLATE_ITEMS,
+            });
+        } catch (error) {
+            if (error?.code !== '23505') throw error;
+            template = await repo.getLatestTemplateSnapshot(campaignId);
+        }
+    }
     if (!template) throw notFound('Assessment template not found');
     return serializeTemplate(template);
 }
@@ -310,6 +332,29 @@ export async function createCampaign({ raceId, name, year, templateTitle, templa
     const normalizedYear = Number.isInteger(Number(year))
         ? Number(year)
         : Number(String(race.date || '').slice(0, 4)) || new Date().getFullYear();
+    const normalizedName = String(name || race.name || '').trim() || race.name;
+    const campaignId = await knex.transaction(async (trx) => {
+        const [campaign] = await trx('assessment_campaigns')
+            .insert({
+                org_id: race.org_id,
+                race_id: numericRaceId,
+                name: normalizedName,
+                year: normalizedYear,
+                status: 'draft',
+            })
+            .returning('*');
+
+        await trx('assessment_template_snapshots').insert({
+            campaign_id: campaign.id,
+            version_no: 1,
+            title: String(templateTitle || getDefaultTemplateTitle(normalizedName)).trim() || getDefaultTemplateTitle(normalizedName),
+            instructions: String(templateInstructions || '').trim(),
+            items_json: items,
+        });
+
+        return campaign.id;
+    });
+    return getCampaignDetail(campaignId);
     const campaign = await repo.createCampaign({
         org_id: race.org_id,
         race_id: numericRaceId,
@@ -347,7 +392,7 @@ export async function updateCampaign(campaignId, { name, year, templateTitle, te
     }
 
     if (templateTitle !== undefined || templateInstructions !== undefined || templateItems !== undefined) {
-        const latestTemplate = await repo.getLatestTemplateSnapshot(campaignId);
+        const latestTemplate = await getCampaignTemplate(campaignId);
         await repo.createTemplateSnapshot({
             campaign_id: campaignId,
             version_no: Number(latestTemplate.version_no || 0) + 1,
