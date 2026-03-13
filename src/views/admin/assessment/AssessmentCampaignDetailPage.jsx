@@ -41,6 +41,10 @@ function AssessmentCampaignDetailPage() {
   const templateItems = detail?.template?.items || []
   const reportMembers = useMemo(() => detail?.report?.members || [], [detail])
   const inviteCodes = detail?.inviteCodes || []
+  const shareLink = useMemo(() => {
+    if (typeof window === 'undefined' || !id) return ''
+    return `${window.location.origin}/assessment/${id}`
+  }, [id])
 
   const loadDetail = async () => {
     setLoading(true)
@@ -264,19 +268,57 @@ function AssessmentCampaignDetailPage() {
     }
   }
 
+  const handleCopyShareLink = async () => {
+    if (!shareLink) return
+    try {
+      await navigator.clipboard.writeText(shareLink)
+      setMessage('\u5206\u4eab\u94fe\u63a5\u5df2\u590d\u5236')
+    } catch (_error) {
+      setMessage(shareLink)
+    }
+  }
+
   if (loading) return <div style={{ padding: 24 }}>加载中...</div>
   if (!detail) return <div style={{ padding: 24 }}>{message || '未找到考评活动。'}</div>
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>{detail.campaign.name}</h1>
           <div style={{ color: 'var(--color-text-secondary)', marginTop: 6 }}>
             {detail.campaign.raceName || '未关联赛事'} · 状态：{CAMPAIGN_STATUS_LABELS[detail.campaign.status] || detail.campaign.status}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              minWidth: 320,
+              maxWidth: 420,
+              padding: 10,
+              borderRadius: 12,
+              background: 'var(--color-bg-card, #fff)',
+              boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))',
+              display: 'grid',
+              gap: 8,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+              {'\u8003\u8bc4\u5206\u4eab\u94fe\u63a5'}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                className="input"
+                readOnly
+                value={shareLink}
+                onFocus={(event) => event.target.select()}
+                style={{ minWidth: 0 }}
+              />
+              <button className="btn btn--secondary" onClick={handleCopyShareLink}>
+                {'\u590d\u5236'}
+              </button>
+            </div>
+          </div>
           <button className="btn btn--secondary" onClick={handlePublish} disabled={saving || detail.campaign.status !== 'draft'}>发布活动</button>
           <button className="btn btn--ghost" onClick={handleClose} disabled={saving || detail.campaign.status === 'closed'}>关闭活动</button>
         </div>
