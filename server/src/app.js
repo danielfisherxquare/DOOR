@@ -22,6 +22,8 @@ import toolsRoutes from './modules/tools/tools.routes.js';
 import projectsRoutes from './modules/projects/projects.routes.js';
 import calendarRoutes from './modules/calendar/calendar.routes.js';
 import interviewRoutes from './modules/interview/interview.routes.js';
+import assessmentPublicRoutes from './modules/assessment/assessment-public.routes.js';
+import assessmentAdminRoutes from './modules/assessment/assessment-admin.routes.js';
 
 const app = express();
 
@@ -53,6 +55,7 @@ app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/tools', toolsRoutes);
 app.use('/api/interview', interviewRoutes);
+app.use('/api/assessment/public', assessmentPublicRoutes);
 
 app.use(requireAuth);
 
@@ -68,6 +71,7 @@ app.use('/api/pipeline', pipelineRoutes);
 app.use('/api/bib', bibRoutes);
 app.use('/api/bib-tracking', bibTrackingRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/assessment', assessmentAdminRoutes);
 app.use('/api/org', orgRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/calendar', calendarRoutes);

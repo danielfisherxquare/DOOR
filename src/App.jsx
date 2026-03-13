@@ -19,6 +19,7 @@ const ScanResult = lazy(() => import('./views/scan/ScanResult'))
 const InterviewForm = lazy(() => import('./views/interview/InterviewForm'))
 const InterviewList = lazy(() => import('./views/interview/InterviewList'))
 const InterviewCompare = lazy(() => import('./views/interview/InterviewCompare'))
+const AssessmentPublicPage = lazy(() => import('./views/assessment/AssessmentPublicPage'))
 
 function RouteLoader({ compact = false }) {
   return (
@@ -94,6 +95,7 @@ function App() {
         <Route path="/interview" element={withSuspense(<InterviewForm />)} />
         <Route path="/interview/records" element={withSuspense(<InterviewList />)} />
         <Route path="/interview/compare" element={withSuspense(<InterviewCompare />)} />
+        <Route path="/assessment/:campaignId" element={withSuspense(<AssessmentPublicPage />)} />
 
         <Route path="*" element={<PortalLayout />} />
       </Routes>
