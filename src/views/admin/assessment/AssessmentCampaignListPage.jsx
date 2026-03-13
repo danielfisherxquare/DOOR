@@ -3,6 +3,13 @@ import { Link } from 'react-router-dom'
 import racesApi from '../../../api/races'
 import assessmentAdminApi from '../../../api/assessmentAdmin'
 
+const STATUS_LABELS = {
+  draft: '草稿',
+  published: '已发布',
+  closed: '已关闭',
+  archived: '已归档',
+}
+
 function AssessmentCampaignListPage() {
   const [campaigns, setCampaigns] = useState([])
   const [races, setRaces] = useState([])
@@ -22,6 +29,7 @@ function AssessmentCampaignListPage() {
 
   const loadData = async () => {
     setLoading(true)
+    setMessage('')
     try {
       const [campaignRes, raceRes] = await Promise.all([
         assessmentAdminApi.listCampaigns(),
@@ -67,7 +75,7 @@ function AssessmentCampaignListPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>考评管理</h1>
-        <button className="btn btn--secondary" onClick={loadData} disabled={loading || saving}>刷新</button>
+        <button className="btn btn--secondary" onClick={() => void loadData()} disabled={loading || saving}>刷新</button>
       </div>
 
       {message && (
@@ -79,23 +87,41 @@ function AssessmentCampaignListPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '360px 1fr', gap: 16 }}>
         <form onSubmit={handleCreate} style={cardStyle}>
           <div style={cardTitleStyle}>创建考评活动</div>
+
           <div style={fieldStyle}>
             <label style={labelStyle}>赛事</label>
-            <select className="input" value={form.raceId} onChange={(e) => setForm((prev) => ({ ...prev, raceId: e.target.value }))}>
+            <select
+              className="input"
+              value={form.raceId}
+              onChange={(e) => setForm((prev) => ({ ...prev, raceId: e.target.value }))}
+            >
               <option value="">请选择赛事</option>
               {races.map((race) => (
                 <option key={race.id} value={race.id}>{race.name}</option>
               ))}
             </select>
           </div>
+
           <div style={fieldStyle}>
             <label style={labelStyle}>考评名称</label>
-            <input className="input" value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="默认使用赛事名称" />
+            <input
+              className="input"
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+              placeholder="默认使用赛事名称"
+            />
           </div>
+
           <div style={fieldStyle}>
             <label style={labelStyle}>年份</label>
-            <input className="input" type="number" value={form.year} onChange={(e) => setForm((prev) => ({ ...prev, year: e.target.value }))} />
+            <input
+              className="input"
+              type="number"
+              value={form.year}
+              onChange={(e) => setForm((prev) => ({ ...prev, year: e.target.value }))}
+            />
           </div>
+
           <button className="btn btn--primary" type="submit" disabled={saving || !form.raceId}>
             {saving ? '创建中...' : '创建'}
           </button>
@@ -124,7 +150,7 @@ function AssessmentCampaignListPage() {
                   <tr key={campaign.id} style={{ borderTop: '1px solid var(--border-color, #e5e7eb)' }}>
                     <td style={tdStyle}>{campaign.name}</td>
                     <td style={tdStyle}>{campaign.raceName || '-'}</td>
-                    <td style={tdStyle}>{campaign.status}</td>
+                    <td style={tdStyle}>{STATUS_LABELS[campaign.status] || campaign.status}</td>
                     <td style={tdStyle}>{campaign.memberCount}</td>
                     <td style={tdStyle}>{campaign.inviteCodeCount}</td>
                     <td style={tdStyle}>
@@ -147,6 +173,7 @@ const cardStyle = {
   padding: 20,
   boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))',
 }
+
 const cardTitleStyle = { fontSize: 18, fontWeight: 700, marginBottom: 16 }
 const fieldStyle = { display: 'grid', gap: 8, marginBottom: 14 }
 const labelStyle = { fontSize: 13, fontWeight: 600 }

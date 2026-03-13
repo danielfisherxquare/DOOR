@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Link, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import adminApi from '../../api/adminApi'
 import useAuthStore from '../../stores/authStore'
@@ -16,8 +16,13 @@ import RacePermissionsPage from '../../views/admin/RacePermissionsPage'
 import UserListPage from '../../views/admin/UserListPage'
 import ProjectListPage from '../../views/admin/projects/ProjectListPage'
 import ProjectDetail from '../../views/admin/projects/ProjectDetail'
-import AssessmentCampaignListPage from '../../views/admin/assessment/AssessmentCampaignListPage'
-import AssessmentCampaignDetailPage from '../../views/admin/assessment/AssessmentCampaignDetailPage'
+
+const AssessmentCampaignListPage = lazy(() => import('../../views/admin/assessment/AssessmentCampaignListPage'))
+const AssessmentCampaignDetailPage = lazy(() => import('../../views/admin/assessment/AssessmentCampaignDetailPage'))
+
+function AdminRouteLoader() {
+  return <div style={{ padding: 24 }}>加载中...</div>
+}
 
 function AdminLayout() {
   const { user, logout } = useAuthStore()
@@ -184,8 +189,22 @@ function AdminLayout() {
           <Route path="members" element={<MemberListPage />} />
           <Route path="members/new" element={<MemberCreatePage />} />
           <Route path="races" element={<RaceManagementPage />} />
-          <Route path="assessment" element={<AssessmentCampaignListPage />} />
-          <Route path="assessment/:id" element={<AssessmentCampaignDetailPage />} />
+          <Route
+            path="assessment"
+            element={(
+              <Suspense fallback={<AdminRouteLoader />}>
+                <AssessmentCampaignListPage />
+              </Suspense>
+            )}
+          />
+          <Route
+            path="assessment/:id"
+            element={(
+              <Suspense fallback={<AdminRouteLoader />}>
+                <AssessmentCampaignDetailPage />
+              </Suspense>
+            )}
+          />
           <Route path="projects" element={<ProjectListPage />} />
           <Route path="projects/:id" element={<ProjectDetail />} />
           <Route path="bib-tracking" element={<BibTrackingPage />} />

@@ -59,7 +59,7 @@ function PortalLayout() {
 }
 
 function App() {
-  const bootstrapAuth = useAuthStore(state => state.bootstrapAuth)
+  const bootstrapAuth = useAuthStore((state) => state.bootstrapAuth)
 
   useEffect(() => {
     bootstrapAuth()
@@ -68,26 +68,32 @@ function App() {
   return (
     <div className="app">
       <Routes>
-        <Route path="/admin/*" element={
-          <AdminProtectedRoute>
-            {withSuspense(<AdminLayout />)}
-          </AdminProtectedRoute>
-        } />
+        <Route
+          path="/admin/*"
+          element={(
+            <AdminProtectedRoute>
+              {withSuspense(<AdminLayout />)}
+            </AdminProtectedRoute>
+          )}
+        />
 
         <Route
           path="/scan/login"
           element={withSuspense(
             <ScanLayout>
               <ScanLogin />
-            </ScanLayout>
+            </ScanLayout>,
           )}
         />
 
-        <Route path="/scan/*" element={
-          <ScanProtectedRoute>
-            {withSuspense(<ScanLayout />)}
-          </ScanProtectedRoute>
-        }>
+        <Route
+          path="/scan/*"
+          element={(
+            <ScanProtectedRoute>
+              {withSuspense(<ScanLayout />)}
+            </ScanProtectedRoute>
+          )}
+        >
           <Route index element={withSuspense(<ScanHome />, { compact: true })} />
           <Route path="result" element={withSuspense(<ScanResult />, { compact: true })} />
         </Route>

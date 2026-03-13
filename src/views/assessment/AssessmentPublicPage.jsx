@@ -4,6 +4,12 @@ import assessmentPublicApi from '../../api/assessmentPublic'
 
 const STORAGE_KEY_PREFIX = 'assessment-session:'
 
+const PROGRESS_STATUS_LABELS = {
+  pending: '未开始',
+  draft: '草稿中',
+  submitted: '已提交',
+}
+
 function getDeviceFingerprint() {
   const key = 'assessment-device-id'
   let current = window.localStorage.getItem(key)
@@ -33,6 +39,41 @@ function AssessmentPublicPage() {
 
   const membersPreview = useMemo(() => meta?.membersPreview || [], [meta])
 
+  const openMember = async (memberId, accessToken = token) => {
+    if (!accessToken || !memberId) return
+
+    const formRes = await assessmentPublicApi.getMemberForm(campaignId, memberId, accessToken)
+    if (!formRes.success) return
+
+    const templateItems = formRes.data.template.items || []
+    const draftScores = formRes.data?.draft?.scores || []
+
+    setCurrentMember(formRes.data.member)
+    setTemplate(formRes.data.template)
+    setScores(templateItems.map((item, index) => ({
+      itemId: item.id,
+      title: item.title,
+      score: draftScores[index]?.score ?? '',
+    })))
+    setComment(formRes.data?.draft?.comment || '')
+    setDirty(false)
+    setSaveState('idle')
+  }
+
+  const hydrateProgress = async (progressData, accessToken = token) => {
+    setProgress(progressData)
+    const nextMemberId = progressData?.inviteCode?.lastMemberId || progressData?.nextPendingMemberId
+    if (nextMemberId && progressData.completedCount < progressData.totalCount) {
+      await openMember(nextMemberId, accessToken)
+      return
+    }
+    setCurrentMember(null)
+    setTemplate(null)
+    setScores([])
+    setComment('')
+    setDirty(false)
+  }
+
   const loadMeta = async () => {
     const res = await assessmentPublicApi.getMeta(campaignId)
     if (res.success) {
@@ -42,37 +83,9 @@ function AssessmentPublicPage() {
 
   const loadProgress = async (accessToken) => {
     const res = await assessmentPublicApi.getProgress(campaignId, accessToken)
-    if (!res.success) return
-    setProgress(res.data)
-    const nextMemberId = res.data.inviteCode?.lastMemberId || res.data.nextPendingMemberId
-    if (nextMemberId) {
-      await openMember(nextMemberId, accessToken)
+    if (res.success) {
+      await hydrateProgress(res.data, accessToken)
     }
-  }
-
-  const openMember = async (memberId, accessToken = token) => {
-    if (!accessToken || !memberId) return
-
-    const [formRes, draftRes] = await Promise.all([
-      assessmentPublicApi.getMemberForm(campaignId, memberId, accessToken),
-      assessmentPublicApi.getDraft(campaignId, memberId, accessToken),
-    ])
-
-    if (!formRes.success) return
-
-    const templateItems = formRes.data.template.items || []
-    const draftScores = draftRes.data?.draft?.scores || []
-
-    setCurrentMember(formRes.data.member)
-    setTemplate(formRes.data.template)
-    setScores(templateItems.map((item, index) => ({
-      itemId: item.id,
-      title: item.title,
-      score: draftScores[index]?.score ?? '',
-    })))
-    setComment(draftRes.data?.draft?.comment || '')
-    setDirty(false)
-    setSaveState('idle')
   }
 
   const flushDraft = async () => {
@@ -146,7 +159,7 @@ function AssessmentPublicPage() {
         const accessToken = res.data.accessToken
         window.sessionStorage.setItem(`${STORAGE_KEY_PREFIX}${campaignId}`, accessToken)
         setToken(accessToken)
-        await loadProgress(accessToken)
+        await hydrateProgress(res.data.progress, accessToken)
       }
     } catch (error) {
       setMessage(error.message)
@@ -170,20 +183,13 @@ function AssessmentPublicPage() {
     setSaveState('saving')
     setMessage('')
     try {
-      await assessmentPublicApi.submit(campaignId, currentMember.id, token, {
+      const res = await assessmentPublicApi.submit(campaignId, currentMember.id, token, {
         scores: scores.map((row) => ({ itemId: row.itemId, score: Number(row.score) })),
         comment,
       })
-      setSaveState('saved')
-      const res = await assessmentPublicApi.getProgress(campaignId, token)
       if (res.success) {
-        setProgress(res.data)
-        if (res.data.nextPendingMemberId) {
-          await openMember(res.data.nextPendingMemberId)
-        } else {
-          setCurrentMember(null)
-          setTemplate(null)
-        }
+        setSaveState('saved')
+        await hydrateProgress(res.data.progress, token)
       }
     } catch (error) {
       setSaveState('error')
@@ -289,14 +295,16 @@ function AssessmentPublicPage() {
                   <button
                     key={member.id}
                     className="btn btn--ghost"
-                    onClick={() => handleSelectMember(member.id)}
+                    onClick={() => void handleSelectMember(member.id)}
                     style={{
                       justifyContent: 'space-between',
                       background: currentMember?.id === member.id ? 'rgba(59,130,246,0.1)' : 'transparent',
                     }}
                   >
                     <span>{member.employeeName}</span>
-                    <span style={{ fontSize: 12, opacity: 0.7 }}>{member.progressStatus}</span>
+                    <span style={{ fontSize: 12, opacity: 0.7 }}>
+                      {PROGRESS_STATUS_LABELS[member.progressStatus] || member.progressStatus}
+                    </span>
                   </button>
                 ))}
               </div>

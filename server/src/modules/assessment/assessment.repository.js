@@ -1,5 +1,9 @@
 import knex from '../../db/knex.js';
 
+function serializeJsonb(value) {
+    return typeof value === 'string' ? value : JSON.stringify(value);
+}
+
 const CAMPAIGN_FIELDS = [
     'assessment_campaigns.id',
     'assessment_campaigns.org_id',
@@ -18,7 +22,17 @@ const CAMPAIGN_FIELDS = [
 export async function listCampaigns() {
     return knex('assessment_campaigns')
         .leftJoin('races', 'assessment_campaigns.race_id', 'races.id')
-        .select(CAMPAIGN_FIELDS)
+        .select(
+            ...CAMPAIGN_FIELDS,
+            knex('assessment_members')
+                .whereRaw('assessment_members.campaign_id = assessment_campaigns.id')
+                .count('*')
+                .as('member_count'),
+            knex('assessment_invite_codes')
+                .whereRaw('assessment_invite_codes.campaign_id = assessment_campaigns.id')
+                .count('*')
+                .as('invite_code_count'),
+        )
         .orderBy('assessment_campaigns.created_at', 'desc');
 }
 
@@ -55,7 +69,12 @@ export async function getLatestTemplateSnapshot(campaignId) {
 }
 
 export async function createTemplateSnapshot(data) {
-    const [row] = await knex('assessment_template_snapshots').insert(data).returning('*');
+    const [row] = await knex('assessment_template_snapshots')
+        .insert({
+            ...data,
+            items_json: serializeJsonb(data.items_json),
+        })
+        .returning('*');
     return row;
 }
 
@@ -220,4 +239,24 @@ export async function listCampaignsForEmployeeCode(employeeCode) {
         )
         .where('members.employee_code', employeeCode)
         .orderBy([{ column: 'campaigns.year', order: 'asc' }, { column: 'campaigns.created_at', order: 'asc' }]);
+}
+
+export async function listLatestKnownMembersByCodes(employeeCodes) {
+    if (!Array.isArray(employeeCodes) || employeeCodes.length === 0) return [];
+
+    return knex
+        .select('employee_code', 'employee_name')
+        .from(
+            knex('assessment_members')
+                .select(
+                    'employee_code',
+                    'employee_name',
+                    knex.raw(
+                        'row_number() over (partition by employee_code order by updated_at desc, created_at desc) as row_num',
+                    ),
+                )
+                .whereIn('employee_code', employeeCodes)
+                .as('latest_members'),
+        )
+        .where('row_num', 1);
 }

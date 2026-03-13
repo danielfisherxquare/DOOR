@@ -1,7 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import * as XLSX from 'xlsx'
 import assessmentAdminApi from '../../../api/assessmentAdmin'
+
+const CAMPAIGN_STATUS_LABELS = {
+  draft: '草稿',
+  published: '已发布',
+  closed: '已关闭',
+  archived: '已归档',
+}
+
+const INVITE_STATUS_LABELS = {
+  unused: '未使用',
+  active: '进行中',
+  completed: '已完成',
+  revoked: '已撤销',
+  expired: '已失效',
+}
+
+const ROSTER_HEADER_MAP = {
+  工号: 'employeeCode',
+  姓名: 'employeeName',
+  岗位: 'position',
+  团队: 'teamName',
+  部门: 'department',
+  排序: 'sortOrder',
+}
 
 function AssessmentCampaignDetailPage() {
   const { id } = useParams()
@@ -25,7 +48,7 @@ function AssessmentCampaignDetailPage() {
     try {
       const res = await assessmentAdminApi.getCampaignDetail(id)
       if (res.success) {
-        setDetail((prev) => ({ ...prev, ...res.data }))
+        setDetail(res.data)
       }
     } catch (error) {
       setDetail(null)
@@ -35,25 +58,9 @@ function AssessmentCampaignDetailPage() {
     }
   }
 
-  const loadOverview = async () => {
-    try {
-      const res = await assessmentAdminApi.getReportOverview(id)
-      if (res.success) {
-        setDetail((prev) => ({ ...prev, report: res.data }))
-      }
-    } catch (error) {
-      setMessage(error.message)
-    }
-  }
-
   useEffect(() => {
     void loadDetail()
   }, [id])
-
-  useEffect(() => {
-    if (!detail?.campaign?.id) return
-    void loadOverview()
-  }, [detail?.campaign?.id])
 
   const updateTemplateItem = (index, key, value) => {
     setDetail((prev) => {
@@ -82,8 +89,8 @@ function AssessmentCampaignDetailPage() {
         templateItems,
       })
       if (res.success) {
-        setDetail((prev) => ({ ...prev, ...res.data }))
-        setMessage('评分模板已保存。')
+        setDetail(res.data)
+        setMessage('评分模板已保存')
       }
     } catch (error) {
       setMessage(error.message)
@@ -93,6 +100,7 @@ function AssessmentCampaignDetailPage() {
   }
 
   const handleDownloadTemplate = async () => {
+    const XLSX = await import('xlsx')
     const res = await assessmentAdminApi.getRosterTemplate(id)
     const meta = res.data
     const headers = meta.columns.map((item) => item.title)
@@ -108,7 +116,7 @@ function AssessmentCampaignDetailPage() {
     const workbook = XLSX.utils.book_new()
     const worksheet = XLSX.utils.json_to_sheet(rows, { header: headers })
     XLSX.utils.book_append_sheet(workbook, worksheet, 'roster')
-    XLSX.writeFile(workbook, meta.fileName)
+    XLSX.writeFile(workbook, meta.fileName, { bookType: 'xlsx' })
   }
 
   const handleRosterUpload = async (event) => {
@@ -116,18 +124,18 @@ function AssessmentCampaignDetailPage() {
     if (!file) return
 
     try {
+      const XLSX = await import('xlsx')
       const buffer = await file.arrayBuffer()
       const workbook = XLSX.read(buffer, { type: 'array' })
       const sheet = workbook.Sheets[workbook.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-      const normalizedRows = rows.map((row) => ({
-        employeeCode: row['工号'],
-        employeeName: row['姓名'],
-        position: row['岗位'],
-        teamName: row['团队'],
-        department: row['部门'],
-        sortOrder: row['排序'],
-      }))
+      const normalizedRows = rows.map((row) => {
+        const normalized = {}
+        Object.entries(ROSTER_HEADER_MAP).forEach(([label, field]) => {
+          normalized[field] = row[label]
+        })
+        return normalized
+      })
 
       const previewRes = await assessmentAdminApi.previewRosterImport(id, normalizedRows)
       if (!previewRes.success) return
@@ -140,7 +148,12 @@ function AssessmentCampaignDetailPage() {
 
       const commitRes = await assessmentAdminApi.commitRosterImport(id, previewRes.data.rows)
       if (commitRes.success) {
-        setMessage(`名单导入成功，共 ${commitRes.data.length} 人。`)
+        const inheritedCount = Number(previewRes.data.inheritedNameCount || 0)
+        setMessage(
+          inheritedCount > 0
+            ? `名单导入成功，共 ${commitRes.data.length} 人；自动继承姓名 ${inheritedCount} 人`
+            : `名单导入成功，共 ${commitRes.data.length} 人`,
+        )
         await loadDetail()
       }
     } catch (error) {
@@ -157,7 +170,7 @@ function AssessmentCampaignDetailPage() {
       const res = await assessmentAdminApi.generateInviteCodes(id, Number(inviteCount))
       if (res.success) {
         setGeneratedCodes(res.data.inviteCodes || [])
-        setMessage(`已生成 ${res.data.inviteCodes?.length || 0} 个邀请码。`)
+        setMessage(`已生成 ${res.data.inviteCodes?.length || 0} 个邀请码`)
         await loadDetail()
       }
     } catch (error) {
@@ -173,8 +186,8 @@ function AssessmentCampaignDetailPage() {
     try {
       const res = await assessmentAdminApi.publishCampaign(id)
       if (res.success) {
-        setDetail((prev) => ({ ...prev, ...res.data }))
-        setMessage('考评活动已发布。')
+        setDetail(res.data)
+        setMessage('考评活动已发布')
       }
     } catch (error) {
       setMessage(error.message)
@@ -189,8 +202,8 @@ function AssessmentCampaignDetailPage() {
     try {
       const res = await assessmentAdminApi.closeCampaign(id)
       if (res.success) {
-        setDetail((prev) => ({ ...prev, ...res.data }))
-        setMessage('考评活动已关闭。')
+        setDetail(res.data)
+        setMessage('考评活动已关闭')
       }
     } catch (error) {
       setMessage(error.message)
@@ -204,9 +217,8 @@ function AssessmentCampaignDetailPage() {
     try {
       const res = await assessmentAdminApi.resetInviteCodeProgress(inviteCodeId)
       if (res.success) {
-        setMessage('邀请码进度已重置。')
+        setMessage('邀请码进度已重置')
         await loadDetail()
-        await loadOverview()
       }
     } catch (error) {
       setMessage(error.message)
@@ -218,7 +230,7 @@ function AssessmentCampaignDetailPage() {
     try {
       const res = await assessmentAdminApi.revokeInviteCode(inviteCodeId)
       if (res.success) {
-        setMessage('邀请码已撤销。')
+        setMessage('邀请码已撤销')
         await loadDetail()
       }
     } catch (error) {
@@ -261,7 +273,7 @@ function AssessmentCampaignDetailPage() {
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>{detail.campaign.name}</h1>
           <div style={{ color: 'var(--color-text-secondary)', marginTop: 6 }}>
-            {detail.campaign.raceName || '未关联赛事'} · 状态：{detail.campaign.status}
+            {detail.campaign.raceName || '未关联赛事'} · 状态：{CAMPAIGN_STATUS_LABELS[detail.campaign.status] || detail.campaign.status}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -271,12 +283,13 @@ function AssessmentCampaignDetailPage() {
       </div>
 
       {message && (
-        <div style={{
-          padding: '12px 16px',
-          borderRadius: 10,
-          background: 'rgba(59,130,246,0.1)',
-          color: 'var(--color-text-primary)',
-        }}
+        <div
+          style={{
+            padding: '12px 16px',
+            borderRadius: 10,
+            background: 'rgba(59,130,246,0.1)',
+            color: 'var(--color-text-primary)',
+          }}
         >
           {message}
         </div>
@@ -332,6 +345,7 @@ function AssessmentCampaignDetailPage() {
             <input className="input" type="number" value={inviteCount} onChange={(e) => setInviteCount(e.target.value)} style={{ maxWidth: 120 }} />
             <button className="btn btn--primary" onClick={handleGenerateInviteCodes} disabled={saving}>生成邀请码</button>
           </div>
+
           {generatedCodes.length > 0 && (
             <div style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 8 }}>本次生成</div>
@@ -342,6 +356,7 @@ function AssessmentCampaignDetailPage() {
               </div>
             </div>
           )}
+
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -354,7 +369,7 @@ function AssessmentCampaignDetailPage() {
             <tbody>
               {inviteCodes.map((code) => (
                 <tr key={code.id} style={{ borderTop: '1px solid var(--border-color, #e5e7eb)' }}>
-                  <td style={tdStyle}>{code.status}</td>
+                  <td style={tdStyle}>{INVITE_STATUS_LABELS[code.status] || code.status}</td>
                   <td style={tdStyle}>{code.activatedAt ? new Date(code.activatedAt).toLocaleString() : '-'}</td>
                   <td style={tdStyle}>{code.completedAt ? new Date(code.completedAt).toLocaleString() : '-'}</td>
                   <td style={tdStyle}>
