@@ -703,6 +703,17 @@ export async function closeCampaign(campaignId) {
     return getCampaignDetail(campaignId);
 }
 
+export async function deleteCampaign(campaignId) {
+    const campaign = await repo.findCampaignById(campaignId);
+    if (!campaign) throw notFound('未找到考评活动');
+
+    await repo.deleteCampaign(campaignId);
+    return {
+        id: campaignId,
+        name: campaign.name,
+    };
+}
+
 export async function previewRosterImport(campaignId, rows) {
     await ensureCampaignEditable(campaignId);
     const employeeCodes = (Array.isArray(rows) ? rows : [])

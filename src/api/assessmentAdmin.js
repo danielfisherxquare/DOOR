@@ -5,6 +5,7 @@ const assessmentAdminApi = {
   createCampaign: (data) => request.post('/admin/assessment/campaigns', data),
   getCampaignDetail: (id) => request.get(`/admin/assessment/campaigns/${id}`),
   updateCampaign: (id, data) => request.put(`/admin/assessment/campaigns/${id}`, data),
+  deleteCampaign: (id) => request.delete(`/admin/assessment/campaigns/${id}`),
   publishCampaign: (id) => request.post(`/admin/assessment/campaigns/${id}/publish`),
   closeCampaign: (id) => request.post(`/admin/assessment/campaigns/${id}/close`),
   getRosterTemplate: (id) => request.get(`/admin/assessment/campaigns/${id}/roster-template`),

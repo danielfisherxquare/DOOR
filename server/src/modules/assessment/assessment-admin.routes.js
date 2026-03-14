@@ -38,6 +38,14 @@ router.put('/campaigns/:id', async (req, res, next) => {
     }
 });
 
+router.delete('/campaigns/:id', async (req, res, next) => {
+    try {
+        res.json({ success: true, data: await service.deleteCampaign(req.params.id) });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.post('/campaigns/:id/publish', async (req, res, next) => {
     try {
         res.json({ success: true, data: await service.publishCampaign(req.params.id) });

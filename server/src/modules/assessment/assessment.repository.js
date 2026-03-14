@@ -61,6 +61,10 @@ export async function updateCampaign(id, data) {
     return row;
 }
 
+export async function deleteCampaign(id) {
+    return knex('assessment_campaigns').where({ id }).del();
+}
+
 export async function getLatestTemplateSnapshot(campaignId) {
     return knex('assessment_template_snapshots')
         .where({ campaign_id: campaignId })

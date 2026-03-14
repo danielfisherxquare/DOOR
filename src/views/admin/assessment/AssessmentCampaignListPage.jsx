@@ -28,6 +28,7 @@ function AssessmentCampaignListPage() {
   const [races, setRaces] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState('')
   const [message, setMessage] = useState('')
   const [form, setForm] = useState({
     raceId: '',
@@ -35,7 +36,10 @@ function AssessmentCampaignListPage() {
     year: new Date().getFullYear(),
   })
 
-  const selectedRace = useMemo(() => races.find((race) => String(race.id) === String(form.raceId)), [races, form.raceId])
+  const selectedRace = useMemo(
+    () => races.find((race) => String(race.id) === String(form.raceId)),
+    [races, form.raceId],
+  )
 
   const loadData = async () => {
     setLoading(true)
@@ -85,11 +89,33 @@ function AssessmentCampaignListPage() {
     }
   }
 
+  const handleDelete = async (campaign) => {
+    if (!campaign?.id) return
+    const confirmed = window.confirm(`确认删除考评活动“${campaign.name}”吗？删除后将同时清理该活动下的成员、邀请码、草稿、提交和报表数据，此操作不可恢复。`)
+    if (!confirmed) return
+
+    setDeletingId(campaign.id)
+    setMessage('')
+    try {
+      const res = await assessmentAdminApi.deleteCampaign(campaign.id)
+      if (res.success) {
+        setMessage(`考评活动“${campaign.name}”已删除。`)
+        await loadData()
+      }
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setDeletingId('')
+    }
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>考评管理</h1>
-        <button className="btn btn--secondary" onClick={() => void loadData()} disabled={loading || saving}>刷新</button>
+        <button className="btn btn--secondary" onClick={() => void loadData()} disabled={loading || saving || Boolean(deletingId)}>
+          刷新
+        </button>
       </div>
 
       {message && (
@@ -104,7 +130,11 @@ function AssessmentCampaignListPage() {
 
           <div style={fieldStyle}>
             <label style={labelStyle}>赛事</label>
-            <select className="input" value={form.raceId} onChange={(event) => setForm((prev) => ({ ...prev, raceId: event.target.value }))}>
+            <select
+              className="input"
+              value={form.raceId}
+              onChange={(event) => setForm((prev) => ({ ...prev, raceId: event.target.value }))}
+            >
               <option value="">请选择赛事</option>
               {races.map((race) => (
                 <option key={race.id} value={race.id}>{race.name}</option>
@@ -114,15 +144,25 @@ function AssessmentCampaignListPage() {
 
           <div style={fieldStyle}>
             <label style={labelStyle}>考评名称</label>
-            <input className="input" value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} placeholder="默认使用赛事名称" />
+            <input
+              className="input"
+              value={form.name}
+              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+              placeholder="默认使用赛事名称"
+            />
           </div>
 
           <div style={fieldStyle}>
             <label style={labelStyle}>年份</label>
-            <input className="input" type="number" value={form.year} onChange={(event) => setForm((prev) => ({ ...prev, year: event.target.value }))} />
+            <input
+              className="input"
+              type="number"
+              value={form.year}
+              onChange={(event) => setForm((prev) => ({ ...prev, year: event.target.value }))}
+            />
           </div>
 
-          <button className="btn btn--primary" type="submit" disabled={saving || !form.raceId}>
+          <button className="btn btn--primary" type="submit" disabled={saving || !form.raceId || Boolean(deletingId)}>
             {saving ? '创建中...' : '创建'}
           </button>
         </form>
@@ -154,7 +194,18 @@ function AssessmentCampaignListPage() {
                     <td style={tdStyle}>{campaign.memberCount}</td>
                     <td style={tdStyle}>{campaign.inviteCodeCount}</td>
                     <td style={tdStyle}>
-                      <Link className="btn btn--ghost btn--sm" to={`/admin/assessment/${campaign.id}`}>详情</Link>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <Link className="btn btn--ghost btn--sm" to={`/admin/assessment/${campaign.id}`}>详情</Link>
+                        <button
+                          className="btn btn--ghost btn--sm"
+                          type="button"
+                          onClick={() => void handleDelete(campaign)}
+                          disabled={saving || loading || deletingId === campaign.id}
+                          style={{ color: '#dc2626' }}
+                        >
+                          {deletingId === campaign.id ? '删除中...' : '删除'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
