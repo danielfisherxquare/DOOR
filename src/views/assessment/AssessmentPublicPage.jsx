@@ -38,6 +38,21 @@ function getStarColor(index) {
   return `hsl(${Math.max(24, hue)} 96% 56%)`
 }
 
+function useCompactLayout(breakpoint = 768) {
+  const [isCompact, setIsCompact] = useState(() => window.innerWidth <= breakpoint)
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(`(max-width: ${breakpoint}px)`)
+    const handleChange = (event) => setIsCompact(event.matches)
+
+    setIsCompact(mediaQuery.matches)
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
+  }, [breakpoint])
+
+  return isCompact
+}
+
 function StarScoreInput({ item, value, onChange }) {
   const [hoverValue, setHoverValue] = useState(null)
   const activeValue = hoverValue ?? normalizeScoreValue(value) ?? ''
@@ -140,6 +155,7 @@ function StarScoreInput({ item, value, onChange }) {
 
 function AssessmentPublicPage() {
   const { campaignId } = useParams()
+  const isCompactLayout = useCompactLayout()
   const [meta, setMeta] = useState(null)
   const [progress, setProgress] = useState(null)
   const [currentMember, setCurrentMember] = useState(null)
@@ -337,11 +353,11 @@ function AssessmentPublicPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f7f7fb', padding: 24 }}>
+    <div style={{ minHeight: '100vh', background: '#f7f7fb', padding: isCompactLayout ? 12 : 24 }}>
       <div style={{ maxWidth: 1240, margin: '0 auto', display: 'grid', gap: 16 }}>
         <div style={panelStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-            <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isCompactLayout ? 'flex-start' : 'center', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ minWidth: 0 }}>
               <h1 style={{ margin: 0, fontSize: 28 }}>{meta?.campaign?.name || '考评活动'}</h1>
               <div style={{ color: '#6b7280', marginTop: 8 }}>
                 {meta?.campaign?.raceName || ''}
@@ -357,12 +373,12 @@ function AssessmentPublicPage() {
         {message && <div style={{ ...panelStyle, background: 'rgba(59,130,246,0.08)' }}>{message}</div>}
 
         {!token ? (
-          <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? 'minmax(0, 1fr)' : '400px minmax(0, 1fr)', gap: 16 }}>
             <div style={panelStyle}>
               <h2 style={{ marginTop: 0 }}>输入邀请码继续评分</h2>
               <form onSubmit={handleLogin} style={{ display: 'grid', gap: 12 }}>
                 <input className="input" value={inviteCode} onChange={(event) => setInviteCode(event.target.value.toUpperCase())} placeholder="请输入邀请码" />
-                <button className="btn btn--primary" type="submit" disabled={authLoading || !inviteCode.trim()}>
+                <button className="btn btn--primary" type="submit" disabled={authLoading || !inviteCode.trim()} style={{ width: '100%' }}>
                   {authLoading ? '登录中...' : '进入评分'}
                 </button>
               </form>
@@ -373,7 +389,7 @@ function AssessmentPublicPage() {
 
             <div style={panelStyle}>
               <div style={{ fontWeight: 700, marginBottom: 12 }}>待评分成员预览</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
                 {membersPreview.map((member) => (
                   <div
                     key={member.id}
@@ -400,7 +416,7 @@ function AssessmentPublicPage() {
             <div>该邀请码对应的评分任务已经全部提交完成。</div>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? 'minmax(0, 1fr)' : '320px minmax(0, 1fr)', gap: 16 }}>
             <div style={panelStyle}>
               <div style={{ fontWeight: 700, marginBottom: 12 }}>评分进度</div>
               <div style={{ color: '#6b7280', marginBottom: 12 }}>已完成 {progress?.completedCount || 0} / {progress?.totalCount || 0}</div>
@@ -431,12 +447,12 @@ function AssessmentPublicPage() {
                 <div>请选择一位成员继续评分。</div>
               ) : (
                 <div style={{ display: 'grid', gap: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
-                    <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isCompactLayout ? 'flex-start' : 'center', gap: 16, flexWrap: 'wrap' }}>
+                    <div style={{ minWidth: 0 }}>
                       <div
                         style={{
                           ...memberDisplayNameStyle,
-                          fontSize: 22,
+                          fontSize: isCompactLayout ? 18 : 22,
                           userSelect: 'none',
                           WebkitUserSelect: 'none',
                         }}
@@ -445,7 +461,7 @@ function AssessmentPublicPage() {
                       </div>
                       <div style={{ color: '#6b7280', marginTop: 4 }}>所在岗位：{currentMember.position || '未填写岗位'}</div>
                     </div>
-                    <div style={{ color: saveState === 'error' ? '#dc2626' : '#6b7280' }}>
+                    <div style={{ color: saveState === 'error' ? '#dc2626' : '#6b7280', width: isCompactLayout ? '100%' : 'auto' }}>
                       {SAVE_STATE_LABELS[saveState] || SAVE_STATE_LABELS.idle}
                     </div>
                   </div>
@@ -474,7 +490,7 @@ function AssessmentPublicPage() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button className="btn btn--primary" onClick={handleSubmit}>提交当前成员评分</button>
                   </div>
                 </div>
@@ -492,6 +508,8 @@ const panelStyle = {
   borderRadius: 16,
   padding: 20,
   boxShadow: '0 10px 30px rgba(15,23,42,0.06)',
+  minWidth: 0,
+  overflowWrap: 'break-word',
 }
 
 const memberDisplayNameStyle = {
@@ -500,6 +518,8 @@ const memberDisplayNameStyle = {
   letterSpacing: 0,
   color: '#111827',
   fontSynthesis: 'none',
+  wordBreak: 'break-word',
+  lineHeight: 1.5,
 }
 
 export default AssessmentPublicPage
