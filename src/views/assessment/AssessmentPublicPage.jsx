@@ -386,7 +386,7 @@ function AssessmentPublicPage() {
                       WebkitUserSelect: 'none',
                     }}
                   >
-                    <div style={{ fontWeight: 700, color: '#111827' }}>{member.employeeCode} {member.employeeName}</div>
+                    <div style={memberDisplayNameStyle}>{member.employeeCode} {member.employeeName}</div>
                     <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>所在岗位：{member.position || '未填写岗位'}</div>
                   </div>
                 ))}
@@ -435,9 +435,8 @@ function AssessmentPublicPage() {
                     <div>
                       <div
                         style={{
+                          ...memberDisplayNameStyle,
                           fontSize: 22,
-                          fontWeight: 700,
-                          color: '#111827',
                           userSelect: 'none',
                           WebkitUserSelect: 'none',
                         }}
@@ -493,6 +492,14 @@ const panelStyle = {
   borderRadius: 16,
   padding: 20,
   boxShadow: '0 10px 30px rgba(15,23,42,0.06)',
+}
+
+const memberDisplayNameStyle = {
+  fontFamily: "'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', sans-serif",
+  fontWeight: 600,
+  letterSpacing: 0,
+  color: '#111827',
+  fontSynthesis: 'none',
 }
 
 export default AssessmentPublicPage

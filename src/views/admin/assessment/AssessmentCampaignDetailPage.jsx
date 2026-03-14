@@ -327,7 +327,7 @@ function AssessmentCampaignDetailPage() {
               <label key={candidate.id} style={candidateRowStyle}>
                 <input type="checkbox" checked={selectedTeamMemberIds.includes(candidate.id)} onChange={() => toggleCandidate(candidate.id)} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700 }}>{candidate.employeeCode} {candidate.employeeName}</div>
+                  <div style={memberDisplayNameStyle}>{candidate.employeeCode} {candidate.employeeName}</div>
                   <div style={{ fontSize: 12, color: '#6b7280' }}>
                     {candidate.position || '未填写岗位'} / {candidate.department || '未填写部门'} / {MEMBER_TYPE_LABELS[candidate.memberType] || candidate.memberType}
                     {candidate.externalEngagementType ? ` / ${EXTERNAL_TYPE_LABELS[candidate.externalEngagementType] || candidate.externalEngagementType}` : ''}
@@ -591,6 +591,14 @@ const candidateRowStyle = {
   borderRadius: 12,
   border: '1px solid #e5e7eb',
   background: '#f8fafc',
+}
+
+const memberDisplayNameStyle = {
+  fontFamily: "'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', sans-serif",
+  fontWeight: 600,
+  letterSpacing: 0,
+  color: '#111827',
+  fontSynthesis: 'none',
 }
 
 export default AssessmentCampaignDetailPage
