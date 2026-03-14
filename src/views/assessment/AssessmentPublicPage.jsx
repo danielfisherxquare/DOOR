@@ -10,6 +10,13 @@ const PROGRESS_STATUS_LABELS = {
   submitted: '已提交',
 }
 
+const SAVE_STATE_LABELS = {
+  idle: '等待编辑',
+  saving: '正在自动保存',
+  saved: '已自动保存',
+  error: '保存失败',
+}
+
 function getDeviceFingerprint() {
   const key = 'assessment-device-id'
   let current = window.localStorage.getItem(key)
@@ -18,6 +25,117 @@ function getDeviceFingerprint() {
     window.localStorage.setItem(key, current)
   }
   return current
+}
+
+function normalizeScoreValue(value) {
+  if (value === '' || value === null || value === undefined) return ''
+  const numeric = Number(value)
+  return Number.isInteger(numeric) ? numeric : ''
+}
+
+function getStarColor(index) {
+  const hue = 46 - index * 2.2
+  return `hsl(${Math.max(24, hue)} 96% 56%)`
+}
+
+function StarScoreInput({ item, value, onChange }) {
+  const [hoverValue, setHoverValue] = useState(null)
+  const activeValue = hoverValue ?? normalizeScoreValue(value) ?? ''
+  const currentValue = normalizeScoreValue(value)
+
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onMouseEnter={() => setHoverValue(0)}
+            onMouseLeave={() => setHoverValue(null)}
+            onFocus={() => setHoverValue(0)}
+            onBlur={() => setHoverValue(null)}
+            onClick={() => onChange(0)}
+            aria-label={`${item.title} 0 分`}
+            title="0 分"
+            style={{
+              border: activeValue === 0 ? '1px solid rgba(59,130,246,0.28)' : '1px solid #e5e7eb',
+              background: activeValue === 0 ? 'rgba(59,130,246,0.08)' : '#fff',
+              color: activeValue === 0 ? '#1d4ed8' : '#6b7280',
+              borderRadius: 999,
+              padding: '7px 10px',
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 700,
+              lineHeight: 1,
+              transition: 'all 120ms ease',
+            }}
+          >
+            0分
+          </button>
+          {Array.from({ length: item.scoreMax }, (_, index) => {
+            const score = index + 1
+            const active = activeValue >= score
+            return (
+              <button
+                key={score}
+                type="button"
+                onMouseEnter={() => setHoverValue(score)}
+                onMouseLeave={() => setHoverValue(null)}
+                onFocus={() => setHoverValue(score)}
+                onBlur={() => setHoverValue(null)}
+                onClick={() => onChange(score)}
+                aria-label={`${item.title} ${score} 分`}
+                title={`${score} 分`}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  padding: 0,
+                  cursor: 'pointer',
+                  fontSize: 26,
+                  lineHeight: 1,
+                  color: active ? getStarColor(index) : '#d1d5db',
+                  transform: active ? 'scale(1.02)' : 'scale(1)',
+                  transition: 'color 120ms ease, transform 120ms ease',
+                }}
+              >
+                ★
+              </button>
+            )
+          })}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div
+            style={{
+              minWidth: 88,
+              padding: '6px 10px',
+              borderRadius: 999,
+              background: activeValue !== '' ? 'rgba(245,158,11,0.12)' : '#f3f4f6',
+              color: activeValue !== '' ? '#b45309' : '#6b7280',
+              fontWeight: 700,
+              textAlign: 'center',
+            }}
+          >
+            {activeValue === '' ? 0 : activeValue} / {item.scoreMax}
+          </div>
+          {currentValue !== '' && (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              onClick={() => onChange('')}
+              style={{ minWidth: 'auto', padding: '8px 12px' }}
+            >
+              清空
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: 12 }}>
+        <span>{item.scoreMin} 分</span>
+        <span>{item.scoreMax} 分</span>
+      </div>
+    </div>
+  )
 }
 
 function AssessmentPublicPage() {
@@ -50,11 +168,13 @@ function AssessmentPublicPage() {
 
     setCurrentMember(formRes.data.member)
     setTemplate(formRes.data.template)
-    setScores(templateItems.map((item, index) => ({
-      itemId: item.id,
-      title: item.title,
-      score: draftScores[index]?.score ?? '',
-    })))
+    setScores(
+      templateItems.map((item, index) => ({
+        itemId: item.id,
+        title: item.title,
+        score: normalizeScoreValue(draftScores[index]?.score),
+      })),
+    )
     setComment(formRes.data?.draft?.comment || '')
     setDirty(false)
     setSaveState('idle')
@@ -76,16 +196,12 @@ function AssessmentPublicPage() {
 
   const loadMeta = async () => {
     const res = await assessmentPublicApi.getMeta(campaignId)
-    if (res.success) {
-      setMeta(res.data)
-    }
+    if (res.success) setMeta(res.data)
   }
 
   const loadProgress = async (accessToken) => {
     const res = await assessmentPublicApi.getProgress(campaignId, accessToken)
-    if (res.success) {
-      await hydrateProgress(res.data, accessToken)
-    }
+    if (res.success) await hydrateProgress(res.data, accessToken)
   }
 
   const flushDraft = async () => {
@@ -106,9 +222,7 @@ function AssessmentPublicPage() {
     ;(async () => {
       try {
         await loadMeta()
-        if (!cancelled && token) {
-          await loadProgress(token)
-        }
+        if (!cancelled && token) await loadProgress(token)
       } catch (error) {
         if (!cancelled) setMessage(error.message)
       } finally {
@@ -131,9 +245,7 @@ function AssessmentPublicPage() {
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') {
-        void flushDraft()
-      }
+      if (document.visibilityState === 'hidden') void flushDraft()
     }
     const handleBeforeUnload = () => {
       void flushDraft()
@@ -174,12 +286,18 @@ function AssessmentPublicPage() {
   }
 
   const handleScoreChange = (index, value) => {
-    setScores((prev) => prev.map((row, rowIndex) => (rowIndex === index ? { ...row, score: value } : row)))
+    setScores((prev) => prev.map((row, rowIndex) => (rowIndex === index ? { ...row, score: normalizeScoreValue(value) } : row)))
     setDirty(true)
   }
 
   const handleSubmit = async () => {
     if (!currentMember) return
+    const incompleteItem = scores.find((row) => row.score === '' || row.score === null || row.score === undefined)
+    if (incompleteItem) {
+      setMessage(`请先完成“${incompleteItem.title}”的评分。`)
+      return
+    }
+
     setSaveState('saving')
     setMessage('')
     try {
@@ -199,11 +317,9 @@ function AssessmentPublicPage() {
 
   const handleLogout = async () => {
     try {
-      if (token) {
-        await assessmentPublicApi.logout(campaignId, token)
-      }
+      if (token) await assessmentPublicApi.logout(campaignId, token)
     } catch (_error) {
-      // Ignore public logout failures.
+      // ignore
     }
     window.sessionStorage.removeItem(`${STORAGE_KEY_PREFIX}${campaignId}`)
     setToken('')
@@ -228,36 +344,30 @@ function AssessmentPublicPage() {
             <div>
               <h1 style={{ margin: 0, fontSize: 28 }}>{meta?.campaign?.name || '考评活动'}</h1>
               <div style={{ color: '#6b7280', marginTop: 8 }}>
-                {meta?.campaign?.raceName || ''} {meta?.memberCount ? `· 待评分人数 ${meta.memberCount}` : ''}
+                {meta?.campaign?.raceName || ''}
+                {meta?.memberCount ? `，待评分人数 ${meta.memberCount}` : ''}
               </div>
             </div>
-            {token && <button className="btn btn--ghost" onClick={handleLogout}>退出邀请码会话</button>}
+            {token && (
+              <button className="btn btn--ghost" onClick={handleLogout}>退出邀请码会话</button>
+            )}
           </div>
         </div>
 
-        {message && (
-          <div style={{ ...panelStyle, background: 'rgba(59,130,246,0.08)' }}>
-            {message}
-          </div>
-        )}
+        {message && <div style={{ ...panelStyle, background: 'rgba(59,130,246,0.08)' }}>{message}</div>}
 
         {!token ? (
           <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 16 }}>
             <div style={panelStyle}>
               <h2 style={{ marginTop: 0 }}>输入邀请码继续评分</h2>
               <form onSubmit={handleLogin} style={{ display: 'grid', gap: 12 }}>
-                <input
-                  className="input"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                  placeholder="请输入邀请码"
-                />
+                <input className="input" value={inviteCode} onChange={(event) => setInviteCode(event.target.value.toUpperCase())} placeholder="请输入邀请码" />
                 <button className="btn btn--primary" type="submit" disabled={authLoading || !inviteCode.trim()}>
                   {authLoading ? '登录中...' : '进入评分'}
                 </button>
               </form>
               <div style={{ marginTop: 12, color: '#6b7280', fontSize: 14 }}>
-                使用邀请码即可进入当前赛事评分。系统会自动恢复上次未完成的位置，并实时自动保存。
+                使用邀请码即可进入当前赛事评分。系统会自动恢复上次未完成的位置，并实时自动保存草稿。
               </div>
             </div>
 
@@ -266,15 +376,11 @@ function AssessmentPublicPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
                 {membersPreview.map((member) => (
                   <div key={member.id} style={{ padding: 12, borderRadius: 12, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
-                    <div style={{ fontWeight: 700 }}>{member.employeeName}</div>
-                    <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
-                      {member.position}{member.teamName ? ` · ${member.teamName}` : ''}
-                    </div>
+                    <div style={{ fontWeight: 700 }}>{member.employeeCode} {member.employeeName}</div>
+                    <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>所在岗位：{member.position || '未填写岗位'}</div>
                   </div>
                 ))}
-                {membersPreview.length === 0 && (
-                  <div style={{ color: '#6b7280' }}>当前还没有可评分成员。</div>
-                )}
+                {membersPreview.length === 0 && <div style={{ color: '#6b7280' }}>当前还没有可评分成员。</div>}
               </div>
             </div>
           </div>
@@ -287,9 +393,7 @@ function AssessmentPublicPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 16 }}>
             <div style={panelStyle}>
               <div style={{ fontWeight: 700, marginBottom: 12 }}>评分进度</div>
-              <div style={{ color: '#6b7280', marginBottom: 12 }}>
-                已完成 {progress?.completedCount || 0} / {progress?.totalCount || 0}
-              </div>
+              <div style={{ color: '#6b7280', marginBottom: 12 }}>已完成 {progress?.completedCount || 0} / {progress?.totalCount || 0}</div>
               <div style={{ display: 'grid', gap: 8 }}>
                 {(progress?.items || []).map((member) => (
                   <button
@@ -302,9 +406,7 @@ function AssessmentPublicPage() {
                     }}
                   >
                     <span>{member.employeeName}</span>
-                    <span style={{ fontSize: 12, opacity: 0.7 }}>
-                      {PROGRESS_STATUS_LABELS[member.progressStatus] || member.progressStatus}
-                    </span>
+                    <span style={{ fontSize: 12, opacity: 0.7 }}>{PROGRESS_STATUS_LABELS[member.progressStatus] || member.progressStatus}</span>
                   </button>
                 ))}
               </div>
@@ -317,16 +419,11 @@ function AssessmentPublicPage() {
                 <div style={{ display: 'grid', gap: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
                     <div>
-                      <div style={{ fontSize: 22, fontWeight: 700 }}>{currentMember.employeeName}</div>
-                      <div style={{ color: '#6b7280', marginTop: 4 }}>
-                        {currentMember.position}{currentMember.teamName ? ` · ${currentMember.teamName}` : ''}
-                      </div>
+                      <div style={{ fontSize: 22, fontWeight: 700 }}>{currentMember.employeeCode} {currentMember.employeeName}</div>
+                      <div style={{ color: '#6b7280', marginTop: 4 }}>所在岗位：{currentMember.position || '未填写岗位'}</div>
                     </div>
                     <div style={{ color: saveState === 'error' ? '#dc2626' : '#6b7280' }}>
-                      {saveState === 'saving' && '正在保存'}
-                      {saveState === 'saved' && '已自动保存'}
-                      {saveState === 'error' && '保存失败'}
-                      {saveState === 'idle' && '等待编辑'}
+                      {SAVE_STATE_LABELS[saveState] || SAVE_STATE_LABELS.idle}
                     </div>
                   </div>
 
@@ -334,16 +431,7 @@ function AssessmentPublicPage() {
                     <div key={item.id} style={{ borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
                       <div style={{ fontWeight: 700 }}>{index + 1}. {item.title}</div>
                       <div style={{ color: '#6b7280', fontSize: 14, margin: '6px 0 10px' }}>{item.description}</div>
-                      <input
-                        className="input"
-                        type="number"
-                        min={item.scoreMin}
-                        max={item.scoreMax}
-                        value={scores[index]?.score ?? ''}
-                        onChange={(e) => handleScoreChange(index, e.target.value)}
-                        placeholder={`${item.scoreMin}-${item.scoreMax}`}
-                        style={{ maxWidth: 140 }}
-                      />
+                      <StarScoreInput item={item} value={scores[index]?.score ?? ''} onChange={(value) => handleScoreChange(index, value)} />
                     </div>
                   ))}
 
@@ -353,15 +441,17 @@ function AssessmentPublicPage() {
                       className="input"
                       rows={4}
                       value={comment}
-                      onChange={(e) => {
-                        setComment(e.target.value)
+                      onChange={(event) => {
+                        setComment(event.target.value)
                         setDirty(true)
                       }}
                     />
+                    <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 8 }}>
+                      备注同样会自动保存，无需手动点击保存。
+                    </div>
                   </div>
 
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn btn--secondary" onClick={() => void flushDraft()}>立即保存</button>
                     <button className="btn btn--primary" onClick={handleSubmit}>提交当前成员评分</button>
                   </div>
                 </div>

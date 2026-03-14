@@ -218,8 +218,8 @@ export default function GanttView({ projectId }) {
                                 <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', borderRight: '1px solid #e5e7eb', position: 'sticky', left: 0, background: '#fff', zIndex: 5, fontSize: 14, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title={task.title}>
                                     {task.title}
                                 </div>
-                                <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', borderRight: '1px solid #e5e7eb', position: 'sticky', left: 200, background: '#fff', zIndex: 5, fontSize: 13, color: '#6b7280' }} title={task.responsible_group || '-'}>
-                                    {task.responsible_group || '-'}
+                                <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', borderRight: '1px solid #e5e7eb', position: 'sticky', left: 200, background: '#fff', zIndex: 5, fontSize: 13, color: '#6b7280' }} title={task.assignee_summary || task.responsible_group || '-'}>
+                                    {task.assignee_summary || task.responsible_group || '-'}
                                 </div>
 
                                 {/* Grid body track */}

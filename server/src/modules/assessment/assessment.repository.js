@@ -92,13 +92,25 @@ export async function replaceMembers(campaignId, members) {
 }
 
 export async function listMembers(campaignId) {
-    return knex('assessment_members')
+    return knex('assessment_members as members')
+        .leftJoin('team_members as team_members', 'members.team_member_id', 'team_members.id')
+        .select(
+            'members.*',
+            'team_members.external_engagement_type as team_external_engagement_type',
+        )
         .where({ campaign_id: campaignId })
         .orderBy([{ column: 'sort_order', order: 'asc' }, { column: 'created_at', order: 'asc' }]);
 }
 
 export async function findMember(campaignId, memberId) {
-    return knex('assessment_members').where({ campaign_id: campaignId, id: memberId }).first();
+    return knex('assessment_members as members')
+        .leftJoin('team_members as team_members', 'members.team_member_id', 'team_members.id')
+        .select(
+            'members.*',
+            'team_members.external_engagement_type as team_external_engagement_type',
+        )
+        .where({ 'members.campaign_id': campaignId, 'members.id': memberId })
+        .first();
 }
 
 export async function createInviteCodes(rows) {
@@ -259,4 +271,57 @@ export async function listLatestKnownMembersByCodes(employeeCodes) {
                 .as('latest_members'),
         )
         .where('row_num', 1);
+}
+
+export async function listCampaignTeamCandidates(campaignId, keyword = '') {
+    const campaign = await knex('assessment_campaigns').where({ id: campaignId }).first('id', 'org_id');
+    if (!campaign?.org_id) return [];
+
+    const query = knex('team_members')
+        .where({ org_id: campaign.org_id })
+        .whereIn('status', ['active', 'inactive'])
+        .select(
+            'id',
+            'employee_code',
+            'employee_name',
+            'position',
+            'department',
+            'member_type',
+            'external_engagement_type',
+            'status',
+            'created_at',
+        )
+        .orderBy([{ column: 'employee_code', order: 'asc' }, { column: 'created_at', order: 'asc' }]);
+
+    if (keyword) {
+        query.andWhere((builder) => {
+            builder
+                .where('employee_code', 'ilike', `%${keyword}%`)
+                .orWhere('employee_name', 'ilike', `%${keyword}%`)
+                .orWhere('department', 'ilike', `%${keyword}%`)
+                .orWhere('position', 'ilike', `%${keyword}%`);
+        });
+    }
+
+    return query;
+}
+
+export async function listTeamMembersByIds(orgId, teamMemberIds) {
+    if (!Array.isArray(teamMemberIds) || teamMemberIds.length === 0) return [];
+
+    return knex('team_members')
+        .where({ org_id: orgId })
+        .whereIn('id', teamMemberIds)
+        .whereIn('status', ['active', 'inactive'])
+        .select(
+            'id',
+            'org_id',
+            'employee_code',
+            'employee_name',
+            'position',
+            'department',
+            'member_type',
+            'external_engagement_type',
+            'status',
+        );
 }

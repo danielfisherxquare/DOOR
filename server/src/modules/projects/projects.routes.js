@@ -15,5 +15,8 @@ router.get('/:projectId/tasks', ProjectsController.getTasksByProjectId);
 router.post('/:projectId/tasks', ProjectsController.createTask);
 router.put('/:projectId/tasks/:taskId', ProjectsController.updateTask);
 router.delete('/:projectId/tasks/:taskId', ProjectsController.deleteTask);
+router.get('/:projectId/team-candidates', ProjectsController.getProjectTeamCandidates);
+router.get('/:projectId/tasks/:taskId/assignees', ProjectsController.getTaskAssignees);
+router.put('/:projectId/tasks/:taskId/assignees', ProjectsController.setTaskAssignees);
 
 export default router;

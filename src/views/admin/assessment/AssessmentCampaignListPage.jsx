@@ -10,6 +10,19 @@ const STATUS_LABELS = {
   archived: '已归档',
 }
 
+const DEFAULT_TEMPLATE_ITEMS = [
+  { id: 'skill', title: '业务技能与专业度', description: '个人硬技能扎实，能熟练操作负责的设备或精准提供对应服务，无低级业务失误。', weight: 1, scoreMin: 0, scoreMax: 10, required: true },
+  { id: 'quality', title: '工作质量与完成度', description: '负责的具体工作按质、按量完成，交付结果达到赛事标准，无明显偷工减料或敷衍。', weight: 1, scoreMin: 0, scoreMax: 10, required: true },
+  { id: 'schedule', title: '进度把控与履约', description: '个人动作迅速，进场、彩排、正赛、撤场等环节严守时间节点，不拖团队后腿。', weight: 1, scoreMin: 0, scoreMax: 10, required: true },
+  { id: 'coordination', title: '协同配合与大局观', description: '与团队内外部人员顺畅对接，互相补位，服从现场统一调度，不推诿扯皮。', weight: 1, scoreMin: 0, scoreMax: 10, required: true },
+  { id: 'execution', title: '需求理解与执行力', description: '对甲方或总控下达的指令能一次性听懂，不跑偏，并迅速转化为实际行动。', weight: 1, scoreMin: 0, scoreMax: 10, required: true },
+  { id: 'feedback', title: '信息反馈与响应', description: '保持通讯畅通，遇到问题、进度受阻或完成任务时，能第一时间真实汇报，不隐瞒。', weight: 1, scoreMin: 0, scoreMax: 10, required: true },
+  { id: 'discipline', title: '工作纪律与风貌', description: '精神面貌积极饱满，严格遵守赛场纪律，不迟到早退，不酒后上岗，不擅自离岗。', weight: 1, scoreMin: 0, scoreMax: 10, required: true },
+  { id: 'ownership', title: '服务意识与责任心', description: '具备主人翁意识，眼里有活，能主动发现并填补负责区域内的服务、安全或执行盲区。', weight: 1, scoreMin: 0, scoreMax: 10, required: true },
+  { id: 'risk', title: '风险意识与敏锐度', description: '能够敏锐察觉自己点位上的安全隐患、设备异常、极端天气前兆等问题并预警。', weight: 1, scoreMin: 0, scoreMax: 10, required: true },
+  { id: 'pressure', title: '突发应变与抗压能力', description: '面对现场高压、突发状况或临时加派的任务，能保持情绪稳定，反应迅速且处理得当。', weight: 1, scoreMin: 0, scoreMax: 10, required: true },
+]
+
 function AssessmentCampaignListPage() {
   const [campaigns, setCampaigns] = useState([])
   const [races, setRaces] = useState([])
@@ -22,10 +35,7 @@ function AssessmentCampaignListPage() {
     year: new Date().getFullYear(),
   })
 
-  const selectedRace = useMemo(
-    () => races.find((race) => String(race.id) === String(form.raceId)),
-    [races, form.raceId],
-  )
+  const selectedRace = useMemo(() => races.find((race) => String(race.id) === String(form.raceId)), [races, form.raceId])
 
   const loadData = async () => {
     setLoading(true)
@@ -54,13 +64,17 @@ function AssessmentCampaignListPage() {
     setSaving(true)
     setMessage('')
     try {
+      const campaignName = form.name.trim() || selectedRace?.name || ''
       const res = await assessmentAdminApi.createCampaign({
         raceId: Number(form.raceId),
-        name: form.name.trim() || selectedRace?.name || '',
+        name: campaignName,
         year: Number(form.year),
+        templateTitle: campaignName ? `${campaignName}考评表` : '赛事考评表',
+        templateInstructions: '',
+        templateItems: DEFAULT_TEMPLATE_ITEMS,
       })
       if (res.success) {
-        setMessage('考评活动创建成功')
+        setMessage('考评活动创建成功。')
         setForm({ raceId: '', name: '', year: new Date().getFullYear() })
         await loadData()
       }
@@ -90,11 +104,7 @@ function AssessmentCampaignListPage() {
 
           <div style={fieldStyle}>
             <label style={labelStyle}>赛事</label>
-            <select
-              className="input"
-              value={form.raceId}
-              onChange={(e) => setForm((prev) => ({ ...prev, raceId: e.target.value }))}
-            >
+            <select className="input" value={form.raceId} onChange={(event) => setForm((prev) => ({ ...prev, raceId: event.target.value }))}>
               <option value="">请选择赛事</option>
               {races.map((race) => (
                 <option key={race.id} value={race.id}>{race.name}</option>
@@ -104,22 +114,12 @@ function AssessmentCampaignListPage() {
 
           <div style={fieldStyle}>
             <label style={labelStyle}>考评名称</label>
-            <input
-              className="input"
-              value={form.name}
-              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-              placeholder="默认使用赛事名称"
-            />
+            <input className="input" value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} placeholder="默认使用赛事名称" />
           </div>
 
           <div style={fieldStyle}>
             <label style={labelStyle}>年份</label>
-            <input
-              className="input"
-              type="number"
-              value={form.year}
-              onChange={(e) => setForm((prev) => ({ ...prev, year: e.target.value }))}
-            />
+            <input className="input" type="number" value={form.year} onChange={(event) => setForm((prev) => ({ ...prev, year: event.target.value }))} />
           </div>
 
           <button className="btn btn--primary" type="submit" disabled={saving || !form.raceId}>

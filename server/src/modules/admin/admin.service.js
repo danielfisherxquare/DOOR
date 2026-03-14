@@ -19,10 +19,16 @@ export async function listOrgs({ page = 1, limit = 20, keyword = '' }) {
     for (const org of items) {
         org.userCount = 0;
         org.raceCount = 0;
+        org.teamMemberCount = 0;
+        org.employeeCount = 0;
+        org.externalSupportCount = 0;
+        org.loginAccountCount = 0;
+        org.projectCount = 0;
+        org.activeRaceCount = 0;
     }
     const orgIds = items.map((org) => org.id);
     if (orgIds.length > 0) {
-        const [userCounts, raceCounts] = await Promise.all([
+        const [userCounts, raceCounts, teamCounts, employeeCounts, externalCounts, loginAccountCounts, projectCounts] = await Promise.all([
             knex('users')
                 .whereIn('org_id', orgIds)
                 .groupBy('org_id')
@@ -33,12 +39,51 @@ export async function listOrgs({ page = 1, limit = 20, keyword = '' }) {
                 .groupBy('org_id')
                 .select('org_id')
                 .count('* as count'),
+            knex('team_members')
+                .whereIn('org_id', orgIds)
+                .groupBy('org_id')
+                .select('org_id')
+                .count('* as count'),
+            knex('team_members')
+                .whereIn('org_id', orgIds)
+                .where({ member_type: 'employee' })
+                .groupBy('org_id')
+                .select('org_id')
+                .count('* as count'),
+            knex('team_members')
+                .whereIn('org_id', orgIds)
+                .where({ member_type: 'external_support' })
+                .groupBy('org_id')
+                .select('org_id')
+                .count('* as count'),
+            knex('team_members')
+                .whereIn('org_id', orgIds)
+                .whereNotNull('account_user_id')
+                .groupBy('org_id')
+                .select('org_id')
+                .count('* as count'),
+            knex('projects')
+                .whereIn('org_id', orgIds)
+                .groupBy('org_id')
+                .select('org_id')
+                .count('* as count'),
         ]);
         const userCountMap = new Map(userCounts.map((row) => [row.org_id, Number(row.count)]));
         const raceCountMap = new Map(raceCounts.map((row) => [row.org_id, Number(row.count)]));
+        const teamCountMap = new Map(teamCounts.map((row) => [row.org_id, Number(row.count)]));
+        const employeeCountMap = new Map(employeeCounts.map((row) => [row.org_id, Number(row.count)]));
+        const externalCountMap = new Map(externalCounts.map((row) => [row.org_id, Number(row.count)]));
+        const loginAccountCountMap = new Map(loginAccountCounts.map((row) => [row.org_id, Number(row.count)]));
+        const projectCountMap = new Map(projectCounts.map((row) => [row.org_id, Number(row.count)]));
         for (const org of items) {
             org.userCount = userCountMap.get(org.id) || 0;
             org.raceCount = raceCountMap.get(org.id) || 0;
+            org.teamMemberCount = teamCountMap.get(org.id) || 0;
+            org.employeeCount = employeeCountMap.get(org.id) || 0;
+            org.externalSupportCount = externalCountMap.get(org.id) || 0;
+            org.loginAccountCount = loginAccountCountMap.get(org.id) || 0;
+            org.projectCount = projectCountMap.get(org.id) || 0;
+            org.activeRaceCount = raceCountMap.get(org.id) || 0;
         }
     }
 
@@ -57,16 +102,41 @@ export async function getOrgDetail(orgId) {
     const org = await knex('organizations').where({ id: orgId }).first();
     if (!org) throw Object.assign(new Error('机构不存在'), { status: 404, expose: true });
 
-    const users = await knex('users')
-        .where({ org_id: orgId })
-        .select('id', 'username', 'email', 'role', 'status', 'created_at')
-        .orderBy('created_at', 'desc');
-    const races = await knex('races')
-        .where({ org_id: orgId })
-        .select('id', 'name', 'date', 'location', 'created_at')
-        .orderBy('created_at', 'desc');
+    const [users, races, teamMembers, projects, overviewList] = await Promise.all([
+        knex('users as users')
+            .leftJoin('team_members as team_members', 'users.team_member_id', 'team_members.id')
+            .where('users.org_id', orgId)
+            .select(
+                'users.id',
+                'users.username',
+                'users.email',
+                'users.role',
+                'users.status',
+                'users.account_source',
+                'users.must_change_password',
+                'users.created_at',
+                'team_members.employee_code',
+                'team_members.employee_name as team_member_name',
+                'team_members.member_type',
+            )
+            .orderBy('users.created_at', 'desc'),
+        knex('races')
+            .where({ org_id: orgId })
+            .select('id', 'name', 'date', 'location', 'created_at')
+            .orderBy('created_at', 'desc'),
+        knex('team_members')
+            .where({ org_id: orgId })
+            .select('id', 'employee_code', 'employee_name', 'position', 'department', 'member_type', 'external_engagement_type', 'status', 'created_at')
+            .orderBy('created_at', 'desc'),
+        knex('projects')
+            .where({ org_id: orgId })
+            .select('id', 'name', 'description', 'race_id', 'created_at', 'updated_at')
+            .orderBy('created_at', 'desc'),
+        listOrgs({ page: 1, limit: 1, keyword: org.name }),
+    ]);
 
-    return { ...org, users, races };
+    const overview = (overviewList.items || []).find((item) => item.id === orgId) || null;
+    return { ...org, overview, users, races, teamMembers, projects };
 }
 
 export async function updateOrg(orgId, fields) {
@@ -115,13 +185,17 @@ export async function deleteOrg(orgId) {
 
 // ── 全平台用户管理 ────────────────────────────────────
 
-export async function listAllUsers({ page = 1, limit = 20, keyword = '', role = '' }) {
+export async function listAllUsers({ page = 1, limit = 20, keyword = '', role = '', orgId = '', accountSource = '', memberType = '', status = '', mustChangePassword = '' }) {
     const query = knex('users')
         .leftJoin('organizations', 'users.org_id', 'organizations.id')
+        .leftJoin('team_members', 'users.team_member_id', 'team_members.id')
         .select(
             'users.id', 'users.username', 'users.email', 'users.role',
-            'users.status', 'users.org_id', 'users.created_at',
+            'users.status', 'users.org_id', 'users.created_at', 'users.account_source', 'users.must_change_password', 'users.team_member_id',
             'organizations.name as org_name',
+            'team_members.employee_code',
+            'team_members.employee_name as team_member_name',
+            'team_members.member_type',
         );
     if (keyword) {
         query.where(function () {
@@ -131,6 +205,23 @@ export async function listAllUsers({ page = 1, limit = 20, keyword = '', role = 
     }
     if (role) {
         query.where('users.role', role);
+    }
+    if (orgId) {
+        query.where('users.org_id', orgId);
+    }
+    if (accountSource) {
+        query.where('users.account_source', accountSource);
+    }
+    if (memberType) {
+        query.where('team_members.member_type', memberType);
+    }
+    if (status) {
+        query.where('users.status', status);
+    }
+    if (mustChangePassword === 'true') {
+        query.where('users.must_change_password', true);
+    } else if (mustChangePassword === 'false') {
+        query.where('users.must_change_password', false);
     }
     const countQuery = query.clone();
     const total = await countQuery.clearSelect().count('users.id as count').first().then(r => r.count);

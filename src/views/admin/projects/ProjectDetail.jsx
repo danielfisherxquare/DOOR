@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 
 import TreeGrid from '../../../components/projects/TreeGrid';
 import GanttView from '../../../components/projects/GanttView';
 import racesApi from '../../../api/races';
 import projectsApi from '../../../api/projects';
+import useAuthStore from '../../../stores/authStore';
 
 export default function ProjectDetail() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const user = useAuthStore((state) => state.user);
     const [project, setProject] = useState(null);
     const [saving, setSaving] = useState(false);
     const [availableRaces, setAvailableRaces] = useState([]);
@@ -21,7 +24,7 @@ export default function ProjectDetail() {
                     if (data.success) setProject(data.data);
                 });
         } else {
-            setProject({ name: '', description: '', race_id: '' });
+            setProject({ name: '', description: '', race_id: '', org_id: searchParams.get('orgId') || user?.orgId || user?.org?.id || '' });
         }
 
         racesApi.getAll().then(res => {
@@ -34,8 +37,12 @@ export default function ProjectDetail() {
     const handleSave = async () => {
         setSaving(true);
         try {
+            const payload = {
+                ...project,
+                org_id: project.org_id || searchParams.get('orgId') || user?.orgId || user?.org?.id || null,
+            };
             const data = id === 'new'
-                ? await projectsApi.create(project)
+                ? await projectsApi.create(payload)
                 : await projectsApi.update(id, project);
 
             if (data.success) {

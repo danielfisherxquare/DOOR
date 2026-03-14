@@ -78,6 +78,22 @@ router.post('/campaigns/:id/roster/commit', async (req, res, next) => {
     }
 });
 
+router.get('/campaigns/:id/team-candidates', async (req, res, next) => {
+    try {
+        res.json({ success: true, data: await service.listCampaignTeamCandidates(req.params.id, req.query?.keyword) });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.put('/campaigns/:id/members', async (req, res, next) => {
+    try {
+        res.json({ success: true, data: await service.setCampaignMembers(req.params.id, req.body?.teamMemberIds) });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.post('/campaigns/:id/invite-codes/generate', async (req, res, next) => {
     try {
         res.json({ success: true, data: await service.generateInviteCodes(req.params.id, req.body?.count) });

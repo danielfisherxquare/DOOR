@@ -135,8 +135,18 @@ router.put('/orgs/:orgId/race-permissions', async (req, res, next) => {
 // GET /api/admin/users
 router.get('/users', async (req, res, next) => {
     try {
-        const { page = 1, limit = 20, keyword = '', role = '' } = req.query;
-        const result = await adminService.listAllUsers({ page: Number(page), limit: Number(limit), keyword, role });
+        const { page = 1, limit = 20, keyword = '', role = '', orgId = '', accountSource = '', memberType = '', status = '', mustChangePassword = '' } = req.query;
+        const result = await adminService.listAllUsers({
+            page: Number(page),
+            limit: Number(limit),
+            keyword,
+            role,
+            orgId,
+            accountSource,
+            memberType,
+            status,
+            mustChangePassword,
+        });
         res.json({ success: true, data: result });
     } catch (err) { next(err); }
 });

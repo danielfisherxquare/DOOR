@@ -17,13 +17,14 @@ const INVITE_STATUS_LABELS = {
   expired: '已失效',
 }
 
-const ROSTER_HEADER_MAP = {
-  工号: 'employeeCode',
-  姓名: 'employeeName',
-  岗位: 'position',
-  团队: 'teamName',
-  部门: 'department',
-  排序: 'sortOrder',
+const MEMBER_TYPE_LABELS = {
+  employee: '正式成员',
+  external_support: '外援',
+}
+
+const EXTERNAL_TYPE_LABELS = {
+  temporary: '临时外援',
+  long_term: '长期外援',
 }
 
 function AssessmentCampaignDetailPage() {
@@ -37,6 +38,10 @@ function AssessmentCampaignDetailPage() {
   const [growthCode, setGrowthCode] = useState('')
   const [growthReport, setGrowthReport] = useState(null)
   const [selectedMemberReport, setSelectedMemberReport] = useState(null)
+  const [candidateKeyword, setCandidateKeyword] = useState('')
+  const [candidateLoading, setCandidateLoading] = useState(false)
+  const [candidates, setCandidates] = useState([])
+  const [selectedTeamMemberIds, setSelectedTeamMemberIds] = useState([])
 
   const templateItems = detail?.template?.items || []
   const reportMembers = useMemo(() => detail?.report?.members || [], [detail])
@@ -53,6 +58,7 @@ function AssessmentCampaignDetailPage() {
       const res = await assessmentAdminApi.getCampaignDetail(id)
       if (res.success) {
         setDetail(res.data)
+        setSelectedTeamMemberIds((res.data.members || []).map((item) => item.teamMemberId).filter(Boolean))
       }
     } catch (error) {
       setDetail(null)
@@ -62,8 +68,23 @@ function AssessmentCampaignDetailPage() {
     }
   }
 
+  const loadCandidates = async (keyword = '') => {
+    setCandidateLoading(true)
+    try {
+      const res = await assessmentAdminApi.getTeamCandidates(id, keyword)
+      if (res.success) {
+        setCandidates(res.data || [])
+      }
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setCandidateLoading(false)
+    }
+  }
+
   useEffect(() => {
     void loadDetail()
+    void loadCandidates('')
   }, [id])
 
   const updateTemplateItem = (index, key, value) => {
@@ -94,7 +115,7 @@ function AssessmentCampaignDetailPage() {
       })
       if (res.success) {
         setDetail(res.data)
-        setMessage('评分模板已保存')
+        setMessage('评分模板已保存。')
       }
     } catch (error) {
       setMessage(error.message)
@@ -103,67 +124,19 @@ function AssessmentCampaignDetailPage() {
     }
   }
 
-  const handleDownloadTemplate = async () => {
-    const XLSX = await import('xlsx')
-    const res = await assessmentAdminApi.getRosterTemplate(id)
-    const meta = res.data
-    const headers = meta.columns.map((item) => item.title)
-    const rows = meta.sampleRows.map((row) => ({
-      工号: row.employeeCode,
-      姓名: row.employeeName,
-      岗位: row.position,
-      团队: row.teamName,
-      部门: row.department,
-      排序: row.sortOrder,
-    }))
-
-    const workbook = XLSX.utils.book_new()
-    const worksheet = XLSX.utils.json_to_sheet(rows, { header: headers })
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'roster')
-    XLSX.writeFile(workbook, meta.fileName, { bookType: 'xlsx' })
-  }
-
-  const handleRosterUpload = async (event) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
+  const handleSyncMembers = async () => {
+    setSaving(true)
+    setMessage('')
     try {
-      const XLSX = await import('xlsx')
-      const buffer = await file.arrayBuffer()
-      const workbook = XLSX.read(buffer, { type: 'array' })
-      const sheet = workbook.Sheets[workbook.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
-      const normalizedRows = rows.map((row) => {
-        const normalized = {}
-        Object.entries(ROSTER_HEADER_MAP).forEach(([label, field]) => {
-          normalized[field] = row[label]
-        })
-        return normalized
-      })
-
-      const previewRes = await assessmentAdminApi.previewRosterImport(id, normalizedRows)
-      if (!previewRes.success) return
-
-      const duplicateCodes = previewRes.data.duplicateEmployeeCodes || []
-      if (duplicateCodes.length > 0) {
-        setMessage(`导入失败，工号重复：${duplicateCodes.join('、')}`)
-        return
-      }
-
-      const commitRes = await assessmentAdminApi.commitRosterImport(id, previewRes.data.rows)
-      if (commitRes.success) {
-        const inheritedCount = Number(previewRes.data.inheritedNameCount || 0)
-        setMessage(
-          inheritedCount > 0
-            ? `名单导入成功，共 ${commitRes.data.length} 人；自动继承姓名 ${inheritedCount} 人`
-            : `名单导入成功，共 ${commitRes.data.length} 人`,
-        )
+      const res = await assessmentAdminApi.setCampaignMembers(id, selectedTeamMemberIds)
+      if (res.success) {
+        setMessage(`已同步 ${res.data.length} 名成员到考评活动。`)
         await loadDetail()
       }
     } catch (error) {
       setMessage(error.message)
     } finally {
-      event.target.value = ''
+      setSaving(false)
     }
   }
 
@@ -174,7 +147,7 @@ function AssessmentCampaignDetailPage() {
       const res = await assessmentAdminApi.generateInviteCodes(id, Number(inviteCount))
       if (res.success) {
         setGeneratedCodes(res.data.inviteCodes || [])
-        setMessage(`已生成 ${res.data.inviteCodes?.length || 0} 个邀请码`)
+        setMessage(`已生成 ${res.data.inviteCodes?.length || 0} 个邀请码。`)
         await loadDetail()
       }
     } catch (error) {
@@ -191,7 +164,7 @@ function AssessmentCampaignDetailPage() {
       const res = await assessmentAdminApi.publishCampaign(id)
       if (res.success) {
         setDetail(res.data)
-        setMessage('考评活动已发布')
+        setMessage('考评活动已发布。')
       }
     } catch (error) {
       setMessage(error.message)
@@ -207,7 +180,7 @@ function AssessmentCampaignDetailPage() {
       const res = await assessmentAdminApi.closeCampaign(id)
       if (res.success) {
         setDetail(res.data)
-        setMessage('考评活动已关闭')
+        setMessage('考评活动已关闭。')
       }
     } catch (error) {
       setMessage(error.message)
@@ -217,11 +190,11 @@ function AssessmentCampaignDetailPage() {
   }
 
   const handleResetInviteCode = async (inviteCodeId) => {
-    if (!window.confirm('确认重置该邀请码的评分进度吗？这会清空它已提交和未提交的数据。')) return
+    if (!window.confirm('确认重置该邀请码的评分进度吗？这会清空它当前的草稿和已提交评分。')) return
     try {
       const res = await assessmentAdminApi.resetInviteCodeProgress(inviteCodeId)
       if (res.success) {
-        setMessage('邀请码进度已重置')
+        setMessage('邀请码进度已重置。')
         await loadDetail()
       }
     } catch (error) {
@@ -234,7 +207,7 @@ function AssessmentCampaignDetailPage() {
     try {
       const res = await assessmentAdminApi.revokeInviteCode(inviteCodeId)
       if (res.success) {
-        setMessage('邀请码已撤销')
+        setMessage('邀请码已撤销。')
         await loadDetail()
       }
     } catch (error) {
@@ -272,10 +245,18 @@ function AssessmentCampaignDetailPage() {
     if (!shareLink) return
     try {
       await navigator.clipboard.writeText(shareLink)
-      setMessage('\u5206\u4eab\u94fe\u63a5\u5df2\u590d\u5236')
+      setMessage('分享链接已复制。')
     } catch (_error) {
       setMessage(shareLink)
     }
+  }
+
+  const toggleCandidate = (candidateId) => {
+    setSelectedTeamMemberIds((prev) => (
+      prev.includes(candidateId)
+        ? prev.filter((item) => item !== candidateId)
+        : [...prev, candidateId]
+    ))
   }
 
   if (loading) return <div style={{ padding: 24 }}>加载中...</div>
@@ -283,40 +264,19 @@ function AssessmentCampaignDetailPage() {
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>{detail.campaign.name}</h1>
           <div style={{ color: 'var(--color-text-secondary)', marginTop: 6 }}>
-            {detail.campaign.raceName || '未关联赛事'} · 状态：{CAMPAIGN_STATUS_LABELS[detail.campaign.status] || detail.campaign.status}
+            {detail.campaign.raceName || '未关联赛事'}，状态：{CAMPAIGN_STATUS_LABELS[detail.campaign.status] || detail.campaign.status}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-          <div
-            style={{
-              minWidth: 320,
-              maxWidth: 420,
-              padding: 10,
-              borderRadius: 12,
-              background: 'var(--color-bg-card, #fff)',
-              boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))',
-              display: 'grid',
-              gap: 8,
-            }}
-          >
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-              {'\u8003\u8bc4\u5206\u4eab\u94fe\u63a5'}
-            </div>
+          <div style={shareCardStyle}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)' }}>考评分发链接</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                className="input"
-                readOnly
-                value={shareLink}
-                onFocus={(event) => event.target.select()}
-                style={{ minWidth: 0 }}
-              />
-              <button className="btn btn--secondary" onClick={handleCopyShareLink}>
-                {'\u590d\u5236'}
-              </button>
+              <input className="input" readOnly value={shareLink} onFocus={(event) => event.target.select()} style={{ minWidth: 0 }} />
+              <button className="btn btn--secondary" onClick={handleCopyShareLink}>复制</button>
             </div>
           </div>
           <button className="btn btn--secondary" onClick={handlePublish} disabled={saving || detail.campaign.status !== 'draft'}>发布活动</button>
@@ -324,18 +284,7 @@ function AssessmentCampaignDetailPage() {
         </div>
       </div>
 
-      {message && (
-        <div
-          style={{
-            padding: '12px 16px',
-            borderRadius: 10,
-            background: 'rgba(59,130,246,0.1)',
-            color: 'var(--color-text-primary)',
-          }}
-        >
-          {message}
-        </div>
-      )}
+      {message && <div style={noticeStyle}>{message}</div>}
 
       <div style={cardStyle}>
         <div style={titleStyle}>评分模板</div>
@@ -343,21 +292,21 @@ function AssessmentCampaignDetailPage() {
           <input
             className="input"
             value={detail.template.title}
-            onChange={(e) => setDetail((prev) => ({ ...prev, template: { ...prev.template, title: e.target.value } }))}
+            onChange={(event) => setDetail((prev) => ({ ...prev, template: { ...prev.template, title: event.target.value } }))}
             placeholder="模板标题"
           />
           <textarea
             className="input"
             rows={3}
             value={detail.template.instructions}
-            onChange={(e) => setDetail((prev) => ({ ...prev, template: { ...prev.template, instructions: e.target.value } }))}
+            onChange={(event) => setDetail((prev) => ({ ...prev, template: { ...prev.template, instructions: event.target.value } }))}
             placeholder="模板说明"
           />
           {templateItems.map((item, index) => (
             <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '220px 1fr 90px', gap: 12 }}>
-              <input className="input" value={item.title} onChange={(e) => updateTemplateItem(index, 'title', e.target.value)} />
-              <input className="input" value={item.description} onChange={(e) => updateTemplateItem(index, 'description', e.target.value)} />
-              <input className="input" type="number" value={item.weight} onChange={(e) => updateTemplateItem(index, 'weight', Number(e.target.value || 1))} />
+              <input className="input" value={item.title} onChange={(event) => updateTemplateItem(index, 'title', event.target.value)} />
+              <input className="input" value={item.description} onChange={(event) => updateTemplateItem(index, 'description', event.target.value)} />
+              <input className="input" type="number" value={item.weight} onChange={(event) => updateTemplateItem(index, 'weight', Number(event.target.value || 1))} />
             </div>
           ))}
           <div>
@@ -368,23 +317,35 @@ function AssessmentCampaignDetailPage() {
 
       <div style={twoColumnStyle}>
         <div style={cardStyle}>
-          <div style={titleStyle}>名单导入</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-            <button className="btn btn--secondary" onClick={handleDownloadTemplate}>下载模板</button>
-            <label className="btn btn--primary" style={{ cursor: 'pointer' }}>
-              上传名单
-              <input type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleRosterUpload} />
-            </label>
+          <div style={titleStyle}>活动成员</div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            <input className="input" value={candidateKeyword} onChange={(event) => setCandidateKeyword(event.target.value)} placeholder="搜索工号、姓名、岗位、部门" />
+            <button className="btn btn--secondary" onClick={() => loadCandidates(candidateKeyword)} disabled={candidateLoading}>搜索</button>
           </div>
-          <div style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>
-            当前成员数：{detail.members.length}
+          <div style={{ maxHeight: 360, overflow: 'auto', display: 'grid', gap: 8 }}>
+            {candidates.map((candidate) => (
+              <label key={candidate.id} style={candidateRowStyle}>
+                <input type="checkbox" checked={selectedTeamMemberIds.includes(candidate.id)} onChange={() => toggleCandidate(candidate.id)} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700 }}>{candidate.employeeCode} {candidate.employeeName}</div>
+                  <div style={{ fontSize: 12, color: '#6b7280' }}>
+                    {candidate.position || '未填写岗位'} / {candidate.department || '未填写部门'} / {MEMBER_TYPE_LABELS[candidate.memberType] || candidate.memberType}
+                    {candidate.externalEngagementType ? ` / ${EXTERNAL_TYPE_LABELS[candidate.externalEngagementType] || candidate.externalEngagementType}` : ''}
+                  </div>
+                </div>
+              </label>
+            ))}
+            {candidates.length === 0 && <div style={{ color: '#6b7280' }}>当前机构下暂无可选团队成员。</div>}
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <button className="btn btn--primary" onClick={handleSyncMembers} disabled={saving || detail.campaign.status !== 'draft'}>同步到考评活动</button>
           </div>
         </div>
 
         <div style={cardStyle}>
           <div style={titleStyle}>邀请码管理</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
-            <input className="input" type="number" value={inviteCount} onChange={(e) => setInviteCount(e.target.value)} style={{ maxWidth: 120 }} />
+            <input className="input" type="number" value={inviteCount} onChange={(event) => setInviteCount(event.target.value)} style={{ maxWidth: 120 }} />
             <button className="btn btn--primary" onClick={handleGenerateInviteCodes} disabled={saving}>生成邀请码</button>
           </div>
 
@@ -410,7 +371,7 @@ function AssessmentCampaignDetailPage() {
             </thead>
             <tbody>
               {inviteCodes.map((code) => (
-                <tr key={code.id} style={{ borderTop: '1px solid var(--border-color, #e5e7eb)' }}>
+                <tr key={code.id} style={{ borderTop: '1px solid #e5e7eb' }}>
                   <td style={tdStyle}>{INVITE_STATUS_LABELS[code.status] || code.status}</td>
                   <td style={tdStyle}>{code.activatedAt ? new Date(code.activatedAt).toLocaleString() : '-'}</td>
                   <td style={tdStyle}>{code.completedAt ? new Date(code.completedAt).toLocaleString() : '-'}</td>
@@ -433,23 +394,26 @@ function AssessmentCampaignDetailPage() {
       </div>
 
       <div style={cardStyle}>
-        <div style={titleStyle}>成员名单</div>
+        <div style={titleStyle}>考评成员快照</div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               <th style={thStyle}>工号</th>
               <th style={thStyle}>姓名</th>
               <th style={thStyle}>岗位</th>
-              <th style={thStyle}>团队</th>
+              <th style={thStyle}>成员类型</th>
             </tr>
           </thead>
           <tbody>
             {detail.members.map((member) => (
-              <tr key={member.id} style={{ borderTop: '1px solid var(--border-color, #e5e7eb)' }}>
+              <tr key={member.id} style={{ borderTop: '1px solid #e5e7eb' }}>
                 <td style={tdStyle}>{member.employeeCode}</td>
                 <td style={tdStyle}>{member.employeeName}</td>
-                <td style={tdStyle}>{member.position}</td>
-                <td style={tdStyle}>{member.teamName || '-'}</td>
+                <td style={tdStyle}>{member.position || '-'}</td>
+                <td style={tdStyle}>
+                  {MEMBER_TYPE_LABELS[member.memberType] || member.memberType}
+                  {member.externalEngagementType ? ` / ${EXTERNAL_TYPE_LABELS[member.externalEngagementType] || member.externalEngagementType}` : ''}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -459,7 +423,7 @@ function AssessmentCampaignDetailPage() {
       <div style={cardStyle}>
         <div style={titleStyle}>赛事报表</div>
         <div style={{ color: 'var(--color-text-secondary)', marginBottom: 12 }}>
-          邀请码总数 {detail.report?.inviteCodeTotal || 0} · 已激活 {detail.report?.inviteCodeActivated || 0} · 已完成 {detail.report?.inviteCodeCompleted || 0}
+          邀请码总数 {detail.report?.inviteCodeTotal || 0} / 已激活 {detail.report?.inviteCodeActivated || 0} / 已完成 {detail.report?.inviteCodeCompleted || 0}
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -474,10 +438,10 @@ function AssessmentCampaignDetailPage() {
           </thead>
           <tbody>
             {reportMembers.map((member) => (
-              <tr key={member.id} style={{ borderTop: '1px solid var(--border-color, #e5e7eb)' }}>
+              <tr key={member.id} style={{ borderTop: '1px solid #e5e7eb' }}>
                 <td style={tdStyle}>{member.employeeCode}</td>
                 <td style={tdStyle}>{member.employeeName}</td>
-                <td style={tdStyle}>{member.position}</td>
+                <td style={tdStyle}>{member.position || '-'}</td>
                 <td style={tdStyle}>{member.report?.sampleCount || 0}</td>
                 <td style={tdStyle}>{member.report?.averageScore || 0}</td>
                 <td style={tdStyle}>
@@ -500,10 +464,10 @@ function AssessmentCampaignDetailPage() {
             <div style={titleStyle}>成员报表详情</div>
             <button className="btn btn--ghost btn--sm" onClick={() => setSelectedMemberReport(null)}>关闭</button>
           </div>
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 12, display: 'grid', gap: 6 }}>
             <div><strong>姓名：</strong>{selectedMemberReport.member.employeeName}</div>
             <div><strong>工号：</strong>{selectedMemberReport.member.employeeCode}</div>
-            <div><strong>岗位：</strong>{selectedMemberReport.member.position}</div>
+            <div><strong>岗位：</strong>{selectedMemberReport.member.position || '-'}</div>
             <div><strong>平均分：</strong>{selectedMemberReport.report.averageScore}</div>
             <div><strong>样本数：</strong>{selectedMemberReport.report.sampleCount}</div>
             <div><strong>方差：</strong>{selectedMemberReport.report.variance}</div>
@@ -517,32 +481,20 @@ function AssessmentCampaignDetailPage() {
             </thead>
             <tbody>
               {(selectedMemberReport.report.itemAverages || []).map((item) => (
-                <tr key={item.itemId} style={{ borderTop: '1px solid var(--border-color, #e5e7eb)' }}>
+                <tr key={item.itemId} style={{ borderTop: '1px solid #e5e7eb' }}>
                   <td style={tdStyle}>{item.title}</td>
                   <td style={tdStyle}>{item.averageScore}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {(selectedMemberReport.report.comments || []).length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>匿名备注</div>
-              <div style={{ display: 'grid', gap: 8 }}>
-                {selectedMemberReport.report.comments.map((comment, index) => (
-                  <div key={`${index}-${comment}`} style={{ padding: 12, borderRadius: 10, background: 'var(--color-bg-secondary, #f5f5f5)' }}>
-                    {comment}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
       <div style={cardStyle}>
         <div style={titleStyle}>成长预览</div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <input className="input" value={growthCode} onChange={(e) => setGrowthCode(e.target.value)} placeholder="输入工号" style={{ maxWidth: 240 }} />
+          <input className="input" value={growthCode} onChange={(event) => setGrowthCode(event.target.value)} placeholder="输入工号" style={{ maxWidth: 240 }} />
           <button className="btn btn--primary" onClick={handleGrowthSearch}>查询</button>
         </div>
         {growthReport?.timeline?.length ? (
@@ -557,7 +509,7 @@ function AssessmentCampaignDetailPage() {
             </thead>
             <tbody>
               {growthReport.timeline.map((row) => (
-                <tr key={`${row.campaignId}-${row.year}`} style={{ borderTop: '1px solid var(--border-color, #e5e7eb)' }}>
+                <tr key={`${row.campaignId}-${row.year}`} style={{ borderTop: '1px solid #e5e7eb' }}>
                   <td style={tdStyle}>{row.year}</td>
                   <td style={tdStyle}>{row.campaignName}</td>
                   <td style={tdStyle}>{row.averageScore}</td>
@@ -579,6 +531,24 @@ const cardStyle = {
   borderRadius: 12,
   padding: 20,
   boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))',
+}
+
+const shareCardStyle = {
+  minWidth: 320,
+  maxWidth: 420,
+  padding: 10,
+  borderRadius: 12,
+  background: 'var(--color-bg-card, #fff)',
+  boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))',
+  display: 'grid',
+  gap: 8,
+}
+
+const noticeStyle = {
+  padding: '12px 16px',
+  borderRadius: 10,
+  background: 'rgba(59,130,246,0.1)',
+  color: 'var(--color-text-primary)',
 }
 
 const twoColumnStyle = {
@@ -611,6 +581,16 @@ const badgeStyle = {
   background: 'rgba(59,130,246,0.1)',
   fontFamily: 'monospace',
   fontSize: 13,
+}
+
+const candidateRowStyle = {
+  display: 'flex',
+  gap: 10,
+  alignItems: 'flex-start',
+  padding: 12,
+  borderRadius: 12,
+  border: '1px solid #e5e7eb',
+  background: '#f8fafc',
 }
 
 export default AssessmentCampaignDetailPage

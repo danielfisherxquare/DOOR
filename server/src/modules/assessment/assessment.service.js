@@ -16,7 +16,7 @@ const DEFAULT_TEMPLATE_ITEMS = [
         title: '业务技能与专业度',
         description: '个人硬技能扎实，能熟练操作负责的设备或精准提供对应服务，无低级业务失误。',
         weight: 1,
-        scoreMin: 1,
+        scoreMin: 0,
         scoreMax: 10,
         required: true,
     },
@@ -25,7 +25,7 @@ const DEFAULT_TEMPLATE_ITEMS = [
         title: '工作质量与完成度',
         description: '负责的具体工作按质、按量完成，交付结果达到赛事标准，无明显偷工减料或敷衍。',
         weight: 1,
-        scoreMin: 1,
+        scoreMin: 0,
         scoreMax: 10,
         required: true,
     },
@@ -34,7 +34,7 @@ const DEFAULT_TEMPLATE_ITEMS = [
         title: '进度把控与履约',
         description: '个人动作迅速，进场、彩排、正赛、撤场等环节严守时间节点，不拖团队后腿。',
         weight: 1,
-        scoreMin: 1,
+        scoreMin: 0,
         scoreMax: 10,
         required: true,
     },
@@ -43,7 +43,7 @@ const DEFAULT_TEMPLATE_ITEMS = [
         title: '协同配合与大局观',
         description: '与团队内外部人员顺畅对接，互相补位，服从现场统一调度，不推诿扯皮。',
         weight: 1,
-        scoreMin: 1,
+        scoreMin: 0,
         scoreMax: 10,
         required: true,
     },
@@ -52,7 +52,7 @@ const DEFAULT_TEMPLATE_ITEMS = [
         title: '需求理解与执行力',
         description: '对甲方或总控下达的指令能一次性听懂，不跑偏，并迅速转化为实际行动。',
         weight: 1,
-        scoreMin: 1,
+        scoreMin: 0,
         scoreMax: 10,
         required: true,
     },
@@ -61,7 +61,7 @@ const DEFAULT_TEMPLATE_ITEMS = [
         title: '信息反馈与响应',
         description: '保持通讯畅通，遇到问题、进度受阻或完成任务时，能第一时间真实汇报，不隐瞒。',
         weight: 1,
-        scoreMin: 1,
+        scoreMin: 0,
         scoreMax: 10,
         required: true,
     },
@@ -70,7 +70,7 @@ const DEFAULT_TEMPLATE_ITEMS = [
         title: '工作纪律与风貌',
         description: '精神面貌积极饱满，严格遵守赛场纪律，不迟到早退，不酒后上岗，不擅自离岗。',
         weight: 1,
-        scoreMin: 1,
+        scoreMin: 0,
         scoreMax: 10,
         required: true,
     },
@@ -79,7 +79,7 @@ const DEFAULT_TEMPLATE_ITEMS = [
         title: '服务意识与责任心',
         description: '具备主人翁意识，眼里有活，能主动发现并填补负责区域内的服务、安全或执行盲区。',
         weight: 1,
-        scoreMin: 1,
+        scoreMin: 0,
         scoreMax: 10,
         required: true,
     },
@@ -88,7 +88,7 @@ const DEFAULT_TEMPLATE_ITEMS = [
         title: '风险意识与敏锐度',
         description: '能够敏锐察觉自己点位上的安全隐患、设备异常、极端天气前兆等问题并预警。',
         weight: 1,
-        scoreMin: 1,
+        scoreMin: 0,
         scoreMax: 10,
         required: true,
     },
@@ -97,7 +97,100 @@ const DEFAULT_TEMPLATE_ITEMS = [
         title: '突发应变与抗压能力',
         description: '面对现场高压、突发状况或临时加派的任务，能保持情绪稳定，反应迅速且处理得当。',
         weight: 1,
-        scoreMin: 1,
+        scoreMin: 0,
+        scoreMax: 10,
+        required: true,
+    },
+];
+
+const CLEAN_DEFAULT_TEMPLATE_ITEMS = [
+    {
+        id: 'skill',
+        title: '业务技能与专业度',
+        description: '个人硬技能扎实，能熟练操作负责的设备或精准提供对应服务，无低级业务失误。',
+        weight: 1,
+        scoreMin: 0,
+        scoreMax: 10,
+        required: true,
+    },
+    {
+        id: 'quality',
+        title: '工作质量与完成度',
+        description: '负责的具体工作按质、按量完成，交付结果达到赛事标准，无明显偷工减料或敷衍。',
+        weight: 1,
+        scoreMin: 0,
+        scoreMax: 10,
+        required: true,
+    },
+    {
+        id: 'schedule',
+        title: '进度把控与履约',
+        description: '个人动作迅速，进场、彩排、正赛、撤场等环节严守时间节点，不拖团队后腿。',
+        weight: 1,
+        scoreMin: 0,
+        scoreMax: 10,
+        required: true,
+    },
+    {
+        id: 'coordination',
+        title: '协同配合与大局观',
+        description: '与团队内外部人员顺畅对接，互相补位，服从现场统一调度，不推诿扯皮。',
+        weight: 1,
+        scoreMin: 0,
+        scoreMax: 10,
+        required: true,
+    },
+    {
+        id: 'execution',
+        title: '需求理解与执行力',
+        description: '对甲方或总控下达的指令能一次性听懂，不跑偏，并迅速转化为实际行动。',
+        weight: 1,
+        scoreMin: 0,
+        scoreMax: 10,
+        required: true,
+    },
+    {
+        id: 'feedback',
+        title: '信息反馈与响应',
+        description: '保持通讯畅通，遇到问题、进度受阻或完成任务时，能第一时间真实汇报，不隐瞒。',
+        weight: 1,
+        scoreMin: 0,
+        scoreMax: 10,
+        required: true,
+    },
+    {
+        id: 'discipline',
+        title: '工作纪律与风貌',
+        description: '精神面貌积极饱满，严格遵守赛场纪律，不迟到早退，不酒后上岗，不擅自离岗。',
+        weight: 1,
+        scoreMin: 0,
+        scoreMax: 10,
+        required: true,
+    },
+    {
+        id: 'ownership',
+        title: '服务意识与责任心',
+        description: '具备主人翁意识，眼里有活，能主动发现并填补负责区域内的服务、安全或执行盲区。',
+        weight: 1,
+        scoreMin: 0,
+        scoreMax: 10,
+        required: true,
+    },
+    {
+        id: 'risk',
+        title: '风险意识与敏锐度',
+        description: '能够敏锐察觉自己点位上的安全隐患、设备异常、极端天气前兆等问题并预警。',
+        weight: 1,
+        scoreMin: 0,
+        scoreMax: 10,
+        required: true,
+    },
+    {
+        id: 'pressure',
+        title: '突发应变与抗压能力',
+        description: '面对现场高压、突发状况或临时加派的任务，能保持情绪稳定，反应迅速且处理得当。',
+        weight: 1,
+        scoreMin: 0,
         scoreMax: 10,
         required: true,
     },
@@ -113,6 +206,19 @@ function notFound(message) {
 
 function forbidden(message) {
     return Object.assign(new Error(message), { status: 403, expose: true });
+}
+
+function normalizeScoreBounds(item) {
+    const scoreMax = Number(item?.scoreMax ?? 10);
+    const rawScoreMin = item?.scoreMin;
+    let scoreMin = Number(rawScoreMin ?? 0);
+    if (scoreMax === 10 && (rawScoreMin === undefined || rawScoreMin === null || scoreMin === 1)) {
+        scoreMin = 0;
+    }
+    return {
+        scoreMin,
+        scoreMax,
+    };
 }
 
 function getDefaultTemplateTitle(campaignName) {
@@ -140,7 +246,11 @@ function serializeCampaign(row) {
 
 function serializeTemplate(row) {
     if (!row) return null;
-    const items = typeof row.items_json === 'string' ? JSON.parse(row.items_json) : row.items_json;
+    const items = (typeof row.items_json === 'string' ? JSON.parse(row.items_json) : row.items_json)
+        .map((item) => ({
+            ...item,
+            ...normalizeScoreBounds(item),
+        }));
     return {
         id: row.id,
         campaignId: row.campaign_id,
@@ -157,11 +267,14 @@ function serializeMember(row) {
     return {
         id: row.id,
         campaignId: row.campaign_id,
+        teamMemberId: row.team_member_id || null,
+        sourceType: row.source_type || 'team_member',
         employeeCode: row.employee_code,
         employeeName: row.employee_name,
         position: row.position,
-        teamName: row.team_name,
         department: row.department,
+        memberType: row.member_type || 'employee',
+        externalEngagementType: row.team_external_engagement_type || null,
         sortOrder: row.sort_order,
         status: row.status,
     };
@@ -171,9 +284,33 @@ function serializeMemberPreview(row) {
     if (!row) return null;
     return {
         id: row.id,
+        employeeCode: row.employee_code,
         employeeName: row.employee_name,
         position: row.position,
-        teamName: row.team_name,
+    };
+}
+
+function serializePublicMember(row) {
+    if (!row) return null;
+    return {
+        id: row.id,
+        employeeCode: row.employee_code,
+        employeeName: row.employee_name,
+        position: row.position,
+    };
+}
+
+function serializeTeamCandidate(row) {
+    if (!row) return null;
+    return {
+        id: row.id,
+        employeeCode: row.employee_code,
+        employeeName: row.employee_name,
+        position: row.position,
+        department: row.department,
+        memberType: row.member_type,
+        externalEngagementType: row.external_engagement_type || null,
+        status: row.status,
     };
 }
 
@@ -193,17 +330,18 @@ function serializeInviteCode(row) {
 }
 
 function normalizeTemplateItems(items) {
-    const source = Array.isArray(items) && items.length > 0 ? items : DEFAULT_TEMPLATE_ITEMS;
+    const source = Array.isArray(items) && items.length > 0 ? items : CLEAN_DEFAULT_TEMPLATE_ITEMS;
     return source.map((item, index) => {
         const title = String(item?.title || '').trim();
         if (!title) throw badRequest(`templateItems[${index}].title is required`);
+        const { scoreMin, scoreMax } = normalizeScoreBounds(item);
         return {
             id: String(item?.id || `item_${index + 1}`),
             title,
             description: String(item?.description || '').trim(),
-            weight: Number(item?.weight || 1),
-            scoreMin: Number(item?.scoreMin || 1),
-            scoreMax: Number(item?.scoreMax || 10),
+            weight: Number(item?.weight ?? 1),
+            scoreMin,
+            scoreMax,
             required: item?.required !== false,
         };
     });
@@ -271,9 +409,9 @@ async function getCampaignTemplate(campaignId) {
             template = await repo.createTemplateSnapshot({
                 campaign_id: campaignId,
                 version_no: 1,
-                title: getDefaultTemplateTitle(campaign.name),
+                title: String(campaign.name || '').trim() ? `${String(campaign.name || '').trim()}考评表` : '赛事考评表',
                 instructions: '',
-                items_json: DEFAULT_TEMPLATE_ITEMS,
+                items_json: CLEAN_DEFAULT_TEMPLATE_ITEMS,
             });
         } catch (error) {
             if (error?.code !== '23505') throw error;
@@ -499,7 +637,7 @@ export async function createCampaign({ raceId, name, year, templateTitle, templa
         await trx('assessment_template_snapshots').insert({
             campaign_id: campaign.id,
             version_no: 1,
-            title: String(templateTitle || getDefaultTemplateTitle(normalizedName)).trim() || getDefaultTemplateTitle(normalizedName),
+            title: String(templateTitle || '').trim() || (normalizedName ? `${normalizedName}考评表` : '赛事考评表'),
             instructions: String(templateInstructions || '').trim(),
             items_json: JSON.stringify(items),
         });
@@ -602,6 +740,45 @@ export async function commitRosterImport(campaignId, rows) {
         department: row.department || null,
         sort_order: row.sortOrder,
         status: 'active',
+    })));
+
+    return inserted.map(serializeMember);
+}
+
+export async function listCampaignTeamCandidates(campaignId, keyword = '') {
+    const campaign = await repo.findCampaignById(campaignId);
+    if (!campaign) throw notFound('未找到考评活动');
+
+    const candidates = await repo.listCampaignTeamCandidates(campaignId, String(keyword || '').trim());
+    return candidates.map(serializeTeamCandidate);
+}
+
+export async function setCampaignMembers(campaignId, teamMemberIds) {
+    const campaign = await ensureCampaignEditable(campaignId);
+    const normalizedIds = [...new Set((Array.isArray(teamMemberIds) ? teamMemberIds : []).map((item) => String(item || '').trim()).filter(Boolean))];
+    if (normalizedIds.length === 0) {
+        throw badRequest('请选择至少一名团队成员');
+    }
+
+    const members = await repo.listTeamMembersByIds(campaign.org_id, normalizedIds);
+    if (members.length !== normalizedIds.length) {
+        const existingIds = new Set(members.map((item) => item.id));
+        const missing = normalizedIds.filter((item) => !existingIds.has(item));
+        throw badRequest(`存在不可用的团队成员：${missing.join(', ')}`);
+    }
+
+    const inserted = await repo.replaceMembers(campaignId, members.map((member, index) => ({
+        campaign_id: campaignId,
+        source_type: 'team_member',
+        team_member_id: member.id,
+        member_type: member.member_type,
+        employee_code: member.employee_code,
+        employee_name: member.employee_name,
+        position: member.position || null,
+        team_name: null,
+        department: member.department || null,
+        sort_order: index + 1,
+        status: member.status === 'archived' ? 'archived' : 'active',
     })));
 
     return inserted.map(serializeMember);
@@ -772,7 +949,7 @@ export async function loginWithInviteCode(campaignId, { inviteCode, deviceFinger
     return {
         accessToken: createAssessmentSessionToken({ campaignId, inviteCodeId: invite.id, sessionId: session.id }),
         inviteCode: serializeInviteCode(await repo.findInviteCodeById(invite.id)),
-        progress: await buildProgress(campaignId, invite.id),
+        progress: await getProgress(campaignId, invite.id),
     };
 }
 
@@ -781,7 +958,19 @@ export async function getProgress(campaignId, inviteCodeId) {
         buildProgress(campaignId, inviteCodeId),
         repo.findInviteCodeById(inviteCodeId),
     ]);
-    return { ...progress, inviteCode: serializeInviteCode(inviteCode) };
+    return {
+        ...progress,
+        items: (progress.items || []).map((item) => ({
+            id: item.id,
+            employeeCode: item.employeeCode,
+            employeeName: item.employeeName,
+            position: item.position,
+            progressStatus: item.progressStatus,
+            submittedAt: item.submittedAt,
+            draftUpdatedAt: item.draftUpdatedAt,
+        })),
+        inviteCode: serializeInviteCode(inviteCode),
+    };
 }
 
 export async function listPublicMembers(campaignId, inviteCodeId) {
@@ -798,7 +987,7 @@ export async function getMemberForm(campaignId, memberId, inviteCodeId) {
 
     if (!member) throw notFound('未找到考评成员');
     return {
-        member: serializeMember(member),
+        member: serializePublicMember(member),
         template,
         isSubmitted: !!submission,
         draft: draft

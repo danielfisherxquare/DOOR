@@ -18,6 +18,7 @@ import bibRoutes from './modules/bib/bib.routes.js';
 import bibTrackingRoutes from './modules/bib-tracking/bib-tracking.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
 import orgRoutes from './modules/org/org.routes.js';
+import teamRoutes from './modules/team/team.routes.js';
 import toolsRoutes from './modules/tools/tools.routes.js';
 import projectsRoutes from './modules/projects/projects.routes.js';
 import calendarRoutes from './modules/calendar/calendar.routes.js';
@@ -73,6 +74,7 @@ app.use('/api/bib-tracking', bibTrackingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/assessment', assessmentAdminRoutes);
 app.use('/api/org', orgRoutes);
+app.use('/api/org', teamRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/calendar', calendarRoutes);
 

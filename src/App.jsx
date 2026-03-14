@@ -8,6 +8,7 @@ import useAuthStore from './stores/authStore'
 
 const Home = lazy(() => import('./views/Home'))
 const Login = lazy(() => import('./views/Login'))
+const ChangePassword = lazy(() => import('./views/ChangePassword'))
 const ForgotPassword = lazy(() => import('./views/ForgotPassword'))
 const ResetPassword = lazy(() => import('./views/ResetPassword'))
 const ToolDetail = lazy(() => import('./views/ToolDetail'))
@@ -48,6 +49,7 @@ function PortalLayout() {
             <Route path="/" element={<Home />} />
             <Route path="/tool/:id" element={<ToolDetail />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/change-password" element={<ChangePassword />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password/:token" element={<ResetPassword />} />
           </Routes>

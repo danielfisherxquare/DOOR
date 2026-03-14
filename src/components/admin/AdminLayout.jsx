@@ -1,18 +1,18 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
-import { Link, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import adminApi from '../../api/adminApi'
 import useAuthStore from '../../stores/authStore'
 
 import AdminDashboard from '../../views/admin/AdminDashboard'
 import AppManagerPage from '../../views/admin/AppManagerPage'
 import BibTrackingPage from '../../views/admin/BibTrackingPage'
-import MemberCreatePage from '../../views/admin/MemberCreatePage'
-import MemberListPage from '../../views/admin/MemberListPage'
 import OrgCreatePage from '../../views/admin/OrgCreatePage'
+import OrgDetailPage from '../../views/admin/OrgDetailPage'
 import OrgListPage from '../../views/admin/OrgListPage'
 import OrgRacePermissionsPage from '../../views/admin/OrgRacePermissionsPage'
 import RaceManagementPage from '../../views/admin/RaceManagementPage'
 import RacePermissionsPage from '../../views/admin/RacePermissionsPage'
+import TeamListPage from '../../views/admin/TeamListPage'
 import UserListPage from '../../views/admin/UserListPage'
 import ProjectListPage from '../../views/admin/projects/ProjectListPage'
 import ProjectDetail from '../../views/admin/projects/ProjectDetail'
@@ -39,7 +39,7 @@ function AdminLayout() {
 
   useEffect(() => {
     if (!isSuperAdmin) return
-    adminApi.getOrgs({ limit: 100 })
+    adminApi.getOrgs({ limit: 200 })
       .then((res) => {
         if (res.success) setOrgs(res.data.items || [])
       })
@@ -49,9 +49,8 @@ function AdminLayout() {
   const isActive = (path) => location.pathname === `/admin${path}` || location.pathname.startsWith(`/admin${path}/`)
 
   const handleOrgChange = (event) => {
-    const orgId = event.target.value
     const nextParams = new URLSearchParams(searchParams)
-    if (orgId) nextParams.set('orgId', orgId)
+    if (event.target.value) nextParams.set('orgId', event.target.value)
     else nextParams.delete('orgId')
     setSearchParams(nextParams)
   }
@@ -70,12 +69,14 @@ function AdminLayout() {
     { path: '/app-manager', label: '应用管理', icon: 'A' },
   ]), [])
 
-  const orgAdminMenus = useMemo(() => ([
-    { path: '/members', label: '成员管理', icon: 'M' },
+  const orgMenus = useMemo(() => ([
+    { path: '/team', label: '团队管理', icon: 'T' },
     { path: '/bib-tracking', label: '号码布状态', icon: '#' },
     { path: '/org-race-permissions', label: '机构赛事授权', icon: 'G', superOnly: true },
     { path: '/race-permissions', label: '赛事授权', icon: 'P' },
   ]), [])
+
+  const linkWithOrg = (path) => `/admin${path}${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`
 
   return (
     <div className="admin-layout">
@@ -94,10 +95,7 @@ function AdminLayout() {
         </div>
 
         <nav className="admin-sidebar__nav">
-          <Link
-            to="/admin"
-            className={`admin-nav-item ${location.pathname === '/admin' ? 'admin-nav-item--active' : ''}`}
-          >
+          <Link to="/admin" className={`admin-nav-item ${location.pathname === '/admin' ? 'admin-nav-item--active' : ''}`}>
             <span className="admin-nav-item__icon">D</span>
             {!sidebarCollapsed && <span>仪表盘</span>}
           </Link>
@@ -106,11 +104,7 @@ function AdminLayout() {
             <>
               <div className="admin-nav-divider">{!sidebarCollapsed && '平台管理'}</div>
               {superAdminMenus.map((menu) => (
-                <Link
-                  key={menu.path}
-                  to={`/admin${menu.path}`}
-                  className={`admin-nav-item ${isActive(menu.path) ? 'admin-nav-item--active' : ''}`}
-                >
+                <Link key={menu.path} to={`/admin${menu.path}`} className={`admin-nav-item ${isActive(menu.path) ? 'admin-nav-item--active' : ''}`}>
                   <span className="admin-nav-item__icon">{menu.icon}</span>
                   {!sidebarCollapsed && <span>{menu.label}</span>}
                 </Link>
@@ -120,8 +114,8 @@ function AdminLayout() {
 
           {canAccessAdmin() && (
             <>
-              <div className="admin-nav-divider">{!sidebarCollapsed && '机构管理'}</div>
-              {isSuperAdmin && !sidebarCollapsed && orgs.length > 0 && (
+              <div className="admin-nav-divider">{!sidebarCollapsed && '机构视角'}</div>
+              {isSuperAdmin && !sidebarCollapsed && (
                 <div style={{ padding: '4px 12px 8px' }}>
                   <select
                     value={selectedOrgId}
@@ -130,9 +124,9 @@ function AdminLayout() {
                       width: '100%',
                       padding: '6px 8px',
                       borderRadius: 6,
-                      border: '1px solid var(--color-border, #d1d5db)',
+                      border: '1px solid #d1d5db',
                       fontSize: 13,
-                      background: 'var(--color-bg-secondary, #f9fafb)',
+                      background: '#f9fafb',
                     }}
                   >
                     <option value="">自动选择机构</option>
@@ -142,19 +136,12 @@ function AdminLayout() {
                   </select>
                 </div>
               )}
-
-              {orgAdminMenus
-                .filter((menu) => !menu.superOnly || isSuperAdmin)
-                .map((menu) => (
-                  <Link
-                    key={menu.path}
-                    to={`/admin${menu.path}${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`}
-                    className={`admin-nav-item ${isActive(menu.path) ? 'admin-nav-item--active' : ''}`}
-                  >
-                    <span className="admin-nav-item__icon">{menu.icon}</span>
-                    {!sidebarCollapsed && <span>{menu.label}</span>}
-                  </Link>
-                ))}
+              {orgMenus.filter((item) => !item.superOnly || isSuperAdmin).map((menu) => (
+                <Link key={menu.path} to={linkWithOrg(menu.path)} className={`admin-nav-item ${isActive(menu.path) ? 'admin-nav-item--active' : ''}`}>
+                  <span className="admin-nav-item__icon">{menu.icon}</span>
+                  {!sidebarCollapsed && <span>{menu.label}</span>}
+                </Link>
+              ))}
             </>
           )}
         </nav>
@@ -162,14 +149,10 @@ function AdminLayout() {
         <div className="admin-sidebar__footer">
           {!sidebarCollapsed && (
             <div className="admin-sidebar__user">
-              <div className="admin-sidebar__avatar">
-                {user?.username?.charAt(0).toUpperCase() || 'A'}
-              </div>
+              <div className="admin-sidebar__avatar">{user?.username?.charAt(0).toUpperCase() || 'A'}</div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.username}</div>
-                <div style={{ fontSize: 11, opacity: 0.7 }}>
-                  {user?.role === 'super_admin' ? '超级管理员' : '机构管理员'}
-                </div>
+                <div style={{ fontSize: 11, opacity: 0.7 }}>{user?.role === 'super_admin' ? '超级管理员' : '机构管理员'}</div>
               </div>
             </div>
           )}
@@ -185,26 +168,14 @@ function AdminLayout() {
           <Route index element={<AdminDashboard />} />
           <Route path="orgs" element={<OrgListPage />} />
           <Route path="orgs/new" element={<OrgCreatePage />} />
+          <Route path="orgs/:orgId" element={<OrgDetailPage />} />
           <Route path="users" element={<UserListPage />} />
-          <Route path="members" element={<MemberListPage />} />
-          <Route path="members/new" element={<MemberCreatePage />} />
+          <Route path="members" element={<Navigate to={`/admin/team${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`} replace />} />
+          <Route path="members/new" element={<Navigate to={`/admin/team${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`} replace />} />
+          <Route path="team" element={<TeamListPage />} />
           <Route path="races" element={<RaceManagementPage />} />
-          <Route
-            path="assessment"
-            element={(
-              <Suspense fallback={<AdminRouteLoader />}>
-                <AssessmentCampaignListPage />
-              </Suspense>
-            )}
-          />
-          <Route
-            path="assessment/:id"
-            element={(
-              <Suspense fallback={<AdminRouteLoader />}>
-                <AssessmentCampaignDetailPage />
-              </Suspense>
-            )}
-          />
+          <Route path="assessment" element={<Suspense fallback={<AdminRouteLoader />}><AssessmentCampaignListPage /></Suspense>} />
+          <Route path="assessment/:id" element={<Suspense fallback={<AdminRouteLoader />}><AssessmentCampaignDetailPage /></Suspense>} />
           <Route path="projects" element={<ProjectListPage />} />
           <Route path="projects/:id" element={<ProjectDetail />} />
           <Route path="bib-tracking" element={<BibTrackingPage />} />
