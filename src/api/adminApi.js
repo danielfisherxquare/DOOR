@@ -16,6 +16,13 @@ const adminApi = {
   resetUserPassword: (userId) => request.post(`/admin/users/${userId}/reset-password`),
 
   getDashboardStats: () => request.get('/admin/dashboard'),
+  listDbBackups: () => request.get('/admin/system/backups'),
+  createDbBackup: () => request.post('/admin/system/backups'),
+  getDbBackupStatus: () => request.get('/admin/system/backups/status'),
+  listDbRestores: () => request.get('/admin/system/restores'),
+  startDbRestore: (uploadId) => request.post('/admin/system/restores', { uploadId }),
+  getDbRestoreStatus: () => request.get('/admin/system/restores/status'),
+  getDbRestoreDetail: (jobId) => request.get(`/admin/system/restores/${jobId}`),
 
   getOrgUsers: (params) => request.get('/org/users', { params }),
   createOrgUser: (data, orgId) => request.post(`/org/users${orgId ? `?orgId=${orgId}` : ''}`, data),

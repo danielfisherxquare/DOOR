@@ -36,11 +36,16 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-}
       DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-false}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://www.xquareliu.com}
+      BACKUP_DIR: ${BACKUP_DIR:-/backups}
+      BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-10}
+      RESTORE_UPLOAD_DIR: ${RESTORE_UPLOAD_DIR:-/backups/uploads}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - ${HOST_BACKUP_DIR:-/var/backups/door}:${BACKUP_DIR:-/backups}
 
   worker:
     build: .

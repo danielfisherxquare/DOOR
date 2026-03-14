@@ -307,3 +307,67 @@ cd tool && npm ci && npm run dev
 
 - 后端详细说明：[door/server/README.md](./server/README.md)
 - 工具详细说明：[tool/README.md](../tool/README.md)
+---
+
+## 数据库备份与恢复
+
+DOOR 现在内置了一套“本机备份 + 后台下载 + 上传恢复到测试库”的数据库运维流程。
+
+### 备份逻辑
+
+- 备份对象：PostgreSQL 主库 `door`
+- 备份格式：`.sql.gz`
+- 宿主机目录：`/var/backups/door`
+- 容器内目录：`/backups`
+- 保留策略：仅保留最近 `10` 份成功备份
+- 后台入口：`/admin/db-backups`
+
+### 服务器环境变量
+
+在 `door/server/.env` 中配置：
+
+```env
+HOST_BACKUP_DIR=/var/backups/door
+BACKUP_DIR=/backups
+BACKUP_RETENTION_COUNT=10
+RESTORE_UPLOAD_DIR=/backups/uploads
+```
+
+初始化目录：
+
+```bash
+sudo mkdir -p /var/backups/door/uploads
+sudo chown -R 1000:1000 /var/backups/door
+```
+
+### 自动备份
+
+推荐由宿主机 `cron` 调用容器内脚本，每天执行一次：
+
+```cron
+30 3 * * * cd /path/to/door/server && docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger cron >> /var/log/door-backup.log 2>&1
+```
+
+### 手动备份与下载
+
+两种方式：
+
+```bash
+cd door/server
+docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger manual
+```
+
+或者直接进入后台：
+
+- 打开 `/admin/db-backups`
+- 点击“立即生成备份”
+- 在列表中点击“下载”
+
+### 上传恢复
+
+- 仅支持上传 `.sql.gz` 文件
+- 页面恢复不会覆盖生产库
+- 恢复目标库格式：`door_restore_YYYYMMDD_HHMMSS`
+- 恢复完成后需要人工检查 `knex_migrations`、`users`、`orgs`、`races`、`records`
+
+详细操作见 [door/server/docs/backup-restore.md](./server/docs/backup-restore.md)。

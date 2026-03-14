@@ -115,3 +115,81 @@ docker compose exec \
 3. `Missing orgId for super_admin`  
 原因：访问 `/api/org/*` 时超管未提供 `orgId`。  
 处理：请求参数追加 `?orgId=<机构ID>`。
+---
+
+## 数据库备份与恢复
+
+服务端现已支持：
+
+- 服务器本机保留最近 `10` 份 PostgreSQL 备份
+- 后台手动生成备份并下载到本地
+- 上传 `.sql.gz` 备份文件并恢复到新的测试数据库
+
+### 目录与挂载
+
+- 宿主机目录：`/var/backups/door`
+- 容器目录：`/backups`
+- 恢复上传目录：`/backups/uploads`
+
+`docker-compose.yml` 中需要将宿主机目录挂载到 `app` 容器：
+
+```yaml
+app:
+  volumes:
+    - /var/backups/door:/backups
+```
+
+### 环境变量
+
+`.env` 中增加：
+
+```env
+HOST_BACKUP_DIR=/var/backups/door
+BACKUP_DIR=/backups
+BACKUP_RETENTION_COUNT=10
+RESTORE_UPLOAD_DIR=/backups/uploads
+```
+
+初始化目录：
+
+```bash
+sudo mkdir -p /var/backups/door/uploads
+sudo chown -R 1000:1000 /var/backups/door
+```
+
+### 自动备份
+
+推荐宿主机 `cron`：
+
+```cron
+30 3 * * * cd /path/to/door/server && docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger cron >> /var/log/door-backup.log 2>&1
+```
+
+### 手动备份
+
+```bash
+cd door/server
+docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger manual
+```
+
+### 后台入口
+
+- 路径：`/admin/db-backups`
+- 仅 `super_admin` 可见
+
+页面支持：
+
+- 查看最近备份列表
+- 立即生成备份
+- 下载备份
+- 上传备份文件
+- 恢复到新的测试数据库
+
+### 恢复规则
+
+- 只支持 `.sql.gz`
+- 不支持页面直接覆盖生产库 `door`
+- 恢复目标库命名：`door_restore_YYYYMMDD_HHMMSS`
+- 恢复成功后仍需人工校验核心表和数据量
+
+详细说明见 `docs/backup-restore.md`。

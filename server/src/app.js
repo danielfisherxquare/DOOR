@@ -25,6 +25,7 @@ import calendarRoutes from './modules/calendar/calendar.routes.js';
 import interviewRoutes from './modules/interview/interview.routes.js';
 import assessmentPublicRoutes from './modules/assessment/assessment-public.routes.js';
 import assessmentAdminRoutes from './modules/assessment/assessment-admin.routes.js';
+import systemBackupRoutes from './modules/system-backups/system-backup.routes.js';
 
 const app = express();
 
@@ -73,6 +74,7 @@ app.use('/api/bib', bibRoutes);
 app.use('/api/bib-tracking', bibTrackingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/assessment', assessmentAdminRoutes);
+app.use('/api/admin/system', systemBackupRoutes);
 app.use('/api/org', orgRoutes);
 app.use('/api/org', teamRoutes);
 app.use('/api/projects', projectsRoutes);

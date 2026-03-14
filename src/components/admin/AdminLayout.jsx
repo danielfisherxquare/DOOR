@@ -6,6 +6,7 @@ import useAuthStore from '../../stores/authStore'
 import AdminDashboard from '../../views/admin/AdminDashboard'
 import AppManagerPage from '../../views/admin/AppManagerPage'
 import BibTrackingPage from '../../views/admin/BibTrackingPage'
+import DatabaseBackupPage from '../../views/admin/DatabaseBackupPage'
 import OrgCreatePage from '../../views/admin/OrgCreatePage'
 import OrgDetailPage from '../../views/admin/OrgDetailPage'
 import OrgListPage from '../../views/admin/OrgListPage'
@@ -24,7 +25,7 @@ function AdminRouteLoader() {
   return <div style={{ padding: 24 }}>加载中...</div>
 }
 
-function AdminLayout() {
+export default function AdminLayout() {
   const { user, logout } = useAuthStore()
   const canAccessAdmin = useAuthStore((state) => state.canAccessAdmin)
   const isSuperAdmin = user?.role === 'super_admin'
@@ -46,7 +47,7 @@ function AdminLayout() {
       .catch(() => {})
   }, [isSuperAdmin])
 
-  const isActive = (path) => location.pathname === `/admin${path}` || location.pathname.startsWith(`/admin${path}/`)
+  const isActive = (routePath) => location.pathname === `/admin${routePath}` || location.pathname.startsWith(`/admin${routePath}/`)
 
   const handleOrgChange = (event) => {
     const nextParams = new URLSearchParams(searchParams)
@@ -66,17 +67,18 @@ function AdminLayout() {
     { path: '/races', label: '赛事管理', icon: 'R' },
     { path: '/assessment', label: '考评管理', icon: 'S' },
     { path: '/projects', label: '项目计划', icon: 'P' },
+    { path: '/db-backups', label: '数据库备份', icon: 'B' },
     { path: '/app-manager', label: '应用管理', icon: 'A' },
   ]), [])
 
   const orgMenus = useMemo(() => ([
     { path: '/team', label: '团队管理', icon: 'T' },
-    { path: '/bib-tracking', label: '号码布状态', icon: '#' },
+    { path: '/bib-tracking', label: '号牌布控', icon: '#' },
     { path: '/org-race-permissions', label: '机构赛事授权', icon: 'G', superOnly: true },
     { path: '/race-permissions', label: '赛事授权', icon: 'P' },
   ]), [])
 
-  const linkWithOrg = (path) => `/admin${path}${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`
+  const linkWithOrg = (routePath) => `/admin${routePath}${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`
 
   return (
     <div className="admin-layout">
@@ -178,6 +180,7 @@ function AdminLayout() {
           <Route path="assessment/:id" element={<Suspense fallback={<AdminRouteLoader />}><AssessmentCampaignDetailPage /></Suspense>} />
           <Route path="projects" element={<ProjectListPage />} />
           <Route path="projects/:id" element={<ProjectDetail />} />
+          <Route path="db-backups" element={<DatabaseBackupPage />} />
           <Route path="bib-tracking" element={<BibTrackingPage />} />
           <Route path="org-race-permissions" element={<OrgRacePermissionsPage />} />
           <Route path="race-permissions" element={<RacePermissionsPage />} />
@@ -326,5 +329,3 @@ function AdminLayout() {
     </div>
   )
 }
-
-export default AdminLayout
