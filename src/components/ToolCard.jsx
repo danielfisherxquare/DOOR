@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { WrenchScrewdriverIcon } from '@heroicons/react/24/solid'
 
 // 工具类型到图标颜色的映射
 const TOOL_ICON_THEMES = {
@@ -48,7 +49,7 @@ function ToolCard({ tool }) {
   return (
     <Link to={tool.path || `/tool/${id}`} className="tool-card">
       <div className={`tool-card__icon ${iconTheme}`}>
-        {icon || '🔧'}
+        {icon || <WrenchScrewdriverIcon className="w-8 h-8" />}
       </div>
       <h3 className="tool-card__name">{name}</h3>
       <p className="tool-card__desc">{description}</p>

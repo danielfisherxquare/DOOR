@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import useAuthStore from '../../stores/authStore'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -188,8 +189,12 @@ function AppManagerPage() {
                         background: 'var(--color-bg-secondary, #f5f5f5)',
                         color: 'var(--color-text-secondary, #666)',
                         fontSize: 14,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
                     }}>
-                        ⚠️ 尚未上传任何安装包
+                        <ExclamationTriangleIcon className="w-5 h-5 text-yellow-500" />
+                        尚未上传任何安装包
                     </div>
                 )}
             </div>

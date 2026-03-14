@@ -31,14 +31,14 @@ function AdminDashboard() {
   }, [isSuperAdmin])
 
   return (
-    <div style={{ display: 'grid', gap: 24 }}>
-      <div>
-        <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8 }}>欢迎回来，{user?.username}</h1>
-        <div style={{ color: 'var(--color-text-secondary)' }}>使用左侧菜单进入管理模块。</div>
+    <div className="admin-dashboard">
+      <div className="admin-dashboard__header">
+        <h1 className="page-title">欢迎回来，{user?.username}</h1>
+        <p className="page-subtitle">使用左侧菜单进入管理模块。</p>
       </div>
 
       {isSuperAdmin && !loading && stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
+        <div className="admin-stats-grid">
           <StatCard label="机构总数" value={stats.orgCount} />
           <StatCard label="用户总数" value={stats.userCount} />
           <StatCard label="活跃用户" value={stats.activeUserCount} />
@@ -46,9 +46,9 @@ function AdminDashboard() {
         </div>
       )}
 
-      <div style={cardStyle}>
-        <h3 style={{ marginTop: 0, marginBottom: 16 }}>快捷操作</h3>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <div className="quick-actions-card">
+        <h3 className="quick-actions-card__title">快捷操作</h3>
+        <div className="quick-actions">
           {QUICK_ACTIONS.filter((item) => item.superAdminOnly ? isSuperAdmin : true).map((item) => (
             <a key={item.href} href={item.href} className="btn btn--ghost">{item.label}</a>
           ))}
@@ -60,18 +60,11 @@ function AdminDashboard() {
 
 function StatCard({ label, value }) {
   return (
-    <div style={cardStyle}>
-      <div style={{ color: 'var(--color-text-secondary)', marginBottom: 8 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 700 }}>{value}</div>
+    <div className="stat-card">
+      <div className="stat-card__label">{label}</div>
+      <div className="stat-card__value">{value}</div>
     </div>
   )
-}
-
-const cardStyle = {
-  background: 'var(--color-bg-card, #fff)',
-  borderRadius: 12,
-  padding: 20,
-  boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))',
 }
 
 export default AdminDashboard

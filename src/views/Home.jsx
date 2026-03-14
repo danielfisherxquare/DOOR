@@ -27,39 +27,22 @@ function Home() {
   return (
     <div className="home">
       {/* 页面标题 */}
-      <div className="home__header" style={{
-        textAlign: 'center',
-        marginBottom: 'var(--spacing-xl)',
-        paddingTop: 'var(--spacing-md)'
-      }}>
-        <h1 className="home__title" style={{
-          fontSize: 'var(--font-size-3xl)',
-          fontWeight: 700,
-          color: 'var(--color-text-primary)',
-          marginBottom: 'var(--spacing-sm)'
-        }}>
+      <header className="home__header">
+        <h1 className="home__title">
           欢迎使用工具门户
         </h1>
-        <p className="home__subtitle" style={{
-          fontSize: 'var(--font-size-md)',
-          color: 'var(--color-text-secondary)'
-        }}>
+        <p className="home__subtitle">
           选择您需要使用的工具
         </p>
 
         {/* 统计徽章 */}
         {!isLoading && !error && tools.length > 0 && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: 'var(--spacing-sm)',
-            marginTop: 'var(--spacing-md)'
-          }}>
+          <div className="home__stats">
             <span className="pill pill--purple">{tools.length} 个工具</span>
             <span className="pill pill--green">{onlineCount} 个在线</span>
           </div>
         )}
-      </div>
+      </header>
 
       {/* 骨架屏加载状态 */}
       {isLoading && (
@@ -72,17 +55,11 @@ function Home() {
 
       {/* 错误状态 */}
       {error && (
-        <div className="card" style={{
-          textAlign: 'center',
-          color: 'var(--color-danger)',
-          maxWidth: 400,
-          margin: '0 auto'
-        }}>
-          <p>加载失败: {error}</p>
+        <div className="error-card">
+          <p className="error-card__message">加载失败：{error}</p>
           <button
             className="btn btn--secondary"
             onClick={fetchTools}
-            style={{ marginTop: 'var(--spacing-md)' }}
           >
             重试
           </button>
@@ -100,12 +77,8 @@ function Home() {
 
       {/* 空状态 */}
       {!isLoading && !error && tools.length === 0 && (
-        <div className="card" style={{
-          textAlign: 'center',
-          maxWidth: 400,
-          margin: '0 auto'
-        }}>
-          <p style={{ color: 'var(--color-text-secondary)' }}>
+        <div className="empty-state">
+          <p className="empty-state__message">
             暂无可用工具
           </p>
         </div>

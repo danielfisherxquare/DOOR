@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
+import { WrenchScrewdriverIcon, ExclamationTriangleIcon } from '@heroicons/react/24/solid'
 import useToolsStore from '../stores/toolsStore'
 
 // 导入工具组件
@@ -41,24 +42,22 @@ function ToolDetail() {
     // 如果工具离线或维护中
     if (currentTool?.status === 'offline') {
       return (
-        <div style={{
-          textAlign: 'center',
-          padding: 'var(--spacing-2xl)',
-          color: 'var(--color-text-secondary)'
-        }}>
-          <p>⚠️ 该工具当前离线，请稍后再试</p>
+        <div className="tool-detail__offline">
+          <div className="flex items-center justify-center gap-2">
+            <ExclamationTriangleIcon className="w-6 h-6 text-yellow-500" />
+            <p>该工具当前离线，请稍后再试</p>
+          </div>
         </div>
       )
     }
 
     if (currentTool?.status === 'maintenance') {
       return (
-        <div style={{
-          textAlign: 'center',
-          padding: 'var(--spacing-2xl)',
-          color: 'var(--color-text-secondary)'
-        }}>
-          <p>🔧 该工具正在维护中，敬请期待</p>
+        <div className="tool-detail__maintenance">
+          <div className="flex items-center justify-center gap-2">
+            <WrenchScrewdriverIcon className="w-6 h-6 text-gray-500" />
+            <p>该工具正在维护中，敬请期待</p>
+          </div>
         </div>
       )
     }
@@ -72,25 +71,12 @@ function ToolDetail() {
 
     // 默认占位内容
     return (
-      <div style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: 200,
-        gap: 'var(--spacing-md)'
-      }}>
-        <p style={{ color: 'var(--color-text-secondary)' }}>
+      <div className="tool-detail__placeholder">
+        <p className="tool-detail__placeholder-text">
           工具功能区域 - 待对接后台服务
         </p>
-        <p style={{
-          fontSize: 'var(--font-size-xs)',
-          color: 'var(--color-text-muted)',
-          background: 'var(--color-bg-secondary)',
-          padding: 'var(--spacing-xs) var(--spacing-sm)',
-          borderRadius: 'var(--radius-sm)'
-        }}>
-          API端点: {currentTool?.apiEndpoint}
+        <p className="tool-detail__placeholder-api">
+          API 端点：{currentTool?.apiEndpoint}
         </p>
         <button
           className="btn btn--primary"
@@ -105,16 +91,8 @@ function ToolDetail() {
   if (isLoading || !currentTool) {
     return (
       <div className="tool-detail">
-        <div style={{ textAlign: 'center', padding: 'var(--spacing-2xl)' }}>
-          <div style={{
-            width: 40,
-            height: 40,
-            border: '3px solid var(--color-bg-card)',
-            borderTopColor: 'var(--color-accent)',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-            margin: '0 auto var(--spacing-md)'
-          }}></div>
+        <div className="loading-state">
+          <div className="loading-state__spinner"></div>
           加载中...
         </div>
       </div>
@@ -188,17 +166,12 @@ function ToolDetail() {
       {/* 工具头部信息 */}
       <div className="tool-detail__header">
         <div className="tool-detail__icon">
-          {currentTool.icon || '🔧'}
+          {currentTool.icon || <WrenchScrewdriverIcon className="w-10 h-10" />}
         </div>
         <div className="tool-detail__info">
           <h1>{currentTool.name}</h1>
           <p>{currentTool.description}</p>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--spacing-sm)',
-            marginTop: 'var(--spacing-sm)'
-          }}>
+          <div className="tool-detail__status-row">
             <span className={`tool-card__status tool-card__status--${currentTool.status}`}>
               <span className={`status-dot status-dot--${currentTool.status}`}></span>
               {statusText[currentTool.status]}

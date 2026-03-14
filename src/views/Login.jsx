@@ -59,20 +59,20 @@ function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-card__header">
-          <div className="navbar__logo" style={{ margin: '0 auto 16px', width: 56, height: 56, borderRadius: 16 }}>TP</div>
+          <div className="login-card__logo">TP</div>
           <h1 className="login-card__title">工具门户</h1>
           <p className="login-card__subtitle">登录以访问您的工具</p>
         </div>
 
         <form className="login-card__form" onSubmit={handleSubmit}>
           {error && (
-            <div style={{ padding: '12px 16px', borderRadius: 'var(--radius-md)', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', fontSize: 'var(--font-size-sm)' }}>
+            <div className="login-card__error">
               {error}
             </div>
           )}
 
           <div className="input-group">
-            <label htmlFor="username" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>用户名或邮箱</label>
+            <label htmlFor="username" className="login-card__label">用户名或邮箱</label>
             <input
               id="username"
               type="text"
@@ -86,7 +86,7 @@ function Login() {
           </div>
 
           <div className="input-group">
-            <label htmlFor="password" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>密码</label>
+            <label htmlFor="password" className="login-card__label">密码</label>
             <input
               id="password"
               type="password"
@@ -99,15 +99,15 @@ function Login() {
             />
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-              <input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} disabled={isLoading} style={{ width: 16, height: 16 }} />
+          <div className="login-card__options">
+            <label className="login-card__remember">
+              <input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} disabled={isLoading} />
               记住我
             </label>
-            <Link to="/forgot-password" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-primary)', textDecoration: 'none' }}>忘记密码？</Link>
+            <Link to="/forgot-password" className="login-card__forgot">忘记密码？</Link>
           </div>
 
-          <button type="submit" className="btn btn--primary btn--large" disabled={isLoading} style={{ marginTop: 16 }}>
+          <button type="submit" className="btn btn--primary btn--large login-card__submit" disabled={isLoading}>
             {isLoading ? '登录中...' : '登录'}
           </button>
         </form>
