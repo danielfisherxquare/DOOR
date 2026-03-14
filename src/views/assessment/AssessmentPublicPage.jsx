@@ -375,8 +375,18 @@ function AssessmentPublicPage() {
               <div style={{ fontWeight: 700, marginBottom: 12 }}>待评分成员预览</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
                 {membersPreview.map((member) => (
-                  <div key={member.id} style={{ padding: 12, borderRadius: 12, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
-                    <div style={{ fontWeight: 700 }}>{member.employeeCode} {member.employeeName}</div>
+                  <div
+                    key={member.id}
+                    style={{
+                      padding: 12,
+                      borderRadius: 12,
+                      background: '#f8fafc',
+                      border: '1px solid #e5e7eb',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, color: '#111827' }}>{member.employeeCode} {member.employeeName}</div>
                     <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>所在岗位：{member.position || '未填写岗位'}</div>
                   </div>
                 ))}
@@ -401,11 +411,15 @@ function AssessmentPublicPage() {
                     className="btn btn--ghost"
                     onClick={() => void handleSelectMember(member.id)}
                     style={{
+                      width: '100%',
                       justifyContent: 'space-between',
                       background: currentMember?.id === member.id ? 'rgba(59,130,246,0.1)' : 'transparent',
+                      color: '#111827',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
                     }}
                   >
-                    <span>{member.employeeName}</span>
+                    <span style={{ color: '#111827' }}>{member.employeeName}</span>
                     <span style={{ fontSize: 12, opacity: 0.7 }}>{PROGRESS_STATUS_LABELS[member.progressStatus] || member.progressStatus}</span>
                   </button>
                 ))}
@@ -419,7 +433,17 @@ function AssessmentPublicPage() {
                 <div style={{ display: 'grid', gap: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
                     <div>
-                      <div style={{ fontSize: 22, fontWeight: 700 }}>{currentMember.employeeCode} {currentMember.employeeName}</div>
+                      <div
+                        style={{
+                          fontSize: 22,
+                          fontWeight: 700,
+                          color: '#111827',
+                          userSelect: 'none',
+                          WebkitUserSelect: 'none',
+                        }}
+                      >
+                        {currentMember.employeeCode} {currentMember.employeeName}
+                      </div>
                       <div style={{ color: '#6b7280', marginTop: 4 }}>所在岗位：{currentMember.position || '未填写岗位'}</div>
                     </div>
                     <div style={{ color: saveState === 'error' ? '#dc2626' : '#6b7280' }}>
