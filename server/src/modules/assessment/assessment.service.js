@@ -506,6 +506,7 @@ async function refreshMemberReportSnapshot(campaignId, memberId) {
         ? Number((totals.reduce((sum, value) => sum + ((value - averageScore) ** 2), 0) / totals.length).toFixed(2))
         : 0;
 
+    const redLineResult = checkRedLines(itemAverages);
     const payload = {
         memberId,
         employeeCode: member.employee_code,
@@ -516,6 +517,7 @@ async function refreshMemberReportSnapshot(campaignId, memberId) {
         variance,
         itemAverages,
         comments: decoded.map((entry) => String(entry.comment || '').trim()).filter(Boolean),
+        tierResult: buildTierResultWithRedLineCheck(averageScore, itemAverages, redLineResult),
     };
 
     const encrypted = encryptJson(payload);
@@ -909,6 +911,7 @@ export async function getGrowthReport(employeeCode) {
             averageScore: report.averageScore,
             sampleCount: report.sampleCount,
             itemAverages: report.itemAverages,
+            tierResult: report.tierResult || buildTierResult(report.averageScore, report.itemAverages),
         });
     }
 
@@ -1118,4 +1121,103 @@ export async function submitMemberScore(campaignId, memberId, inviteCodeId, sess
 export async function logoutSession(sessionId) {
     await repo.touchSession(sessionId, { status: 'expired' });
     return { success: true };
+}
+
+const CORE_ITEM_IDS = ['skill', 'quality', 'execution'];
+const RED_LINE_THRESHOLD = 4;
+
+const TIER_CONFIG = {
+    'S': { title: 'S级 - 应提拔', color: '#FFD700', priority: 5 },
+    'A': { title: 'A级 - 应培养', color: '#6366F1', priority: 4 },
+    'B': { title: 'B级 - 稳定贡献', color: '#10B981', priority: 3 },
+    'C': { title: 'C级 - 需关注', color: '#F59E0B', priority: 2 },
+    'D': { title: 'D级 - 应淘汰', color: '#EF4444', priority: 1 }
+};
+
+const TIER_DESCRIPTIONS = {
+    'S': '核心能力突出，具备带领团队的潜质，建议纳入人才梯队培养计划。',
+    'A': '表现优异，是部门骨干力量，可考虑赋予更多责任和挑战性任务。',
+    'B': '能胜任当前岗位要求，建议持续关注其成长轨迹。',
+    'C': '存在明显短板，需制定针对性提升计划，建议1-3个月后复评。',
+    'D': '能力严重不足或多项核心指标不达标，建议调整岗位或启动淘汰流程。'
+};
+
+function checkRedLines(itemAverages) {
+    const itemMap = new Map(itemAverages.map(item => [item.itemId, item.averageScore]));
+    const warnings = [];
+    let redLineCount = 0;
+
+    CORE_ITEM_IDS.forEach(itemId => {
+        const score = itemMap.get(itemId);
+        if (score !== undefined && score <= RED_LINE_THRESHOLD) {
+            redLineCount++;
+            const itemTitle = itemAverages.find(i => i.itemId === itemId)?.title || itemId;
+            warnings.push(`${itemTitle} 得分 ${score.toFixed(1)} 分，低于合格线`);
+        }
+    });
+
+    return { redLineCount, warnings, hasRedLine: redLineCount > 0 };
+}
+
+function calculateEmployeeTier(averageScore, itemAverages) {
+    const { redLineCount } = checkRedLines(itemAverages);
+    
+    if (redLineCount >= 2) return 'D';
+    if (redLineCount >= 1 && averageScore < 60) return 'D';
+    if (redLineCount >= 1) return 'C';
+    
+    if (averageScore >= 90) {
+        const highScores = itemAverages.filter(item => item.averageScore >= 9).length;
+        return highScores >= 3 ? 'S' : 'A';
+    }
+    if (averageScore >= 75) return 'A';
+    if (averageScore >= 60) return 'B';
+    if (averageScore >= 40) return 'C';
+    return 'D';
+}
+
+function buildTierResult(averageScore, itemAverages) {
+    const tier = calculateEmployeeTier(averageScore, itemAverages);
+    const { redLineCount, warnings } = checkRedLines(itemAverages);
+    
+    return {
+        tier,
+        tierTitle: TIER_CONFIG[tier].title,
+        tierColor: TIER_CONFIG[tier].color,
+        tierDescription: TIER_DESCRIPTIONS[tier],
+        redLineCount,
+        redLineWarnings: warnings,
+        hasRedLine: redLineCount > 0
+    };
+}
+
+function buildTierResultWithRedLineCheck(averageScore, itemAverages, redLineResult) {
+    const tier = calculateEmployeeTierWithRedLineCheck(averageScore, itemAverages, redLineResult);
+    
+    return {
+        tier,
+        tierTitle: TIER_CONFIG[tier].title,
+        tierColor: TIER_CONFIG[tier].color,
+        tierDescription: TIER_DESCRIPTIONS[tier],
+        redLineCount: redLineResult.redLineCount,
+        redLineWarnings: redLineResult.warnings,
+        hasRedLine: redLineResult.hasRedLine
+    };
+}
+
+function calculateEmployeeTierWithRedLineCheck(averageScore, itemAverages, redLineResult) {
+    const { redLineCount } = redLineResult;
+    
+    if (redLineCount >= 2) return 'D';
+    if (redLineCount >= 1 && averageScore < 60) return 'D';
+    if (redLineCount >= 1) return 'C';
+    
+    if (averageScore >= 90) {
+        const highScores = itemAverages.filter(item => item.averageScore >= 9).length;
+        return highScores >= 3 ? 'S' : 'A';
+    }
+    if (averageScore >= 75) return 'A';
+    if (averageScore >= 60) return 'B';
+    if (averageScore >= 40) return 'C';
+    return 'D';
 }

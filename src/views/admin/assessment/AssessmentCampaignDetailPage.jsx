@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import assessmentAdminApi from '../../../api/assessmentAdmin'
 
@@ -27,6 +27,82 @@ const EXTERNAL_TYPE_LABELS = {
   long_term: '长期外援',
 }
 
+const CORE_ITEM_IDS = ['skill', 'quality', 'execution']
+const RED_LINE_THRESHOLD = 4
+
+const TIER_CONFIG = {
+  'S': { title: 'S级 - 应提拔', color: '#FFD700' },
+  'A': { title: 'A级 - 应培养', color: '#6366F1' },
+  'B': { title: 'B级 - 稳定贡献', color: '#10B981' },
+  'C': { title: 'C级 - 需关注', color: '#F59E0B' },
+  'D': { title: 'D级 - 应淘汰', color: '#EF4444' }
+}
+
+const TIER_DESCRIPTIONS = {
+  'S': '核心能力突出，具备带领团队的潜质，建议纳入人才梯队培养计划。',
+  'A': '表现优异，是部门骨干力量，可考虑赋予更多责任和挑战性任务。',
+  'B': '能胜任当前岗位要求，建议持续关注其成长轨迹。',
+  'C': '存在明显短板，需制定针对性提升计划，建议1-3个月后复评。',
+  'D': '能力严重不足或多项核心指标不达标，建议调整岗位或启动淘汰流程。'
+}
+
+function checkRedLines(itemAverages) {
+  const itemMap = new Map(itemAverages.map(item => [item.itemId, item.averageScore]))
+  const warnings = []
+  let redLineCount = 0
+  
+  CORE_ITEM_IDS.forEach(itemId => {
+    const score = itemMap.get(itemId)
+    if (score !== undefined && score <= RED_LINE_THRESHOLD) {
+      redLineCount++
+      const itemTitle = itemAverages.find(i => i.itemId === itemId)?.title || itemId
+      warnings.push(`${itemTitle} 得分 ${score.toFixed(1)} 分，低于合格线`)
+    }
+  })
+  
+  return { redLineCount, warnings, hasRedLine: redLineCount > 0 }
+}
+
+function calculateTier(averageScore, itemAverages) {
+  const { redLineCount } = checkRedLines(itemAverages)
+  
+  if (redLineCount >= 2) return 'D'
+  if (redLineCount >= 1 && averageScore < 60) return 'D'
+  if (redLineCount >= 1) return 'C'
+  
+  if (averageScore >= 90) {
+    const highScores = itemAverages.filter(item => item.averageScore >= 9).length
+    return highScores >= 3 ? 'S' : 'A'
+  }
+  if (averageScore >= 75) return 'A'
+  if (averageScore >= 60) return 'B'
+  if (averageScore >= 40) return 'C'
+  return 'D'
+}
+
+function buildTierResultFallback(averageScore, itemAverages) {
+  const tier = calculateTier(averageScore, itemAverages)
+  const { redLineCount, warnings } = checkRedLines(itemAverages)
+  
+  return {
+    tier,
+    tierTitle: TIER_CONFIG[tier].title,
+    tierColor: TIER_CONFIG[tier].color,
+    tierDescription: TIER_DESCRIPTIONS[tier],
+    redLineCount,
+    redLineWarnings: warnings,
+    hasRedLine: redLineCount > 0
+  }
+}
+
+function getTierResult(report) {
+  if (report.tierResult) return report.tierResult
+  if (report.itemAverages && report.averageScore !== undefined) {
+    return buildTierResultFallback(report.averageScore, report.itemAverages)
+  }
+  return null
+}
+
 function AssessmentCampaignDetailPage() {
   const { id } = useParams()
   const [detail, setDetail] = useState(null)
@@ -42,6 +118,8 @@ function AssessmentCampaignDetailPage() {
   const [candidateLoading, setCandidateLoading] = useState(false)
   const [candidates, setCandidates] = useState([])
   const [selectedTeamMemberIds, setSelectedTeamMemberIds] = useState([])
+  const radarChartRef = useRef(null)
+  const radarChartInstance = useRef(null)
 
   const templateItems = detail?.template?.items || []
   const reportMembers = useMemo(() => detail?.report?.members || [], [detail])
@@ -228,6 +306,62 @@ function AssessmentCampaignDetailPage() {
       setMessage(error.message)
     }
   }
+
+  const renderRadarChart = (report) => {
+    if (!radarChartRef.current || !window.Chart) return
+    
+    if (radarChartInstance.current) {
+      radarChartInstance.current.destroy()
+      radarChartInstance.current = null
+    }
+    
+    const itemAverages = report.itemAverages || []
+    const tierResult = getTierResult(report)
+    const tierColor = tierResult?.tierColor || '#6366F1'
+    
+    radarChartInstance.current = new window.Chart(radarChartRef.current, {
+      type: 'radar',
+      data: {
+        labels: itemAverages.map(item => item.title.slice(0, 6)),
+        datasets: [{
+          label: '平均分',
+          data: itemAverages.map(item => item.averageScore),
+          backgroundColor: `${tierColor}33`,
+          borderColor: tierColor,
+          pointBackgroundColor: tierColor,
+          pointBorderColor: '#fff',
+          borderWidth: 2,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          r: {
+            angleLines: { color: 'rgba(0, 0, 0, 0.08)' },
+            grid: { color: 'rgba(0, 0, 0, 0.08)' },
+            pointLabels: { font: { size: 11, weight: '600' }, color: '#57534e' },
+            ticks: { display: false, stepSize: 2 },
+            min: 0,
+            max: 10
+          }
+        },
+        plugins: { legend: { display: false } }
+      }
+    })
+  }
+
+  useEffect(() => {
+    if (selectedMemberReport?.report) {
+      renderRadarChart(selectedMemberReport.report)
+    }
+    return () => {
+      if (radarChartInstance.current) {
+        radarChartInstance.current.destroy()
+        radarChartInstance.current = null
+      }
+    }
+  }, [selectedMemberReport])
 
   const handleGrowthSearch = async () => {
     if (!growthCode.trim()) return
@@ -460,32 +594,96 @@ function AssessmentCampaignDetailPage() {
 
       {selectedMemberReport && (
         <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div style={titleStyle}>成员报表详情</div>
             <button className="btn btn--ghost btn--sm" onClick={() => setSelectedMemberReport(null)}>关闭</button>
           </div>
-          <div style={{ marginBottom: 12, display: 'grid', gap: 6 }}>
-            <div><strong>姓名：</strong>{selectedMemberReport.member.employeeName}</div>
-            <div><strong>工号：</strong>{selectedMemberReport.member.employeeCode}</div>
-            <div><strong>岗位：</strong>{selectedMemberReport.member.position || '-'}</div>
-            <div><strong>平均分：</strong>{selectedMemberReport.report.averageScore}</div>
-            <div><strong>样本数：</strong>{selectedMemberReport.report.sampleCount}</div>
-            <div><strong>方差：</strong>{selectedMemberReport.report.variance}</div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 24 }}>
+            <div style={{ height: 260 }}>
+              <canvas ref={radarChartRef} />
+            </div>
+            
+            <div style={{ display: 'grid', gap: 16 }}>
+              {(() => {
+                const tierResult = getTierResult(selectedMemberReport.report)
+                return tierResult && (
+                  <div style={{
+                    padding: 16,
+                    borderRadius: 12,
+                    background: `${tierResult.tierColor}15`,
+                    border: `1px solid ${tierResult.tierColor}40`
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                      <span style={{
+                        padding: '4px 12px',
+                        borderRadius: 6,
+                        background: tierResult.tierColor,
+                        color: '#fff',
+                        fontWeight: 700,
+                        fontSize: 14
+                      }}>
+                        {tierResult.tierTitle}
+                      </span>
+                      {tierResult.hasRedLine && (
+                        <span style={{ color: '#EF4444', fontSize: 13, fontWeight: 600 }}>
+                          ⚠️ {tierResult.redLineCount} 条红线
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ color: '#374151', fontSize: 14, lineHeight: 1.6 }}>
+                      {tierResult.tierDescription}
+                    </div>
+                    {tierResult.redLineWarnings?.length > 0 && (
+                      <div style={{ marginTop: 8, fontSize: 13, color: '#DC2626' }}>
+                        {tierResult.redLineWarnings.map((w, i) => (
+                          <div key={i}>• {w}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 14 }}>
+                <div><strong>姓名：</strong>{selectedMemberReport.member.employeeName}</div>
+                <div><strong>工号：</strong>{selectedMemberReport.member.employeeCode}</div>
+                <div><strong>岗位：</strong>{selectedMemberReport.member.position || '-'}</div>
+                <div><strong>平均分：</strong>{selectedMemberReport.report.averageScore}</div>
+                <div><strong>样本数：</strong>{selectedMemberReport.report.sampleCount}</div>
+                <div><strong>方差：</strong>{selectedMemberReport.report.variance}</div>
+              </div>
+            </div>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
             <thead>
               <tr>
                 <th style={thStyle}>维度</th>
                 <th style={thStyle}>平均分</th>
+                <th style={thStyle}>状态</th>
               </tr>
             </thead>
             <tbody>
-              {(selectedMemberReport.report.itemAverages || []).map((item) => (
-                <tr key={item.itemId} style={{ borderTop: '1px solid #e5e7eb' }}>
-                  <td style={tdStyle}>{item.title}</td>
-                  <td style={tdStyle}>{item.averageScore}</td>
-                </tr>
-              ))}
+              {(selectedMemberReport.report.itemAverages || []).map((item) => {
+                const isCore = CORE_ITEM_IDS.includes(item.itemId)
+                const isRedLine = isCore && item.averageScore <= RED_LINE_THRESHOLD
+                return (
+                  <tr key={item.itemId} style={{ borderTop: '1px solid #e5e7eb' }}>
+                    <td style={tdStyle}>
+                      {item.title}
+                      {isCore && <span style={{ color: '#6366F1', marginLeft: 4, fontSize: 11 }}>核心</span>}
+                    </td>
+                    <td style={tdStyle}>{item.averageScore}</td>
+                    <td style={tdStyle}>
+                      {isRedLine && <span style={{ color: '#EF4444', fontWeight: 600 }}>⚠️ 红线</span>}
+                      {!isRedLine && item.averageScore >= 8 && <span style={{ color: '#10B981' }}>优秀</span>}
+                      {!isRedLine && item.averageScore < 8 && item.averageScore >= 6 && <span style={{ color: '#6B7280' }}>合格</span>}
+                      {!isRedLine && item.averageScore < 6 && <span style={{ color: '#F59E0B' }}>待提升</span>}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -504,18 +702,36 @@ function AssessmentCampaignDetailPage() {
                 <th style={thStyle}>年份</th>
                 <th style={thStyle}>活动</th>
                 <th style={thStyle}>均分</th>
+                <th style={thStyle}>等级</th>
                 <th style={thStyle}>样本数</th>
               </tr>
             </thead>
             <tbody>
-              {growthReport.timeline.map((row) => (
-                <tr key={`${row.campaignId}-${row.year}`} style={{ borderTop: '1px solid #e5e7eb' }}>
-                  <td style={tdStyle}>{row.year}</td>
-                  <td style={tdStyle}>{row.campaignName}</td>
-                  <td style={tdStyle}>{row.averageScore}</td>
-                  <td style={tdStyle}>{row.sampleCount}</td>
-                </tr>
-              ))}
+              {growthReport.timeline.map((row) => {
+                const tierResult = row.tierResult || getTierResult({ averageScore: row.averageScore, itemAverages: row.itemAverages })
+                return (
+                  <tr key={`${row.campaignId}-${row.year}`} style={{ borderTop: '1px solid #e5e7eb' }}>
+                    <td style={tdStyle}>{row.year}</td>
+                    <td style={tdStyle}>{row.campaignName}</td>
+                    <td style={tdStyle}>{row.averageScore}</td>
+                    <td style={tdStyle}>
+                      {tierResult ? (
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: 4,
+                          background: tierResult.tierColor,
+                          color: '#fff',
+                          fontSize: 12,
+                          fontWeight: 600
+                        }}>
+                          {tierResult.tierTitle}
+                        </span>
+                      ) : '-'}
+                    </td>
+                    <td style={tdStyle}>{row.sampleCount}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         ) : (
