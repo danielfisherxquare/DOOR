@@ -461,13 +461,13 @@ function AssessmentCampaignDetailPage() {
       </div>
 
       <div style={twoColumnStyle}>
-        <div style={cardStyle}>
+        <div style={{ ...cardStyle, display: 'grid', gridTemplateRows: 'auto auto 1fr auto', gap: 16, minHeight: 600 }}>
           <div style={titleStyle}>活动成员</div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
             <input className="input" value={candidateKeyword} onChange={(event) => setCandidateKeyword(event.target.value)} placeholder="搜索工号、姓名、岗位、部门" style={{ flex: 1 }} />
             <button className="btn btn--secondary" onClick={() => loadCandidates(candidateKeyword)} disabled={candidateLoading}>搜索</button>
           </div>
-          <div style={{ maxHeight: 450, overflow: 'auto', display: 'grid', gap: 8 }}>
+          <div style={{ maxHeight: 600, overflow: 'auto', display: 'grid', gap: 8 }}>
             {candidates.map((candidate) => (
               <label key={candidate.id} style={candidateRowStyle}>
                 <input type="checkbox" checked={selectedTeamMemberIds.includes(candidate.id)} onChange={() => toggleCandidate(candidate.id)} style={{ marginTop: 4, flexShrink: 0 }} />
@@ -485,21 +485,20 @@ function AssessmentCampaignDetailPage() {
             ))}
             {candidates.length === 0 && <div style={{ color: '#6b7280', padding: 20, textAlign: 'center' }}>当前机构下暂无可选团队成员。</div>}
           </div>
-          <div style={{ marginTop: 12 }}>
+          <div style={{ paddingTop: 16, borderTop: '1px solid #e5e7eb' }}>
             <button className="btn btn--primary" onClick={handleSyncMembers} disabled={saving || detail.campaign.status !== 'draft'}>同步到考评活动</button>
           </div>
         </div>
 
-        <div style={cardStyle}>
+        <div style={{ ...cardStyle, display: 'grid', gridTemplateRows: 'auto auto 1fr', gap: 16, minHeight: 600 }}>
           <div style={titleStyle}>邀请码管理</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input className="input" type="number" value={inviteCount} onChange={(event) => setInviteCount(event.target.value)} style={{ maxWidth: 120 }} />
             <button className="btn btn--primary" onClick={handleGenerateInviteCodes} disabled={saving}>生成邀请码</button>
           </div>
-
           {generatedCodes.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 8 }}>本次生成</div>
+            <div style={{ padding: '12px', background: '#f0f9ff', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, color: '#0369a1', marginBottom: 8, fontWeight: 600 }}>本次生成</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {generatedCodes.map((code) => (
                   <div key={code.id} style={badgeStyle}>{code.plainCode}</div>
@@ -507,68 +506,69 @@ function AssessmentCampaignDetailPage() {
               </div>
             </div>
           )}
-
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={thStyle}>邀请码</th>
-                <th style={thStyle}>状态</th>
-                <th style={thStyle}>激活时间</th>
-                <th style={thStyle}>完成时间</th>
-                <th style={thStyle}>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {inviteCodes.map((code) => (
-                <tr key={code.id} style={{ borderTop: '1px solid #e5e7eb' }}>
-                  <td style={tdStyle}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <code style={{
-                        padding: '2px 8px',
-                        background: '#f3f4f6',
-                        borderRadius: 4,
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: '#1f2937'
-                      }}>
-                        {code.plainCode || 'N/A'}
-                      </code>
-                      {code.plainCode && (
-                        <button
-                          className="btn btn--ghost btn--sm"
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(code.plainCode)
-                              setMessage('邀请码已复制到剪贴板')
-                            } catch (_error) {
-                              setMessage(code.plainCode)
-                            }
-                          }}
-                          style={{ padding: '2px 6px', fontSize: 12 }}
-                        >
-                          复制
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                  <td style={tdStyle}>{INVITE_STATUS_LABELS[code.status] || code.status}</td>
-                  <td style={tdStyle}>{code.activatedAt ? new Date(code.activatedAt).toLocaleString() : '-'}</td>
-                  <td style={tdStyle}>{code.completedAt ? new Date(code.completedAt).toLocaleString() : '-'}</td>
-                  <td style={tdStyle}>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button className="btn btn--ghost btn--sm" onClick={() => handleResetInviteCode(code.id)}>重置进度</button>
-                      <button className="btn btn--ghost btn--sm" onClick={() => handleRevokeInviteCode(code.id)} disabled={code.status === 'revoked'}>撤销</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {inviteCodes.length === 0 && (
+          <div style={{ maxHeight: 600, overflow: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
                 <tr>
-                  <td style={tdStyle} colSpan={5}>暂无邀请码</td>
+                  <th style={thStyle}>邀请码</th>
+                  <th style={thStyle}>状态</th>
+                  <th style={thStyle}>激活时间</th>
+                  <th style={thStyle}>完成时间</th>
+                  <th style={thStyle}>操作</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {inviteCodes.map((code) => (
+                  <tr key={code.id} style={{ borderTop: '1px solid #e5e7eb' }}>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <code style={{
+                          padding: '2px 8px',
+                          background: '#f3f4f6',
+                          borderRadius: 4,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: '#1f2937'
+                        }}>
+                          {code.plainCode || 'N/A'}
+                        </code>
+                        {code.plainCode && (
+                          <button
+                            className="btn btn--ghost btn--sm"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(code.plainCode)
+                                setMessage('邀请码已复制到剪贴板')
+                              } catch (_error) {
+                                setMessage(code.plainCode)
+                              }
+                            }}
+                            style={{ padding: '2px 6px', fontSize: 12 }}
+                          >
+                            复制
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td style={tdStyle}>{INVITE_STATUS_LABELS[code.status] || code.status}</td>
+                    <td style={tdStyle}>{code.activatedAt ? new Date(code.activatedAt).toLocaleString() : '-'}</td>
+                    <td style={tdStyle}>{code.completedAt ? new Date(code.completedAt).toLocaleString() : '-'}</td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn--ghost btn--sm" onClick={() => handleResetInviteCode(code.id)}>重置进度</button>
+                        <button className="btn btn--ghost btn--sm" onClick={() => handleRevokeInviteCode(code.id)} disabled={code.status === 'revoked'}>撤销</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {inviteCodes.length === 0 && (
+                  <tr>
+                    <td style={tdStyle} colSpan={5}>暂无邀请码</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
