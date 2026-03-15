@@ -464,23 +464,26 @@ function AssessmentCampaignDetailPage() {
         <div style={cardStyle}>
           <div style={titleStyle}>活动成员</div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <input className="input" value={candidateKeyword} onChange={(event) => setCandidateKeyword(event.target.value)} placeholder="搜索工号、姓名、岗位、部门" />
+            <input className="input" value={candidateKeyword} onChange={(event) => setCandidateKeyword(event.target.value)} placeholder="搜索工号、姓名、岗位、部门" style={{ flex: 1 }} />
             <button className="btn btn--secondary" onClick={() => loadCandidates(candidateKeyword)} disabled={candidateLoading}>搜索</button>
           </div>
-          <div style={{ maxHeight: 360, overflow: 'auto', display: 'grid', gap: 8 }}>
+          <div style={{ maxHeight: 450, overflow: 'auto', display: 'grid', gap: 8 }}>
             {candidates.map((candidate) => (
               <label key={candidate.id} style={candidateRowStyle}>
-                <input type="checkbox" checked={selectedTeamMemberIds.includes(candidate.id)} onChange={() => toggleCandidate(candidate.id)} />
-                <div style={{ flex: 1 }}>
-                  <div style={memberDisplayNameStyle}>{candidate.employeeCode} {candidate.employeeName}</div>
-                  <div style={{ fontSize: 12, color: '#6b7280' }}>
-                    {candidate.position || '未填写岗位'} / {candidate.department || '未填写部门'} / {MEMBER_TYPE_LABELS[candidate.memberType] || candidate.memberType}
-                    {candidate.externalEngagementType ? ` / ${EXTERNAL_TYPE_LABELS[candidate.externalEngagementType] || candidate.externalEngagementType}` : ''}
+                <input type="checkbox" checked={selectedTeamMemberIds.includes(candidate.id)} onChange={() => toggleCandidate(candidate.id)} style={{ marginTop: 4, flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={memberDisplayNameStyle}>{candidate.employeeCode} · {candidate.employeeName}</div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, display: 'grid', gap: 2 }}>
+                    <div>{candidate.position || '未填写岗位'}</div>
+                    <div>{candidate.department || '未填写部门'} · {MEMBER_TYPE_LABELS[candidate.memberType] || candidate.memberType}</div>
+                    {candidate.externalEngagementType && (
+                      <div style={{ color: '#059669' }}>{EXTERNAL_TYPE_LABELS[candidate.externalEngagementType] || candidate.externalEngagementType}</div>
+                    )}
                   </div>
                 </div>
               </label>
             ))}
-            {candidates.length === 0 && <div style={{ color: '#6b7280' }}>当前机构下暂无可选团队成员。</div>}
+            {candidates.length === 0 && <div style={{ color: '#6b7280', padding: 20, textAlign: 'center' }}>当前机构下暂无可选团队成员。</div>}
           </div>
           <div style={{ marginTop: 12 }}>
             <button className="btn btn--primary" onClick={handleSyncMembers} disabled={saving || detail.campaign.status !== 'draft'}>同步到考评活动</button>
@@ -811,7 +814,7 @@ const noticeStyle = {
 
 const twoColumnStyle = {
   display: 'grid',
-  gridTemplateColumns: '1fr 1fr',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))',
   gap: 16,
 }
 
@@ -843,20 +846,22 @@ const badgeStyle = {
 
 const candidateRowStyle = {
   display: 'flex',
-  gap: 10,
+  gap: 12,
   alignItems: 'flex-start',
-  padding: 12,
-  borderRadius: 12,
+  padding: '14px 16px',
+  borderRadius: 10,
   border: '1px solid #e5e7eb',
-  background: '#f8fafc',
+  background: '#ffffff',
+  cursor: 'pointer',
+  transition: 'all 0.15s ease',
 }
 
 const memberDisplayNameStyle = {
   fontFamily: "'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC', sans-serif",
   fontWeight: 600,
-  letterSpacing: 0,
+  fontSize: 14,
   color: '#111827',
-  fontSynthesis: 'none',
+  letterSpacing: 0.3,
 }
 
 export default AssessmentCampaignDetailPage
