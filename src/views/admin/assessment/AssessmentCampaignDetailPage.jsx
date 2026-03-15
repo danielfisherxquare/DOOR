@@ -508,6 +508,7 @@ function AssessmentCampaignDetailPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
+                <th style={thStyle}>邀请码</th>
                 <th style={thStyle}>状态</th>
                 <th style={thStyle}>激活时间</th>
                 <th style={thStyle}>完成时间</th>
@@ -517,6 +518,36 @@ function AssessmentCampaignDetailPage() {
             <tbody>
               {inviteCodes.map((code) => (
                 <tr key={code.id} style={{ borderTop: '1px solid #e5e7eb' }}>
+                  <td style={tdStyle}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <code style={{
+                        padding: '2px 8px',
+                        background: '#f3f4f6',
+                        borderRadius: 4,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: '#1f2937'
+                      }}>
+                        {code.plainCode || 'N/A'}
+                      </code>
+                      {code.plainCode && (
+                        <button
+                          className="btn btn--ghost btn--sm"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(code.plainCode)
+                              setMessage('邀请码已复制到剪贴板')
+                            } catch (_error) {
+                              setMessage(code.plainCode)
+                            }
+                          }}
+                          style={{ padding: '2px 6px', fontSize: 12 }}
+                        >
+                          复制
+                        </button>
+                      )}
+                    </div>
+                  </td>
                   <td style={tdStyle}>{INVITE_STATUS_LABELS[code.status] || code.status}</td>
                   <td style={tdStyle}>{code.activatedAt ? new Date(code.activatedAt).toLocaleString() : '-'}</td>
                   <td style={tdStyle}>{code.completedAt ? new Date(code.completedAt).toLocaleString() : '-'}</td>
@@ -530,7 +561,7 @@ function AssessmentCampaignDetailPage() {
               ))}
               {inviteCodes.length === 0 && (
                 <tr>
-                  <td style={tdStyle} colSpan={4}>暂无邀请码</td>
+                  <td style={tdStyle} colSpan={5}>暂无邀请码</td>
                 </tr>
               )}
             </tbody>

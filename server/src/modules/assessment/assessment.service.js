@@ -316,6 +316,21 @@ function serializeTeamCandidate(row) {
 
 function serializeInviteCode(row) {
     if (!row) return null;
+    
+    let plainCode = null;
+    if (row.plain_code_ciphertext && row.plain_code_iv && row.plain_code_auth_tag) {
+        try {
+            const decrypted = decryptJson({
+                ciphertext: Buffer.from(row.plain_code_ciphertext, 'base64'),
+                iv: row.plain_code_iv,
+                authTag: row.plain_code_auth_tag,
+            });
+            plainCode = decrypted.plainCode;
+        } catch (error) {
+            console.error('Failed to decrypt invite code:', error.message);
+        }
+    }
+    
     return {
         id: row.id,
         campaignId: row.campaign_id,
@@ -326,6 +341,7 @@ function serializeInviteCode(row) {
         lastMemberId: row.last_member_id,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        plainCode,
     };
 }
 
@@ -812,10 +828,14 @@ export async function generateInviteCodes(campaignId, count = 1) {
     for (let i = 0; i < normalizedCount; i += 1) {
         const plainCode = createInviteCodeValue(8);
         plainCodes.push(plainCode);
+        const encrypted = encryptJson({ plainCode });
         rows.push({
             campaign_id: campaignId,
             code_hash: hashInviteCode(plainCode),
             status: 'unused',
+            plain_code_ciphertext: Buffer.from(encrypted.ciphertext).toString('base64'),
+            plain_code_iv: encrypted.iv,
+            plain_code_auth_tag: encrypted.authTag,
         });
     }
 
