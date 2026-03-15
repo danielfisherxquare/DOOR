@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import assessmentAdminApi from '../../../api/assessmentAdmin'
+import { loadChartJs } from '../../../utils/chartLoader'
 
 const CAMPAIGN_STATUS_LABELS = {
   draft: '草稿',
@@ -118,8 +119,16 @@ function AssessmentCampaignDetailPage() {
   const [candidateLoading, setCandidateLoading] = useState(false)
   const [candidates, setCandidates] = useState([])
   const [selectedTeamMemberIds, setSelectedTeamMemberIds] = useState([])
+  const [chartLoaded, setChartLoaded] = useState(false)
   const radarChartRef = useRef(null)
   const radarChartInstance = useRef(null)
+
+  useEffect(() => {
+    loadChartJs().then(Chart => {
+      window.Chart = Chart
+      setChartLoaded(true)
+    })
+  }, [])
 
   const templateItems = detail?.template?.items || []
   const reportMembers = useMemo(() => detail?.report?.members || [], [detail])
@@ -308,7 +317,7 @@ function AssessmentCampaignDetailPage() {
   }
 
   const renderRadarChart = (report) => {
-    if (!radarChartRef.current || !window.Chart) return
+    if (!radarChartRef.current || !chartLoaded || !window.Chart) return
     
     if (radarChartInstance.current) {
       radarChartInstance.current.destroy()
