@@ -118,7 +118,7 @@ function AssessmentCampaignDetailPage() {
   const [candidateKeyword, setCandidateKeyword] = useState('')
   const [candidateLoading, setCandidateLoading] = useState(false)
   const [candidates, setCandidates] = useState([])
-  const [selectedTeamMemberIds, setSelectedTeamMemberIds] = useState([])
+  const [selectedMembers, setSelectedMembers] = useState([])
   const [chartLoaded, setChartLoaded] = useState(false)
   const radarChartRef = useRef(null)
   const radarChartInstance = useRef(null)
@@ -133,6 +133,11 @@ function AssessmentCampaignDetailPage() {
   const templateItems = detail?.template?.items || []
   const reportMembers = useMemo(() => detail?.report?.members || [], [detail])
   const inviteCodes = detail?.inviteCodes || []
+  const selectedMemberMap = useMemo(() => new Map(selectedMembers.map((item) => [item.teamMemberId, item])), [selectedMembers])
+  const positionOptions = useMemo(
+    () => [...new Set(candidates.map((item) => String(item.position || '').trim()).filter(Boolean))],
+    [candidates],
+  )
   const shareLink = useMemo(() => {
     if (typeof window === 'undefined' || !id) return ''
     return `${window.location.origin}/assessment/${id}`
@@ -145,7 +150,14 @@ function AssessmentCampaignDetailPage() {
       const res = await assessmentAdminApi.getCampaignDetail(id)
       if (res.success) {
         setDetail(res.data)
-        setSelectedTeamMemberIds((res.data.members || []).map((item) => item.teamMemberId).filter(Boolean))
+        setSelectedMembers(
+          (res.data.members || [])
+            .filter((item) => item.teamMemberId)
+            .map((item) => ({
+              teamMemberId: item.teamMemberId,
+              position: item.position || '',
+            })),
+        )
       }
     } catch (error) {
       setDetail(null)
@@ -215,7 +227,7 @@ function AssessmentCampaignDetailPage() {
     setSaving(true)
     setMessage('')
     try {
-      const res = await assessmentAdminApi.setCampaignMembers(id, selectedTeamMemberIds)
+      const res = await assessmentAdminApi.setCampaignMembers(id, selectedMembers)
       if (res.success) {
         setMessage(`已同步 ${res.data.length} 名成员到考评活动。`)
         await loadDetail()
@@ -397,11 +409,20 @@ function AssessmentCampaignDetailPage() {
   }
 
   const toggleCandidate = (candidateId) => {
-    setSelectedTeamMemberIds((prev) => (
-      prev.includes(candidateId)
-        ? prev.filter((item) => item !== candidateId)
-        : [...prev, candidateId]
-    ))
+    setSelectedMembers((prev) => {
+      const existing = prev.find((item) => item.teamMemberId === candidateId)
+      if (existing) return prev.filter((item) => item.teamMemberId !== candidateId)
+      const candidate = candidates.find((item) => item.id === candidateId)
+      return [...prev, { teamMemberId: candidateId, position: candidate?.position || '' }]
+    })
+  }
+
+  const updateCandidatePosition = (candidateId, position) => {
+    setSelectedMembers((prev) => prev.map((item) => (
+      item.teamMemberId === candidateId
+        ? { ...item, position }
+        : item
+    )))
   }
 
   if (loading) return <div style={{ padding: 24 }}>加载中...</div>
@@ -467,10 +488,13 @@ function AssessmentCampaignDetailPage() {
             <input className="input" value={candidateKeyword} onChange={(event) => setCandidateKeyword(event.target.value)} placeholder="搜索工号、姓名、岗位、部门" style={{ flex: 1 }} />
             <button className="btn btn--secondary" onClick={() => loadCandidates(candidateKeyword)} disabled={candidateLoading}>搜索</button>
           </div>
+          <datalist id={`assessment-position-options-${id}`}>
+            {positionOptions.map((item) => <option key={item} value={item} />)}
+          </datalist>
           <div style={{ maxHeight: 600, overflow: 'auto', display: 'grid', gap: 8 }}>
             {candidates.map((candidate) => (
               <label key={candidate.id} style={candidateRowStyle}>
-                <input type="checkbox" checked={selectedTeamMemberIds.includes(candidate.id)} onChange={() => toggleCandidate(candidate.id)} style={{ marginTop: 4, flexShrink: 0 }} />
+                <input type="checkbox" checked={selectedMemberMap.has(candidate.id)} onChange={() => toggleCandidate(candidate.id)} style={{ marginTop: 4, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={memberDisplayNameStyle}>{candidate.employeeCode} · {candidate.employeeName}</div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, display: 'grid', gap: 2 }}>
@@ -480,6 +504,18 @@ function AssessmentCampaignDetailPage() {
                       <div style={{ color: '#059669' }}>{EXTERNAL_TYPE_LABELS[candidate.externalEngagementType] || candidate.externalEngagementType}</div>
                     )}
                   </div>
+                  {selectedMemberMap.has(candidate.id) && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={candidateFieldLabelStyle}>本场岗位 / 板块</div>
+                      <input
+                        className="input"
+                        value={selectedMemberMap.get(candidate.id)?.position || ''}
+                        onChange={(event) => updateCandidatePosition(candidate.id, event.target.value)}
+                        placeholder="输入本场赛事岗位"
+                        list={`assessment-position-options-${id}`}
+                      />
+                    </div>
+                  )}
                 </div>
               </label>
             ))}
@@ -862,6 +898,12 @@ const memberDisplayNameStyle = {
   fontSize: 14,
   color: '#111827',
   letterSpacing: 0.3,
+}
+
+const candidateFieldLabelStyle = {
+  fontSize: 12,
+  color: '#6b7280',
+  marginBottom: 4,
 }
 
 export default AssessmentCampaignDetailPage

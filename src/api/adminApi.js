@@ -1,5 +1,7 @@
 import request from '../utils/request'
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+
 const adminApi = {
   getOrgs: (params) => request.get('/admin/orgs', { params }),
   createOrg: (data) => request.post('/admin/orgs', data),
@@ -35,8 +37,26 @@ const adminApi = {
 
   getTeamMembers: (params) => request.get('/org/team-members', { params }),
   getTeamMember: (teamMemberId, params) => request.get(`/org/team-members/${teamMemberId}`, { params }),
+  getTeamMemberPhoto: async (teamMemberId, orgId, token) => {
+    const response = await fetch(`${API_BASE_URL}/org/team-members/${teamMemberId}/photo${orgId ? `?orgId=${orgId}` : ''}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(errorText || '读取成员照片失败')
+    }
+    return response.blob()
+  },
   createTeamMember: (data, orgId) => request.post(`/org/team-members${orgId ? `?orgId=${orgId}` : ''}`, data),
   updateTeamMember: (teamMemberId, data, orgId) => request.patch(`/org/team-members/${teamMemberId}${orgId ? `?orgId=${orgId}` : ''}`, data),
+  uploadTeamMemberPhoto: (teamMemberId, file, orgId) => {
+    const formData = new FormData()
+    formData.append('photo', file)
+    return request.post(`/org/team-members/${teamMemberId}/photo${orgId ? `?orgId=${orgId}` : ''}`, formData)
+  },
+  deleteTeamMemberPhoto: (teamMemberId, orgId) => request.delete(`/org/team-members/${teamMemberId}/photo${orgId ? `?orgId=${orgId}` : ''}`),
   archiveTeamMember: (teamMemberId, orgId) => request.post(`/org/team-members/${teamMemberId}/archive${orgId ? `?orgId=${orgId}` : ''}`),
   restoreTeamMember: (teamMemberId, orgId) => request.post(`/org/team-members/${teamMemberId}/restore${orgId ? `?orgId=${orgId}` : ''}`),
   enableTeamMemberAccount: (teamMemberId, orgId) => request.post(`/org/team-members/${teamMemberId}/enable-account${orgId ? `?orgId=${orgId}` : ''}`),

@@ -784,7 +784,10 @@ export async function listCampaignTeamCandidates(campaignId, keyword = '') {
 
 export async function setCampaignMembers(campaignId, teamMemberIds) {
     const campaign = await ensureCampaignEditable(campaignId);
-    const normalizedIds = [...new Set((Array.isArray(teamMemberIds) ? teamMemberIds : []).map((item) => String(item || '').trim()).filter(Boolean))];
+    const rawMembers = Array.isArray(teamMemberIds)
+        ? teamMemberIds.map((item) => (typeof item === 'object' && item !== null ? item : { teamMemberId: item }))
+        : [];
+    const normalizedIds = [...new Set(rawMembers.map((item) => String(item.teamMemberId || '').trim()).filter(Boolean))];
     if (normalizedIds.length === 0) {
         throw badRequest('请选择至少一名团队成员');
     }
@@ -796,6 +799,16 @@ export async function setCampaignMembers(campaignId, teamMemberIds) {
         throw badRequest(`存在不可用的团队成员：${missing.join(', ')}`);
     }
 
+    const memberInputMap = new Map(
+        rawMembers
+            .map((item) => ({
+                teamMemberId: String(item.teamMemberId || '').trim(),
+                position: String(item.position || '').trim(),
+            }))
+            .filter((item) => item.teamMemberId)
+            .map((item) => [item.teamMemberId, item]),
+    );
+
     const inserted = await repo.replaceMembers(campaignId, members.map((member, index) => ({
         campaign_id: campaignId,
         source_type: 'team_member',
@@ -803,7 +816,7 @@ export async function setCampaignMembers(campaignId, teamMemberIds) {
         member_type: member.member_type,
         employee_code: member.employee_code,
         employee_name: member.employee_name,
-        position: member.position || null,
+        position: memberInputMap.get(String(member.id))?.position || member.position || null,
         team_name: null,
         department: member.department || null,
         sort_order: index + 1,

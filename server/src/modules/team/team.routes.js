@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import path from 'path';
 import { requireRoles } from '../../middleware/require-roles.js';
 import * as teamService from './team.service.js';
+import { uploadTeamMemberPhotoMiddleware } from './team-photo.js';
 
 const router = Router();
 
@@ -72,6 +74,18 @@ router.get('/team-members/:teamMemberId', async (req, res, next) => {
     }
 });
 
+router.get('/team-members/:teamMemberId/photo', async (req, res, next) => {
+    try {
+        const orgId = getOrgId(req);
+        if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId' });
+        const absolutePath = await teamService.getTeamMemberPhotoFile(orgId, req.params.teamMemberId);
+        res.type(path.extname(absolutePath));
+        res.sendFile(absolutePath);
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.post('/team-members', async (req, res, next) => {
     try {
         const orgId = getOrgId(req);
@@ -87,6 +101,27 @@ router.patch('/team-members/:teamMemberId', async (req, res, next) => {
         const orgId = getOrgId(req);
         if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId' });
         res.json({ success: true, data: await teamService.updateTeamMember(orgId, req.params.teamMemberId, req.body) });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/team-members/:teamMemberId/photo', uploadTeamMemberPhotoMiddleware.single('photo'), async (req, res, next) => {
+    try {
+        const orgId = getOrgId(req);
+        if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId' });
+        if (!req.file) return res.status(400).json({ success: false, message: 'Missing photo file' });
+        res.json({ success: true, data: await teamService.uploadTeamMemberPhoto(orgId, req.params.teamMemberId, req.file) });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.delete('/team-members/:teamMemberId/photo', async (req, res, next) => {
+    try {
+        const orgId = getOrgId(req);
+        if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId' });
+        res.json({ success: true, data: await teamService.deleteTeamMemberPhoto(orgId, req.params.teamMemberId) });
     } catch (error) {
         next(error);
     }

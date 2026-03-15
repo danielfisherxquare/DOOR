@@ -22,7 +22,7 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
   })
   const [candidates, setCandidates] = useState([])
   const [candidateKeyword, setCandidateKeyword] = useState('')
-  const [selectedIds, setSelectedIds] = useState([])
+  const [selectedAssignees, setSelectedAssignees] = useState([])
   const [saving, setSaving] = useState(false)
   const [loadingCandidates, setLoadingCandidates] = useState(false)
 
@@ -36,13 +36,40 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
       is_milestone: Boolean(task.is_milestone),
       notes: task.notes || '',
     })
-    setSelectedIds((task.assignees || []).map((item) => item.teamMemberId).filter(Boolean))
+    setSelectedAssignees(
+      (task.assignees || [])
+        .filter((item) => item.teamMemberId)
+        .map((item) => ({
+          teamMemberId: item.teamMemberId,
+          position: item.position || '',
+        })),
+    )
   }, [task])
+
+  const selectedAssigneeMap = useMemo(
+    () => new Map(selectedAssignees.map((item) => [item.teamMemberId, item])),
+    [selectedAssignees],
+  )
 
   const selectedSummary = useMemo(() => {
     const candidateMap = new Map(candidates.map((item) => [item.id, item]))
-    return selectedIds.map((id) => candidateMap.get(id)).filter(Boolean)
-  }, [candidates, selectedIds])
+    return selectedAssignees
+      .map((item) => {
+        const candidate = candidateMap.get(item.teamMemberId)
+        return candidate
+          ? {
+              ...candidate,
+              scopedPosition: item.position || candidate.position || '',
+            }
+          : null
+      })
+      .filter(Boolean)
+  }, [candidates, selectedAssignees])
+
+  const positionOptions = useMemo(
+    () => [...new Set(candidates.map((item) => String(item.position || '').trim()).filter(Boolean))],
+    [candidates],
+  )
 
   const loadCandidates = async (keyword = '') => {
     setLoadingCandidates(true)
@@ -60,13 +87,30 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
   }, [task, projectId])
 
   const toggleCandidate = (candidateId) => {
-    setSelectedIds((prev) => (prev.includes(candidateId) ? prev.filter((item) => item !== candidateId) : [...prev, candidateId]))
+    setSelectedAssignees((prev) => {
+      const existing = prev.find((item) => item.teamMemberId === candidateId)
+      if (existing) return prev.filter((item) => item.teamMemberId !== candidateId)
+      const candidate = candidates.find((item) => item.id === candidateId)
+      return [...prev, { teamMemberId: candidateId, position: candidate?.position || '' }]
+    })
+  }
+
+  const updateAssigneePosition = (candidateId, position) => {
+    setSelectedAssignees((prev) => prev.map((item) => (
+      item.teamMemberId === candidateId
+        ? { ...item, position }
+        : item
+    )))
   }
 
   const handleSave = async () => {
-    if (!payload.title) return alert('标题不能为空')
+    if (!payload.title.trim()) {
+      window.alert('任务名称不能为空')
+      return
+    }
     if (payload.start_date && payload.end_date && new Date(payload.start_date) > new Date(payload.end_date)) {
-      return alert('开始日期不能晚于结束日期')
+      window.alert('开始日期不能晚于结束日期')
+      return
     }
 
     setSaving(true)
@@ -80,29 +124,30 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
 
       const taskRes = await projectsApi.updateTask(projectId, task.id, taskPayload)
       if (!taskRes.success) {
-        alert(`保存失败: ${taskRes.message || '未知错误'}`)
+        window.alert(`保存失败：${taskRes.message || '未知错误'}`)
         return
       }
 
-      const assigneePayload = selectedIds.map((teamMemberId) => {
-        const candidate = candidates.find((item) => item.id === teamMemberId)
+      const assigneePayload = selectedAssignees.map((item) => {
+        const candidate = candidates.find((entry) => entry.id === item.teamMemberId)
         return {
           sourceType: 'team_member',
-          teamMemberId,
+          teamMemberId: item.teamMemberId,
           employeeCode: candidate?.employeeCode || '',
           employeeName: candidate?.employeeName || '',
-          position: candidate?.position || '',
+          position: item.position || candidate?.position || '',
         }
       })
+
       const assigneeRes = await projectsApi.setTaskAssignees(projectId, task.id, assigneePayload)
       if (!assigneeRes.success) {
-        alert(`负责人保存失败: ${assigneeRes.message || '未知错误'}`)
+        window.alert(`负责人保存失败：${assigneeRes.message || '未知错误'}`)
         return
       }
 
       onSaveSuccess()
     } catch (error) {
-      alert(error.message || '网络错误')
+      window.alert(error.message || '网络错误')
     } finally {
       setSaving(false)
     }
@@ -153,27 +198,54 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
         <div style={{ marginBottom: 12 }}>
           <label style={labelStyle}>负责人</label>
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            <input className="input" style={{ ...inputStyle, marginBottom: 0 }} value={candidateKeyword} onChange={(event) => setCandidateKeyword(event.target.value)} placeholder="搜索工号、姓名、岗位" />
+            <input
+              className="input"
+              style={{ ...inputStyle, marginBottom: 0 }}
+              value={candidateKeyword}
+              onChange={(event) => setCandidateKeyword(event.target.value)}
+              placeholder="搜索工号、姓名、岗位、部门"
+            />
             <button className="btn btn--secondary" onClick={() => void loadCandidates(candidateKeyword)} disabled={loadingCandidates}>搜索</button>
           </div>
-          <div style={{ maxHeight: 180, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, display: 'grid', gap: 8 }}>
-            {candidates.map((candidate) => (
-              <label key={candidate.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: 8, borderRadius: 8, background: '#f8fafc' }}>
-                <input type="checkbox" checked={selectedIds.includes(candidate.id)} onChange={() => toggleCandidate(candidate.id)} />
-                <div>
-                  <div style={{ fontWeight: 600 }}>{candidate.employeeCode} {candidate.employeeName}</div>
-                  <div style={{ fontSize: 12, color: '#6b7280' }}>
-                    {candidate.position || '未填写岗位'} · {candidate.department || '未填写部门'} · {MEMBER_TYPE_LABELS[candidate.memberType] || candidate.memberType}
-                    {candidate.externalEngagementType ? ` · ${EXTERNAL_TYPE_LABELS[candidate.externalEngagementType] || candidate.externalEngagementType}` : ''}
+          <datalist id={`task-position-options-${task.id}`}>
+            {positionOptions.map((item) => <option key={item} value={item} />)}
+          </datalist>
+          <div style={{ maxHeight: 280, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, display: 'grid', gap: 8 }}>
+            {candidates.map((candidate) => {
+              const selected = selectedAssigneeMap.get(candidate.id)
+              return (
+                <label key={candidate.id} style={candidateCardStyle}>
+                  <input type="checkbox" checked={Boolean(selected)} onChange={() => toggleCandidate(candidate.id)} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600 }}>{candidate.employeeCode} {candidate.employeeName}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                      {candidate.position || '未填写岗位'} · {candidate.department || '未填写部门'} · {MEMBER_TYPE_LABELS[candidate.memberType] || candidate.memberType}
+                      {candidate.externalEngagementType ? ` · ${EXTERNAL_TYPE_LABELS[candidate.externalEngagementType] || candidate.externalEngagementType}` : ''}
+                    </div>
+                    {selected && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={miniLabelStyle}>本项目岗位 / 板块</div>
+                        <input
+                          className="input"
+                          style={{ ...inputStyle, marginBottom: 0 }}
+                          value={selected.position}
+                          onChange={(event) => updateAssigneePosition(candidate.id, event.target.value)}
+                          placeholder="输入本项目岗位"
+                          list={`task-position-options-${task.id}`}
+                        />
+                      </div>
+                    )}
                   </div>
-                </div>
-              </label>
-            ))}
+                </label>
+              )
+            })}
             {candidates.length === 0 && <div style={{ color: '#6b7280', fontSize: 13 }}>当前没有可选团队成员。</div>}
           </div>
           {selectedSummary.length > 0 && (
-            <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
-              当前已选：{selectedSummary.map((item) => `${item.employeeCode} ${item.employeeName}`).join('、')}
+            <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280', display: 'grid', gap: 4 }}>
+              {selectedSummary.map((item) => (
+                <div key={item.id}>{item.employeeCode} {item.employeeName} · {item.scopedPosition || '未填写岗位'}</div>
+              ))}
             </div>
           )}
         </div>
@@ -206,8 +278,8 @@ const cardStyle = {
   background: '#fff',
   borderRadius: 12,
   padding: 24,
-  width: 560,
-  maxWidth: '90%',
+  width: 640,
+  maxWidth: '92%',
   boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
 }
 
@@ -218,9 +290,24 @@ const labelStyle = {
   marginBottom: 4,
 }
 
+const miniLabelStyle = {
+  fontSize: 12,
+  color: '#6b7280',
+  marginBottom: 4,
+}
+
 const inputStyle = {
   width: '100%',
   padding: 8,
   border: '1px solid #d1d5db',
   borderRadius: 4,
+}
+
+const candidateCardStyle = {
+  display: 'flex',
+  gap: 8,
+  alignItems: 'flex-start',
+  padding: 8,
+  borderRadius: 8,
+  background: '#f8fafc',
 }

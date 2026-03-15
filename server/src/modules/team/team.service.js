@@ -3,6 +3,11 @@ import knex from '../../db/knex.js';
 import * as repo from './team.repository.js';
 import { buildTeamMemberEmail, buildTeamMemberUsername, createInitialPassword } from './team-password.js';
 import { decryptField, encryptField } from './team-crypto.js';
+import {
+    deleteTeamMemberPhotoFile,
+    getTeamMemberPhotoAbsolutePath,
+    validateTeamMemberPhoto,
+} from './team-photo.js';
 
 function badRequest(message) {
     return Object.assign(new Error(message), { status: 400, expose: true });
@@ -48,6 +53,7 @@ function serializeTeamMember(row) {
         department: row.department,
         memberType: row.member_type,
         externalEngagementType: row.external_engagement_type,
+        hasPhoto: Boolean(row.photo_path),
         idNumberMasked: maskId(row.id_number_last4),
         contactMasked: maskPhone(row.contact_last4),
         status: row.status,
@@ -79,15 +85,27 @@ function serializeTeamMemberDetail(row) {
     };
 }
 
+function normalizeCleanMemberType(value) {
+    if (value === '正式成员') return 'employee';
+    if (value === '外援') return 'external_support';
+    return value;
+}
+
+function normalizeCleanExternalType(value) {
+    if (value === '临时') return 'temporary';
+    if (value === '长期') return 'long_term';
+    return value;
+}
+
 function normalizeInput(input, { partial = false } = {}) {
     const employeeCode = input.employeeCode === undefined ? undefined : String(input.employeeCode || '').trim();
     const employeeName = input.employeeName === undefined ? undefined : String(input.employeeName || '').trim();
     const position = input.position === undefined ? undefined : String(input.position || '').trim();
     const department = input.department === undefined ? undefined : String(input.department || '').trim();
-    const memberType = input.memberType === undefined ? undefined : normalizeMemberType(input.memberType);
+    const memberType = input.memberType === undefined ? undefined : normalizeMemberType(normalizeCleanMemberType(input.memberType));
     const externalEngagementType = input.externalEngagementType === undefined
         ? undefined
-        : normalizeExternalType(input.externalEngagementType);
+        : normalizeExternalType(normalizeCleanExternalType(input.externalEngagementType));
     const idNumber = input.idNumber === undefined ? undefined : String(input.idNumber || '').trim();
     const contact = input.contact === undefined ? undefined : String(input.contact || '').trim();
 
@@ -251,6 +269,46 @@ export async function updateTeamMember(orgId, teamMemberId, input) {
         const detail = await repo.findTeamMemberById(orgId, teamMemberId, trx);
         return serializeTeamMemberDetail(detail);
     });
+}
+
+export async function uploadTeamMemberPhoto(orgId, teamMemberId, file) {
+    const existing = await repo.findTeamMemberById(orgId, teamMemberId);
+    if (!existing) {
+        if (file?.filename) await deleteTeamMemberPhotoFile(file.filename);
+        throw notFound('Team member not found');
+    }
+
+    try {
+        await validateTeamMemberPhoto(file);
+    } catch (error) {
+        if (file?.filename) await deleteTeamMemberPhotoFile(file.filename);
+        throw badRequest(error.message || 'Invalid photo');
+    }
+
+    const previousPhotoPath = existing.photo_path;
+    const updated = await repo.updateTeamMember(orgId, teamMemberId, { photo_path: file.filename });
+    if (previousPhotoPath && previousPhotoPath !== file.filename) {
+        await deleteTeamMemberPhotoFile(previousPhotoPath);
+    }
+    return serializeTeamMemberDetail(updated);
+}
+
+export async function deleteTeamMemberPhoto(orgId, teamMemberId) {
+    const existing = await repo.findTeamMemberById(orgId, teamMemberId);
+    if (!existing) throw notFound('Team member not found');
+    if (!existing.photo_path) return serializeTeamMemberDetail(existing);
+
+    const photoPath = existing.photo_path;
+    const updated = await repo.updateTeamMember(orgId, teamMemberId, { photo_path: null });
+    await deleteTeamMemberPhotoFile(photoPath);
+    return serializeTeamMemberDetail(updated);
+}
+
+export async function getTeamMemberPhotoFile(orgId, teamMemberId) {
+    const existing = await repo.findTeamMemberById(orgId, teamMemberId);
+    if (!existing) throw notFound('Team member not found');
+    if (!existing.photo_path) throw notFound('Team member photo not found');
+    return getTeamMemberPhotoAbsolutePath(existing.photo_path);
 }
 
 export async function archiveTeamMember(orgId, teamMemberId) {

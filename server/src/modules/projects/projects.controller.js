@@ -87,12 +87,13 @@ async function normalizeAssignees(projectId, assignees) {
         if (!item.teamMemberId) throw badRequest(`assignees[${index}].teamMemberId is required`);
         const member = memberMap.get(item.teamMemberId);
         if (!member) throw badRequest(`assignees[${index}] team member not found`);
+        const scopedPosition = String(item.position || '').trim();
         return {
             source_type: 'team_member',
             team_member_id: member.id,
             employee_code: member.employee_code,
             employee_name: member.employee_name,
-            position: member.position,
+            position: scopedPosition || member.position || null,
             member_type: member.member_type,
             external_engagement_type: member.external_engagement_type,
         };

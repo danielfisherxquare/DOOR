@@ -28,7 +28,6 @@ import assessmentAdminRoutes from './modules/assessment/assessment-admin.routes.
 import systemBackupRoutes from './modules/system-backups/system-backup.routes.js';
 
 const app = express();
-
 function getCorsOrigin() {
     const cloudOrigins = ['http://47.251.107.41', 'http://www.xquareliu.com', 'http://xquareliu.com'];
 
