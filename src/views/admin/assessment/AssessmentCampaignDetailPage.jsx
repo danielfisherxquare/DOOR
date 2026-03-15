@@ -319,19 +319,21 @@ function AssessmentCampaignDetailPage() {
   const renderRadarChart = (report) => {
     if (!radarChartRef.current || !chartLoaded || !window.Chart) return
     
+    const itemAverages = report.itemAverages || []
+    if (itemAverages.length === 0) return
+    
     if (radarChartInstance.current) {
       radarChartInstance.current.destroy()
       radarChartInstance.current = null
     }
     
-    const itemAverages = report.itemAverages || []
     const tierResult = getTierResult(report)
     const tierColor = tierResult?.tierColor || '#6366F1'
     
     radarChartInstance.current = new window.Chart(radarChartRef.current, {
       type: 'radar',
       data: {
-        labels: itemAverages.map(item => item.title.slice(0, 6)),
+        labels: itemAverages.map(item => (item.title || '').slice(0, 6)),
         datasets: [{
           label: '平均分',
           data: itemAverages.map(item => item.averageScore),
