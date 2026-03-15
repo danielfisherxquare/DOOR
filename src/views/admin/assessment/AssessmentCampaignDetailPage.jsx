@@ -363,7 +363,7 @@ function AssessmentCampaignDetailPage() {
   }
 
   useEffect(() => {
-    if (selectedMemberReport?.report) {
+    if (selectedMemberReport?.report && chartLoaded) {
       renderRadarChart(selectedMemberReport.report)
     }
     return () => {
@@ -372,7 +372,7 @@ function AssessmentCampaignDetailPage() {
         radarChartInstance.current = null
       }
     }
-  }, [selectedMemberReport])
+  }, [selectedMemberReport, chartLoaded])
 
   const handleGrowthSearch = async () => {
     if (!growthCode.trim()) return
