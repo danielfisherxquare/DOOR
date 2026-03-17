@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import credentialApi from '../../../api/credential'
 
 const STATUS_OPTIONS = [
@@ -14,8 +14,8 @@ const EMPTY_TEMPLATE = {
     templateCode: '',
     frontLayoutJson: null,
     backLayoutJson: null,
-    pageWidth: 567,
-    pageHeight: 567,
+    pageWidth: 283.46,
+    pageHeight: 396.85,
     version: 1,
     status: 'draft',
     description: '',
@@ -460,7 +460,7 @@ function getTypeIcon(type) {
         rect: 'R',
         image: 'I',
         qr: 'Q',
-        zoneLegend: 'Z',
+        accessLegend: 'A',
         mapImage: 'M',
         hotline: 'H',
         serialNo: 'S',

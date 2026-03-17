@@ -1,59 +1,23 @@
 # Credential Race Selection Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> Superseded on 2026-03-17 by `2026-03-17-credential-direct-refactor-implementation-plan.md`.
 
-**Goal:** Implement a new race selection page for the credential management module and fix sidebar raceId loss.
+## Status
 
-**Architecture:** Add a selection page displaying all races in an org, modify routing defaults, enhance `AdminLayout` to preserve `raceId` in URL search params during sub-menu navigation, and add fallback links in subpages.
+这份实现计划已经完成其中与赛事选择相关的部分，但其余命名和页面职责基于旧模型，现已不再作为执行依据。
 
-**Tech Stack:** React, React Router
+## What Still Applies
 
----
-### Task 1: Update AdminLayout Sidebar & Routes
+- 保留 `/admin/credential/select-race` 作为入口。
+- 在凭证管理子页面之间继续透传 `orgId` 与 `raceId`。
+- 在缺少 `raceId` 时提供返回赛事选择页的兜底入口。
 
-**Files:**
-- Modify: `src/components/admin/AdminLayout.jsx`
+## What No Longer Applies
 
-**Step 1: Update minimal implementation**
-1. Extract `currentRaceId` from `searchParams.get('raceId')`.
-2. Update the helper function to `linkWithContext(routePath)` to attach both `orgId` and `raceId` to URLs if present. Update `orgMenus` mapping to use `linkWithContext(child.path)`.
-3. Add `CredentialSelectRacePage` to lazy imports and map it to `path="credential/select-race"`.
-4. Update the default `/admin/credential` `<Navigate>` element to redirect to `/admin/credential/select-race${selectedOrgId ? ...}` instead of `zones`.
+- 旧的 `/admin/credential/zones` 作为默认落点。
+- 任何围绕 `zones / role templates / applications` 的页面契约说明。
+- 把 race-selection 计划当作当前凭证模块重构的主计划。
 
-**Step 2: Commit**
-```bash
-git add src/components/admin/AdminLayout.jsx
-git commit -m "feat: preserve raceId context in sidebar and map select-race route"
-```
+## Canonical Plan
 
-### Task 2: Implement SelectRacePage
-
-**Files:**
-- Create: `src/views/admin/credential/CredentialSelectRacePage.jsx`
-
-**Step 1: Write the minimal implementation**
-Render a `useEffect` loaded page that dynamically populates `racesApi.getAll({ orgId: selectedOrgId })`. If `!selectedOrgId`, show prompt to select org. If valid, show cards. Include a Link around each card navigating to `/admin/credential/zones?orgId=${selectedOrgId}&raceId=${race.id}`.
-
-**Step 2: Commit**
-```bash
-git add src/views/admin/credential/CredentialSelectRacePage.jsx
-git commit -m "feat: implement credential race selection landing page"
-```
-
-### Task 3: Update Subpages without RaceId
-
-**Files:**
-- Modify: `src/views/admin/credential/CredentialZonePage.jsx`
-- Modify: `src/views/admin/credential/CredentialRolePage.jsx`
-- Modify: `src/views/admin/credential/CredentialStylePage.jsx`
-- Modify: `src/views/admin/credential/CredentialApplicationPage.jsx`
-- Modify: `src/views/admin/credential/CredentialReviewPage.jsx`
-
-**Step 1: Write the minimal implementation**
-For each credential subpage that depends on a race, change the empty state (`if (!raceId)`) from simple text to a friendly View with an action button linking to `/admin/credential/select-race${selectedOrgId ? "?orgId="+selectedOrgId : ""}`, e.g. `<Link className="btn btn--primary" to="...">返回选择赛事</Link>`.
-
-**Step 2: Commit**
-```bash
-git add src/views/admin/credential/Credential*.jsx
-git commit -m "feat: update credential subpages to offer 'return to race generation' escape hatch"
-```
+当前应以 [2026-03-17-credential-direct-refactor-implementation-plan.md](/Users/Xquare/.gemini/antigravity/scratch/door/docs/plans/2026-03-17-credential-direct-refactor-implementation-plan.md) 为准。

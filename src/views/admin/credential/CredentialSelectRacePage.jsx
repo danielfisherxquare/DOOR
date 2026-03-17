@@ -70,7 +70,7 @@ export default function CredentialSelectRacePage() {
                     {races.map((race) => (
                         <Link
                             key={race.id}
-                            to={`/admin/credential/zones?orgId=${orgId}&raceId=${race.id}`}
+                            to={`/admin/credential/access-areas?orgId=${orgId}&raceId=${race.id}`}
                             style={styles.card}
                             className="bento-card"
                         >

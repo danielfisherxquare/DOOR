@@ -85,11 +85,11 @@ export default function AdminLayout() {
     { path: '/bib-tracking', label: '号牌布控', icon: '#' },
     {
       path: '/credential', label: '证件管理', icon: 'C', children: [
-        { path: '/zones', label: '分区管理' },
-        { path: '/roles', label: '岗位模板' },
-        { path: '/styles', label: '样式模板' },
-        { path: '/applications', label: '证件申请' },
+        { path: '/access-areas', label: '通行区域' },
+        { path: '/categories', label: '证件类别' },
+        { path: '/requests', label: '证件申请与直建' },
         { path: '/review', label: '证件审核', superOnly: true },
+        { path: '/styles', label: '证件样式' },
       ]
     },
     { path: '/org-race-permissions', label: '机构赛事授权', icon: 'G', superOnly: true },
@@ -234,10 +234,13 @@ export default function AdminLayout() {
           {/* Credential Routes */}
           <Route path="credential" element={<Navigate to={`/admin/credential/select-race${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`} replace />} />
           <Route path="credential/select-race" element={<Suspense fallback={<AdminRouteLoader />}><CredentialSelectRacePage /></Suspense>} />
-          <Route path="credential/zones" element={<Suspense fallback={<AdminRouteLoader />}><CredentialZonePage /></Suspense>} />
-          <Route path="credential/roles" element={<Suspense fallback={<AdminRouteLoader />}><CredentialRolePage /></Suspense>} />
+          <Route path="credential/zones" element={<Navigate to={`/admin/credential/access-areas${location.search || ''}`} replace />} />
+          <Route path="credential/roles" element={<Navigate to={`/admin/credential/categories${location.search || ''}`} replace />} />
+          <Route path="credential/access-areas" element={<Suspense fallback={<AdminRouteLoader />}><CredentialZonePage /></Suspense>} />
+          <Route path="credential/categories" element={<Suspense fallback={<AdminRouteLoader />}><CredentialRolePage /></Suspense>} />
           <Route path="credential/styles" element={<Suspense fallback={<AdminRouteLoader />}><CredentialStylePage /></Suspense>} />
-          <Route path="credential/applications" element={<Suspense fallback={<AdminRouteLoader />}><CredentialApplicationPage /></Suspense>} />
+          <Route path="credential/applications" element={<Navigate to={`/admin/credential/requests${location.search || ''}`} replace />} />
+          <Route path="credential/requests" element={<Suspense fallback={<AdminRouteLoader />}><CredentialApplicationPage /></Suspense>} />
           <Route path="credential/review" element={<Suspense fallback={<AdminRouteLoader />}><CredentialReviewPage /></Suspense>} />
 
           <Route path="org-race-permissions" element={<OrgRacePermissionsPage />} />
