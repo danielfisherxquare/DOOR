@@ -28,6 +28,7 @@ const CredentialRolePage = lazy(() => import('../../views/admin/credential/Crede
 const CredentialStylePage = lazy(() => import('../../views/admin/credential/CredentialStylePage'))
 const CredentialApplicationPage = lazy(() => import('../../views/admin/credential/CredentialApplicationPage'))
 const CredentialReviewPage = lazy(() => import('../../views/admin/credential/CredentialReviewPage'))
+const CredentialIssuePage = lazy(() => import('../../views/admin/credential/CredentialIssuePage'))
 
 function AdminRouteLoader() {
   return <div style={{ padding: 24 }}>加载中...</div>
@@ -89,6 +90,7 @@ export default function AdminLayout() {
         { path: '/categories', label: '证件类别' },
         { path: '/requests', label: '证件申请与直建' },
         { path: '/review', label: '证件审核', superOnly: true },
+        { path: '/issue', label: '领取管理' },
         { path: '/styles', label: '证件样式' },
       ]
     },
@@ -242,6 +244,7 @@ export default function AdminLayout() {
           <Route path="credential/applications" element={<Navigate to={`/admin/credential/requests${location.search || ''}`} replace />} />
           <Route path="credential/requests" element={<Suspense fallback={<AdminRouteLoader />}><CredentialApplicationPage /></Suspense>} />
           <Route path="credential/review" element={<Suspense fallback={<AdminRouteLoader />}><CredentialReviewPage /></Suspense>} />
+          <Route path="credential/issue" element={<Suspense fallback={<AdminRouteLoader />}><CredentialIssuePage /></Suspense>} />
 
           <Route path="org-race-permissions" element={<OrgRacePermissionsPage />} />
           <Route path="race-permissions" element={<RacePermissionsPage />} />

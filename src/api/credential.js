@@ -26,6 +26,7 @@ const credentialApi = {
     getCredential: (raceId, credentialId) => request.get(`/credential/credentials/${raceId}/${credentialId}`),
     resolveCredential: (qrPayload) => request.post('/credential/scan/resolve', { qrPayload }),
     voidCredential: (raceId, credentialId, data) => request.post(`/credential/credentials/${raceId}/${credentialId}/void`, data),
+    issueCredential: (raceId, credentialId, data) => request.post(`/credential/credentials/${raceId}/${credentialId}/issue`, data),
     reissueCredential: (raceId, credentialId, data) => request.post(`/credential/credentials/${raceId}/${credentialId}/reissue`, data),
     getCredentialStats: (raceId) => request.get(`/credential/stats/${raceId}`),
 }
