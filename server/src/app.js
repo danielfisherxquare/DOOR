@@ -82,6 +82,9 @@ app.use('/api/calendar', calendarRoutes);
 import ocrRoutes from './modules/ocr/ocr.routes.js';
 app.use('/api/ocr', ocrRoutes);
 
+import credentialRoutes from './modules/credential/credential.routes.js';
+app.use('/api/credential', credentialRoutes);
+
 app.use(errorHandler);
 
 export default app;

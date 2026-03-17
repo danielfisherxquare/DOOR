@@ -21,6 +21,14 @@ import ProjectDetail from '../../views/admin/projects/ProjectDetail'
 const AssessmentCampaignListPage = lazy(() => import('../../views/admin/assessment/AssessmentCampaignListPage'))
 const AssessmentCampaignDetailPage = lazy(() => import('../../views/admin/assessment/AssessmentCampaignDetailPage'))
 
+// Credential Pages
+const CredentialSelectRacePage = lazy(() => import('../../views/admin/credential/CredentialSelectRacePage'))
+const CredentialZonePage = lazy(() => import('../../views/admin/credential/CredentialZonePage'))
+const CredentialRolePage = lazy(() => import('../../views/admin/credential/CredentialRolePage'))
+const CredentialStylePage = lazy(() => import('../../views/admin/credential/CredentialStylePage'))
+const CredentialApplicationPage = lazy(() => import('../../views/admin/credential/CredentialApplicationPage'))
+const CredentialReviewPage = lazy(() => import('../../views/admin/credential/CredentialReviewPage'))
+
 function AdminRouteLoader() {
   return <div style={{ padding: 24 }}>加载中...</div>
 }
@@ -37,6 +45,7 @@ export default function AdminLayout() {
   const [orgs, setOrgs] = useState([])
 
   const selectedOrgId = searchParams.get('orgId') || ''
+  const selectedRaceId = searchParams.get('raceId') || ''
 
   useEffect(() => {
     if (!isSuperAdmin) return
@@ -44,7 +53,7 @@ export default function AdminLayout() {
       .then((res) => {
         if (res.success) setOrgs(res.data.items || [])
       })
-      .catch(() => {})
+      .catch(() => { })
   }, [isSuperAdmin])
 
   const isActive = (routePath) => location.pathname === `/admin${routePath}` || location.pathname.startsWith(`/admin${routePath}/`)
@@ -74,11 +83,29 @@ export default function AdminLayout() {
   const orgMenus = useMemo(() => ([
     { path: '/team', label: '团队管理', icon: 'T' },
     { path: '/bib-tracking', label: '号牌布控', icon: '#' },
+    {
+      path: '/credential', label: '证件管理', icon: 'C', children: [
+        { path: '/zones', label: '分区管理' },
+        { path: '/roles', label: '岗位模板' },
+        { path: '/styles', label: '样式模板' },
+        { path: '/applications', label: '证件申请' },
+        { path: '/review', label: '证件审核', superOnly: true },
+      ]
+    },
     { path: '/org-race-permissions', label: '机构赛事授权', icon: 'G', superOnly: true },
     { path: '/race-permissions', label: '赛事授权', icon: 'P' },
   ]), [])
 
-  const linkWithOrg = (routePath) => `/admin${routePath}${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`
+  const linkWithContext = (routePath) => {
+    const params = new URLSearchParams()
+    if (selectedOrgId) params.set('orgId', selectedOrgId)
+    // Only preserve raceId when navigating within credential module or other race-dependent modules
+    if (selectedRaceId && (routePath.includes('/credential') || routePath.includes('/bib-tracking'))) {
+      params.set('raceId', selectedRaceId)
+    }
+    const queryString = params.toString()
+    return `/admin${routePath}${queryString ? `?${queryString}` : ''}`
+  }
 
   return (
     <div className="admin-layout">
@@ -138,12 +165,33 @@ export default function AdminLayout() {
                   </select>
                 </div>
               )}
-              {orgMenus.filter((item) => !item.superOnly || isSuperAdmin).map((menu) => (
-                <Link key={menu.path} to={linkWithOrg(menu.path)} className={`admin-nav-item ${isActive(menu.path) ? 'admin-nav-item--active' : ''}`}>
-                  <span className="admin-nav-item__icon">{menu.icon}</span>
-                  {!sidebarCollapsed && <span>{menu.label}</span>}
-                </Link>
-              ))}
+              {orgMenus.filter((item) => !item.superOnly || isSuperAdmin).map((menu) => {
+                const isMenuActive = isActive(menu.path)
+                // 仅当是证件管理且没有选择赛事时，不显示子菜单
+                const shouldShowChildren = menu.children && (!menu.path.includes('credential') || searchParams.get('raceId'))
+
+                return (
+                  <div key={menu.path} className="admin-nav-group">
+                    <Link to={linkWithContext(menu.path)} className={`admin-nav-item ${isMenuActive ? 'admin-nav-item--active' : ''}`}>
+                      <span className="admin-nav-item__icon">{menu.icon}</span>
+                      {!sidebarCollapsed && <span>{menu.label}</span>}
+                    </Link>
+                    {isMenuActive && !sidebarCollapsed && shouldShowChildren && (
+                      <div className="admin-nav-children">
+                        {menu.children.filter(child => !child.superOnly || isSuperAdmin).map((child) => (
+                          <Link
+                            key={child.path}
+                            to={linkWithContext(`${menu.path}${child.path}`)}
+                            className={`admin-nav-child-item ${location.pathname.includes(child.path) ? 'admin-nav-child-item--active' : ''}`}
+                          >
+                            <span>{child.label}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </>
           )}
         </nav>
@@ -182,6 +230,16 @@ export default function AdminLayout() {
           <Route path="projects/:id" element={<ProjectDetail />} />
           <Route path="db-backups" element={<DatabaseBackupPage />} />
           <Route path="bib-tracking" element={<BibTrackingPage />} />
+
+          {/* Credential Routes */}
+          <Route path="credential" element={<Navigate to={`/admin/credential/select-race${selectedOrgId ? `?orgId=${selectedOrgId}` : ''}`} replace />} />
+          <Route path="credential/select-race" element={<Suspense fallback={<AdminRouteLoader />}><CredentialSelectRacePage /></Suspense>} />
+          <Route path="credential/zones" element={<Suspense fallback={<AdminRouteLoader />}><CredentialZonePage /></Suspense>} />
+          <Route path="credential/roles" element={<Suspense fallback={<AdminRouteLoader />}><CredentialRolePage /></Suspense>} />
+          <Route path="credential/styles" element={<Suspense fallback={<AdminRouteLoader />}><CredentialStylePage /></Suspense>} />
+          <Route path="credential/applications" element={<Suspense fallback={<AdminRouteLoader />}><CredentialApplicationPage /></Suspense>} />
+          <Route path="credential/review" element={<Suspense fallback={<AdminRouteLoader />}><CredentialReviewPage /></Suspense>} />
+
           <Route path="org-race-permissions" element={<OrgRacePermissionsPage />} />
           <Route path="race-permissions" element={<RacePermissionsPage />} />
           <Route path="app-manager" element={<AppManagerPage />} />
@@ -294,6 +352,33 @@ export default function AdminLayout() {
           overflow-y: auto;
           min-height: 100vh;
         }
+        .admin-nav-group {
+          display: flex;
+          flex-direction: column;
+        }
+        .admin-nav-children {
+          padding-left: 36px;
+          margin-top: 2px;
+          margin-bottom: 4px;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .admin-nav-child-item {
+          display: block;
+          padding: 8px 12px;
+          border-radius: 6px;
+          text-decoration: none;
+          color: var(--color-text-secondary, #666);
+          font-size: 13px;
+          transition: all 150ms ease;
+        }
+        .admin-nav-child-item:hover { background: var(--color-bg-secondary, #f3f4f6); color: var(--color-text-primary, #333); }
+        .admin-nav-child-item--active {
+          color: var(--color-primary) !important;
+          font-weight: 600;
+          background: rgba(var(--color-primary-rgb, 59, 130, 246), 0.1);
+        }
         .btn--sm { padding: 4px 8px; font-size: 14px; }
         @media (max-width: 768px) {
           .admin-layout { flex-direction: column; }
@@ -324,6 +409,7 @@ export default function AdminLayout() {
           .admin-nav-item { flex-shrink: 0; padding: 8px 12px; margin-bottom: 0; }
           .admin-nav-item span:not(.admin-nav-item__icon) { display: none; }
           .admin-main { padding: 16px; padding-bottom: 80px; min-height: auto; }
+          .admin-nav-children { display: none; }
         }
       `}</style>
     </div>
