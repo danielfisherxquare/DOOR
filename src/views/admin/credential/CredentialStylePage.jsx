@@ -175,6 +175,23 @@ function CredentialStylePage() {
                 </div>
             </div>
 
+            {/* 排版编辑引导提示 */}
+            <div style={{
+                padding: '12px 16px',
+                borderRadius: 8,
+                background: '#EFF6FF',
+                border: '1px solid #BFDBFE',
+                color: '#1E40AF',
+                fontSize: 13,
+                marginBottom: 20,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+            }}>
+                <span style={{ fontSize: 16 }}>💡</span>
+                <span>此页面管理模板元数据（名称、编码、状态）。如需进行<strong>详细排版编辑</strong>（字段拖放、底板导入、地图截图），请使用 <strong>TOOL 客户端</strong>的证件排版器。</span>
+            </div>
+
             {/* 模板列表 */}
             <div style={styles.grid}>
                 {loading ? (
