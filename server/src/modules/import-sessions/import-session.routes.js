@@ -101,6 +101,11 @@ router.put('/:sid/summary', async (req, res, next) => {
         const orgId = await resolveOrgId(req, { sid });
         const summary = req.body;
 
+        // 验证 summary 必须是对象
+        if (!summary || typeof summary !== 'object' || Array.isArray(summary)) {
+            throw badRequest('summary 必须是有效的对象');
+        }
+
         const session = await importSessionRepository.setSummary(orgId, sid, summary);
         res.json({
             success: true,
@@ -119,6 +124,11 @@ router.post('/:sid/chunks', async (req, res, next) => {
         const { sid } = req.params;
         const orgId = await resolveOrgId(req, { sid });
         const rows = req.body;
+
+        // 验证 rows 必须是数组
+        if (!Array.isArray(rows)) {
+            throw badRequest('rows 必须是数组');
+        }
 
         const totalRows = await importSessionRepository.appendChunk(orgId, sid, rows);
         res.json({
@@ -182,20 +192,26 @@ router.post('/:sid/commit', requireRaceAccess('raceId'), async (req, res, next) 
         const orgId = req.raceAccess.operatorOrgId;
         const { raceId, category } = req.body;
 
+        // 验证必填字段
+        if (!raceId) {
+            return res.status(400).json({ success: false, message: 'raceId is required' });
+        }
+
+        const raceIdNum = Number(raceId);
+        if (!Number.isFinite(raceIdNum) || raceIdNum <= 0) {
+            return res.status(400).json({ success: false, message: 'raceId 必须是有效的正整数' });
+        }
+
         const session = await importSessionRepository.findById(orgId, sid);
         if (!session || session.status !== 'open') {
             return res.status(400).json({ success: false, message: 'Session invalid or already committed' });
-        }
-
-        if (!raceId) {
-            return res.status(400).json({ success: false, message: 'raceId is required' });
         }
 
         // 创建异步 Job，携带必要参数
         const job = await jobRepository.enqueue(
             orgId,
             'commit-import-session',
-            { sessionId: sid, raceId, category: category || 'Mass' },
+            { sessionId: sid, raceId: raceIdNum, category: category || 'Mass' },
             `${orgId}:import:${sid}`, // idempotency_key 保证只产生一个
             req.authContext.userId,  // createdBy
         );

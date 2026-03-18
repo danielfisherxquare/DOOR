@@ -1,7 +1,7 @@
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
-import { tenantContext } from '../src/middleware/tenant-context.js';
+import { requireAuth } from '../src/middleware/require-auth.js';
 import { errorHandler } from '../src/middleware/error-handler.js';
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
@@ -35,13 +35,16 @@ describe('Import Sessions API', () => {
         await knex('import_session_chunks').del();
         await knex('import_sessions').del();
         await knex('refresh_tokens').del();
+        await knex('credential_credentials').del();
+        await knex('credential_applications').del();
         await knex('users').del();
+        await knex('races').del();
         await knex('organizations').del();
 
         app = express();
         app.use(express.json());
         app.use('/api/auth', authRoutes);
-        app.use('/api/import-sessions', tenantContext, importSessionRoutes);
+        app.use('/api/import-sessions', requireAuth, importSessionRoutes);
         app.use(errorHandler);
 
         server = app.listen(0);
@@ -65,7 +68,10 @@ describe('Import Sessions API', () => {
         await knex('import_session_chunks').del();
         await knex('import_sessions').del();
         await knex('refresh_tokens').del();
+        await knex('credential_credentials').del();
+        await knex('credential_applications').del();
         await knex('users').del();
+        await knex('races').del();
         await knex('organizations').del();
         server.close();
         await knex.destroy();

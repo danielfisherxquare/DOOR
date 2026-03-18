@@ -96,7 +96,8 @@ export async function saveLists(orgId, entries) {
     const rows = entries.map(e => lotteryListMapper.toDbInsert(e, orgId));
     const results = await knex('lottery_lists')
         .insert(rows)
-        .onConflict(['org_id', 'race_id', 'list_type', 'id_number'])
+        // 🔐 使用 id_number_hash 进行冲突检测（加密字段无法直接比较）
+        .onConflict(['org_id', 'race_id', 'list_type', 'id_number_hash'])
         .merge()
         .returning('*');
     return results.map(lotteryListMapper.fromDbRow);
@@ -124,7 +125,8 @@ export async function bulkPutLists(orgId, entries) {
     const rows = entries.map(e => lotteryListMapper.toDbInsert(e, orgId));
     const results = await knex('lottery_lists')
         .insert(rows)
-        .onConflict(['org_id', 'race_id', 'list_type', 'id_number'])
+        // 🔐 使用 id_number_hash 进行冲突检测（加密字段无法直接比较）
+        .onConflict(['org_id', 'race_id', 'list_type', 'id_number_hash'])
         .merge()
         .returning('id');
     return { upserted: results.length };
@@ -150,11 +152,12 @@ export async function updateList(orgId, id, data) {
 
 export async function getConflicts(orgId, raceId) {
     // 在 whitelist 和 blacklist 中同时出现的 id_number
+    // 🔐 使用 id_number_hash 进行匹配（加密字段无法直接比较）
     const rows = await knex('lottery_lists as w')
         .join('lottery_lists as b', function () {
             this.on('w.org_id', '=', 'b.org_id')
                 .andOn('w.race_id', '=', 'b.race_id')
-                .andOn('w.id_number', '=', 'b.id_number');
+                .andOn('w.id_number_hash', '=', 'b.id_number_hash');
         })
         .where({
             'w.org_id': orgId,
@@ -163,7 +166,8 @@ export async function getConflicts(orgId, raceId) {
             'b.list_type': 'blacklist',
         })
         .select('w.id_number', 'w.name');
-    return rows;
+    // 使用 mapper 解密 id_number
+    return rows.map(lotteryListMapper.fromDbRow);
 }
 
 // ═══════════════════════════════════════════════════════════════════════

@@ -5,10 +5,16 @@
  * → 批量 INSERT 新记录 + UPDATE 重复记录 → 标记会话 committed
  *
  * payload: { sessionId, raceId, category }
+ *
+ * 敏感数据处理：
+ * - 使用 recordMapper 进行加密写入
+ * - 使用 id_number_hash 进行去重检查
  */
 import { registerHandler } from '../jobs/job.handlers.js';
 import { importSessionRepository } from '../import-sessions/import-session.repository.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
+import { recordMapper } from '../../db/mappers/records.js';
+import { idNumberBlindIndex, normalizeIdNumber } from '../../utils/crypto.js';
 
 // ── 辅助函数 ─────────────────────────────────────────────
 
@@ -94,29 +100,39 @@ function mapRowToDbRecord(row, orgId, raceId, now) {
 
 /**
  * 去重检查（从 sqliteService.cjs 移植）
- * 按 id_number 对比 DB 已有记录
+ * 按 id_number_hash 对比 DB 已有记录（加密安全）
  */
 async function checkDuplicates(knex, incoming, orgId, raceId) {
     if (!incoming || incoming.length === 0) {
         return { newRecords: [], duplicates: [], internalUpdateCount: 0, rejectedRecords: [] };
     }
 
-    // 1. 获取该赛事下所有有证件号的已有记录
+    // 1. 计算所有有证件号的 hash 值
+    const hashToRecord = new Map();
+    for (const inc of incoming) {
+        if (!inc.idNumber) continue;
+        const normalized = normalizeIdNumber(inc.idNumber);
+        const hash = idNumberBlindIndex(inc.idNumber);
+        hashToRecord.set(hash, { ...inc, _normalizedIdNumber: normalized, _hash: hash });
+    }
+
+    // 2. 获取该赛事下所有有证件号的已有记录（使用 hash 列）
     const existingRows = await knex('records')
-        .select('id', 'id_number', 'duplicate_count', 'mark', 'source', 'event', 'duplicate_sources', 'runner_category')
+        .select('id', 'id_number_hash', 'duplicate_count', 'mark', 'source', 'event', 'duplicate_sources', 'runner_category')
         .where({ org_id: orgId, race_id: raceId })
-        .whereNotNull('id_number')
-        .where('id_number', '!=', '');
+        .whereNotNull('id_number_hash');
 
     const existingMap = new Map();
     for (const row of existingRows) {
-        existingMap.set(row.id_number.trim(), row);
+        if (row.id_number_hash) {
+            existingMap.set(row.id_number_hash, row);
+        }
     }
 
     const newRecords = [];
     const duplicates = [];
     const rejectedRecords = [];
-    const incomingIdSet = new Set();
+    const incomingHashSet = new Set();
 
     for (const inc of incoming) {
         if (!inc.idNumber) {
@@ -126,11 +142,11 @@ async function checkDuplicates(knex, incoming, orgId, raceId) {
             continue;
         }
 
-        const key = inc.idNumber.trim();
+        const hash = idNumberBlindIndex(inc.idNumber);
 
-        if (existingMap.has(key)) {
+        if (existingMap.has(hash)) {
             // ── DB 重复 ──
-            const exist = existingMap.get(key);
+            const exist = existingMap.get(hash);
             const currentCount = exist.duplicate_count || 1;
             const newCount = currentCount + 1;
 
@@ -154,23 +170,28 @@ async function checkDuplicates(knex, incoming, orgId, raceId) {
                 duplicate_sources: newDuplicateSources,
             };
 
-            // 合并非空字段
-            const fieldMap = {
-                name: 'name', namePinyin: 'name_pinyin', phone: 'phone', country: 'country',
+            // 合并非空字段（排除敏感字段，由 mapper 处理）
+            const nonSensitiveFields = {
+                name: 'name', namePinyin: 'name_pinyin', country: 'country',
                 idType: 'id_type', gender: 'gender', age: 'age', birthday: 'birthday',
                 event: 'event', source: 'source', clothingSize: 'clothing_size',
                 province: 'province', city: 'city', district: 'district', address: 'address',
-                email: 'email', emergencyName: 'emergency_name', emergencyPhone: 'emergency_phone',
-                bloodType: 'blood_type', orderGroupId: 'order_group_id', paymentStatus: 'payment_status',
+                email: 'email', emergencyName: 'emergency_name', bloodType: 'blood_type',
+                orderGroupId: 'order_group_id', paymentStatus: 'payment_status',
                 bagWindowNo: 'bag_window_no', bagNo: 'bag_no', expoWindowNo: 'expo_window_no',
                 bibNumber: 'bib_number', bibColor: 'bib_color', _source: '_source',
                 lotteryStatus: 'lottery_status',
             };
-            for (const [camel, snake] of Object.entries(fieldMap)) {
+            for (const [camel, snake] of Object.entries(nonSensitiveFields)) {
                 if (inc[camel] !== '' && inc[camel] !== null && inc[camel] !== undefined) {
                     updateData[snake] = inc[camel];
                 }
             }
+
+            // 敏感字段单独处理（需要加密）
+            if (inc.phone) updateData.phone = inc.phone;
+            if (inc.emergencyPhone) updateData.emergency_phone = inc.emergencyPhone;
+            if (inc.idNumber) updateData.idNumber = inc.idNumber;
 
             // Category merge
             const mergeDecision = resolveCategoryMerge(exist.runner_category, inc.runnerCategory);
@@ -188,7 +209,7 @@ async function checkDuplicates(knex, incoming, orgId, raceId) {
             duplicates.push({ id: exist.id, data: updateData });
 
             // 更新内存 map 以处理同批次多条匹配
-            existingMap.set(key, {
+            existingMap.set(hash, {
                 ...exist,
                 duplicate_count: newCount,
                 mark: newMark,
@@ -196,9 +217,9 @@ async function checkDuplicates(knex, incoming, orgId, raceId) {
                 runner_category: updateData.runner_category || exist.runner_category,
             });
 
-        } else if (incomingIdSet.has(key)) {
+        } else if (incomingHashSet.has(hash)) {
             // ── 批次内部重复 ──
-            const firstInstance = newRecords.find(r => r.idNumber === key);
+            const firstInstance = newRecords.find(r => r.idNumber === inc.idNumber);
             if (firstInstance) {
                 firstInstance.duplicateCount = (firstInstance.duplicateCount || 1) + 1;
                 const src = inc.source || '未知来源';
@@ -234,7 +255,7 @@ async function checkDuplicates(knex, incoming, orgId, raceId) {
                 continue;
             }
 
-            incomingIdSet.add(key);
+            incomingHashSet.add(hash);
             const initSources = JSON.stringify([{ platform: inc.source || '', event: inc.event || '' }]);
             newRecords.push({ ...inc, runnerCategory: normalizedCat, duplicateCount: 1, duplicateSources: initSources });
         }
@@ -308,10 +329,54 @@ registerHandler('commit-import-session', async (job, { knex, heartbeat }) => {
     await heartbeat(40, `新增 ${newRecords.length}, 更新 ${duplicates.length}, 拒绝 ${rejectedRecords.length}`);
 
     // 4. 批量插入新记录（分 500 条一批避免 PG 参数上限）
+    // 使用 recordMapper.toDbInsert 进行加密
     let addedCount = 0;
     if (newRecords.length > 0) {
         const BATCH_SIZE = 500;
-        const dbRecords = newRecords.map(r => mapRowToDbRecord(r, orgId, raceId, now));
+        const dbRecords = newRecords.map(r => {
+            // 使用 mapper 进行字段映射和加密
+            const mapped = recordMapper.toDbInsert({
+                orgId,
+                raceId,
+                name: r.name,
+                namePinyin: r.namePinyin,
+                phone: r.phone,
+                country: r.country,
+                idType: r.idType,
+                idNumber: r.idNumber,
+                gender: r.gender,
+                age: r.age,
+                birthday: r.birthday,
+                event: normalizeEvent(r.event),
+                source: r.source,
+                clothingSize: r.clothingSize,
+                province: r.province,
+                city: r.city,
+                district: r.district,
+                address: r.address,
+                email: r.email,
+                emergencyName: r.emergencyName,
+                emergencyPhone: r.emergencyPhone,
+                bloodType: r.bloodType,
+                orderGroupId: r.orderGroupId,
+                paymentStatus: r.paymentStatus,
+                mark: r.mark,
+                bagWindowNo: r.bagWindowNo,
+                bagNo: r.bagNo,
+                expoWindowNo: r.expoWindowNo,
+                bibNumber: r.bibNumber,
+                bibColor: r.bibColor,
+                _source: r._source,
+                runnerCategory: r.runnerCategory,
+                lotteryStatus: r.lotteryStatus,
+                duplicateCount: r.duplicateCount,
+                duplicateSources: r.duplicateSources,
+            });
+            // 添加导入时间戳和审核状态
+            mapped._imported_at = now;
+            mapped.audit_status = 'pending';
+            return mapped;
+        });
 
         for (let i = 0; i < dbRecords.length; i += BATCH_SIZE) {
             const batch = dbRecords.slice(i, i + BATCH_SIZE);
@@ -325,13 +390,57 @@ registerHandler('commit-import-session', async (job, { knex, heartbeat }) => {
 
     await heartbeat(75, `更新 ${duplicates.length} 条重复记录`);
 
-    // 5. 逐条更新重复记录
+    // 5. 逐条更新重复记录（使用 recordMapper.toDbUpdate 进行加密）
     let updatedCount = 0;
     if (duplicates.length > 0) {
         for (let i = 0; i < duplicates.length; i++) {
             const { id, data } = duplicates[i];
-            data.updated_at = now;
-            await knex('records').where({ id }).update(data);
+
+            // 使用 mapper 进行更新（敏感字段加密）
+            const mapperInput = {
+                orgId,
+                raceId,
+            };
+            // 映射字段
+            if (data.name !== undefined) mapperInput.name = data.name;
+            if (data.name_pinyin !== undefined) mapperInput.namePinyin = data.name_pinyin;
+            if (data.phone !== undefined) mapperInput.phone = data.phone;
+            if (data.country !== undefined) mapperInput.country = data.country;
+            if (data.id_type !== undefined) mapperInput.idType = data.id_type;
+            if (data.idNumber !== undefined) mapperInput.idNumber = data.idNumber;
+            if (data.gender !== undefined) mapperInput.gender = data.gender;
+            if (data.age !== undefined) mapperInput.age = data.age;
+            if (data.birthday !== undefined) mapperInput.birthday = data.birthday;
+            if (data.event !== undefined) mapperInput.event = data.event;
+            if (data.source !== undefined) mapperInput.source = data.source;
+            if (data.clothing_size !== undefined) mapperInput.clothingSize = data.clothing_size;
+            if (data.province !== undefined) mapperInput.province = data.province;
+            if (data.city !== undefined) mapperInput.city = data.city;
+            if (data.district !== undefined) mapperInput.district = data.district;
+            if (data.address !== undefined) mapperInput.address = data.address;
+            if (data.email !== undefined) mapperInput.email = data.email;
+            if (data.emergency_name !== undefined) mapperInput.emergencyName = data.emergency_name;
+            if (data.emergency_phone !== undefined) mapperInput.emergencyPhone = data.emergency_phone;
+            if (data.blood_type !== undefined) mapperInput.bloodType = data.blood_type;
+            if (data.order_group_id !== undefined) mapperInput.orderGroupId = data.order_group_id;
+            if (data.payment_status !== undefined) mapperInput.paymentStatus = data.payment_status;
+            if (data.bag_window_no !== undefined) mapperInput.bagWindowNo = data.bag_window_no;
+            if (data.bag_no !== undefined) mapperInput.bagNo = data.bag_no;
+            if (data.expo_window_no !== undefined) mapperInput.expoWindowNo = data.expo_window_no;
+            if (data.bib_number !== undefined) mapperInput.bibNumber = data.bib_number;
+            if (data.bib_color !== undefined) mapperInput.bibColor = data.bib_color;
+            if (data._source !== undefined) mapperInput._source = data._source;
+            if (data.lottery_status !== undefined) mapperInput.lotteryStatus = data.lottery_status;
+
+            const updateRow = recordMapper.toDbUpdate(mapperInput);
+            // 添加非敏感的更新字段
+            updateRow.duplicate_count = data.duplicate_count;
+            updateRow.mark = data.mark;
+            updateRow.duplicate_sources = data.duplicate_sources;
+            if (data.runner_category !== undefined) updateRow.runner_category = data.runner_category;
+            updateRow.updated_at = now;
+
+            await knex('records').where({ id }).update(updateRow);
             updatedCount++;
 
             if (i % 100 === 0) {

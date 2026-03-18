@@ -41,18 +41,8 @@ function Login() {
     if (rememberMe) localStorage.setItem('rememberedUsername', username)
     else localStorage.removeItem('rememberedUsername')
 
-    const result = await login(username, password, rememberMe)
-    if (!result.success) return
-
-    if (result.mustChangePassword) {
-      navigate('/change-password', { replace: true })
-      return
-    }
-
-    const params = new URLSearchParams(location.search)
-    const redirect = params.get('redirect')
-    const from = location.state?.from?.pathname || (redirect && redirect.startsWith('/') ? redirect : null) || '/'
-    navigate(from, { replace: true })
+    await login(username, password, rememberMe)
+    // 导航逻辑由 useEffect 根据 isAuthenticated 状态统一处理，避免重复导航
   }
 
   return (

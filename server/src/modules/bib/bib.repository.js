@@ -1,6 +1,7 @@
 import knex from '../../db/knex.js';
 import { bibConfigMapper, bibAssignmentMapper } from '../../db/mappers/bib.js';
 import * as snapshotRepo from '../pipeline/snapshot.repository.js';
+import { decryptField } from '../../utils/crypto.js';
 
 const BATCH_SIZE = 1000;
 const DEFAULT_EVENT_LABEL = '\u672a\u5206\u9879\u76ee';
@@ -138,6 +139,16 @@ export async function getExecutionDataset(orgId, raceId) {
         .whereNotNull('id')
         .select('id');
 
+    // 🔐 解密 id_number 字段
+    for (const record of eligibleRecords) {
+        if (record.idNumber) {
+            record.idNumber = decryptField(record.idNumber, {
+                tableName: 'records',
+                columnName: 'id_number',
+            }) || '';
+        }
+    }
+
     const statusSummary = await recordsForRace(orgId, raceId)
         .select(knex.raw(`COALESCE(NULLIF(TRIM(lottery_status), ''), '${EMPTY_STATUS_LABEL}') AS status`))
         .count('* as count')
@@ -235,9 +246,14 @@ export async function bulkAssign(orgId, raceId, assignments) {
 
             for (let i = 0; i < normalizedAssignments.length; i += BATCH_SIZE) {
                 const batch = normalizedAssignments.slice(i, i + BATCH_SIZE);
-                const values = batch.map((assignment) =>
-                    `(${assignment.recordId}, '${assignment.bibNumber.replace(/'/g, "''")}', '${assignment.bagWindowNo.replace(/'/g, "''")}', '${assignment.bagNo.replace(/'/g, "''")}', '${assignment.expoWindowNo.replace(/'/g, "''")}', '${assignment.bibColor.replace(/'/g, "''")}')`,
-                ).join(',\n');
+
+                // Use UNNEST with parameterized arrays for safe bulk update
+                const recordIds = batch.map(a => a.recordId);
+                const bibNumbers = batch.map(a => a.bibNumber);
+                const bagWindowNos = batch.map(a => a.bagWindowNo);
+                const bagNos = batch.map(a => a.bagNo);
+                const expoWindowNos = batch.map(a => a.expoWindowNo);
+                const bibColors = batch.map(a => a.bibColor);
 
                 const result = await trx.raw(`
                     UPDATE records AS r
@@ -246,12 +262,18 @@ export async function bulkAssign(orgId, raceId, assignments) {
                         bag_no = v.bag_no,
                         expo_window_no = v.expo_window_no,
                         bib_color = v.bib_color
-                    FROM (VALUES ${values})
-                        AS v(record_id, bib_number, bag_window_no, bag_no, expo_window_no, bib_color)
-                    WHERE r.id = v.record_id::int
+                    FROM UNNEST(
+                        ?::int[],
+                        ?::text[],
+                        ?::text[],
+                        ?::text[],
+                        ?::text[],
+                        ?::text[]
+                    ) AS v(record_id, bib_number, bag_window_no, bag_no, expo_window_no, bib_color)
+                    WHERE r.id = v.record_id
                       AND r.org_id = ?
                       AND r.race_id = ?
-                `, [orgId, raceId]);
+                `, [recordIds, bibNumbers, bagWindowNos, bagNos, expoWindowNos, bibColors, orgId, raceId]);
 
                 updatedCount += result.rowCount || batch.length;
             }

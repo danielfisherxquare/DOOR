@@ -1,22 +1,55 @@
 /**
  * Records Mapper — snake_case (DB) ↔ camelCase (API)
  * 40+ 字段，与前端 DbRecord 接口 1:1 对齐
+ *
+ * 敏感字段加密支持：
+ * - phone, emergency_phone, id_number 使用 AES-256-GCM 加密
+ * - 生成 phone_hash, id_number_hash 盲索引用于等值查询
+ * - 支持双读：兼容旧数据明文格式
  */
 import { deserializeJsonb, serializeJsonb } from './jsonb.js';
+import {
+    decryptField,
+    encryptField,
+    normalizePhone,
+    normalizeIdNumber,
+    phoneBlindIndex,
+    idNumberBlindIndex,
+    isEncrypted,
+} from '../../utils/crypto.js';
+
+/**
+ * 创建 AAD 上下文（用于加密完整性校验）
+ * @param {object} data - 记录数据
+ * @returns {object} AAD 上下文
+ */
+function createEncryptionContext(data) {
+    return {
+        tableName: 'records',
+        orgId: data.orgId,
+        raceId: data.raceId,
+    };
+}
 
 export const recordMapper = {
     fromDbRow(row) {
         if (!row) return null;
+
+        // 解密敏感字段（支持双读）
+        const phone = decryptField(row.phone, { tableName: 'records', columnName: 'phone' });
+        const emergencyPhone = decryptField(row.emergency_phone, { tableName: 'records', columnName: 'emergency_phone' });
+        const idNumber = decryptField(row.id_number, { tableName: 'records', columnName: 'id_number' });
+
         return {
             id: Number(row.id),
             orgId: row.org_id,
             raceId: Number(row.race_id),
             name: row.name,
             namePinyin: row.name_pinyin,
-            phone: row.phone,
+            phone,
             country: row.country,
             idType: row.id_type,
-            idNumber: row.id_number,
+            idNumber,
             gender: row.gender,
             age: row.age,
             birthday: row.birthday,
@@ -29,7 +62,7 @@ export const recordMapper = {
             address: row.address,
             email: row.email,
             emergencyName: row.emergency_name,
-            emergencyPhone: row.emergency_phone,
+            emergencyPhone,
             bloodType: row.blood_type,
             orderGroupId: row.order_group_id,
             paymentStatus: row.payment_status,
@@ -54,19 +87,29 @@ export const recordMapper = {
             duplicateSources: row.duplicate_sources,
             createdAt: row.created_at,
             updatedAt: row.updated_at,
+            // 保留 hash 列用于查询（不暴露给前端）
+            _phoneHash: row.phone_hash,
+            _idNumberHash: row.id_number_hash,
         };
     },
 
     toDbInsert(data) {
+        const ctx = createEncryptionContext(data);
+
+        // 加密敏感字段
+        const phone = data.phone ?? '';
+        const emergencyPhone = data.emergencyPhone ?? '';
+        const idNumber = data.idNumber ?? '';
+
         return {
             org_id: data.orgId,
             race_id: data.raceId,
             name: data.name ?? '',
             name_pinyin: data.namePinyin ?? '',
-            phone: data.phone ?? '',
+            phone: phone ? encryptField(normalizePhone(phone), { ...ctx, columnName: 'phone' }) : '',
             country: data.country ?? '',
             id_type: data.idType ?? '',
-            id_number: data.idNumber ?? '',
+            id_number: idNumber ? encryptField(normalizeIdNumber(idNumber), { ...ctx, columnName: 'id_number' }) : '',
             gender: data.gender ?? '',
             age: data.age ?? '',
             birthday: data.birthday ?? '',
@@ -79,7 +122,7 @@ export const recordMapper = {
             address: data.address ?? '',
             email: data.email ?? '',
             emergency_name: data.emergencyName ?? '',
-            emergency_phone: data.emergencyPhone ?? '',
+            emergency_phone: emergencyPhone ? encryptField(normalizePhone(emergencyPhone), { ...ctx, columnName: 'emergency_phone' }) : '',
             blood_type: data.bloodType ?? '',
             order_group_id: data.orderGroupId ?? '',
             payment_status: data.paymentStatus ?? '',
@@ -102,19 +145,22 @@ export const recordMapper = {
             region_type: data.regionType ?? null,
             duplicate_count: data.duplicateCount ?? 0,
             duplicate_sources: data.duplicateSources ?? null,
+            // 盲索引用于等值查询
+            phone_hash: phone ? phoneBlindIndex(phone) : null,
+            id_number_hash: idNumber ? idNumberBlindIndex(idNumber) : null,
         };
     },
 
     toDbUpdate(data) {
         const row = {};
         const map = {
-            name: 'name', namePinyin: 'name_pinyin', phone: 'phone',
-            country: 'country', idType: 'id_type', idNumber: 'id_number',
+            name: 'name', namePinyin: 'name_pinyin',
+            country: 'country', idType: 'id_type',
             gender: 'gender', age: 'age', birthday: 'birthday',
             event: 'event', source: 'source', clothingSize: 'clothing_size',
             province: 'province', city: 'city', district: 'district',
             address: 'address', email: 'email',
-            emergencyName: 'emergency_name', emergencyPhone: 'emergency_phone',
+            emergencyName: 'emergency_name',
             bloodType: 'blood_type', orderGroupId: 'order_group_id',
             paymentStatus: 'payment_status', mark: 'mark',
             lotteryStatus: 'lottery_status', lotteryZone: 'lottery_zone',
@@ -129,6 +175,26 @@ export const recordMapper = {
 
         for (const [camel, snake] of Object.entries(map)) {
             if (data[camel] !== undefined) row[snake] = data[camel];
+        }
+
+        // 敏感字段加密处理
+        const ctx = createEncryptionContext(data);
+
+        if (data.phone !== undefined) {
+            const phone = data.phone ?? '';
+            row.phone = phone ? encryptField(normalizePhone(phone), { ...ctx, columnName: 'phone' }) : '';
+            row.phone_hash = phone ? phoneBlindIndex(phone) : null;
+        }
+
+        if (data.emergencyPhone !== undefined) {
+            const emergencyPhone = data.emergencyPhone ?? '';
+            row.emergency_phone = emergencyPhone ? encryptField(normalizePhone(emergencyPhone), { ...ctx, columnName: 'emergency_phone' }) : '';
+        }
+
+        if (data.idNumber !== undefined) {
+            const idNumber = data.idNumber ?? '';
+            row.id_number = idNumber ? encryptField(normalizeIdNumber(idNumber), { ...ctx, columnName: 'id_number' }) : '';
+            row.id_number_hash = idNumber ? idNumberBlindIndex(idNumber) : null;
         }
 
         // JSON 字段需序列化

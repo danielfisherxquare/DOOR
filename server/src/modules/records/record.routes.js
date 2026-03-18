@@ -6,6 +6,7 @@ import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { recordMapper } from '../../db/mappers/records.js';
 import * as recordRepo from './record.repository.js';
+import { requireAuth } from '../../middleware/require-auth.js';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import { resolveRaceAccess } from '../races/race-access.service.js';
 import knex from '../../db/knex.js';
@@ -69,7 +70,7 @@ async function resolveRaceIdByBulkUpdates(req) {
 }
 
 // POST /api/records/query — 综合查询
-router.post('/query', async (req, res, next) => {
+router.post('/query', requireAuth, async (req, res, next) => {
     try {
         const { keyword, filters, offset, limit, raceId, sort } = req.body;
         const scopedOrgId = await resolveScopedOrgId(req, raceId);
@@ -85,7 +86,7 @@ router.post('/query', async (req, res, next) => {
 });
 
 // POST /api/records/analysis — 数据库统计分析
-router.post('/analysis', async (req, res, next) => {
+router.post('/analysis', requireAuth, async (req, res, next) => {
     try {
         const { keyword, filters, raceId } = req.body;
         const scopedOrgId = await resolveScopedOrgId(req, raceId);
@@ -101,7 +102,7 @@ router.post('/analysis', async (req, res, next) => {
 });
 
 // POST /api/records/unique-values — 获取字段唯一值
-router.post('/unique-values', async (req, res, next) => {
+router.post('/unique-values', requireAuth, async (req, res, next) => {
     try {
         const { field, raceId, limit } = req.body;
         if (!field) {

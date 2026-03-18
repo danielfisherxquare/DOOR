@@ -1,10 +1,19 @@
 /**
  * Record Repository — 选手记录数据访问层（读路径）
  * 支持综合查询、统计分析、字段唯一值、快速统计
+ *
+ * 🔐 加密字段处理：
+ * - phone, id_number, emergency_phone 已加密
+ * - 使用 blind index (phone_hash, id_number_hash) 进行精确匹配
+ * - 模糊搜索 (contains/startsWith/endsWith) 不适用于加密字段
  */
 import knex from '../../db/knex.js';
 import { isHalfEvent } from '../../utils/event-normalizer.js';
 import { recordMapper } from '../../db/mappers/records.js';
+import {
+    idNumberBlindIndex,
+    normalizeIdNumber,
+} from '../../utils/crypto.js';
 
 // super_admin 的 orgId 为 null，此时不加 org_id 过滤
 function scopeOrg(qb, orgId) {
@@ -14,15 +23,23 @@ function scopeOrg(qb, orgId) {
 
 // ── 字段白名单（防 SQL 注入）──────────────────────────
 const ALLOWED_FILTER_FIELDS = new Set([
-    'name', 'name_pinyin', 'phone', 'country', 'id_type', 'id_number',
+    'name', 'name_pinyin', 'country', 'id_type',
     'gender', 'age', 'birthday', 'event', 'source', 'clothing_size',
     'province', 'city', 'district', 'address', 'email',
-    'emergency_name', 'emergency_phone', 'blood_type',
+    'emergency_name', 'blood_type',
     'order_group_id', 'payment_status', 'mark',
     'lottery_status', 'lottery_zone', 'bib_number', 'bib_color',
     '_source', 'runner_category', 'audit_status', 'reject_reason',
     'region_type',
 ]);
+
+// 🔐 加密字段：仅支持 equals 操作符（使用 blind index）
+const ENCRYPTED_FIELDS = new Set(['phone', 'id_number', 'emergency_phone']);
+const ENCRYPTED_FIELD_HASH_MAP = {
+    phone: 'phone_hash',
+    id_number: 'id_number_hash',
+    emergency_phone: null, // 无单独 hash 列
+};
 
 const UNIQUE_VALUES_ALLOWED = new Set([
     'event', 'gender', 'source', 'clothing_size', 'province', 'city',
@@ -57,6 +74,42 @@ function applyFilters(qb, filters) {
 
     for (const f of filters) {
         const col = toSnake(f.field);
+
+        // 🔐 加密字段：仅支持 equals/notEmpty/empty（使用 blind index 或 hash 列）
+        if (ENCRYPTED_FIELDS.has(col)) {
+            const hashCol = ENCRYPTED_FIELD_HASH_MAP[col];
+            switch (f.operator) {
+                case 'equals':
+                    if (hashCol) {
+                        // 使用 blind index 进行精确匹配
+                        const hash = col === 'id_number'
+                            ? idNumberBlindIndex(f.value)
+                            : null; // phone 需要导入 phoneBlindIndex
+                        if (hash) qb.where(hashCol, hash);
+                    }
+                    break;
+                case 'notEmpty':
+                    if (hashCol) {
+                        qb.whereNotNull(hashCol);
+                    } else {
+                        qb.where(col, '!=', '').whereNotNull(col);
+                    }
+                    break;
+                case 'empty':
+                    if (hashCol) {
+                        qb.whereNull(hashCol);
+                    } else {
+                        qb.where(function () {
+                            this.where(col, '').orWhereNull(col);
+                        });
+                    }
+                    break;
+                // contains/startsWith/endsWith 不支持加密字段，静默忽略
+            }
+            continue;
+        }
+
+        // 非加密字段的正常处理
         if (!ALLOWED_FILTER_FIELDS.has(col)) continue;
 
         switch (f.operator) {
@@ -93,14 +146,10 @@ export async function query(orgId, raceId, { keyword, filters, offset = 0, limit
     const base = scopeOrg(knex('records'), orgId);
     if (raceId) base.where({ race_id: raceId });
 
-    // 关键词搜索
+    // 关键词搜索（仅 name 可用 LIKE，加密字段无法模糊搜索）
     if (keyword?.trim()) {
         const kw = `%${keyword.trim()}%`;
-        base.where(function () {
-            this.whereILike('name', kw)
-                .orWhereILike('id_number', kw)
-                .orWhereILike('phone', kw);
-        });
+        base.whereILike('name', kw);
     }
 
     applyFilters(base, filters);
@@ -129,13 +178,10 @@ export async function analysis(orgId, raceId, { keyword, filters } = {}) {
     const base = scopeOrg(knex('records'), orgId);
     if (raceId) base.where({ race_id: raceId });
 
+    // 关键词搜索（仅 name 可用 LIKE，加密字段无法模糊搜索）
     if (keyword?.trim()) {
         const kw = `%${keyword.trim()}%`;
-        base.where(function () {
-            this.whereILike('name', kw)
-                .orWhereILike('id_number', kw)
-                .orWhereILike('phone', kw);
-        });
+        base.whereILike('name', kw);
     }
     applyFilters(base, filters);
 
@@ -389,16 +435,19 @@ export async function importVerificationResults(orgId, raceId, results) {
     await knex.transaction(async (trx) => {
         // 1. 更新 Full
         if (fullMap.size > 0) {
-            const ids = Array.from(fullMap.keys());
+            const entries = Array.from(fullMap.entries());
             const BATCH = 500;
-            for (let i = 0; i < ids.length; i += BATCH) {
-                const batch = ids.slice(i, i + BATCH);
-                for (const idNum of batch) {
-                    const fullQ = trx('records').where({ race_id: safeRaceId, id_number: idNum });
+            for (let i = 0; i < entries.length; i += BATCH) {
+                const batch = entries.slice(i, i + BATCH);
+                for (const [idNum, pbJson] of batch) {
+                    // 🔐 使用 blind index 匹配加密的 id_number
+                    const hash = idNumberBlindIndex(idNum);
+                    if (!hash) continue;
+                    const fullQ = trx('records').where({ race_id: safeRaceId, id_number_hash: hash });
                     if (orgId) fullQ.andWhere({ org_id: orgId });
                     const cnt = await fullQ
                         .update({
-                            personal_best_full: fullMap.get(idNum),
+                            personal_best_full: pbJson,
                             updated_at: knex.fn.now(),
                         });
                     totalUpdated += cnt;
@@ -408,16 +457,19 @@ export async function importVerificationResults(orgId, raceId, results) {
 
         // 2. 更新 Half
         if (halfMap.size > 0) {
-            const ids = Array.from(halfMap.keys());
+            const entries = Array.from(halfMap.entries());
             const BATCH = 500;
-            for (let i = 0; i < ids.length; i += BATCH) {
-                const batch = ids.slice(i, i + BATCH);
-                for (const idNum of batch) {
-                    const halfQ = trx('records').where({ race_id: safeRaceId, id_number: idNum });
+            for (let i = 0; i < entries.length; i += BATCH) {
+                const batch = entries.slice(i, i + BATCH);
+                for (const [idNum, pbJson] of batch) {
+                    // 🔐 使用 blind index 匹配加密的 id_number
+                    const hash = idNumberBlindIndex(idNum);
+                    if (!hash) continue;
+                    const halfQ = trx('records').where({ race_id: safeRaceId, id_number_hash: hash });
                     if (orgId) halfQ.andWhere({ org_id: orgId });
                     const cnt = await halfQ
                         .update({
-                            personal_best_half: halfMap.get(idNum),
+                            personal_best_half: pbJson,
                             updated_at: knex.fn.now(),
                         });
                     totalUpdated += cnt;

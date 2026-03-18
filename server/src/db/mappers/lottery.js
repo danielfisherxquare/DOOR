@@ -1,8 +1,20 @@
 /**
  * Lottery Mapper — snake_case (DB) ↔ camelCase (API)
  * 覆盖 race_capacity / lottery_configs / lottery_lists / lottery_rules / lottery_weights 五张表
+ *
+ * lottery_lists 敏感字段加密支持：
+ * - phone, id_number 使用 AES-256-GCM 加密
+ * - 生成 id_number_hash 盲索引用于等值查询和去重
  */
 import { deserializeJsonb, serializeJsonb } from './jsonb.js';
+import {
+    decryptField,
+    encryptField,
+    normalizePhone,
+    normalizeIdNumber,
+    phoneBlindIndex,
+    idNumberBlindIndex,
+} from '../../utils/crypto.js';
 
 // ─── race_capacity ──────────────────────────────────────────────────
 export const raceCapacityMapper = {
@@ -107,38 +119,62 @@ export const lotteryConfigMapper = {
 export const lotteryListMapper = {
     fromDbRow(row) {
         if (!row) return null;
+
+        // 解密敏感字段（支持双读）
+        const idNumber = decryptField(row.id_number, { tableName: 'lottery_lists', columnName: 'id_number' });
+        const phone = decryptField(row.phone, { tableName: 'lottery_lists', columnName: 'phone' });
+
         return {
             id: Number(row.id),
             orgId: row.org_id,
             raceId: Number(row.race_id),
             listType: row.list_type,
             name: row.name,
-            idNumber: row.id_number,
-            phone: row.phone,
+            idNumber,
+            phone,
             matchedRecordId: row.matched_record_id != null ? Number(row.matched_record_id) : null,
             matchType: row.match_type,
             createdAt: row.created_at,
+            // 保留 hash 列用于查询（不暴露给前端）
+            _idNumberHash: row.id_number_hash,
         };
     },
 
     toDbInsert(data, orgId) {
+        // 加密敏感字段
+        const idNumber = data.idNumber ?? '';
+        const phone = data.phone ?? '';
+
         return {
             org_id: orgId,
             race_id: data.raceId,
             list_type: data.listType,
             name: data.name ?? '',
-            id_number: data.idNumber ?? '',
-            phone: data.phone ?? '',
+            id_number: idNumber ? encryptField(normalizeIdNumber(idNumber), { tableName: 'lottery_lists', columnName: 'id_number', orgId, raceId: data.raceId }) : '',
+            phone: phone ? encryptField(normalizePhone(phone), { tableName: 'lottery_lists', columnName: 'phone', orgId, raceId: data.raceId }) : '',
             matched_record_id: data.matchedRecordId ?? null,
             match_type: data.matchType ?? null,
+            // 盲索引用于等值查询和去重
+            id_number_hash: idNumber ? idNumberBlindIndex(idNumber) : null,
         };
     },
 
     toDbUpdate(data) {
         const row = {};
         if (data.name !== undefined) row.name = data.name;
-        if (data.idNumber !== undefined) row.id_number = data.idNumber;
-        if (data.phone !== undefined) row.phone = data.phone;
+
+        // 敏感字段加密处理
+        if (data.idNumber !== undefined) {
+            const idNumber = data.idNumber ?? '';
+            row.id_number = idNumber ? encryptField(normalizeIdNumber(idNumber), { tableName: 'lottery_lists', columnName: 'id_number' }) : '';
+            row.id_number_hash = idNumber ? idNumberBlindIndex(idNumber) : null;
+        }
+
+        if (data.phone !== undefined) {
+            const phone = data.phone ?? '';
+            row.phone = phone ? encryptField(normalizePhone(phone), { tableName: 'lottery_lists', columnName: 'phone' }) : '';
+        }
+
         if (data.matchedRecordId !== undefined) row.matched_record_id = data.matchedRecordId;
         if (data.matchType !== undefined) row.match_type = data.matchType;
         return row;
