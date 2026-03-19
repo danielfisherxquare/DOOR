@@ -11,6 +11,68 @@ import {
     lotteryWeightMapper,
 } from '../../db/mappers/lottery.js';
 
+function isMissingLotteryListUpsertConstraint(err) {
+    return err?.code === '42P10'
+        || String(err?.message || '').includes('no unique or exclusion constraint matching the ON CONFLICT specification');
+}
+
+async function manualUpsertLotteryLists(rows, returning = '*') {
+    return knex.transaction(async (trx) => {
+        const results = [];
+
+        for (const row of rows) {
+            const existing = row.id_number_hash
+                ? await trx('lottery_lists')
+                    .where({
+                        org_id: row.org_id,
+                        race_id: row.race_id,
+                        list_type: row.list_type,
+                        id_number_hash: row.id_number_hash,
+                    })
+                    .first('id')
+                : null;
+
+            if (existing?.id) {
+                const [updated] = await trx('lottery_lists')
+                    .where({ id: existing.id, org_id: row.org_id })
+                    .update({
+                        name: row.name,
+                        id_number: row.id_number,
+                        phone: row.phone,
+                        matched_record_id: row.matched_record_id,
+                        match_type: row.match_type,
+                        id_number_hash: row.id_number_hash,
+                    })
+                    .returning(returning);
+                results.push(updated);
+                continue;
+            }
+
+            const [inserted] = await trx('lottery_lists')
+                .insert(row)
+                .returning(returning);
+            results.push(inserted);
+        }
+
+        return results;
+    });
+}
+
+async function upsertLotteryLists(rows, returning = '*') {
+    try {
+        return await knex('lottery_lists')
+            .insert(rows)
+            .onConflict(['org_id', 'race_id', 'list_type', 'id_number_hash'])
+            .merge()
+            .returning(returning);
+    } catch (err) {
+        if (!isMissingLotteryListUpsertConstraint(err)) {
+            throw err;
+        }
+        return manualUpsertLotteryLists(rows, returning);
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  race_capacity
 // ═══════════════════════════════════════════════════════════════════════
@@ -94,6 +156,8 @@ export async function getLists(orgId, raceId, listType) {
 export async function saveLists(orgId, entries) {
     if (!entries.length) return [];
     const rows = entries.map(e => lotteryListMapper.toDbInsert(e, orgId));
+    const upsertedRows = await upsertLotteryLists(rows, '*');
+    return upsertedRows.map(lotteryListMapper.fromDbRow);
     const results = await knex('lottery_lists')
         .insert(rows)
         // 🔐 使用 id_number_hash 进行冲突检测（加密字段无法直接比较）
@@ -123,6 +187,8 @@ export async function bulkAddLists(orgId, entries) {
 export async function bulkPutLists(orgId, entries) {
     if (!entries.length) return { upserted: 0 };
     const rows = entries.map(e => lotteryListMapper.toDbInsert(e, orgId));
+    const upsertedRows = await upsertLotteryLists(rows, 'id');
+    return { upserted: upsertedRows.length };
     const results = await knex('lottery_lists')
         .insert(rows)
         // 🔐 使用 id_number_hash 进行冲突检测（加密字段无法直接比较）
@@ -287,4 +353,3 @@ export async function getLotteryResults(orgId, raceId) {
         bucketBreakdown: bucketMap,
     };
 }
-
