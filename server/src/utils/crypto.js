@@ -206,39 +206,40 @@ export function decryptField(ciphertext, context = {}) {
         return ciphertext;
     }
 
-    // 解析密文格式
-    const parts = ciphertext.split(':');
-    // 格式: enc:v1:<version>:<iv>:<tag>:<cipher> = 6 parts
-    if (parts.length !== 6) {
-        throw new Error(`[crypto] 无效的密文格式 (expected 6 parts, got ${parts.length})`);
-    }
-
-    const [, , keyVersion, ivB64, tagB64, cipherB64] = parts;
-
-    // 获取对应版本的密钥
-    const key = getEncryptionKey(keyVersion);
-
-    // 解码
-    const iv = Buffer.from(ivB64, 'base64url');
-    const authTag = Buffer.from(tagB64, 'base64url');
-    const encrypted = Buffer.from(cipherB64, 'base64url');
-
-    // 创建 decipher
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-    decipher.setAuthTag(authTag);
-
-    // 可选：验证 AAD
-    if (context.tableName || context.columnName || context.orgId || context.raceId) {
-        const aadData = JSON.stringify({
-            t: context.tableName,
-            c: context.columnName,
-            o: context.orgId,
-            r: context.raceId,
-        });
-        decipher.setAAD(Buffer.from(aadData, 'utf8'));
-    }
-
     try {
+        // 解析密文格式
+        const parts = ciphertext.split(':');
+        // 格式: enc:v1:<version>:<iv>:<tag>:<cipher> = 6 parts
+        if (parts.length !== 6) {
+            console.warn(`[crypto] 无效的密文格式 (expected 6 parts, got ${parts.length})`);
+            return '***解密失败***';
+        }
+
+        const [, , keyVersion, ivB64, tagB64, cipherB64] = parts;
+
+        // 获取对应版本的密钥
+        const key = getEncryptionKey(keyVersion);
+
+        // 解码
+        const iv = Buffer.from(ivB64, 'base64url');
+        const authTag = Buffer.from(tagB64, 'base64url');
+        const encrypted = Buffer.from(cipherB64, 'base64url');
+
+        // 创建 decipher
+        const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+        decipher.setAuthTag(authTag);
+
+        // 可选：验证 AAD
+        if (context.tableName || context.columnName || context.orgId || context.raceId) {
+            const aadData = JSON.stringify({
+                t: context.tableName,
+                c: context.columnName,
+                o: context.orgId,
+                r: context.raceId,
+            });
+            decipher.setAAD(Buffer.from(aadData, 'utf8'));
+        }
+
         // 解密
         const decrypted = Buffer.concat([
             decipher.update(encrypted),
@@ -246,11 +247,9 @@ export function decryptField(ciphertext, context = {}) {
         ]);
         return decrypted.toString('utf8');
     } catch (err) {
-        // AAD 不匹配或密文被篡改
-        if (err.message.includes('auth tag')) {
-            throw new Error('[crypto] AuthTag 验证失败：密文可能被篡改或 AAD 上下文不匹配');
-        }
-        throw err;
+        // 捕获所有解密相关的错误（包括密钥缺失、AAD 不匹配或密文被篡改）
+        console.error(`[crypto] 解密失败: ${err.message}`);
+        return '***解密失败***';
     }
 }
 
