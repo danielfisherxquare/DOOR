@@ -26,6 +26,33 @@ import {
 
 const BATCH_SIZE = 1000;
 
+function parseDateOnly(value) {
+    if (!value) return null;
+
+    if (value instanceof Date) {
+        if (Number.isNaN(value.getTime())) return null;
+        return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+    }
+
+    const raw = String(value).trim();
+    if (!raw) return null;
+
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+        const year = Number(match[1]);
+        const month = Number(match[2]) - 1;
+        const day = Number(match[3]);
+        const parsed = new Date(year, month, day);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed;
+        }
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Step 1: 年龄检查 (underage)
 // ═══════════════════════════════════════════════════════════════════════
@@ -42,7 +69,8 @@ registerHandler('audit:underage', async (job, { knex, heartbeat }) => {
         .where({ org_id: orgId, race_id: raceId, audit_status: 'pending' })
         .select('id', 'id_number', 'birthday');
 
-    const raceDateObj = raceDate ? new Date(raceDate) : new Date();
+    const now = new Date();
+    const raceDateObj = parseDateOnly(raceDate) || new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const underageIds = [];
 
     await heartbeat(15, `正在检查 ${records.length} 名选手的年龄`);
@@ -79,8 +107,8 @@ registerHandler('audit:underage', async (job, { knex, heartbeat }) => {
 
         // 数据源 2: 回退到 birthday 字段 (未加密)
         if (age === null && r.birthday) {
-            const bd = new Date(r.birthday);
-            if (!isNaN(bd.getTime())) {
+            const bd = parseDateOnly(r.birthday);
+            if (bd && !isNaN(bd.getTime())) {
                 age = raceDateObj.getFullYear() - bd.getFullYear();
                 const m = raceDateObj.getMonth() - bd.getMonth();
                 if (m < 0 || (m === 0 && raceDateObj.getDate() < bd.getDate())) {
