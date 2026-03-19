@@ -36,10 +36,11 @@ export const recordMapper = {
         if (!row) return null;
 
         // 创建解密上下文（需要与加密时的 AAD 一致）
+        // 注意：race_id 是 bigint 列，pg 驱动返回字符串，必须转为 Number 才能匹配加密时的类型
         const ctx = {
             tableName: 'records',
             orgId: row.org_id,
-            raceId: row.race_id,
+            raceId: Number(row.race_id),
         };
 
         // 解密敏感字段（支持双读）

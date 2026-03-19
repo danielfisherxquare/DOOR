@@ -126,6 +126,19 @@ export function normalizePhone(value) {
 // ============================================================================
 
 /**
+ * 规范化 AAD 上下文，确保类型一致性
+ * 解决 PostgreSQL bigint 列返回字符串而加密时使用 Number 的不一致问题
+ */
+function normalizeAadContext(context) {
+    return JSON.stringify({
+        t: context.tableName ?? '',
+        c: context.columnName ?? '',
+        o: context.orgId != null ? String(context.orgId) : '',
+        r: context.raceId != null ? Number(context.raceId) : '',
+    });
+}
+
+/**
  * 判断一个值是否已经是加密密文
  *
  * @param {string} value - 待判断的值
@@ -159,13 +172,7 @@ export function encryptField(plaintext, context = {}) {
 
     // 可选：添加 AAD（附加认证数据）
     if (context.tableName || context.columnName || context.orgId || context.raceId) {
-        const aadData = JSON.stringify({
-            t: context.tableName,
-            c: context.columnName,
-            o: context.orgId,
-            r: context.raceId,
-        });
-        cipher.setAAD(Buffer.from(aadData, 'utf8'));
+        cipher.setAAD(Buffer.from(normalizeAadContext(context), 'utf8'));
     }
 
     // 加密
@@ -231,13 +238,7 @@ export function decryptField(ciphertext, context = {}) {
 
         // 可选：验证 AAD
         if (context.tableName || context.columnName || context.orgId || context.raceId) {
-            const aadData = JSON.stringify({
-                t: context.tableName,
-                c: context.columnName,
-                o: context.orgId,
-                r: context.raceId,
-            });
-            decipher.setAAD(Buffer.from(aadData, 'utf8'));
+            decipher.setAAD(Buffer.from(normalizeAadContext(context), 'utf8'));
         }
 
         // 解密
