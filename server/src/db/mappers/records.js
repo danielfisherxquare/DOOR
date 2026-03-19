@@ -35,10 +35,17 @@ export const recordMapper = {
     fromDbRow(row) {
         if (!row) return null;
 
+        // 创建解密上下文（需要与加密时的 AAD 一致）
+        const ctx = {
+            tableName: 'records',
+            orgId: row.org_id,
+            raceId: row.race_id,
+        };
+
         // 解密敏感字段（支持双读）
-        const phone = decryptField(row.phone, { tableName: 'records', columnName: 'phone' });
-        const emergencyPhone = decryptField(row.emergency_phone, { tableName: 'records', columnName: 'emergency_phone' });
-        const idNumber = decryptField(row.id_number, { tableName: 'records', columnName: 'id_number' });
+        const phone = decryptField(row.phone, { ...ctx, columnName: 'phone' });
+        const emergencyPhone = decryptField(row.emergency_phone, { ...ctx, columnName: 'emergency_phone' });
+        const idNumber = decryptField(row.id_number, { ...ctx, columnName: 'id_number' });
 
         return {
             id: Number(row.id),
@@ -151,7 +158,7 @@ export const recordMapper = {
         };
     },
 
-    toDbUpdate(data) {
+    toDbUpdate(data, orgId, raceId) {
         const row = {};
         const map = {
             name: 'name', namePinyin: 'name_pinyin',
@@ -178,7 +185,11 @@ export const recordMapper = {
         }
 
         // 敏感字段加密处理
-        const ctx = createEncryptionContext(data);
+        // 使用传入的 orgId/raceId，或从 data 中获取
+        const ctx = createEncryptionContext({
+            orgId: orgId ?? data.orgId,
+            raceId: raceId ?? data.raceId,
+        });
 
         if (data.phone !== undefined) {
             const phone = data.phone ?? '';

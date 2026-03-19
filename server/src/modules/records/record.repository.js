@@ -317,7 +317,15 @@ export async function count(orgId, raceId) {
 // ── 单条记录更新（写路径）──────────────────────────────
 
 export async function updateById(orgId, recordId, data) {
-    const row = recordMapper.toDbUpdate(data);
+    // 先获取现有记录的 raceId（用于加密上下文）
+    const existing = await knex('records')
+        .where({ id: recordId })
+        .select('race_id')
+        .first();
+
+    if (!existing) return null;
+
+    const row = recordMapper.toDbUpdate(data, orgId, existing.race_id);
     const query = knex('records').where({ id: recordId });
     if (orgId) query.andWhere({ org_id: orgId });
     const [updated] = await query.update(row).returning('*');
@@ -335,7 +343,15 @@ export async function bulkUpdate(orgId, updates) {
             const recordId = Number(item?.id);
             if (!Number.isFinite(recordId) || recordId <= 0) continue;
 
-            const row = recordMapper.toDbUpdate(item?.data || {});
+            // 获取现有记录的 raceId
+            const existing = await trx('records')
+                .where({ id: recordId })
+                .select('race_id')
+                .first();
+
+            if (!existing) continue;
+
+            const row = recordMapper.toDbUpdate(item?.data || {}, orgId, existing.race_id);
             if (Object.keys(row).length === 0) continue;
 
             const q = trx('records').where({ id: recordId });

@@ -120,9 +120,16 @@ export const lotteryListMapper = {
     fromDbRow(row) {
         if (!row) return null;
 
+        // 创建解密上下文（需要与加密时的 AAD 一致）
+        const ctx = {
+            tableName: 'lottery_lists',
+            orgId: row.org_id,
+            raceId: row.race_id,
+        };
+
         // 解密敏感字段（支持双读）
-        const idNumber = decryptField(row.id_number, { tableName: 'lottery_lists', columnName: 'id_number' });
-        const phone = decryptField(row.phone, { tableName: 'lottery_lists', columnName: 'phone' });
+        const idNumber = decryptField(row.id_number, { ...ctx, columnName: 'id_number' });
+        const phone = decryptField(row.phone, { ...ctx, columnName: 'phone' });
 
         return {
             id: Number(row.id),
@@ -159,20 +166,27 @@ export const lotteryListMapper = {
         };
     },
 
-    toDbUpdate(data) {
+    toDbUpdate(data, orgId, raceId) {
         const row = {};
         if (data.name !== undefined) row.name = data.name;
+
+        // 创建加密上下文
+        const ctx = {
+            tableName: 'lottery_lists',
+            orgId,
+            raceId,
+        };
 
         // 敏感字段加密处理
         if (data.idNumber !== undefined) {
             const idNumber = data.idNumber ?? '';
-            row.id_number = idNumber ? encryptField(normalizeIdNumber(idNumber), { tableName: 'lottery_lists', columnName: 'id_number' }) : '';
+            row.id_number = idNumber ? encryptField(normalizeIdNumber(idNumber), { ...ctx, columnName: 'id_number' }) : '';
             row.id_number_hash = idNumber ? idNumberBlindIndex(idNumber) : null;
         }
 
         if (data.phone !== undefined) {
             const phone = data.phone ?? '';
-            row.phone = phone ? encryptField(normalizePhone(phone), { tableName: 'lottery_lists', columnName: 'phone' }) : '';
+            row.phone = phone ? encryptField(normalizePhone(phone), { ...ctx, columnName: 'phone' }) : '';
         }
 
         if (data.matchedRecordId !== undefined) row.matched_record_id = data.matchedRecordId;

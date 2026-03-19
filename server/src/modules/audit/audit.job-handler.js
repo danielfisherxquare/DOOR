@@ -56,6 +56,8 @@ registerHandler('audit:underage', async (job, { knex, heartbeat }) => {
             const decryptedIdNumber = decryptField(r.id_number, {
                 tableName: 'records',
                 columnName: 'id_number',
+                orgId,
+                raceId,
             });
 
             if (decryptedIdNumber && decryptedIdNumber.length === 18) {
@@ -149,6 +151,8 @@ registerHandler('audit:blacklist', async (job, { knex, heartbeat }) => {
         idNumber: decryptField(b.id_number, {
             tableName: 'lottery_lists',
             columnName: 'id_number',
+            orgId,
+            raceId,
         }) || '',
         idNumberHash: b.id_number_hash,
     }));
@@ -238,6 +242,8 @@ registerHandler('audit:blacklist', async (job, { knex, heartbeat }) => {
                 const decryptedIdNumber = r.id_number ? decryptField(r.id_number, {
                     tableName: 'records',
                     columnName: 'id_number',
+                    orgId,
+                    raceId,
                 }) : '';
 
                 if (!decryptedIdNumber) continue;

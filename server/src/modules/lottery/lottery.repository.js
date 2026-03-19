@@ -142,7 +142,15 @@ export async function bulkDeleteLists(orgId, ids) {
 }
 
 export async function updateList(orgId, id, data) {
-    const row = lotteryListMapper.toDbUpdate(data);
+    // 先获取现有记录的 raceId（用于加密上下文）
+    const existing = await knex('lottery_lists')
+        .where({ org_id: orgId, id })
+        .select('race_id')
+        .first();
+
+    if (!existing) return null;
+
+    const row = lotteryListMapper.toDbUpdate(data, orgId, existing.race_id);
     const [updated] = await knex('lottery_lists')
         .where({ org_id: orgId, id })
         .update(row)

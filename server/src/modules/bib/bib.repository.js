@@ -139,12 +139,14 @@ export async function getExecutionDataset(orgId, raceId) {
         .whereNotNull('id')
         .select('id');
 
-    // 🔐 解密 id_number 字段
+    // 🔐 解密 id_number 字段（需要传入 orgId 和 raceId 作为 AAD 上下文）
     for (const record of eligibleRecords) {
         if (record.idNumber) {
             record.idNumber = decryptField(record.idNumber, {
                 tableName: 'records',
                 columnName: 'id_number',
+                orgId,
+                raceId,
             }) || '';
         }
     }
