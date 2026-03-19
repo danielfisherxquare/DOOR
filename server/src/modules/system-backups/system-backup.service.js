@@ -13,6 +13,7 @@ const scriptsDir = path.resolve(serverRoot, 'scripts');
 const backupScriptPath = path.join(scriptsDir, 'run-postgres-backup.sh');
 const restoreScriptPath = path.join(scriptsDir, 'run-postgres-restore.sh');
 const backupFilenameRegex = /^door_backup_\d{8}_\d{6}\.sql\.gz$/;
+const envFilenameRegex = /^door_backup_\d{8}_\d{6}\.env$/;
 
 function createHttpError(status, message, expose = true) {
   const error = new Error(message);
@@ -132,11 +133,16 @@ function runScript(scriptPath, args, timeoutMs) {
 }
 
 function normalizeBackupMetadata(metadata) {
-  return {
+  const result = {
     ...metadata,
     sizeLabel: formatSize(Number(metadata.sizeBytes || 0)),
     downloadUrl: `/api/admin/system/backups/${metadata.filename}/download`,
   };
+  if (metadata.envFile) {
+    result.envSizeLabel = formatSize(Number(metadata.envSizeBytes || 0));
+    result.envDownloadUrl = `/api/admin/system/backups/${metadata.envFile}/download-env`;
+  }
+  return result;
 }
 
 function normalizeRestoreJob(job) {
@@ -180,6 +186,17 @@ export async function downloadBackup(filename) {
   const filePath = path.join(resolveBackupDir(), filename);
   if (!await pathExists(filePath)) {
     throw createHttpError(404, '备份文件不存在');
+  }
+  return filePath;
+}
+
+export async function downloadEnvFile(filename) {
+  if (!envFilenameRegex.test(filename)) {
+    throw createHttpError(400, '非法的 .env 备份文件名');
+  }
+  const filePath = path.join(resolveBackupDir(), filename);
+  if (!await pathExists(filePath)) {
+    throw createHttpError(404, '.env 备份文件不存在');
   }
   return filePath;
 }
@@ -251,14 +268,16 @@ export const uploadMiddleware = multer({
     destination: (_req, _file, cb) => {
       ensureStorageDirs().then(() => cb(null, resolveUploadDir())).catch((error) => cb(error));
     },
-    filename: (_req, _file, cb) => {
-      cb(null, `${Date.now()}-${randomUUID()}.sql.gz`);
+    filename: (_req, file, cb) => {
+      const ext = String(file.originalname || '').toLowerCase().endsWith('.env') ? '.env' : '.sql.gz';
+      cb(null, `${Date.now()}-${randomUUID()}${ext}`);
     },
   }),
   limits: { fileSize: 2 * 1024 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!String(file.originalname || '').toLowerCase().endsWith('.sql.gz')) {
-      cb(createHttpError(400, '仅支持上传 .sql.gz 备份文件'));
+    const name = String(file.originalname || '').toLowerCase();
+    if (!name.endsWith('.sql.gz') && !name.endsWith('.env')) {
+      cb(createHttpError(400, '仅支持上传 .sql.gz 备份文件或 .env 配置文件'));
       return;
     }
     cb(null, true);
@@ -283,6 +302,29 @@ export async function registerUpload(file) {
 
   await fs.writeFile(path.join(resolveUploadDir(), `${uploadId}.json`), `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
   return normalizeRestoreJob(metadata);
+}
+
+export async function registerEnvUpload(file) {
+  if (!file) return null;
+  const uploadId = `env_upload_${Date.now()}`;
+  const metadata = {
+    uploadId,
+    filename: file.originalname,
+    storedFilename: file.filename,
+    uploadedAt: new Date().toISOString(),
+    sizeBytes: file.size,
+    filePath: file.path,
+  };
+  await fs.writeFile(path.join(resolveUploadDir(), `${uploadId}.json`), `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
+  return metadata;
+}
+
+export async function updateUploadMetadata(uploadId, patch) {
+  const filePath = path.join(resolveUploadDir(), `${uploadId}.json`);
+  const current = await readJson(filePath);
+  const updated = { ...current, ...patch };
+  await fs.writeFile(filePath, `${JSON.stringify(updated, null, 2)}\n`, 'utf8');
+  return updated;
 }
 
 export async function startRestore(uploadId) {
@@ -315,6 +357,11 @@ export async function startRestore(uploadId) {
 
   await writeRestoreJob(job);
 
+  const envArgs = [];
+  if (upload.envFilePath && await pathExists(upload.envFilePath)) {
+    envArgs.push('--env-file', upload.envFilePath);
+  }
+
   const child = spawn('bash', [
     restoreScriptPath,
     '--input',
@@ -323,6 +370,7 @@ export async function startRestore(uploadId) {
     targetDatabase,
     '--result-file',
     resultFile,
+    ...envArgs,
   ], {
     cwd: serverRoot,
     env: buildSpawnEnv(),

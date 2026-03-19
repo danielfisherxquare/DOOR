@@ -4,6 +4,7 @@ set -euo pipefail
 INPUT_PATH=""
 TARGET_DB=""
 RESULT_FILE=""
+ENV_FILE=""
 DB_OPS_LOCK_DIR="${DB_OPS_LOCK_DIR:-/tmp/door-db-ops.lock}"
 DATABASE_URL="${DATABASE_URL:-postgres://door:door_dev@postgres:5432/door}"
 ADMIN_DATABASE_URL="${ADMIN_DATABASE_URL:-${DATABASE_URL%/*}/postgres}"
@@ -20,6 +21,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --result-file)
       RESULT_FILE="${2:-}"
+      shift 2
+      ;;
+    --env-file)
+      ENV_FILE="${2:-}"
       shift 2
       ;;
     *)
@@ -83,10 +88,23 @@ fi
 
 RESTORED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
+# ── 还原 .env 文件 ──────────────────────────────────────────────
+ENV_RESTORED=false
+if [[ -n "${ENV_FILE}" && -f "${ENV_FILE}" ]]; then
+  ENV_DST="$(cd "$(dirname "$0")/.." && pwd)/.env"
+  if [[ -f "${ENV_DST}" ]]; then
+    cp "${ENV_DST}" "${ENV_DST}.bak.$(date +%s)"
+  fi
+  cp "${ENV_FILE}" "${ENV_DST}"
+  chmod 600 "${ENV_DST}"
+  ENV_RESTORED=true
+fi
+
 cat > "${RESULT_FILE}" <<EOF
 {
   "targetDatabase": "${TARGET_DB}",
   "restoredAt": "${RESTORED_AT}",
+  "envRestored": ${ENV_RESTORED},
   "checks": {
     "connectivity": ${CONNECTIVITY},
     "migrationTablePresent": ${MIGRATION_TABLE_PRESENT},

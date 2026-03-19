@@ -60,6 +60,17 @@ fi
 
 mv "${TMP_PATH}" "${TARGET_PATH}"
 
+# ── 备份 .env 文件 ──────────────────────────────────────────────
+ENV_SRC="${ENV_FILE:-$(cd "$(dirname "$0")/.." && pwd)/.env}"
+ENV_FILENAME="${FILE_PREFIX}_${TIMESTAMP}.env"
+ENV_TARGET="${BACKUP_DIR}/${ENV_FILENAME}"
+ENV_SIZE=0
+if [[ -f "${ENV_SRC}" ]]; then
+  cp "${ENV_SRC}" "${ENV_TARGET}"
+  chmod 600 "${ENV_TARGET}"
+  ENV_SIZE="$(wc -c < "${ENV_TARGET}" | tr -d ' ')"
+fi
+
 SIZE_BYTES="$(wc -c < "${TARGET_PATH}" | tr -d ' ')"
 SHA256="$(checksum_file "${TARGET_PATH}")"
 CREATED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -73,7 +84,9 @@ cat > "${META_PATH}" <<EOF
   "format": "sql.gz",
   "trigger": "${TRIGGER}",
   "status": "success",
-  "sha256": "${SHA256}"
+  "sha256": "${SHA256}",
+  "envFile": "${ENV_FILENAME}",
+  "envSizeBytes": ${ENV_SIZE}
 }
 EOF
 
@@ -81,7 +94,7 @@ mapfile -t META_FILES < <(find "${BACKUP_DIR}" -maxdepth 1 -type f -name "${FILE
 if (( ${#META_FILES[@]} > BACKUP_RETENTION_COUNT )); then
   for META in "${META_FILES[@]:BACKUP_RETENTION_COUNT}"; do
     BASE="${META%.meta.json}"
-    rm -f "${META}" "${BASE}.sql.gz"
+    rm -f "${META}" "${BASE}.sql.gz" "${BASE}.env"
   done
 fi
 

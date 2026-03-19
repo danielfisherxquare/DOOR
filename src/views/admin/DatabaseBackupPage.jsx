@@ -36,6 +36,7 @@ function getCardStyle() {
 export default function DatabaseBackupPage() {
   const token = useAuthStore((state) => state.token)
   const fileInputRef = useRef(null)
+  const envFileInputRef = useRef(null)
   const [backups, setBackups] = useState([])
   const [restores, setRestores] = useState([])
   const [status, setStatus] = useState({ backupRunning: false, restoreRunning: false })
@@ -45,6 +46,7 @@ export default function DatabaseBackupPage() {
   const [uploading, setUploading] = useState(false)
   const [startingRestore, setStartingRestore] = useState(false)
   const [uploadedFile, setUploadedFile] = useState(null)
+  const [envFile, setEnvFile] = useState(null)
 
   const loadData = async () => {
     setLoading(true)
@@ -130,6 +132,39 @@ export default function DatabaseBackupPage() {
     }
   }
 
+  const handleDownloadEnv = async (envFilename) => {
+    setMessage(null)
+    try {
+      const response = await fetch(`${API_BASE}/admin/system/backups/${encodeURIComponent(envFilename)}/download-env`, {
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+        },
+      })
+      if (!response.ok) {
+        let errorMessage = '下载 .env 备份失败'
+        try {
+          const data = await response.json()
+          errorMessage = data.message || errorMessage
+        } catch {
+          // noop
+        }
+        throw new Error(errorMessage)
+      }
+      const blob = await response.blob()
+      const objectUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = envFilename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(objectUrl)
+      setMessage({ type: 'success', text: `已开始下载 ${envFilename}` })
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message || '下载 .env 备份失败' })
+    }
+  }
+
   const handleUpload = async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -139,6 +174,9 @@ export default function DatabaseBackupPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      if (envFile) {
+        formData.append('envFile', envFile)
+      }
       const response = await fetch(`${API_BASE}/admin/system/restores/upload`, {
         method: 'POST',
         headers: {
@@ -151,7 +189,10 @@ export default function DatabaseBackupPage() {
         throw new Error(data.message || '上传恢复文件失败')
       }
       setUploadedFile(data.data)
-      setMessage({ type: 'success', text: `已上传 ${data.data.filename}` })
+      const envMsg = envFile ? '（含 .env）' : ''
+      setMessage({ type: 'success', text: `已上传 ${data.data.filename}${envMsg}` })
+      setEnvFile(null)
+      if (envFileInputRef.current) envFileInputRef.current.value = ''
     } catch (error) {
       setMessage({ type: 'error', text: error.message || '上传恢复文件失败' })
     } finally {
@@ -256,9 +297,16 @@ export default function DatabaseBackupPage() {
                       </span>
                     </td>
                     <td style={{ padding: '12px 8px' }}>
-                      <button className="btn btn--ghost btn--sm" onClick={() => handleDownload(item.filename)} disabled={busy}>
-                        下载
-                      </button>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button className="btn btn--ghost btn--sm" onClick={() => handleDownload(item.filename)} disabled={busy}>
+                          下载 DB
+                        </button>
+                        {item.envFile && (
+                          <button className="btn btn--ghost btn--sm" onClick={() => handleDownloadEnv(item.envFile)} disabled={busy}>
+                            下载 .env
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -278,7 +326,10 @@ export default function DatabaseBackupPage() {
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
           <button className="btn btn--ghost" onClick={() => fileInputRef.current?.click()} disabled={busy}>
-            {uploading ? '上传中...' : '选择恢复文件'}
+            {uploading ? '上传中...' : '选择恢复文件 (.sql.gz)'}
+          </button>
+          <button className="btn btn--ghost" onClick={() => envFileInputRef.current?.click()} disabled={busy} style={{ opacity: 0.85 }}>
+            {envFile ? `✅ ${envFile.name}` : '附加 .env 文件（可选）'}
           </button>
           {uploadedFile && (
             <div style={{ fontSize: 13, color: '#374151' }}>
@@ -296,6 +347,16 @@ export default function DatabaseBackupPage() {
           accept=".sql.gz"
           style={{ display: 'none' }}
           onChange={handleUpload}
+        />
+        <input
+          ref={envFileInputRef}
+          type="file"
+          accept=".env"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) setEnvFile(f)
+          }}
         />
 
         <div style={{ padding: 12, borderRadius: 10, background: '#fff7ed', color: '#9a3412', fontSize: 13 }}>

@@ -3,13 +3,16 @@ import { requireRoles } from '../../middleware/require-roles.js';
 import {
   createBackup,
   downloadBackup,
+  downloadEnvFile,
   getBackupStatus,
   getRestoreDetail,
   getRestoreStatus,
   listBackups,
   listRestores,
+  registerEnvUpload,
   registerUpload,
   startRestore,
+  updateUploadMetadata,
   uploadMiddleware,
 } from './system-backup.service.js';
 
@@ -53,10 +56,27 @@ router.get('/backups/:filename/download', async (req, res, next) => {
   }
 });
 
-router.post('/restores/upload', uploadMiddleware.single('file'), async (req, res, next) => {
+router.get('/backups/:filename/download-env', async (req, res, next) => {
   try {
-    const upload = await registerUpload(req.file);
-    res.status(201).json({ success: true, data: upload });
+    const filePath = await downloadEnvFile(req.params.filename);
+    res.download(filePath, req.params.filename);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/restores/upload', uploadMiddleware.fields([{ name: 'file', maxCount: 1 }, { name: 'envFile', maxCount: 1 }]), async (req, res, next) => {
+  try {
+    const sqlFile = req.files?.file?.[0];
+    const envFile = req.files?.envFile?.[0];
+    const upload = await registerUpload(sqlFile);
+    let envUpload = null;
+    if (envFile) {
+      envUpload = await registerEnvUpload(envFile);
+      // Persist env file path into the upload metadata so startRestore can find it
+      await updateUploadMetadata(upload.uploadId, { envFilePath: envUpload.filePath });
+    }
+    res.status(201).json({ success: true, data: { ...upload, envUpload } });
   } catch (error) {
     next(error);
   }
