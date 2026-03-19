@@ -84,9 +84,9 @@ cat > "${META_PATH}" <<EOF
   "format": "sql.gz",
   "trigger": "${TRIGGER}",
   "status": "success",
-  "sha256": "${SHA256}",
-  "envFile": "${ENV_FILENAME}",
-  "envSizeBytes": ${ENV_SIZE}
+  "sha256": "${SHA256}"$(if [[ ${ENV_SIZE} -gt 0 ]]; then echo ",
+  \"envFile\": \"${ENV_FILENAME}\",
+  \"envSizeBytes\": ${ENV_SIZE}"; fi)
 }
 EOF
 

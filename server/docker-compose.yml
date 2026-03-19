@@ -46,6 +46,8 @@ services:
         condition: service_healthy
     volumes:
       - ${HOST_BACKUP_DIR:-/var/backups/door}:${BACKUP_DIR:-/backups}
+      # Required for .env backup to function correctly inside the container
+      - ./.env:/app/.env:ro
 
   worker:
     build: .
