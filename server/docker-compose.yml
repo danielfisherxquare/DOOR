@@ -37,6 +37,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
       NODE_ENV: ${NODE_ENV:-development}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      # PII 加密密钥（key-guard 启动时验证一致性）
+      PII_ACTIVE_KEY_VERSION: ${PII_ACTIVE_KEY_VERSION:-v1}
+      PII_ENCRYPTION_KEY_V1: ${PII_ENCRYPTION_KEY_V1:-}
+      PII_HMAC_KEY_V1: ${PII_HMAC_KEY_V1:-}
       # Optional runtime config (recommended in production)
       CORS_ORIGIN: ${CORS_ORIGIN:-}
       DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-false}
@@ -71,14 +75,18 @@ services:
       redis:
         condition: service_healthy
 
-  # 自动备份：每 6 小时 pg_dump，保留最近 20 份
+  # 自动备份：每 6 小时调用现有备份脚本，与 Web 后台完全集成
   pg-backup:
-    image: postgres:16-alpine
+    image: door-server-app:latest
     container_name: door-pg-backup
     environment:
-      PGPASSWORD: ${POSTGRES_PASSWORD:-door_dev}
+      DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
+      BACKUP_DIR: ${BACKUP_DIR:-/backups}
+      BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-20}
+      DB_OPS_LOCK_DIR: /tmp/door-db-ops.lock
     volumes:
-      - ${HOST_BACKUP_DIR:-./backups}:/backups
+      - ${HOST_BACKUP_DIR:-./backups}:${BACKUP_DIR:-/backups}
+      - ./.env:/app/.env:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,19 +94,15 @@ services:
     command:
       - -c
       - |
-        echo "[backup] 自动备份服务已启动 (每6小时)"
+        echo "[auto-backup] 自动备份服务已启动 (每6小时)"
+        echo "[auto-backup] 备份目录: $${BACKUP_DIR}"
+        echo "[auto-backup] 保留策略: 最近 $${BACKUP_RETENTION_COUNT} 份"
         while true; do
-          FILENAME="/backups/door_auto_$$(date +%Y%m%d_%H%M%S).sql"
-          echo "[backup] 开始备份 -> $$FILENAME"
-          pg_dump -h postgres -U door -d door --no-owner --no-acl > "$$FILENAME" 2>&1
-          if [ $$? -eq 0 ]; then
-            echo "[backup] ✅ 备份成功: $$FILENAME ($$(du -h $$FILENAME | cut -f1))"
-          else
-            echo "[backup] ❌ 备份失败"
-          fi
-          # 清理旧备份，保留最近 20 份
-          ls -t /backups/door_auto_*.sql 2>/dev/null | tail -n +21 | xargs rm -f 2>/dev/null
-          echo "[backup] 下次备份: 6小时后"
+          echo "[auto-backup] 开始备份 ($$(date '+%Y-%m-%d %H:%M:%S'))"
+          bash /app/scripts/run-postgres-backup.sh --trigger auto 2>&1 && \
+            echo "[auto-backup] ✅ 备份成功" || \
+            echo "[auto-backup] ❌ 备份失败"
+          echo "[auto-backup] 下次备份: 6小时后"
           sleep 21600
         done
     restart: unless-stopped

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import knex from '../../db/knex.js';
+import { checkKeyHealth } from '../../utils/key-guard.js';
 
 const router = Router();
 
@@ -13,12 +14,21 @@ router.get('/live', (_req, res) => {
 
 /**
  * GET /api/health/ready
- * 就绪探针 — 检查 PG 连接
+ * 就绪探针 — 检查 PG 连接 + 加密密钥一致性
  */
 router.get('/ready', async (_req, res) => {
     try {
         await knex.raw('SELECT 1');
-        res.json({ status: 'ok', database: 'connected' });
+        const keyStatus = await checkKeyHealth(knex);
+        if (!keyStatus.healthy) {
+            return res.status(503).json({
+                status: 'error',
+                database: 'connected',
+                encryption: 'key_mismatch',
+                message: '加密密钥与数据库不匹配，请检查 .env 文件',
+            });
+        }
+        res.json({ status: 'ok', database: 'connected', encryption: 'ok' });
     } catch (err) {
         console.error('健康检查失败:', err.message);
         res.status(503).json({ status: 'error', database: 'disconnected' });
@@ -26,3 +36,4 @@ router.get('/ready', async (_req, res) => {
 });
 
 export default router;
+
