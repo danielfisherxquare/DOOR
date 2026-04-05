@@ -133,15 +133,94 @@ docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger manual
 # 1. 停止应用层（保留数据库运行）
 docker compose stop app worker
 
-# 2. 恢复备份
-Get-Content backups/door_auto_XXXXXXXX_XXXXXX.sql | docker exec -i door-postgres psql -U door -d door
-# Linux: cat backups/door_auto_XXXXXXXX_XXXXXX.sql | docker exec -i door-postgres psql -U door -d door
+# 2. 恢复备份（含 .env）
+# 先恢复 .env 密钥文件！
+cp backups/door_backup_XXXXXXXX_XXXXXX.env .env
+# 再恢复数据库
+Get-Content backups/door_backup_XXXXXXXX_XXXXXX.sql.gz | docker exec -i door-postgres psql -U door -d door
+# Linux: zcat backups/door_backup_XXXXXXXX_XXXXXX.sql.gz | docker exec -i door-postgres psql -U door -d door
 
 # 3. 重启应用层
 docker compose up -d app worker
 
 # 4. 验证
 curl http://localhost:3001/api/health/ready
+```
+
+## 🔐 加密密钥保护 (Key Guard)
+
+### 问题背景
+
+系统使用 AES-256-GCM 对 PII 字段（手机号、身份证等）进行加密。如果 `.env` 中的密钥被意外替换：
+- 所有加密数据变为 `***解密失败***`
+- 盲索引失效，无法按手机/身份证查询
+- **数据不可逆丢失**（除非恢复原始密钥）
+
+### 工作原理
+
+```
+首次启动                              后续启动
+┌──────────┐                         ┌──────────┐
+│ 读取 .env │                         │ 读取 .env │
+│ 加密密钥   │                         │ 加密密钥   │
+└────┬─────┘                         └────┬─────┘
+     │                                    │
+     ▼                                    ▼
+┌─────────────────┐                  ┌─────────────────┐
+│ 加密已知 canary  │                  │ 解密 canary      │
+│ 写入数据库       │                  │ 比对是否一致      │
+└────┬────────────┘                  └────┬────────────┘
+     │                                    │
+     ▼                                    ├── ✅ 一致 → 正常启动
+  正常启动                                 └── ❌ 不一致 → 拒绝启动
+```
+
+### 启动行为
+
+| 环境 | 密钥匹配 | 行为 |
+|------|----------|------|
+| 生产 | ✅ 匹配 | 正常启动 |
+| 生产 | ❌ 不匹配 | **拒绝启动** + 打印恢复指引 |
+| 开发 | ✅ 匹配 | 正常启动 |
+| 开发 | ❌ 不匹配 | 警告并继续 |
+
+### 密钥指纹
+
+启动日志会显示密钥指纹（SHA-256 前 16 位），用于快速比对：
+
+```
+[key-guard] ✅ 加密密钥验证通过
+[key-guard]    密钥指纹: 06cb2a82fc5ac402
+```
+
+### 健康检查集成
+
+```bash
+# 返回 encryption: "ok" 或 encryption: "key_mismatch"
+curl http://localhost:3001/api/health/ready
+```
+
+### 密钥不匹配时的恢复
+
+```bash
+# 1. 从备份恢复 .env（密钥在里面）
+ls backups/door_backup_*.env
+cp backups/door_backup_XXXXXXXX_XXXXXX.env .env
+
+# 2. 重启
+docker compose restart app
+
+# 3. 验证
+curl -s http://localhost:3001/api/health/ready | grep encryption
+```
+
+### 强制重置密钥（⚠️ 旧加密数据将不可读）
+
+```bash
+# 仅在确认旧数据可丢弃时执行
+docker exec door-postgres psql -U door -d door \
+  -c "DELETE FROM system_settings WHERE key IN ('pii_key_canary','pii_key_fingerprint');"
+docker compose restart app
 ```
 
 ## 超级管理员初始化
