@@ -19,12 +19,51 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs & error logs
 *.log
+*.err.log
 npm-debug.log*
+
+# Build/compile output text files
+build-output.txt
+build_output.txt
+tsc_output.txt
+
+# Temporary & debug files
+.tmp-*
+tmp-*
+.runtime/
+
+# One-off debug/fix scripts (root level)
+check_server.js
+fix-*.mjs
+refactorCss.cjs
+migration-test.mjs
+test-3d-studio*.js
+test-3d-studio*.mjs
+
+# Windows batch files (dev-only)
+*.bat
+
+# Test & migration screenshots
+migration-test-*.png
+tmp-reimbursement-*.html
+tmp-reimbursement-*.png
+door-audit-screenshots/
+
+# Server runtime data
+server/uploads/
+server/storage/
+server/venv/
+server/test-output*.txt
+server/test_invoice.png
 
 # Binary uploads
 server/uploads/apps/*.exe
 server/uploads/apps/*.7z
 server/uploads/apps/*.msi
 server/uploads/apps/*.zip
+
+# Playwright
+.playwright-cli/
+.playwright-mcp/
