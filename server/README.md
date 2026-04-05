@@ -1,5 +1,35 @@
 # DOOR Server README（端口统一版）
 
+## Docker 镜像与容器命名
+
+为避免与其他项目的 Docker 资源冲突，所有容器均使用 `door-` 前缀：
+
+| 服务 | 镜像名称 | 容器名称 | 说明 |
+|------|----------|----------|------|
+| PostgreSQL | `postgres:16-alpine` | `door-postgres` | 主数据库 |
+| Redis | `redis:7-alpine` | `door-redis` | 缓存/限流 |
+| API 服务 | `door-server-app:latest` | `door-app` | Express API |
+| Worker | `door-server-app:latest` | `door-worker` | 后台任务 |
+| Nginx | `nginx:alpine` | `door-nginx` | SSL 网关 |
+| 自动备份 | `postgres:16-alpine` | `door-pg-backup` | 每6小时 pg_dump |
+
+> `app` 和 `worker` 共用同一个镜像 `door-server-app:latest`，仅启动命令不同。
+> `pg-backup` 是轻量级 sidecar，复用 postgres 镜像仅执行 `pg_dump`。
+
+## 本地环境配置文件
+
+本地测试环境使用以下配置文件自动适配（无需 SSL 证书）：
+
+| 文件 | 用途 |
+|------|------|
+| `docker-compose.yml` | 基础配置（生产/本地共用） |
+| `docker-compose.override.yml` | 本地环境覆盖配置（自动合并） |
+| `nginx.local.conf` | 本地 HTTP 配置 |
+| `nginx.conf` | 生产 HTTPS 配置 |
+
+> `docker-compose.override.yml` 在执行 `docker compose` 命令时自动合并。
+> 生产部署时删除此文件即可使用 HTTPS 配置。
+
 ## 服务与端口
 
 - API 服务：`3001`
@@ -52,6 +82,68 @@ curl http://localhost/api/health/ready
 curl http://localhost:3001/api/health/ready
 ```
 
+## ⚠️ 数据保护机制
+
+### 数据持久化（防止 `docker compose down -v` 误删）
+
+PostgreSQL 数据**绑定挂载到宿主机目录**，而非 Docker 匿名卷：
+
+```yaml
+# docker-compose.yml
+postgres:
+  volumes:
+    - ${PGDATA_HOST_DIR:-./pgdata}:/var/lib/postgresql/data
+```
+
+- 数据存储位置：`server/pgdata/`（宿主机）
+- 执行 `docker compose down -v` **不会删除数据**
+- 若需彻底清空数据库，需手动 `rm -rf pgdata/`
+
+### 安全操作规范
+
+| 操作 | 命令 | 数据影响 |
+|------|------|----------|
+| 停止服务 | `docker compose down` | ✅ 数据安全 |
+| 停止+删卷 | `docker compose down -v` | ✅ 数据安全（已绑定挂载） |
+| 重建服务 | `docker compose up -d --build` | ✅ 数据安全 |
+| 删除数据目录 | `rm -rf pgdata/` | ❌ **数据丢失** |
+
+### 自动备份 Sidecar
+
+`pg-backup` 容器自动运行，无需额外配置：
+
+- **频率**：每 6 小时执行一次 `pg_dump`
+- **保留**：最近 20 份，自动清理旧备份
+- **存储**：`server/backups/door_auto_YYYYMMDD_HHMMSS.sql`
+- **日志**：`docker logs door-pg-backup`
+
+### 手动立即备份
+
+```bash
+# 方式一：通过备份容器内的 pg_dump
+docker exec door-postgres pg_dump -U door -d door --no-owner --no-acl > backups/manual_backup.sql
+
+# 方式二：通过 app 容器内的脚本
+docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger manual
+```
+
+### 从备份恢复
+
+```bash
+# 1. 停止应用层（保留数据库运行）
+docker compose stop app worker
+
+# 2. 恢复备份
+Get-Content backups/door_auto_XXXXXXXX_XXXXXX.sql | docker exec -i door-postgres psql -U door -d door
+# Linux: cat backups/door_auto_XXXXXXXX_XXXXXX.sql | docker exec -i door-postgres psql -U door -d door
+
+# 3. 重启应用层
+docker compose up -d app worker
+
+# 4. 验证
+curl http://localhost:3001/api/health/ready
+```
+
 ## 超级管理员初始化
 
 ```bash
@@ -68,8 +160,8 @@ docker compose exec \
 |---|---|
 | `super_admin` | 全平台（机构、用户、赛事） |
 | `org_admin` | 本机构全部赛事与成员管理 |
-| `race_editor` | 被授权赛事可读写 |
-| `race_viewer` | 被授权赛事只读 |
+| `race_admin` | 被授权赛事可读写 |
+| `user` | 被授权赛事只读 |
 
 ## 重大更新部署说明
 
@@ -119,77 +211,84 @@ docker compose exec \
 
 ## 数据库备份与恢复
 
-服务端现已支持：
+### 备份体系总览
 
-- 服务器本机保留最近 `10` 份 PostgreSQL 备份
-- 后台手动生成备份并下载到本地
-- 上传 `.sql.gz` 备份文件并恢复到新的测试数据库
+| 层级 | 方式 | 频率 | 保留 | 位置 |
+|------|------|------|------|------|
+| **L1 自动** | `pg-backup` sidecar 容器 | 每 6 小时 | 最近 20 份 | `server/backups/door_auto_*.sql` |
+| **L2 手动** | `pg_dump` 或脚本 | 按需 | 不限 | `server/backups/` |
+| **L3 后台** | Web 管理界面 | 按需 | 可配置 | `/admin/db-backups` |
 
 ### 目录与挂载
 
-- 宿主机目录：`/var/backups/door`
-- 容器目录：`/backups`
-- 恢复上传目录：`/backups/uploads`
-
-`docker-compose.yml` 中需要将宿主机目录挂载到 `app` 容器：
-
-```yaml
-app:
-  volumes:
-    - /var/backups/door:/backups
+```
+server/
+├── pgdata/          ← PostgreSQL 数据文件（绑定挂载，不入 Git）
+├── backups/         ← 所有备份文件（不入 Git）
+│   ├── door_auto_20260405_143425.sql    ← 自动备份
+│   ├── manual_backup.sql                ← 手动备份
+│   └── uploads/                         ← Web 上传恢复的临时目录
 ```
 
-### 环境变量
+### 环境变量（可选覆盖）
 
-`.env` 中增加：
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `PGDATA_HOST_DIR` | `./pgdata` | PostgreSQL 数据宿主机路径 |
+| `HOST_BACKUP_DIR` | `./backups` | 备份文件宿主机路径 |
+| `BACKUP_DIR` | `/backups` | 容器内备份路径 |
+| `BACKUP_RETENTION_COUNT` | `10` | Web 后台保留份数 |
 
-```env
-HOST_BACKUP_DIR=/var/backups/door
-BACKUP_DIR=/backups
-BACKUP_RETENTION_COUNT=10
-RESTORE_UPLOAD_DIR=/backups/uploads
-```
+### 自动备份（L1）
 
-初始化目录：
+`pg-backup` sidecar 随 `docker compose up -d` 自动启动，无需额外配置。
 
 ```bash
-sudo mkdir -p /var/backups/door/uploads
-sudo chown -R 1000:1000 /var/backups/door
+# 查看备份日志
+docker logs door-pg-backup
+
+# 查看已有备份
+ls -lht server/backups/door_auto_*.sql
 ```
 
-### 自动备份
-
-推荐宿主机 `cron`：
-
-```cron
-30 3 * * * cd /path/to/door/server && docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger cron >> /var/log/door-backup.log 2>&1
-```
-
-### 手动备份
+### 手动备份（L2）
 
 ```bash
-cd door/server
+# 方式一：直接 pg_dump
+docker exec door-postgres pg_dump -U door -d door --no-owner --no-acl > backups/manual_$(date +%Y%m%d).sql
+
+# 方式二：通过 app 容器脚本
 docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger manual
 ```
 
-### 后台入口
+### Web 后台（L3）
 
-- 路径：`/admin/db-backups`
-- 仅 `super_admin` 可见
+- 路径：`/admin/db-backups`（仅 `super_admin`）
+- 支持：查看列表、生成备份、下载、上传恢复
 
-页面支持：
+### 恢复流程
 
-- 查看最近备份列表
-- 立即生成备份
-- 下载备份
-- 上传备份文件
-- 恢复到新的测试数据库
+```bash
+# 1. 停应用层
+docker compose stop app worker
+
+# 2. 恢复（Windows PowerShell）
+Get-Content backups/door_auto_XXXXXXXX_XXXXXX.sql | docker exec -i door-postgres psql -U door -d door
+
+# 2. 恢复（Linux/macOS）
+cat backups/door_auto_XXXXXXXX_XXXXXX.sql | docker exec -i door-postgres psql -U door -d door
+
+# 3. 重启
+docker compose up -d app worker
+
+# 4. 验证
+curl http://localhost:3001/api/health/ready
+```
 
 ### 恢复规则
 
-- 只支持 `.sql.gz`
-- 不支持页面直接覆盖生产库 `door`
-- 恢复目标库命名：`door_restore_YYYYMMDD_HHMMSS`
-- 恢复成功后仍需人工校验核心表和数据量
+- Web 后台恢复只支持 `.sql.gz`，目标库命名 `door_restore_YYYYMMDD_HHMMSS`
+- 命令行恢复支持 `.sql`，可直接覆盖生产库
+- 恢复成功后仍需人工校验核心表数据量
 
 详细说明见 `docs/backup-restore.md`。

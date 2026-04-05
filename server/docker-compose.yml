@@ -1,12 +1,14 @@
 services:
   postgres:
     image: postgres:16-alpine
+    container_name: door-postgres
     environment:
       POSTGRES_DB: door
       POSTGRES_USER: door
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-door_dev}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # ⚠️ 绑定挂载到宿主机目录，docker compose down -v 不会删除
+      - ${PGDATA_HOST_DIR:-./pgdata}:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
@@ -16,6 +18,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    container_name: door-redis
     command: [ "redis-server", "--save", "", "--appendonly", "no" ]
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
@@ -23,7 +26,9 @@ services:
       retries: 5
 
   app:
+    image: door-server-app:latest
     build: .
+    container_name: door-app
     command: [ "node", "src/index.js" ]
     ports:
       - "3001:3001"
@@ -45,12 +50,13 @@ services:
       redis:
         condition: service_healthy
     volumes:
-      - ${HOST_BACKUP_DIR:-/var/backups/door}:${BACKUP_DIR:-/backups}
+      - ${HOST_BACKUP_DIR:-./backups}:${BACKUP_DIR:-/backups}
       # Required for .env backup to function correctly inside the container
       - ./.env:/app/.env:ro
 
   worker:
-    build: .
+    image: door-server-app:latest
+    container_name: door-worker
     command: [ "node", "src/worker.js" ]
     environment:
       DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
@@ -65,8 +71,41 @@ services:
       redis:
         condition: service_healthy
 
+  # 自动备份：每 6 小时 pg_dump，保留最近 20 份
+  pg-backup:
+    image: postgres:16-alpine
+    container_name: door-pg-backup
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-door_dev}
+    volumes:
+      - ${HOST_BACKUP_DIR:-./backups}:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo "[backup] 自动备份服务已启动 (每6小时)"
+        while true; do
+          FILENAME="/backups/door_auto_$$(date +%Y%m%d_%H%M%S).sql"
+          echo "[backup] 开始备份 -> $$FILENAME"
+          pg_dump -h postgres -U door -d door --no-owner --no-acl > "$$FILENAME" 2>&1
+          if [ $$? -eq 0 ]; then
+            echo "[backup] ✅ 备份成功: $$FILENAME ($$(du -h $$FILENAME | cut -f1))"
+          else
+            echo "[backup] ❌ 备份失败"
+          fi
+          # 清理旧备份，保留最近 20 份
+          ls -t /backups/door_auto_*.sql 2>/dev/null | tail -n +21 | xargs rm -f 2>/dev/null
+          echo "[backup] 下次备份: 6小时后"
+          sleep 21600
+        done
+    restart: unless-stopped
+
   nginx:
     image: nginx:alpine
+    container_name: door-nginx
     ports:
       - "80:80"
       - "443:443"
@@ -76,6 +115,3 @@ services:
       - /etc/nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
       - app
-
-volumes:
-  pgdata:

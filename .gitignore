@@ -55,6 +55,8 @@ door-audit-screenshots/
 server/uploads/
 server/storage/
 server/venv/
+server/pgdata/
+server/backups/
 server/test-output*.txt
 server/test_invoice.png
 
