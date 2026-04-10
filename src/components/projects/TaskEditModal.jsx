@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import projectsApi from '../../api/projects'
+import './projects-components.css'
 
 const MEMBER_TYPE_LABELS = {
   employee: '正式成员',
@@ -58,9 +59,9 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
         const candidate = candidateMap.get(item.teamMemberId)
         return candidate
           ? {
-              ...candidate,
-              scopedPosition: item.position || candidate.position || '',
-            }
+            ...candidate,
+            scopedPosition: item.position || candidate.position || '',
+          }
           : null
       })
       .filter(Boolean)
@@ -156,51 +157,50 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
   if (!task) return null
 
   return (
-    <div style={backdropStyle}>
-      <div style={cardStyle}>
-        <h3 style={{ margin: '0 0 16px', fontSize: 18 }}>编辑任务</h3>
+    <div className="task-edit-backdrop">
+      <div className="task-edit-card">
+        <h3 className="task-edit-title">编辑任务</h3>
 
-        <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>任务名称 *</label>
-          <input className="input" style={inputStyle} value={payload.title} onChange={(event) => setPayload({ ...payload, title: event.target.value })} />
+        <div className="task-edit-field">
+          <label className="task-edit-label">任务名称 *</label>
+          <input className="task-edit-input" value={payload.title} onChange={(event) => setPayload({ ...payload, title: event.target.value })} />
         </div>
 
-        <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-          <div style={{ flex: 1 }}>
-            <label style={labelStyle}>状态</label>
-            <select className="input" style={inputStyle} value={payload.status} onChange={(event) => setPayload({ ...payload, status: event.target.value })}>
+        <div className="task-edit-row">
+          <div>
+            <label className="task-edit-label">状态</label>
+            <select className="task-edit-select" value={payload.status} onChange={(event) => setPayload({ ...payload, status: event.target.value })}>
               <option value="TODO">待办</option>
               <option value="IN_PROGRESS">进行中</option>
               <option value="DONE">已完成</option>
               <option value="CANCELLED">已取消</option>
             </select>
           </div>
-          <div style={{ flex: 1 }}>
-            <label style={labelStyle}>里程碑</label>
-            <select className="input" style={inputStyle} value={payload.is_milestone ? 'yes' : 'no'} onChange={(event) => setPayload({ ...payload, is_milestone: event.target.value === 'yes' })}>
+          <div>
+            <label className="task-edit-label">里程碑</label>
+            <select className="task-edit-select" value={payload.is_milestone ? 'yes' : 'no'} onChange={(event) => setPayload({ ...payload, is_milestone: event.target.value === 'yes' })}>
               <option value="no">否</option>
               <option value="yes">是</option>
             </select>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-          <div style={{ flex: 1 }}>
-            <label style={labelStyle}>开始日期</label>
-            <input className="input" type="date" style={inputStyle} value={payload.start_date} onChange={(event) => setPayload({ ...payload, start_date: event.target.value })} />
+        <div className="task-edit-row">
+          <div>
+            <label className="task-edit-label">开始日期</label>
+            <input className="task-edit-input" type="date" value={payload.start_date} onChange={(event) => setPayload({ ...payload, start_date: event.target.value })} />
           </div>
-          <div style={{ flex: 1 }}>
-            <label style={labelStyle}>结束日期</label>
-            <input className="input" type="date" style={inputStyle} value={payload.end_date} onChange={(event) => setPayload({ ...payload, end_date: event.target.value })} />
+          <div>
+            <label className="task-edit-label">结束日期</label>
+            <input className="task-edit-input" type="date" value={payload.end_date} onChange={(event) => setPayload({ ...payload, end_date: event.target.value })} />
           </div>
         </div>
 
-        <div style={{ marginBottom: 12 }}>
-          <label style={labelStyle}>负责人</label>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <div className="task-edit-field">
+          <label className="task-edit-label">负责人</label>
+          <div className="task-edit-search-row">
             <input
-              className="input"
-              style={{ ...inputStyle, marginBottom: 0 }}
+              className="task-edit-input task-edit-search-input"
               value={candidateKeyword}
               onChange={(event) => setCandidateKeyword(event.target.value)}
               placeholder="搜索工号、姓名、岗位、部门"
@@ -210,24 +210,23 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
           <datalist id={`task-position-options-${task.id}`}>
             {positionOptions.map((item) => <option key={item} value={item} />)}
           </datalist>
-          <div style={{ maxHeight: 280, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 8, padding: 8, display: 'grid', gap: 8 }}>
+          <div className="task-edit-candidate-list">
             {candidates.map((candidate) => {
               const selected = selectedAssigneeMap.get(candidate.id)
               return (
-                <label key={candidate.id} style={candidateCardStyle}>
+                <label key={candidate.id} className="task-edit-candidate-card">
                   <input type="checkbox" checked={Boolean(selected)} onChange={() => toggleCandidate(candidate.id)} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600 }}>{candidate.employeeCode} {candidate.employeeName}</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                  <div className="task-edit-candidate-info">
+                    <div className="task-edit-candidate-name">{candidate.employeeCode} {candidate.employeeName}</div>
+                    <div className="task-edit-candidate-meta">
                       {candidate.position || '未填写岗位'} · {candidate.department || '未填写部门'} · {MEMBER_TYPE_LABELS[candidate.memberType] || candidate.memberType}
                       {candidate.externalEngagementType ? ` · ${EXTERNAL_TYPE_LABELS[candidate.externalEngagementType] || candidate.externalEngagementType}` : ''}
                     </div>
                     {selected && (
-                      <div style={{ marginTop: 8 }}>
-                        <div style={miniLabelStyle}>本项目岗位 / 板块</div>
+                      <div className="task-edit-candidate-position">
+                        <div className="task-edit-mini-label">本项目岗位 / 板块</div>
                         <input
-                          className="input"
-                          style={{ ...inputStyle, marginBottom: 0 }}
+                          className="task-edit-input task-edit-candidate-position-input"
                           value={selected.position}
                           onChange={(event) => updateAssigneePosition(candidate.id, event.target.value)}
                           placeholder="输入本项目岗位"
@@ -239,10 +238,10 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
                 </label>
               )
             })}
-            {candidates.length === 0 && <div style={{ color: '#6b7280', fontSize: 13 }}>当前没有可选团队成员。</div>}
+            {candidates.length === 0 && <div className="task-edit-candidate-empty">当前没有可选团队成员。</div>}
           </div>
           {selectedSummary.length > 0 && (
-            <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280', display: 'grid', gap: 4 }}>
+            <div className="task-edit-selected-summary">
               {selectedSummary.map((item) => (
                 <div key={item.id}>{item.employeeCode} {item.employeeName} · {item.scopedPosition || '未填写岗位'}</div>
               ))}
@@ -250,12 +249,12 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
           )}
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>备注</label>
-          <textarea className="input" rows={4} style={inputStyle} value={payload.notes} onChange={(event) => setPayload({ ...payload, notes: event.target.value })} />
+        <div className="task-edit-field">
+          <label className="task-edit-label">备注</label>
+          <textarea className="task-edit-textarea" rows={4} value={payload.notes} onChange={(event) => setPayload({ ...payload, notes: event.target.value })} />
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+        <div className="task-edit-actions">
           <button className="btn" onClick={onClose}>取消</button>
           <button className="btn btn--primary" onClick={handleSave} disabled={saving}>{saving ? '保存中...' : '保存修改'}</button>
         </div>
@@ -264,50 +263,4 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
   )
 }
 
-const backdropStyle = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(0,0,0,0.5)',
-  zIndex: 9999,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-}
-
-const cardStyle = {
-  background: '#fff',
-  borderRadius: 12,
-  padding: 24,
-  width: 640,
-  maxWidth: '92%',
-  boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-}
-
-const labelStyle = {
-  display: 'block',
-  fontSize: 12,
-  color: '#6b7280',
-  marginBottom: 4,
-}
-
-const miniLabelStyle = {
-  fontSize: 12,
-  color: '#6b7280',
-  marginBottom: 4,
-}
-
-const inputStyle = {
-  width: '100%',
-  padding: 8,
-  border: '1px solid #d1d5db',
-  borderRadius: 4,
-}
-
-const candidateCardStyle = {
-  display: 'flex',
-  gap: 8,
-  alignItems: 'flex-start',
-  padding: 8,
-  borderRadius: 8,
-  background: '#f8fafc',
-}
+// 样式已迁移到 projects-components.css

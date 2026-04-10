@@ -3,6 +3,17 @@ import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import adminApi from '../../api/adminApi'
 import useAuthStore from '../../stores/authStore'
+import {
+  CommandDataTable,
+  CommandEmptyState,
+  CommandMetricGrid,
+  CommandNotice,
+  CommandPanel,
+  CommandShell,
+  CommandStatusTag,
+  ContextRequirementState,
+} from '../../components/command/CommandPrimitives'
+import './team-list-page.css'
 
 const MEMBER_TYPE_LABELS = {
   employee: '正式成员',
@@ -195,6 +206,18 @@ export default function TeamListPage() {
     () => buildEmployeeCodeOptions(employeeCodeCatalog, form.employeeCode),
     [employeeCodeCatalog, form.employeeCode],
   )
+
+  const metrics = useMemo(() => {
+    const activeCount = items.filter((item) => item.status === 'active').length
+    const withPhotoCount = items.filter((item) => item.hasPhoto).length
+    const accountCount = items.filter((item) => item.accountUsername).length
+    return [
+      { key: 'total', label: '当前成员', value: total || items.length, meta: '当前筛选条件下命中的成员总数', pill: 'TM' },
+      { key: 'active', label: '启用成员', value: activeCount, meta: '当前页中仍处于启用状态的成员', pill: 'ON' },
+      { key: 'photo', label: '已上传照片', value: withPhotoCount, meta: '当前页中已经补齐成员照片的数量', pill: 'PH' },
+      { key: 'account', label: '已开通账号', value: accountCount, meta: '当前页中已绑定登录账号的成员数量', pill: 'AC' },
+    ]
+  }, [items, total])
 
   const filteredEmployeeCodeOptions = useMemo(() => {
     const input = String(form.employeeCode || '').trim().toLowerCase()
@@ -523,35 +546,37 @@ export default function TeamListPage() {
 
   if (!canUsePage) {
     return (
-      <div style={emptyStateStyle}>
-        超级管理员需要先选择机构，才能进入团队管理。
-      </div>
+      <ContextRequirementState
+        title="先锁定机构，再进入团队管理"
+        description="超级管理员需要先在顶部上下文条中选择机构，才能导入、编辑和开通团队成员。"
+      />
     )
   }
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <div style={headerRowStyle}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700 }}>团队管理</h1>
-          <div style={{ marginTop: 8, color: 'var(--color-text-secondary, #6b7280)' }}>
-            统一维护正式成员、临时外援和长期外援。
+    <div className="command-page surface-admin">
+      <CommandShell
+        eyebrow="团队管理"
+        title="团队成员"
+        summary="统一维护正式成员、临时外援和长期外援，支持导入、账号开通、照片补齐和状态治理。"
+        actions={(
+          <div className="command-actions-row">
+            <input ref={importInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImport} />
+            <button className="btn btn--ghost" onClick={downloadTemplate}>下载导入模板</button>
+            <button className="btn btn--secondary" onClick={() => importInputRef.current?.click()} disabled={importing}>
+              {importing ? '导入中...' : '导入成员'}
+            </button>
+            <button className="btn btn--primary" onClick={openCreate}>新增成员</button>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <input ref={importInputRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }} onChange={handleImport} />
-          <button className="btn btn--ghost" onClick={downloadTemplate}>下载导入模板</button>
-          <button className="btn btn--secondary" onClick={() => importInputRef.current?.click()} disabled={importing}>
-            {importing ? '导入中...' : '导入成员'}
-          </button>
-          <button className="btn btn--primary" onClick={openCreate}>新增成员</button>
-        </div>
-      </div>
+        )}
+      >
+        <CommandMetricGrid items={metrics} />
+      </CommandShell>
 
-      {message && <div style={noticeStyle}>{message}</div>}
+      {message ? <CommandNotice tone={message.includes('失败') ? 'danger' : 'info'}>{message}</CommandNotice> : null}
 
-      <div style={cardStyle}>
-        <div style={filterGridStyle}>
+      <CommandPanel title="筛选条件" subtitle="可以按成员类型、状态、账号与关键词快速定位目标成员。" className="team-list-page__filter-panel">
+        <div className="team-list-page__filter-grid" style={filterGridStyle}>
           <input
             className="input"
             placeholder="搜索工号、姓名、岗位、部门"
@@ -580,34 +605,36 @@ export default function TeamListPage() {
           </select>
           <button className="btn btn--secondary" onClick={() => { setPage(1); void loadItems() }}>搜索</button>
         </div>
-      </div>
+      </CommandPanel>
 
-      <div style={cardStyle}>
+      <CommandPanel title="成员列表" subtitle="编辑、归档、开通账号和密码重置都统一在当前列表完成。" className="team-list-page__list-panel">
         {loading ? (
-          <div style={loadingStateStyle}>加载中...</div>
+          <CommandNotice tone="info">正在加载团队成员...</CommandNotice>
         ) : (
           <>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            {items.length === 0 ? (
+              <CommandEmptyState title="暂无成员数据" description="可以先新增成员或通过模板批量导入。" icon="TM" />
+            ) : (
+              <CommandDataTable className="team-list-page__table-wrap">
                 <thead>
                   <tr style={tableHeadRowStyle}>
-                    <th style={thStyle}>照片</th>
-                    <th style={thStyle}>工号</th>
-                    <th style={thStyle}>姓名</th>
-                    <th style={thStyle}>岗位</th>
-                    <th style={thStyle}>部门</th>
-                    <th style={thStyle}>成员类型</th>
-                    <th style={thStyle}>身份证号</th>
-                    <th style={thStyle}>联系方式</th>
-                    <th style={thStyle}>账号</th>
-                    <th style={thStyle}>状态</th>
-                    <th style={thStyle}>操作</th>
+                    <th style={thStyle} className="team-list-page__photo-col">照片</th>
+                    <th style={thStyle} className="team-list-page__code-col">工号</th>
+                    <th style={thStyle} className="team-list-page__name-col">姓名</th>
+                    <th style={thStyle} className="team-list-page__position-col">岗位</th>
+                    <th style={thStyle} className="team-list-page__department-col">部门</th>
+                    <th style={thStyle} className="team-list-page__type-col">成员类型</th>
+                    <th style={thStyle} className="team-list-page__private-col">身份证号</th>
+                    <th style={thStyle} className="team-list-page__private-col">联系方式</th>
+                    <th style={thStyle} className="team-list-page__account-col">账号</th>
+                    <th style={thStyle} className="team-list-page__status-col">状态</th>
+                    <th style={thStyle} className="team-list-page__actions-col">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((item) => (
                     <tr key={item.id} style={tableRowStyle}>
-                      <td style={tdStyle}>
+                      <td style={tdStyle} className="team-list-page__photo-col">
                         <TeamMemberPhoto
                           teamMemberId={item.id}
                           hasPhoto={item.hasPhoto}
@@ -617,77 +644,90 @@ export default function TeamListPage() {
                           placeholder={<div style={listPhotoPlaceholderStyle}>无照片</div>}
                         />
                       </td>
-                      <td style={tdStyle}>{item.employeeCode}</td>
-                      <td style={tdStyle}>{item.employeeName}</td>
-                      <td style={tdStyle}>{item.position || '-'}</td>
-                      <td style={tdStyle}>{item.department || '-'}</td>
-                      <td style={tdStyle}>
+                      <td style={tdStyle} className="team-list-page__code-col">{item.employeeCode}</td>
+                      <td style={tdStyle} className="team-list-page__name-col">
+                        <div className="team-list-page__member-identity">
+                          <span className="team-list-page__member-name">{item.employeeName}</span>
+                          <span className="team-list-page__member-subline">
+                            {item.employeeCode} · {item.position || '未填写岗位'} · {item.department || '未填写部门'}
+                          </span>
+                        </div>
+                      </td>
+                      <td style={tdStyle} className="team-list-page__position-col">{item.position || '-'}</td>
+                      <td style={tdStyle} className="team-list-page__department-col">{item.department || '-'}</td>
+                      <td style={tdStyle} className="team-list-page__type-col">
                         {MEMBER_TYPE_LABELS[item.memberType] || item.memberType}
                         {item.externalEngagementType ? ` / ${EXTERNAL_TYPE_LABELS[item.externalEngagementType] || item.externalEngagementType}` : ''}
                       </td>
-                      <td style={tdStyle}>{item.idNumberMasked || '-'}</td>
-                      <td style={tdStyle}>{item.contactMasked || '-'}</td>
-                      <td style={tdStyle}>
+                      <td style={tdStyle} className="team-list-page__private-col">{item.idNumberMasked || '-'}</td>
+                      <td style={tdStyle} className="team-list-page__private-col">{item.contactMasked || '-'}</td>
+                      <td style={tdStyle} className="team-list-page__account-col">
                         {item.accountUsername ? (
-                          <div style={{ display: 'grid', gap: 2 }}>
+                          <div className="team-list-page__account-stack">
                             <span>{item.accountUsername}</span>
-                            <span style={{ fontSize: 12, color: '#6b7280' }}>{item.accountStatus || 'active'}</span>
+                            <span>{item.accountStatus || 'active'}</span>
                           </div>
                         ) : '未开通'}
                       </td>
-                      <td style={tdStyle}>
-                        <span style={{ color: item.status === 'active' ? '#059669' : '#b45309', fontWeight: 600 }}>
+                      <td style={tdStyle} className="team-list-page__status-col">
+                        <CommandStatusTag tone={item.status === 'active' ? 'success' : 'warning'}>
                           {item.status === 'active' ? '启用' : '已归档'}
-                        </span>
+                        </CommandStatusTag>
                       </td>
-                      <td style={tdStyle}>
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                          <button className="btn btn--ghost btn--sm" onClick={() => void openEdit(item)}>编辑</button>
+                      <td style={tdStyle} className="team-list-page__actions-col">
+                        <div className="team-list-page__row-actions">
+                          <button
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => void openEdit(item)}
+                          >
+                            编辑
+                          </button>
                           {item.status === 'active' ? (
                             <button
                               className="btn btn--ghost btn--sm"
                               onClick={() => void runMemberAction(() => adminApi.archiveTeamMember(item.id, effectiveOrgId), '成员已归档')}
+                              title="归档成员"
+                              aria-label={`归档 ${item.employeeName}`}
                             >
-                              归档
+                              档
                             </button>
                           ) : (
                             <button
                               className="btn btn--ghost btn--sm"
                               onClick={() => void runMemberAction(() => adminApi.restoreTeamMember(item.id, effectiveOrgId), '成员已恢复')}
+                              title="恢复成员"
+                              aria-label={`恢复 ${item.employeeName}`}
                             >
-                              恢复
+                              恢
                             </button>
                           )}
                           {!item.accountUsername && item.memberType === 'external_support' && (
                             <button
                               className="btn btn--ghost btn--sm"
                               onClick={() => void runMemberAction(() => adminApi.enableTeamMemberAccount(item.id, effectiveOrgId))}
+                              title="开通账号"
+                              aria-label={`为 ${item.employeeName} 开通账号`}
                             >
-                              开通账号
+                              开号
                             </button>
                           )}
                           {item.accountUsername && (
                             <button
                               className="btn btn--ghost btn--sm"
                               onClick={() => void runMemberAction(() => adminApi.resetTeamMemberPassword(item.id, effectiveOrgId))}
+                              title="重置密码"
+                              aria-label={`重置 ${item.employeeName} 的密码`}
                             >
-                              重置密码
+                              重密
                             </button>
                           )}
                         </div>
                       </td>
                     </tr>
                   ))}
-                  {items.length === 0 && (
-                    <tr>
-                      <td colSpan={11} style={{ ...tdStyle, textAlign: 'center', color: '#6b7280', padding: '32px 16px' }}>
-                        暂无成员数据
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
-              </table>
-            </div>
+              </CommandDataTable>
+            )}
 
             {totalPages > 1 && (
               <div style={paginationStyle}>
@@ -698,7 +738,7 @@ export default function TeamListPage() {
             )}
           </>
         )}
-      </div>
+      </CommandPanel>
 
       {editing !== undefined && (
         <div style={backdropStyle} onClick={closeDialog}>
@@ -706,7 +746,7 @@ export default function TeamListPage() {
             <div style={dialogHeaderStyle}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 22 }}>{editing ? '编辑团队成员' : '新增团队成员'}</h2>
-                <div style={{ marginTop: 6, color: '#6b7280', fontSize: 14 }}>
+                <div style={{ marginTop: 6, color: 'var(--text-secondary)', fontSize: 14 }}>
                   照片为 2:3 竖幅，用于成员档案和后续项目、活动展示。
                 </div>
               </div>
@@ -722,7 +762,7 @@ export default function TeamListPage() {
                   <button className="btn btn--ghost" onClick={handleRemovePhoto} disabled={!photoPreviewUrl && !form.hasPhoto}>
                     删除照片
                   </button>
-                  <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
                     支持 JPG、PNG、WEBP，大小不超过 5MB。
                   </div>
                 </div>
@@ -756,7 +796,7 @@ export default function TeamListPage() {
                               type="button"
                               style={{
                                 ...employeeCodeOptionStyle,
-                                color: item.disabled ? '#9ca3af' : '#111827',
+                                color: item.disabled ? 'var(--text-disabled)' : 'var(--text-primary)',
                                 cursor: item.disabled ? 'not-allowed' : 'pointer',
                                 background: item.code === form.employeeCode ? '#eff6ff' : 'transparent',
                               }}
@@ -854,9 +894,10 @@ export default function TeamListPage() {
 
 const emptyStateStyle = {
   padding: 24,
-  borderRadius: 12,
-  background: 'var(--color-bg-card, #fff)',
-  color: 'var(--color-text-secondary, #6b7280)',
+  borderRadius: 0,
+  background: 'linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), var(--surface))',
+  border: '1px solid var(--border)',
+  color: 'var(--text-secondary)',
 }
 
 const headerRowStyle = {
@@ -868,17 +909,19 @@ const headerRowStyle = {
 }
 
 const cardStyle = {
-  background: 'var(--color-bg-card, #fff)',
-  borderRadius: 16,
+  background: 'linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), var(--surface))',
+  borderRadius: 0,
   padding: 20,
-  boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))',
+  border: '1px solid var(--border)',
+  boxShadow: 'var(--shadow-sm)',
 }
 
 const noticeStyle = {
   padding: '12px 16px',
-  borderRadius: 12,
-  background: 'rgba(59,130,246,0.12)',
-  color: '#1d4ed8',
+  borderRadius: 0,
+  background: 'var(--info-soft)',
+  border: '1px solid color-mix(in srgb, var(--info) 28%, transparent)',
+  color: 'var(--info)',
 }
 
 const filterGridStyle = {
@@ -890,16 +933,16 @@ const filterGridStyle = {
 const loadingStateStyle = {
   padding: 40,
   textAlign: 'center',
-  color: 'var(--color-text-secondary, #6b7280)',
+  color: 'var(--text-secondary)',
 }
 
 const tableHeadRowStyle = {
-  borderBottom: '1px solid #e5e7eb',
-  background: 'var(--color-bg-secondary, #f8fafc)',
+  borderBottom: '1px solid var(--border)',
+  background: 'var(--bg-secondary)',
 }
 
 const tableRowStyle = {
-  borderBottom: '1px solid #f1f5f9',
+  borderBottom: '1px solid var(--border)',
 }
 
 const thStyle = {
@@ -907,7 +950,7 @@ const thStyle = {
   textAlign: 'left',
   fontSize: 13,
   fontWeight: 600,
-  color: '#6b7280',
+  color: 'var(--text-secondary)',
   whiteSpace: 'nowrap',
 }
 
@@ -921,18 +964,18 @@ const listPhotoStyle = {
   width: 48,
   height: 72,
   objectFit: 'cover',
-  borderRadius: 10,
-  border: '1px solid #e5e7eb',
-  background: '#f8fafc',
+  borderRadius: 0,
+  border: '1px solid var(--border)',
+  background: 'var(--bg-secondary)',
 }
 
 const listPhotoPlaceholderStyle = {
   width: 48,
   height: 72,
-  borderRadius: 10,
-  border: '1px dashed #d1d5db',
-  background: '#f8fafc',
-  color: '#9ca3af',
+  borderRadius: 0,
+  border: '1px dashed var(--border)',
+  background: 'var(--bg-secondary)',
+  color: 'var(--text-disabled)',
   fontSize: 11,
   display: 'flex',
   alignItems: 'center',
@@ -1057,7 +1100,7 @@ const employeeCodeOptionStyle = {
 
 const employeeCodeHintStyle = {
   padding: '12px 14px',
-  color: '#6b7280',
+  color: 'var(--text-secondary)',
   fontSize: 13,
 }
 
@@ -1066,5 +1109,5 @@ const dialogFooterStyle = {
   justifyContent: 'flex-end',
   gap: 10,
   padding: '20px 28px 28px',
-  borderTop: '1px solid #e5e7eb',
+  borderTop: '1px solid var(--border)',
 }

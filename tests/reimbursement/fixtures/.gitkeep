@@ -1,0 +1,8 @@
+# 测试数据占位文件
+# 请将您的测试发票和付款凭证图片放置在此目录：
+#
+# - invoice-sample.jpg    - 测试发票图片
+# - payment-receipt.png   - 测试付款凭证截图
+#
+# 支持的发票格式：JPG, PNG, PDF (最大 20MB)
+# 支持的付款凭证格式：JPG, PNG

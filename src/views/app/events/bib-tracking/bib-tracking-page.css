@@ -1,0 +1,236 @@
+.bib-tracking-filters {
+  display: grid;
+  gap: 12px;
+}
+
+.bib-tracking-filter-grid {
+  display: grid;
+  grid-template-columns: 160px minmax(240px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.bib-tracking-field {
+  display: grid;
+  gap: 6px;
+}
+
+.bib-tracking-label {
+  display: block;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--command-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.bib-tracking-filters__keyword {
+  min-width: 0;
+}
+
+.bib-tracking-filters__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bib-tracking-list-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.bib-tracking-list-meta,
+.bib-tracking-muted {
+  font-size: var(--font-size-sm);
+  color: var(--command-muted, #64748b);
+}
+
+.bib-tracking-table .command-table-scroll {
+  overflow-x: auto;
+}
+
+.bib-tracking-table__table {
+  min-width: 1080px;
+}
+
+.bib-tracking-table__empty {
+  padding: 18px 14px;
+  text-align: center;
+}
+
+.bib-tracking-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.bib-tracking-pagination__status {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--command-text, #0f172a);
+}
+
+.bib-tracking-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.28);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 60;
+}
+
+.bib-tracking-drawer {
+  width: min(560px, 100%);
+  height: 100%;
+  overflow-y: auto;
+  border-radius: 0;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  box-shadow: -16px 0 40px rgba(15, 23, 42, 0.16);
+}
+
+.bib-tracking-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.bib-tracking-detail-field {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(248, 250, 252, 0.88);
+}
+
+.bib-tracking-detail-field__label {
+  margin-bottom: 6px;
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  color: var(--command-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.bib-tracking-detail-field__value {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  word-break: break-all;
+  color: var(--command-text, #0f172a);
+}
+
+.bib-tracking-section {
+  display: grid;
+  gap: 12px;
+}
+
+.bib-tracking-section-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.bib-tracking-section-title {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--command-text, #0f172a);
+}
+
+.bib-tracking-section-summary,
+.bib-tracking-timeline-card__meta {
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  color: var(--command-muted, #64748b);
+}
+
+.bib-tracking-rollback-copy {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--command-text, #0f172a);
+}
+
+.bib-tracking-textarea {
+  width: 100%;
+  min-height: 88px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.98);
+  font-size: var(--font-size-md);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.bib-tracking-rollback-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.bib-tracking-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.bib-tracking-timeline-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.bib-tracking-timeline-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.bib-tracking-timeline-card__title {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--command-text, #0f172a);
+}
+
+.bib-tracking-focusable:focus-visible,
+.bib-tracking-drawer button:focus-visible,
+.bib-tracking-filters .input:focus-visible,
+.bib-tracking-filters .btn:focus-visible,
+.bib-tracking-textarea:focus-visible {
+  outline: 2px solid var(--command-accent, #b91c1c);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+
+  .bib-tracking-filter-grid,
+  .bib-tracking-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .bib-tracking-drawer {
+    width: 100%;
+  }
+
+  .bib-tracking-pagination,
+  .bib-tracking-rollback-actions {
+    justify-content: flex-start;
+  }
+}

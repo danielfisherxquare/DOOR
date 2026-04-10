@@ -7,6 +7,7 @@ function ChangePasswordPage() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
   const fetchCurrentUser = useAuthStore((state) => state.fetchCurrentUser)
+  const getDefaultLandingPath = useAuthStore((state) => state.getDefaultLandingPath)
 
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -31,7 +32,7 @@ function ChangePasswordPage() {
       const res = await authApi.changePassword({ oldPassword, newPassword })
       if (res.success) {
         await fetchCurrentUser()
-        navigate('/admin', { replace: true })
+        navigate(getDefaultLandingPath(), { replace: true })
       }
     } catch (error) {
       setMessage(error.message)
@@ -45,7 +46,7 @@ function ChangePasswordPage() {
       <div className="login-card">
         <div className="login-card__header">
           <h1 className="login-card__title">修改密码</h1>
-          <p className="login-card__subtitle">{user?.username} 需要先修改初始密码后才能继续使用系统。</p>
+          <p className="login-card__subtitle">{user?.username} 需要先修改初始密码后才能继续进入 DOOR Workspace。</p>
         </div>
         <form className="login-card__form" onSubmit={handleSubmit}>
           {message && (

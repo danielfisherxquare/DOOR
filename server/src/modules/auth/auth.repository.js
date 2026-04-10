@@ -142,3 +142,35 @@ export async function cleanExpiredTokens() {
         .delete();
 }
 
+// ── Password Reset Token ─────────────────────────────
+
+export async function createPasswordResetToken(userId, tokenHash, expiresAt) {
+    const [row] = await knex('password_reset_tokens')
+        .insert({
+            user_id: userId,
+            token_hash: tokenHash,
+            expires_at: expiresAt,
+        })
+        .returning('*');
+    return row;
+}
+
+export async function findPasswordResetToken(tokenHash) {
+    return knex('password_reset_tokens')
+        .where({ token_hash: tokenHash })
+        .where('expires_at', '>', new Date())
+        .first();
+}
+
+export async function deletePasswordResetToken(tokenHash) {
+    return knex('password_reset_tokens')
+        .where({ token_hash: tokenHash })
+        .delete();
+}
+
+export async function deleteUserPasswordResetTokens(userId) {
+    return knex('password_reset_tokens')
+        .where({ user_id: userId })
+        .delete();
+}
+

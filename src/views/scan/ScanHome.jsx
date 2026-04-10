@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BrowserQRCodeReader } from '@zxing/browser'
+import { CommandNotice, CommandPanel } from '../../components/command/CommandPrimitives'
 
 function extractToken(rawText) {
   const text = String(rawText || '').trim()
@@ -13,11 +14,7 @@ function extractToken(rawText) {
   }
 }
 
-/**
- * 检测摄像头环境可用性
- */
 function detectCameraSupport() {
-  // window.isSecureContext: HTTPS 或 localhost 时为 true
   if (typeof window !== 'undefined' && !window.isSecureContext) {
     return '当前页面不是 HTTPS，浏览器禁止使用摄像头。请使用 https:// 开头的地址访问。'
   }
@@ -27,24 +24,21 @@ function detectCameraSupport() {
   return null
 }
 
-/**
- * 根据错误对象返回用户友好的中文提示
- */
 function getCameraErrorMessage(err) {
   const name = err?.name || ''
   const msg = err?.message || ''
 
   if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-    return '摄像头权限被拒绝。请点击浏览器地址栏的锁头/设置图标，允许摄像头权限后刷新页面重试。'
+    return '摄像头权限被拒绝。请点击浏览器地址栏的锁头或设置图标，允许摄像头权限后刷新页面重试。'
   }
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
     return '未检测到摄像头设备。请确认设备带有摄像头。'
   }
   if (name === 'NotReadableError' || name === 'TrackStartError') {
-    return '摄像头被其它应用占用或无法读取，请关闭其它使用摄像头的应用后重试。'
+    return '摄像头被其他应用占用或无法读取，请关闭其他使用摄像头的应用后重试。'
   }
   if (name === 'OverconstrainedError') {
-    return '当前摄像头不满足要求，正在尝试使用默认摄像头...'
+    return '当前摄像头不满足要求，系统正在尝试使用默认摄像头。'
   }
   if (name === 'AbortError') {
     return '摄像头启动被中止，请重试。'
@@ -52,16 +46,22 @@ function getCameraErrorMessage(err) {
   if (name === 'SecurityError') {
     return '浏览器安全策略阻止了摄像头访问。请确保使用 HTTPS 并允许摄像头权限。'
   }
-  // TypeError 通常意味着 getUserMedia 不可用
   if (name === 'TypeError') {
     return '浏览器不支持摄像头 API。请使用 Chrome 或 Safari 浏览器。'
   }
   return `无法打开摄像头：${msg || name || '未知错误'}`
 }
 
+function CameraGlyph() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  )
+}
+
 function ScanHome() {
-  // ⚠️ 关键：video 元素始终保持在 DOM 中，不做条件渲染
-  //    避免 React 重新渲染时销毁/重建 video 节点导致 @zxing 引用失效
   const videoRef = useRef(null)
   const readerRef = useRef(null)
   const controlsRef = useRef(null)
@@ -71,27 +71,22 @@ function ScanHome() {
   const [searchParams] = useSearchParams()
   const [manualToken, setManualToken] = useState(searchParams.get('t') || '')
   const [cameraError, setCameraError] = useState('')
-  // idle | requesting | scanning | error
   const [cameraState, setCameraState] = useState('idle')
 
-  // 如果 URL 中自带 token，直接跳转结果页
   useEffect(() => {
     const preset = searchParams.get('t')
     if (preset) {
-      navigate(`/scan/result?t=${encodeURIComponent(preset)}`, { replace: true })
+      navigate(`/ops/scan/result?t=${encodeURIComponent(preset)}`, { replace: true })
       return
     }
     scanningRef.current = false
   }, [navigate, searchParams])
 
-  // 清理：组件卸载时停止扫码
-  useEffect(() => {
-    return () => {
-      controlsRef.current?.stop()
-      readerRef.current = null
-      controlsRef.current = null
-      scanningRef.current = false
-    }
+  useEffect(() => () => {
+    controlsRef.current?.stop()
+    readerRef.current = null
+    controlsRef.current = null
+    scanningRef.current = false
   }, [])
 
   const stopScanning = useCallback(() => {
@@ -117,11 +112,10 @@ function ScanHome() {
     controlsRef.current?.stop()
     controlsRef.current = null
     readerRef.current = null
-    navigate(`/scan/result?t=${encodeURIComponent(token)}`)
+    navigate(`/ops/scan/result?t=${encodeURIComponent(token)}`)
   }, [navigate])
 
   const startScanning = useCallback(async () => {
-    // 环境检测
     const envError = detectCameraSupport()
     if (envError) {
       setCameraState('error')
@@ -134,22 +128,18 @@ function ScanHome() {
     scanningRef.current = false
 
     try {
-      // @zxing/browser 内部会自己调用 getUserMedia，
-      // 所以直接让它来处理，不需要预先请求再释放。
-      // 将 videoRef.current 传给 reader，它会绑定 srcObject。
       const reader = new BrowserQRCodeReader()
       readerRef.current = reader
 
       const controls = await reader.decodeFromVideoDevice(
-        undefined,           // deviceId: undefined = 让库自己选择（优先后置摄像头）
-        videoRef.current,    // 已经挂载好的 video 元素
+        undefined,
+        videoRef.current,
         (result) => {
           if (result && !scanningRef.current) {
             const token = extractToken(result.getText())
             handleDetectedToken(token)
           }
-          // NotFoundException 是正常的"当前帧未识别到二维码"，忽略即可
-        }
+        },
       )
 
       controlsRef.current = controls
@@ -157,12 +147,10 @@ function ScanHome() {
     } catch (err) {
       console.error('[ScanHome] 摄像头启动失败:', err)
 
-      // 如果是 OverconstrainedError，尝试不指定 facingMode 的降级方案
       if (err?.name === 'OverconstrainedError') {
         try {
           const reader = new BrowserQRCodeReader()
           readerRef.current = reader
-          // 降级：不指定任何约束，使用默认摄像头
           const stream = await navigator.mediaDevices.getUserMedia({ video: true })
           const controls = await reader.decodeFromStream(stream, videoRef.current, (result) => {
             if (result && !scanningRef.current) {
@@ -190,100 +178,87 @@ function ScanHome() {
     event.preventDefault()
     const token = extractToken(manualToken)
     if (!token) return
-    navigate(`/scan/result?t=${encodeURIComponent(token)}`)
+    navigate(`/ops/scan/result?t=${encodeURIComponent(token)}`)
   }
 
   const isVideoVisible = cameraState === 'scanning'
 
   return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <div style={{ background: '#fff', borderRadius: 24, padding: 16, boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div style={{ fontWeight: 700 }}>扫码区</div>
-          {cameraState === 'scanning' && (
-            <button className="btn btn--ghost" onClick={stopScanning} style={{ fontSize: 13, padding: '4px 12px' }}>
-              停止扫码
-            </button>
-          )}
-        </div>
-        <div style={{
-          borderRadius: 20,
-          overflow: 'hidden',
-          background: '#0F172A',
-          aspectRatio: '3 / 4',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative'
-        }}>
-          {/* ⚠️ video 元素始终存在于 DOM 中，通过 CSS 控制显隐 */}
-          <video
-            ref={videoRef}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              display: isVideoVisible ? 'block' : 'none'
-            }}
-            muted
-            playsInline
-            autoPlay
-          />
+    <div className="command-page surface-ops">
+      <CommandNotice tone="info">
+        扫码页已经切换到执行指挥台语法。摄像头区、权限提示、失败重试和手动输入共用同一层级，不再使用旧版白卡和 emoji 状态块。
+      </CommandNotice>
 
-          {/* 非扫码状态的覆盖层 */}
-          {!isVideoVisible && (
-            <div style={{ textAlign: 'center', padding: 24, color: '#94A3B8' }}>
-              {cameraState === 'idle' && (
-                <>
-                  <div style={{ fontSize: 48, marginBottom: 16 }}>📷</div>
-                  <div style={{ marginBottom: 16, fontSize: 14 }}>点击下方按钮开始扫码</div>
-                  <button
-                    className="btn btn--primary"
-                    onClick={startScanning}
-                    style={{ fontSize: 16, padding: '12px 32px' }}
-                  >
-                    开始扫码
-                  </button>
-                </>
-              )}
-              {cameraState === 'requesting' && (
-                <>
-                  <div style={{ fontSize: 36, marginBottom: 16, animation: 'pulse 1.5s infinite' }}>📷</div>
-                  <div style={{ fontSize: 14 }}>正在请求摄像头权限...</div>
-                  <div style={{ fontSize: 12, marginTop: 8, opacity: 0.7 }}>请在浏览器弹窗中点击"允许"</div>
-                </>
-              )}
-              {cameraState === 'error' && (
-                <>
-                  <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-                  <div style={{ color: '#FCA5A5', fontSize: 13, marginBottom: 16, lineHeight: 1.6, maxWidth: 280, margin: '0 auto 16px' }}>
-                    {cameraError}
+      <CommandPanel
+        title="扫码采集区"
+        subtitle="优先使用摄像头完成二维码采集；如果设备权限受限，可以直接切换到下方手动输入。"
+        actions={cameraState === 'scanning' ? (
+          <button className="btn btn--ghost" onClick={stopScanning}>
+            停止扫码
+          </button>
+        ) : null}
+      >
+        <div className="command-scanner">
+          <div className="command-scanner__stage">
+            <video
+              ref={videoRef}
+              className={`command-scanner__video ${isVideoVisible ? '' : 'command-scanner__video--hidden'}`.trim()}
+              muted
+              playsInline
+              autoPlay
+            />
+
+            {!isVideoVisible ? (
+              <div className="command-scanner__overlay">
+                {cameraState === 'idle' ? (
+                  <div className="command-scanner__overlay-content">
+                    <span className="command-scanner__glyph" aria-hidden="true"><CameraGlyph /></span>
+                    <p className="command-scanner__headline">准备启动摄像头</p>
+                    <p className="command-scanner__description">请保持二维码完整入镜，系统会自动识别并跳转到结果页。</p>
+                    <button className="btn btn--primary" onClick={startScanning}>开始扫码</button>
                   </div>
-                  <button
-                    className="btn btn--ghost"
-                    onClick={startScanning}
-                    style={{ fontSize: 14, color: '#94A3B8', borderColor: '#475569' }}
-                  >
-                    重试
-                  </button>
-                </>
-              )}
-            </div>
-          )}
+                ) : null}
+
+                {cameraState === 'requesting' ? (
+                  <div className="command-scanner__overlay-content">
+                    <span className="command-scanner__glyph" aria-hidden="true"><CameraGlyph /></span>
+                    <span className="command-progress-pill">正在请求摄像头权限</span>
+                    <p className="command-scanner__description">请在浏览器权限弹窗中允许摄像头访问，允许后会自动进入识别状态。</p>
+                    <p className="command-scanner__helper">建议使用 HTTPS 或 localhost 环境打开当前页面。</p>
+                  </div>
+                ) : null}
+
+                {cameraState === 'error' ? (
+                  <div className="command-scanner__overlay-content">
+                    <span className="command-scanner__glyph" aria-hidden="true"><CameraGlyph /></span>
+                    <p className="command-scanner__headline">摄像头不可用</p>
+                    <p className="command-scanner__description command-scanner__description--danger">{cameraError}</p>
+                    <button className="btn btn--ghost" onClick={startScanning}>重新尝试</button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+
+          {cameraState === 'scanning' ? (
+            <CommandNotice tone="success">摄像头已启动，识别到二维码后会自动跳转到结果页。</CommandNotice>
+          ) : null}
         </div>
+      </CommandPanel>
 
-      </div>
-
-      <form onSubmit={handleManualSubmit} style={{ background: '#fff', borderRadius: 24, padding: 16, boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)', display: 'grid', gap: 12 }}>
-        <div style={{ fontWeight: 700 }}>手动输入</div>
-        <input
-          className="input"
-          placeholder="粘贴二维码链接或 token"
-          value={manualToken}
-          onChange={(event) => setManualToken(event.target.value)}
-        />
-        <button className="btn btn--primary" type="submit">查询状态</button>
-      </form>
+      <CommandPanel title="手动输入" subtitle="粘贴二维码链接或 token，用于无摄像头、权限受限或远程协助场景。">
+        <form onSubmit={handleManualSubmit} className="command-stack">
+          <input
+            className="input"
+            placeholder="粘贴二维码链接或 token"
+            value={manualToken}
+            onChange={(event) => setManualToken(event.target.value)}
+          />
+          <div className="command-actions-row">
+            <button className="btn btn--primary" type="submit">查询状态</button>
+          </div>
+        </form>
+      </CommandPanel>
     </div>
   )
 }

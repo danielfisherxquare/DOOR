@@ -8,7 +8,7 @@ const router = Router();
 const READ_SCOPES = new Set(['effective', 'user', 'org']);
 const WRITE_SCOPES = new Set(['user', 'org']);
 
-router.use(requireRoles('org_admin', 'super_admin', 'race_editor'));
+router.use(requireRoles('org_admin', 'super_admin', 'race_admin'));
 
 function badRequest(message) {
     return Object.assign(new Error(message), { status: 400, expose: true });
@@ -46,16 +46,27 @@ async function resolveOrgId(req) {
     if (orgId) return orgId;
 
     if (role !== 'super_admin') {
-        throw badRequest('Current account is missing an organization context');
+        const err = new Error('当前账户缺少机构上下文，请联系管理员分配机构');
+        err.status = 400;
+        err.expose = true;
+        throw err;
     }
 
     const explicitOrgId = req.query.orgId || req.body?.orgId;
     if (!explicitOrgId) {
-        throw badRequest('super_admin requests require orgId');
+        const err = new Error('超级管理员需要指定 orgId 参数');
+        err.status = 400;
+        err.expose = true;
+        throw err;
     }
 
     const org = await knex('organizations').where({ id: explicitOrgId }).first('id');
-    if (!org) throw notFound('Target organization not found');
+    if (!org) {
+        const err = new Error('目标机构不存在');
+        err.status = 404;
+        err.expose = true;
+        throw err;
+    }
     return explicitOrgId;
 }
 

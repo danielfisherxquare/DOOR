@@ -1,0 +1,240 @@
+/**
+ * TileNetworkMonitor.css
+ * 瓦片网络监控样式
+ */
+
+/* 折叠状态 */
+.tile-monitor-collapsed {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s;
+  z-index: 900;
+}
+
+.tile-monitor-collapsed:hover {
+  background: var(--surface-hover);
+}
+
+.monitor-icon {
+  font-size: 16px;
+}
+
+.active-indicator {
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.ready-indicator {
+  color: #10b981;
+  font-size: 12px;
+}
+
+.hit-rate-mini {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 展开状态 */
+.tile-monitor {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  width: 260px;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 900;
+  overflow: hidden;
+}
+
+.tile-monitor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tile-monitor-header h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.collapse-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.collapse-btn:hover {
+  background: var(--accent);
+}
+
+/* 统计数据 */
+.tile-monitor-stats {
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.tile-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tile-stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.tile-stat-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tile-stat-value.cache {
+  color: #10b981;
+}
+
+.tile-stat-value.network {
+  color: var(--info);
+}
+
+.tile-stat-value.rate {
+  color: var(--accent);
+}
+
+.tile-stat-value.active {
+  color: var(--warning);
+}
+
+.tile-stat-value.error {
+  color: var(--danger);
+}
+
+/* 命中率进度条 */
+.hit-rate-bar {
+  margin: 0 16px 12px;
+  height: 4px;
+  background: var(--surface-hover);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.hit-rate-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, var(--accent));
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+/* 历史记录切换 */
+.history-toggle {
+  width: 100%;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.history-toggle:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+/* 历史记录列表 */
+.tile-monitor-history {
+  max-height: 200px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+  padding: 8px 0;
+}
+
+.tile-event-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  font-size: 11px;
+  transition: background 0.2s;
+}
+
+.tile-event-row:hover {
+  background: var(--surface-hover);
+}
+
+.tile-event-row.cache {
+  color: #10b981;
+}
+
+.tile-event-row.network {
+  color: var(--info);
+}
+
+.tile-event-row.error {
+  color: var(--danger);
+}
+
+.event-icon {
+  font-size: 8px;
+}
+
+.event-coords {
+  flex: 1;
+  font-family: monospace;
+}
+
+.event-duration {
+  color: var(--text-secondary);
+}
+
+.event-time {
+  color: var(--text-secondary);
+}
+
+.no-events {
+  text-align: center;
+  padding: 16px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* 重置按钮 */
+.reset-btn {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-btn:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
+}

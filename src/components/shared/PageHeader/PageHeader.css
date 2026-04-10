@@ -1,0 +1,55 @@
+/* ========================================
+   PageHeader 页面标题区样式
+   ======================================== */
+
+.page-header {
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.page-header__main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.page-header__eyebrow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-header__kicker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 4px 8px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+}
+
+.page-header__role-pill {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  padding: 4px 8px;
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+}
+
+.page-header__title {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 4px 0;
+}
+
+.page-header__summary {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}

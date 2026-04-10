@@ -1,53 +1,410 @@
-# DOOR 系统 README
+# DOOR 系统部署指南
 
-本仓库中与 DOOR 相关的主要目录：
+DOOR 是一个赛事运营管理平台，包含前端（Vite + React）和后端（Express.js + PostgreSQL）。
 
-- `door/`：门户前端（Vite + React）
-- `door/server/`：后端 API（Express + PostgreSQL + Knex）
-- `tool/`：本地数据管理工具（Vite + Electron）
+---
 
-## 端口基线
+## 目录
+
+- [环境要求](#环境要求)
+- [本地测试环境](#本地测试环境)
+- [远程生产部署](#远程生产部署)
+- [常用操作](#常用操作)
+- [故障排查](#故障排查)
+
+---
+
+## 环境要求
+
+| 组件 | 版本要求 |
+|------|----------|
+| Node.js | >= 18.x |
+| npm | >= 9.x |
+| PostgreSQL | >= 14.x (本地开发可选，可用 Docker) |
+| Docker | >= 24.x (推荐) |
+| Docker Compose | >= 2.x |
+
+---
+
+## 本地测试环境
+
+### 目录职责与启动边界
+
+`door/` 和 `door/server/` 不是同一个运行根目录，命令不能混用：
+
+| 目录 | 职责 | 只应在这里执行的命令 |
+|------|------|----------------------|
+| `door/` | 前端工程（Vite + React） | `npm run dev`、`npm run build` |
+| `door/server/` | 后端工程（Express + Worker + Docker Compose） | `npm run dev`、`npm run worker`、`npm run migrate`、`docker compose ...` |
+
+> [!IMPORTANT]
+> - `npm run dev` 在 `door/` 中启动的是前端 Vite 开发服务，默认端口 `5173`
+> - `npm run dev` 在 `door/server/` 中启动的是后端 API 服务，默认端口 `3001`
+> - `npm run worker` 只能在 `door/server/` 中执行
+> - `docker compose` 只能在 `door/server/` 中执行，因为 compose 文件在这里
+
+### 前端本地 API 配置
+
+前端开发时，推荐使用 `door/.env.local` 覆盖 API 地址，让本地页面通过 Vite 代理访问本地后端：
+
+```env
+VITE_API_BASE_URL=/api
+```
+
+说明：
+
+- `door/.env` 可以保留云端或正式环境地址
+- `door/.env.local` 只用于本地开发，优先级更高
+- 如果把 `VITE_API_BASE_URL` 写成线上地址，例如 `https://xquareliu.com/api`，那么本地前端会直接请求线上接口，不会走本地 `5173 -> 3001` 代理
+- 因此做本地联调时，应优先检查 `door/.env.local` 是否为 `/api`
+
+### Docker 镜像与容器命名
+
+为避免不同项目/环境的 Docker 资源冲突，所有镜像和容器均使用 `door-` 前缀：
+
+| 服务 | 镜像名称 | 容器名称 |
+|------|----------|----------|
+| PostgreSQL | `postgres:16-alpine` (公共镜像) | `door-postgres` |
+| Redis | `redis:7-alpine` (公共镜像) | `door-redis` |
+| API 服务 | `door-server-app:latest` (本地构建) | `door-app` |
+| Worker | `door-server-app:latest` (复用) | `door-worker` |
+| Nginx | `nginx:alpine` (公共镜像) | `door-nginx` |
+
+> [!IMPORTANT]
+> `app` 和 `worker` 共用同一个镜像 `door-server-app:latest`，仅启动命令不同。
+
+### 本地环境配置文件
+
+本地测试环境使用以下配置文件自动适配：
+
+| 文件 | 用途 |
+|------|------|
+| `docker-compose.yml` | 基础配置（生产/本地共用） |
+| `docker-compose.override.yml` | 本地环境覆盖配置（自动合并） |
+| `nginx.local.conf` | 本地 HTTP 配置（无 SSL） |
+| `nginx.conf` | 生产 HTTPS 配置 |
+
+> [!NOTE]
+> `docker-compose.override.yml` 会在执行 `docker compose` 命令时自动与 `docker-compose.yml` 合并。
+> 生产部署时删除或重命名此文件即可使用 HTTPS 配置。
+
+### 端口说明
 
 | 服务 | 默认端口 | 说明 |
 |---|---:|---|
 | DOOR 后端 API | `3001` | `http://localhost:3001/api/...` |
 | DOOR 前端 dev | `5173` | Vite dev server，`/api` 代理到 `3001` |
-| TOOL 前端 dev | `5174` | Vite dev server，`/api` 代理到 `3001` |
-| Nginx 网关 | `80` / `443` | Docker 部署入口，HTTP→HTTPS 重定向，`/api` 反代到 `app:3001` |
 | PostgreSQL | `5432` | Docker 映射 `5432:5432` |
+| Nginx 网关 | `80` | 本地 HTTP 入口 |
 
-## 云端部署配置
+---
+
+### 方式一：Docker Compose（推荐）
+
+适合一键拉起完整环境，包括数据库、缓存、后端服务。
+
+#### 0. 前置条件
+
+- **Docker Desktop** 已启动并完全就绪（系统托盘图标稳定显示）
+- 如有其他 Node 进程占用文件，先关闭后再执行
+
+```bash
+# 检查 Docker 是否就绪
+docker info
+```
+
+#### 1. 进入后端目录
+
+```bash
+cd door/server
+```
+
+#### 2. 配置环境变量
+
+```bash
+cp .env.example .env
+```
+
+本地测试环境可使用默认值：
+
+```env
+POSTGRES_PASSWORD=door_dev
+JWT_SECRET=dev_secret
+NODE_ENV=development
+PUBLIC_BASE_URL=http://localhost
+```
+
+#### 3. 构建前端
+
+```bash
+# 回到项目根目录
+cd ..
+
+# 安装依赖（如有锁定错误，先关闭其他 Node 进程）
+npm ci
+
+# 构建生产版本
+npm run build
+
+# 返回后端目录
+cd server
+```
+
+#### 4. 启动所有服务
+
+```bash
+docker compose up -d --build
+```
+
+启动后的容器：
+- `door-postgres` - PostgreSQL 数据库 (端口 5432)
+- `door-redis` - Redis 缓存
+- `door-app` - API 服务 (端口 3001)
+- `door-worker` - 后台任务处理
+- `door-nginx` - 反向代理 (端口 80)
+
+#### 5. 执行数据库迁移
+
+```bash
+docker compose exec app npm run migrate
+```
+
+#### 6. 初始化超级管理员
+
+```bash
+docker compose exec app node scripts/seed-super-admin.js
+# 默认账号: Xquareliu / lk930813
+```
+
+> [!IMPORTANT]
+> 超级管理员账号不是只看 `.env` 就会自动生效，`users` 表中的实际登录账号以最近一次执行 `scripts/seed-super-admin.js` 的结果为准。
+> 如果你修改了 `door/server/.env` 里的 `SUPER_ADMIN_USERNAME`、`SUPER_ADMIN_EMAIL` 或 `SUPER_ADMIN_PASSWORD`，需要重新执行一次 seed，数据库里的超管账号和密码才会同步更新。
+
+#### 7. 访问应用
+
+- 前端页面：http://localhost
+- API 服务：http://localhost/api
+- 健康检查：http://localhost/api/health/ready
+
+---
+
+### 方式二：本地开发模式（前后端分离）
+
+适合开发调试，支持热重载。
+
+#### 1. 启动后端服务
+
+```bash
+cd door/server
+
+# 安装依赖
+npm ci
+
+# 配置环境变量
+cp .env.example .env
+
+# 需要本地 PostgreSQL 或修改 .env 指向远程数据库
+# DATABASE_URL=postgres://door:door_dev@localhost:5432/door
+
+# 执行迁移
+npm run migrate
+
+# 如果修改过 SUPER_ADMIN_*，同步更新本地超管账号
+node --env-file-if-exists=.env scripts/seed-super-admin.js
+
+# 启动开发服务（支持热重载）
+npm run dev
+```
+
+后端运行在 http://localhost:3001
+
+#### 2. 启动前端开发服务（新终端）
+
+```bash
+cd door
+
+# 安装依赖
+npm ci
+
+# 建议在 door/.env.local 中使用本地代理
+# VITE_API_BASE_URL=/api
+
+# 启动 Vite 开发服务
+npm run dev
+```
+
+前端运行在 http://localhost:5173
+
+#### 3. 启动 Worker（第三个终端，建议同时开启）
+
+```bash
+cd door/server
+
+# 启动后台任务处理
+npm run worker
+```
+
+Worker 用于处理导入提交、清洗流水线、抽签等后台任务。本地联调这些功能时建议始终保持开启。
+
+#### 4. 访问应用
+
+- 前端页面：http://localhost:5173
+- API 代理：Vite 会自动代理 `/api` 到 `http://localhost:3001`
+
+#### 5. 本地开发推荐启动顺序
+
+```bash
+# 终端 1：后端 API
+cd door/server
+npm run dev
+
+# 终端 2：Worker
+cd door/server
+npm run worker
+
+# 终端 3：前端
+cd door
+npm run dev
+```
+
+如果页面能打开但登录、导入、抽签、排号等功能仍然异常，优先检查：
+
+1. 前端是否真的从 `door/` 启动
+2. 后端和 Worker 是否真的从 `door/server/` 启动
+3. `door/.env.local` 是否使用了 `VITE_API_BASE_URL=/api`
+4. 本地后端健康检查是否正常：`http://localhost:3001/api/health/ready`
+
+---
+
+### 仅启动数据库（用于本地开发）
+
+如果只想用 Docker 管理数据库，后端跑在本地：
+
+```bash
+cd door/server
+
+# 仅启动 postgres 和 redis
+docker compose up -d postgres redis
+
+# 本地连接数据库
+# DATABASE_URL=postgres://door:door_dev@localhost:5432/door
+```
+
+---
+
+### 本地开发常用地址
+
+| 环境 | 地址 |
+|------|------|
+| DOOR（dev） | `http://localhost:5173` |
+| API（直连） | `http://localhost:3001` |
+| 网关（Docker） | `http://localhost` |
+
+---
+
+## 远程生产部署
+
+### 云端部署配置
 
 DOOR 部署在云服务器（阿里云），使用 HTTPS 对外服务。
 
 - 主入口（域名）：`https://www.xquareliu.com` / `https://xquareliu.com`
 - IP 入口：`http://47.251.107.41`（自动跳转到 HTTPS）
 
-> [!IMPORTANT]
-> **以下配置必须保持一致，任何端口或域名变更时需同步更新所有位置。**
+---
 
-### 1. 后端环境变量（`door/server/.env`）
+### 1. 服务器准备
+
+确保服务器已安装：
+- Docker >= 24.x
+- Docker Compose >= 2.x
+- Git
+
+```bash
+# 克隆代码
+git clone <repository-url> door
+cd door/server
+```
+
+---
+
+### 2. 配置生产环境变量
+
+```bash
+cp .env.example .env
+```
+
+编辑 `.env`，填写生产配置：
 
 ```env
+# 数据库密码（必须修改）
+POSTGRES_PASSWORD=your_secure_password_here
+
+# JWT 密钥（必须修改，建议 32 位以上随机字符串）
+JWT_SECRET=your_jwt_secret_here
+
+# 运行环境
 NODE_ENV=production
 PORT=3001
+
+# 公网访问地址
 PUBLIC_BASE_URL=https://www.xquareliu.com
+
+# CORS 允许的域名（逗号分隔，不要带端口号）
 CORS_ORIGIN=https://www.xquareliu.com,https://xquareliu.com,http://47.251.107.41
+
+# 禁止公开注册
+DISABLE_REGISTRATION=true
+
+# 备份目录配置
+HOST_BACKUP_DIR=/var/backups/door
+BACKUP_DIR=/backups
+BACKUP_RETENTION_COUNT=10
+RESTORE_UPLOAD_DIR=/backups/uploads
+
+# Redis 连接
+REDIS_URL=redis://redis:6379
+
+# 可选：DashScope API（报告生成）
+DASHSCOPE_API_KEY=your_dashscope_api_key
+DASHSCOPE_BASE_URL=https://coding.dashscope.aliyuncs.com/v1
 ```
 
 > [!CAUTION]
 > **CORS_ORIGIN 中的域名不要带端口号**（80 端口在 HTTP 中是默认的，浏览器 origin 不会包含 `:80`）。
 > 错误示例：`http://www.xquareliu.com:8080` ← 会导致浏览器报 Network Error。
 
-### 2. 前端环境变量（`door/.env`，构建时使用）
+---
 
-```env
-VITE_API_BASE_URL=https://www.xquareliu.com/api
+### 3. 初始化备份目录
+
+```bash
+sudo mkdir -p /var/backups/door/uploads
+sudo chown -R 1000:1000 /var/backups/door
 ```
 
-> 如果不设置此变量，前端代码会 fallback 到 `/api`（相对路径），在同域部署时也能正常工作。
+---
 
-### 3. Nginx 网关（`door/server/nginx.conf`）
+### 4. 配置 SSL 证书
+
+证书文件存放在服务器 `/etc/nginx/ssl/` 目录：
+- `xquareliu.com.pem` — 证书文件
+- `xquareliu.com.key` — 私钥文件
+
+```bash
+sudo mkdir -p /etc/nginx/ssl
+sudo cp your-cert.pem /etc/nginx/ssl/xquareliu.com.pem
+sudo cp your-key.pem /etc/nginx/ssl/xquareliu.com.key
+```
+
+> [!NOTE]
+> 阿里云免费证书有效期 1 年，到期前需在控制台重新申请并替换文件。
+
+---
+
+### 5. Nginx 网关配置
+
+`door/server/nginx.conf` 关键配置：
 
 ```nginx
 # HTTP → HTTPS 301 重定向
@@ -61,7 +418,7 @@ ssl_certificate     /etc/nginx/ssl/xquareliu.com.pem;
 ssl_certificate_key /etc/nginx/ssl/xquareliu.com.key;
 ```
 
-### 4. Docker 端口映射（`door/server/docker-compose.yml`）
+Docker 端口映射（`docker-compose.yml`）：
 
 ```yaml
 nginx:
@@ -69,28 +426,20 @@ nginx:
     - "80:80"
     - "443:443"
   volumes:
+    - ../dist:/usr/share/nginx/html:ro
     - /etc/nginx/ssl:/etc/nginx/ssl:ro
 ```
 
-### 5. SSL 证书（阿里云免费证书）
-
-证书文件存放在服务器 `/etc/nginx/ssl/` 目录：
-- `xquareliu.com.pem` — 证书文件
-- `xquareliu.com.key` — 私钥文件
-
-> [!NOTE]
-> 阿里云免费证书有效期 1 年，到期前需在控制台重新申请并替换文件。
-
 ---
 
-## 首次部署（从零开始）
-
-在 `door/server/` 目录执行：
+### 6. 首次部署流程
 
 ```bash
-# 1. 复制环境变量模板并编辑
+cd door/server
+
+# 1. 配置环境变量
 cp .env.example .env
-# 编辑 .env：设置 POSTGRES_PASSWORD、JWT_SECRET 等
+# 编辑 .env 设置密码等
 
 # 2. 构建前端（在 door/ 目录）
 cd ..
@@ -106,23 +455,18 @@ docker compose exec app npm run migrate
 
 # 5. 创建超级管理员
 docker compose exec app node scripts/seed-super-admin.js
-# 默认账号: Xquareliu / lk930813（可通过环境变量覆盖）
 ```
 
 健康检查：
 
 ```bash
-curl -i http://127.0.0.1/api/health/ready
+curl https://www.xquareliu.com/api/health/ready
 # 期望: {"status":"ok","database":"connected"}
 ```
 
 ---
 
-## 更新与发布（生产环境）
-
-代码更新后，需要在云端执行以下步骤：
-
-### Docker 部署（推荐）
+### 7. 生产更新流程
 
 ```bash
 cd door/server
@@ -142,16 +486,70 @@ docker compose up -d --build
 # 4. 执行数据库迁移（如有新迁移文件）
 docker compose exec app npm run migrate
 
-# 5.（可选）更新超管凭证
-docker compose exec app node scripts/seed-super-admin.js
+# 5. 验证
+curl https://www.xquareliu.com/api/health/ready
 ```
 
-> [!WARNING]
-> **单页应用 (SPA) 路由 Fallback**
->
-> 前端使用 React Router (BrowserRouter)，打包产物只有一个 `index.html`。
-> 必须在 Nginx 中配置 `try_files $uri $uri/ /index.html`，否则深层链接（如 `/scan`、`/admin`）会 404。
-> 当前 `nginx.conf` 已包含此配置。
+---
+
+### 8. 配置自动备份（可选）
+
+在服务器 crontab 中添加：
+
+```bash
+sudo crontab -e
+```
+
+```cron
+# 每天凌晨 3:30 自动备份
+30 3 * * * cd /path/to/door/server && docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger cron >> /var/log/door-backup.log 2>&1
+```
+
+---
+
+## 常用操作
+
+### 查看服务状态
+
+```bash
+# 使用 docker compose（推荐）
+docker compose ps
+docker compose logs -f app
+
+# 或直接使用容器名
+docker ps --filter "name=door-"
+docker logs -f door-app
+```
+
+### 进入容器调试
+
+```bash
+# 使用 docker compose
+docker compose exec app sh
+docker compose exec postgres psql -U door -d door
+
+# 或直接使用容器名
+docker exec -it door-app sh
+docker exec -it door-postgres psql -U door -d door
+```
+
+### 手动备份数据库
+
+```bash
+docker compose exec app bash scripts/run-postgres-backup.sh --trigger manual
+```
+
+### 重启服务
+
+```bash
+# 使用 docker compose
+docker compose restart app
+docker compose restart nginx
+
+# 或直接使用容器名
+docker restart door-app
+docker restart door-nginx
+```
 
 ### 仅重启服务（不重新构建）
 
@@ -160,16 +558,157 @@ docker compose exec app node scripts/seed-super-admin.js
 docker compose restart app worker
 ```
 
-### 手动部署（非 Docker）
+### 停止所有服务
 
 ```bash
-# 前端
-cd door && npm ci && npm run build
-# 将 dist/ 上传到服务器供 Nginx 托管
+docker compose down
+```
 
-# 后端
-cd door/server && npm ci && npm run migrate
-pm2 restart door-api
+---
+
+## 故障排查
+
+### 1. 数据库连接失败 `ECONNREFUSED`
+
+**原因：** PostgreSQL 未启动或端口不对。
+
+**解决：**
+```bash
+# 检查 postgres 容器状态
+docker compose ps postgres
+
+# 重启 postgres
+docker compose restart postgres
+```
+
+### 2. 迁移失败 `relation "xxx" does not exist`
+
+**原因：** 数据库迁移未执行。
+
+**解决：**
+```bash
+docker compose exec app npm run migrate
+```
+
+### 3. 前端页面空白或 404
+
+**原因：** 前端未构建或 dist 目录为空。
+
+**解决：**
+```bash
+cd door
+npm run build
+# 确保 dist 目录存在且有内容
+ls -la dist/
+```
+
+### 4. 登录报 Network Error
+
+**原因：** CORS 配置不正确。
+
+**解决：** 检查 `.env` 中 `CORS_ORIGIN` 是否正确（不要带端口号）。
+
+### 5. 深层链接 404（如 `/app`、`/admin`）
+
+**原因：** Nginx 未配置 SPA fallback。
+
+**解决：** 确保 `nginx.conf` 包含 `try_files $uri $uri/ /index.html`。
+
+### 6. 忘记管理员密码
+
+**解决：** 重新运行超级管理员初始化脚本：
+
+```bash
+docker compose exec \
+  -e SUPER_ADMIN_PASSWORD="new_password" \
+  -e SUPER_ADMIN_USERNAME="your_admin" \
+  -e SUPER_ADMIN_EMAIL="admin@your-domain.com" \
+  app node scripts/seed-super-admin.js
+```
+
+### 7. Docker 命令报 `failed to connect to the docker API`
+
+**原因：** Docker Desktop 未完全启动。
+
+**解决：**
+1. 确保 Docker Desktop 已启动（系统托盘图标稳定显示）
+2. 等待几秒后重试
+3. 验证：`docker info` 能正常输出
+
+### 8. npm ci 报 `EPERM: operation not permitted`
+
+**原因：** 其他 Node 进程占用文件。
+
+**解决：**
+```bash
+# 关闭所有 Node 进程
+taskkill //F //IM node.exe
+
+# 重新安装
+npm ci
+```
+
+### 9. nginx 容器启动后立即退出
+
+**原因：** 本地环境没有 SSL 证书，但使用了生产配置。
+
+**解决：** 确保 `docker-compose.override.yml` 文件存在，它会自动使用 `nginx.local.conf`（HTTP 配置）。
+
+```bash
+# 检查文件是否存在
+ls docker-compose.override.yml nginx.local.conf
+
+# 重新启动 nginx
+docker compose up -d nginx
+```
+
+---
+
+## 四层入口
+
+DOOR 采用 `public + app + ops + admin` 四层入口。
+
+| 入口层 | 路径 | 说明 |
+|------|------|------|
+| 公开层 | `/login`、`/forgot-password`、`/reset-password/:token`、`/download` | 登录、下载中心 |
+| 应用层 | `/app`、`/app/reimbursements`、`/app/settings` | 个人工作台、我的报销、我的设置 |
+| 执行端 | `/ops`、`/ops/scan`、`/ops/bibs/pickup` | 扫码、发放、号牌领取 |
+| 后台 | `/admin/*` | 组织治理、配置、审批、分析 |
+
+默认登录跳转规则：
+
+- `super_admin`、`org_admin` 进入 `/admin`
+- `race_admin` 进入 `/ops`
+- `user`、普通用户进入 `/app`
+
+---
+
+## 权限模型
+
+| 角色 | 能力范围 |
+|------|----------|
+| `super_admin` | 全平台管理（机构、用户、赛事） |
+| `org_admin` | 本机构全部赛事与成员管理 |
+| `race_admin` | 被授权赛事可读写 |
+| `user` | 被授权赛事只读 |
+
+---
+
+## 目录结构
+
+```
+door/
+├── src/                    # 前端源码
+├── dist/                   # 前端构建产物（nginx 挂载）
+├── server/
+│   ├── src/               # 后端源码
+│   ├── docker-compose.yml # Docker 编排文件
+│   ├── Dockerfile         # 后端镜像构建
+│   ├── nginx.conf         # Nginx 配置
+│   ├── .env.example       # 环境变量示例
+│   └── knexfile.js        # 数据库迁移配置
+├── package.json           # 前端依赖
+└── vite.config.js         # Vite 配置
 ```
 
 ---
@@ -184,190 +723,14 @@ pm2 restart door-api
 | `20260304000001` (phase6) | 2026-03-04 | Phase 6: lottery_results, snapshots, bib 表 |
 | `20260305000001` | 2026-03-05 | org_race_permissions 表 |
 | `20260307000001` | 2026-03-07 | Bib Tracking 物资追踪表 |
-| `20260307000002` | 2026-03-07 | `races.lottery_mode_default` + `race_capacity.lottery_mode_override`（直通模式） |
+| `20260324000001` | 2026-03-24 | password_reset_tokens 表（忘记密码功能） |
 
 > [!IMPORTANT]
 > 每次部署后务必执行 `docker compose exec app npm run migrate`。
-> 未迁移会导致接口报错（如缺少 `org_race_permissions` 表）。
 
 ---
-
-## 超级管理员
-
-种子脚本位于 `door/server/scripts/seed-super-admin.js`，支持幂等执行（已存在则更新）。
-
-| 参数 | 环境变量 | 默认值 |
-|------|---------|--------|
-| 用户名 | `SUPER_ADMIN_USERNAME` | `Xquareliu` |
-| 邮箱 | `SUPER_ADMIN_EMAIL` | `admin@platform.local` |
-| 密码 | `SUPER_ADMIN_PASSWORD` | `lk930813` |
-
-```bash
-# 使用默认凭证
-docker compose exec app node scripts/seed-super-admin.js
-
-# 或通过环境变量覆盖
-docker compose exec \
-  -e SUPER_ADMIN_USERNAME=NewAdmin \
-  -e SUPER_ADMIN_PASSWORD=NewPass123 \
-  app node scripts/seed-super-admin.js
-```
-
----
-
-## 工具门户入口
-
-首页（`/`）展示工具卡片列表，数据来源于 `src/stores/toolsStore.js`：
-
-| 工具 | 路径 | 说明 |
-|------|------|------|
-| 后台管理 | `/admin` | 需要 `org_admin` 或 `super_admin` 角色 |
-| 扫码功能 | `/scan` | 需要登录，未登录时重定向到 `/scan/login` |
-| 3D 机械计时钟 | `/tool/mechanical-clock-3d` | 公开访问 |
-| 应用下载 | `/tool/app-download` | 公开访问 |
-
----
-
-## 管理后台操作流程
-
-权限模型：`super_admin` > `org_admin` > `race_editor` > `race_viewer`
-
-### 1. 超管初始化
-
-1. 使用超管账号登录 `/admin`
-2. "机构管理"创建机构
-3. "用户管理"/"成员管理"创建用户并分配角色
-4. 非 `super_admin` 必须绑定机构
-
-### 2. 赛事管理
-
-1. 超管在"赛事管理"创建赛事（需选择所属机构）
-2. "机构赛事授权"为机构分配赛事（`editor`/`viewer`）
-3. "赛事授权"为成员分配赛事权限
-
-### 3. 访问控制
-
-| 角色 | 权限 |
-|------|------|
-| `super_admin` | 全平台管理，跨机构 |
-| `org_admin` | 管理本机构成员，按机构授权级别读写赛事 |
-| `race_editor` | 仅访问被分配赛事，可写 |
-| `race_viewer` | 仅访问被分配赛事，只读 |
-
-### 4. 常见问题
-
-| 问题 | 解决 |
-|------|------|
-| 缺少 `org_race_permissions` 表 | 执行 `npm run migrate` |
-| 登录报 Network Error | 检查 `.env` 中 `CORS_ORIGIN` 是否正确（不要带端口号） |
-| 保存时服务器内部错误 | 检查后端日志 + 迁移状态 |
-| 超管看不到某机构数据 | 在侧边栏切换目标机构 |
-
----
-
-## 编码约定
-
-- 所有源码 `UTF-8`（无 BOM）+ `LF`
-- 提交前：`npm run check:encoding`
-
----
-
-## 本地开发
-
-```bash
-# 后端
-cd door/server && npm ci && npm run dev
-
-# 门户前端
-cd door && npm ci && npm run dev
-
-# 工具前端
-cd tool && npm ci && npm run dev
-```
-
-## 防止"自动拉起"导致冲突
-
-1. `docker compose up` 只能在 `door/server/` 执行
-2. `door` Vite 默认 `open: true`，不需要时用 `npm run dev -- --open false`
-3. `tool` Electron 联调用 `npm run electron:dev`
-4. 本机 PostgreSQL 占用 `5432` 时需先释放或修改映射
-
-## 常用地址
-
-| 环境 | 地址 |
-|------|------|
-| 门户（dev） | `http://localhost:5173` |
-| 工具（dev） | `http://localhost:5174` |
-| API（直连） | `http://localhost:3001` |
-| 网关（Docker） | `http://localhost`（80 → HTTPS 重定向） |
-| 云端（域名） | `https://www.xquareliu.com` |
-| 云端（IP） | `http://47.251.107.41`（→ HTTPS） |
 
 ## 参考
 
 - 后端详细说明：[door/server/README.md](./server/README.md)
-- 工具详细说明：[tool/README.md](../tool/README.md)
----
-
-## 数据库备份与恢复
-
-DOOR 现在内置了一套“本机备份 + 后台下载 + 上传恢复到测试库”的数据库运维流程。
-
-### 备份逻辑
-
-- 备份对象：PostgreSQL 主库 `door`
-- 备份格式：`.sql.gz`
-- 宿主机目录：`/var/backups/door`
-- 容器内目录：`/backups`
-- 保留策略：仅保留最近 `10` 份成功备份
-- 后台入口：`/admin/db-backups`
-
-### 服务器环境变量
-
-在 `door/server/.env` 中配置：
-
-```env
-HOST_BACKUP_DIR=/var/backups/door
-BACKUP_DIR=/backups
-BACKUP_RETENTION_COUNT=10
-RESTORE_UPLOAD_DIR=/backups/uploads
-```
-
-初始化目录：
-
-```bash
-sudo mkdir -p /var/backups/door/uploads
-sudo chown -R 1000:1000 /var/backups/door
-```
-
-### 自动备份
-
-推荐由宿主机 `cron` 调用容器内脚本，每天执行一次：
-
-```cron
-30 3 * * * cd /path/to/door/server && docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger cron >> /var/log/door-backup.log 2>&1
-```
-
-### 手动备份与下载
-
-两种方式：
-
-```bash
-cd door/server
-docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger manual
-```
-
-或者直接进入后台：
-
-- 打开 `/admin/db-backups`
-- 点击“立即生成备份”
-- 在列表中点击“下载”
-
-### 上传恢复
-
-- 仅支持上传 `.sql.gz` 文件
-- 页面恢复不会覆盖生产库
-- 恢复目标库格式：`door_restore_YYYYMMDD_HHMMSS`
-- 恢复完成后需要人工检查 `knex_migrations`、`users`、`orgs`、`races`、`records`
-
-详细操作见 [door/server/docs/backup-restore.md](./server/docs/backup-restore.md)。
+- 备份恢复详细说明：[door/server/docs/backup-restore.md](./server/docs/backup-restore.md)

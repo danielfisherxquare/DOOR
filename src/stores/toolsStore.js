@@ -2,48 +2,16 @@ import { create } from 'zustand'
 
 const mockTools = [
   {
-    id: 'admin-portal',
-    name: '后台管理',
-    description: '机构、用户、赛事与授权综合管理平台',
-    icon: '⚙️',
-    status: 'online',
-    path: '/admin'
-  },
-  {
-    id: 'scan-tool',
-    name: '扫码功能',
-    description: '扫码/输入 token 查询号码布发放状态',
-    icon: '📸',
-    status: 'online',
-    path: '/scan'
-  },
-  {
-    id: 'interview-tool',
-    name: '数字化面试评分',
-    description: '体育赛事公司面试评分与候选人对比工具',
-    icon: '🏅',
-    status: 'online',
-    path: '/interview',
-    type: 'creative'
-  },
-  {
     id: 'mechanical-clock-3d',
     name: '3D 机械计时钟',
     description: '真正的3D段式翻转时钟，每个笔画都是立体六面体，翻转时可见金属侧面',
     icon: '🕰️',
     status: 'online',
+    path: '/tool/mechanical-clock-3d',
     apiEndpoint: '/tools/mechanical-clock-3d',
-    component: 'MechanicalClock3D'
+    component: 'MechanicalClock3D',
+    public: true,
   },
-  {
-    id: 'app-download',
-    name: '应用下载',
-    description: '下载本地马拉松报名数据管理器客户端',
-    icon: '📥',
-    status: 'online',
-    apiEndpoint: '/tools/app-download',
-    component: 'AppDownload'
-  }
 ]
 
 const useToolsStore = create((set) => ({
@@ -89,7 +57,7 @@ const useToolsStore = create((set) => ({
 
   clearCurrentTool: () => {
     set({ currentTool: null })
-  }
+  },
 }))
 
 export default useToolsStore

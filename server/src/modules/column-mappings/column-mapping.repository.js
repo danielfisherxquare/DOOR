@@ -58,7 +58,16 @@ async function findLegacyByOrg(orgId) {
 async function upsertLegacyBatch(orgId, mappings) {
     if (!orgId || !mappings || mappings.length === 0) return [];
 
-    const rows = mappings.map((mapping) => columnMappingMapper.toDbInsert({
+    // 去重：保留每个 sourceColumn 最后一个映射
+    const dedupedMap = new Map();
+    for (const mapping of mappings) {
+        if (mapping.sourceColumn) {
+            dedupedMap.set(mapping.sourceColumn, mapping);
+        }
+    }
+    const dedupedMappings = Array.from(dedupedMap.values());
+
+    const rows = dedupedMappings.map((mapping) => columnMappingMapper.toDbInsert({
         ...mapping,
         orgId,
         userId: null,
@@ -138,7 +147,16 @@ export async function upsertUserBatch(orgId, userId, mappings) {
 
     if (!orgId || !userId || !mappings || mappings.length === 0) return [];
 
-    const rows = mappings.map((mapping) => columnMappingMapper.toDbInsert({
+    // 去重：保留每个 sourceColumn 最后一个映射
+    const dedupedMap = new Map();
+    for (const mapping of mappings) {
+        if (mapping.sourceColumn) {
+            dedupedMap.set(mapping.sourceColumn, mapping);
+        }
+    }
+    const dedupedMappings = Array.from(dedupedMap.values());
+
+    const rows = dedupedMappings.map((mapping) => columnMappingMapper.toDbInsert({
         ...mapping,
         orgId,
         userId,

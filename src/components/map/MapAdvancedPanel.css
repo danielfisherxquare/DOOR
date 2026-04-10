@@ -1,0 +1,48 @@
+/**
+ * MapAdvancedPanel.css
+ * 图形详细信息与高级操作面板样式
+ */
+
+/* 
+  Most styles have been migrated to inline styles using Tectonic CSS variables 
+  or CommandPrimitives component defaults to align with the standard UI.
+  This file is kept for backwards compatibility or specific overrides.
+*/
+
+.advanced-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.advanced-panel__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.coord-display {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.coord-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.coord-decimal {
+  font-size: var(--font-size-caption);
+  color: var(--text-muted);
+}

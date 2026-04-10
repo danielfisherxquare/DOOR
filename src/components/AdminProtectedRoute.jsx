@@ -8,8 +8,11 @@ function AdminProtectedRoute({ children }) {
 
   if (isBootstrapping) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--color-text-secondary)' }}>
-        <div style={{ width: 40, height: 40, border: '3px solid var(--color-bg-card)', borderTopColor: 'var(--color-accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <div className="layout--admin tectonic-access-state">
+        <div className="tectonic-access-state__content">
+          <div className="tectonic-access-state__spinner" aria-hidden="true" />
+          <p className="tectonic-access-state__copy">正在校验管理后台权限…</p>
+        </div>
       </div>
     )
   }
@@ -24,11 +27,13 @@ function AdminProtectedRoute({ children }) {
 
   if (!canAccessAdmin()) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 16 }}>
-        <div style={{ fontSize: 48 }}>!</div>
-        <h2 style={{ color: 'var(--color-text-primary)' }}>权限不足</h2>
-        <p style={{ color: 'var(--color-text-secondary)' }}>当前账号没有访问管理后台的权限。</p>
-        <a href="/" className="btn btn--primary">返回首页</a>
+      <div className="layout--admin tectonic-access-state">
+        <div className="tectonic-access-state__content">
+          <div className="tectonic-access-state__icon">!</div>
+          <h2 className="tectonic-access-state__title">权限不足</h2>
+          <p className="tectonic-access-state__copy">当前账号没有访问管理后台的权限。</p>
+          <a href="/" className="btn btn--primary">返回首页</a>
+        </div>
       </div>
     )
   }

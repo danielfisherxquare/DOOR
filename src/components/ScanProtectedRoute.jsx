@@ -21,7 +21,7 @@ function ScanProtectedRoute({ children }) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to={`/scan/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />
+    return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />
   }
 
   return children

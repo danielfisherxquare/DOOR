@@ -246,6 +246,13 @@ export async function updateUserByAdmin(userId, fields) {
     const nextRole = hasRole ? fields.role : user.role;
     let nextOrgId = hasOrgId ? fields.orgId : user.org_id;
 
+    if (hasRole && !['super_admin', 'org_admin', 'race_admin', 'user'].includes(fields.role)) {
+        throw Object.assign(new Error('角色无效'), { status: 400, expose: true });
+    }
+    if (hasStatus && !['active', 'disabled'].includes(fields.status)) {
+        throw Object.assign(new Error('状态无效'), { status: 400, expose: true });
+    }
+
     if (nextRole === 'super_admin') {
         nextOrgId = null;
     } else if (!nextOrgId) {
@@ -336,92 +343,6 @@ export async function createOrgAdmin(orgId, { username, email, password }) {
 }
 
 // ── Super Admin: 机构赛事授权 ─────────────────────────
-
-export async function getOrgRacePermissions(orgId) {
-    const org = await knex('organizations').where({ id: orgId }).first();
-    if (!org) throw Object.assign(new Error('机构不存在'), { status: 404, expose: true });
-
-    const [permissions, allRaces] = await Promise.all([
-        knex('org_race_permissions as grp')
-            .innerJoin('races', 'grp.race_id', 'races.id')
-            .leftJoin('organizations as race_org', 'races.org_id', 'race_org.id')
-            .where('grp.org_id', orgId)
-            .select(
-                'grp.race_id',
-                'grp.access_level',
-                'races.name as race_name',
-                'races.org_id as race_org_id',
-                'race_org.name as race_org_name',
-            )
-            .orderBy('races.created_at', 'desc'),
-        knex('races')
-            .leftJoin('organizations', 'races.org_id', 'organizations.id')
-            .select(
-                'races.id',
-                'races.name',
-                'races.org_id',
-                'races.date',
-                'races.location',
-                'organizations.name as org_name',
-            )
-            .orderBy('races.created_at', 'desc'),
-    ]);
-
-    return { org, permissions, allRaces };
-}
-
-export async function setOrgRacePermissions(orgId, operatorId, permissionsList) {
-    const org = await knex('organizations').where({ id: orgId }).first();
-    if (!org) throw Object.assign(new Error('机构不存在'), { status: 404, expose: true });
-
-    const normalized = new Map();
-    for (const item of permissionsList) {
-        const raceId = Number(item.raceId);
-        if (!Number.isFinite(raceId) || raceId <= 0) {
-            throw Object.assign(new Error(`无效赛事 ID: ${item.raceId}`), { status: 400, expose: true });
-        }
-        const accessLevel = item.accessLevel || 'viewer';
-        if (!['editor', 'viewer'].includes(accessLevel)) {
-            throw Object.assign(new Error(`赛事 ${raceId} 的 accessLevel 无效`), { status: 400, expose: true });
-        }
-        normalized.set(raceId, accessLevel);
-    }
-
-    const raceIds = [...normalized.keys()];
-    if (raceIds.length > 0) {
-        const races = await knex('races').whereIn('id', raceIds).select('id', 'org_id');
-        const raceById = new Map(races.map((row) => [Number(row.id), row]));
-        const validRaceIdSet = new Set(races.map((row) => Number(row.id)));
-        const missing = raceIds.filter((raceId) => !validRaceIdSet.has(raceId));
-        if (missing.length > 0) {
-            throw Object.assign(new Error(`赛事 ${missing.join(',')} 不存在`), { status: 400, expose: true });
-        }
-        for (const raceId of raceIds) {
-            const race = raceById.get(raceId);
-            if (race && race.org_id === orgId) {
-                normalized.delete(raceId);
-            }
-        }
-    }
-
-    await knex.transaction(async (trx) => {
-        await trx('org_race_permissions').where({ org_id: orgId }).del();
-        const grantedRaceIds = [...normalized.keys()];
-        if (grantedRaceIds.length > 0) {
-            await trx('org_race_permissions').insert(
-                grantedRaceIds.map((raceId) => ({
-                    org_id: orgId,
-                    race_id: raceId,
-                    access_level: normalized.get(raceId),
-                    granted_by: operatorId || null,
-                    updated_at: knex.fn.now(),
-                })),
-            );
-        }
-    });
-
-    return { message: `已为机构 ${org.name} 配置 ${normalized.size} 个赛事授权` };
-}
 
 // ── 统计概览 ─────────────────────────────────────────
 

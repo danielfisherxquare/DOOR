@@ -1,0 +1,688 @@
+/* ========================================
+   DOOR 统一设计系统 - 设计Token
+   版本: 1.0.0
+   说明: 所有变量通过层感知自动应用不同配色
+   ======================================== */
+
+/* ========================================
+   核心变量映射（层感知）
+   这些变量会根据父级 .layout--{layer} 类自动切换
+   ======================================== */
+
+:root {
+   /* === Public / default Tectonic layer === */
+   --layer-accent: #D8262C;
+   --layer-accent-hover: #b30018;
+   --layer-accent-active: #930011;
+   --layer-accent-soft: rgba(216, 38, 44, 0.08);
+   --layer-accent-muted: rgba(216, 38, 44, 0.15);
+   --layer-accent-light: #ffb3ad;
+
+   --layer-bg-primary: #fcf9f8;
+   --layer-bg-secondary: #f0eded;
+   --layer-bg-tertiary: #e4e2e1;
+
+   --layer-surface: #ffffff;
+   --layer-surface-hover: #f6f3f2;
+   --layer-surface-active: #eae7e7;
+
+   --layer-panel: #1c1917;
+   --layer-panel-strong: #0c0a09;
+   --layer-panel-soft: rgba(255, 255, 255, 0.04);
+   --layer-panel-hover: rgba(255, 255, 255, 0.06);
+
+   --layer-text-primary: #1b1c1c;
+   --layer-text-secondary: #454747;
+   --layer-text-muted: #78716c;
+   --layer-text-disabled: #a8a29e;
+   --layer-text-on-dark: #fafaf9;
+   --layer-text-on-dark-muted: #d6d3d1;
+   --layer-text-on-accent: #ffffff;
+
+   --layer-border: #e7e5e4;
+   --layer-border-strong: #d6d3d1;
+   --layer-border-subtle: rgba(216, 38, 44, 0.05);
+   --layer-border-accent: rgba(216, 38, 44, 0.3);
+
+   /* === 核心强调色 === */
+   --accent: var(--layer-accent);
+   --accent-hover: var(--layer-accent-hover);
+   --accent-active: var(--layer-accent-active);
+   --accent-soft: var(--layer-accent-soft);
+   --accent-muted: var(--layer-accent-muted);
+   --accent-light: var(--layer-accent-light);
+
+   /* === 背景色系 === */
+   --bg-primary: var(--layer-bg-primary);
+   --bg-secondary: var(--layer-bg-secondary);
+   --bg-tertiary: var(--layer-bg-tertiary);
+
+   /* === 表面/卡片 === */
+   --surface: var(--layer-surface);
+   --surface-hover: var(--layer-surface-hover);
+   --surface-active: var(--layer-surface-active);
+
+   /* === 深色面板 === */
+   --panel: var(--layer-panel);
+   --panel-strong: var(--layer-panel-strong);
+   --panel-soft: var(--layer-panel-soft);
+   --panel-hover: var(--layer-panel-hover);
+
+   /* === 文字色系 === */
+   --text-primary: var(--layer-text-primary);
+   --text-secondary: var(--layer-text-secondary);
+   --text-muted: var(--layer-text-muted);
+   --text-disabled: var(--layer-text-disabled);
+   --text-on-dark: var(--layer-text-on-dark);
+   --text-on-dark-muted: var(--layer-text-on-dark-muted);
+   --text-on-accent: var(--layer-text-on-accent);
+
+   /* === 边框色系 === */
+   --border: var(--layer-border);
+   --border-strong: var(--layer-border-strong);
+   --border-subtle: var(--layer-border-subtle);
+   --border-accent: var(--layer-border-accent);
+
+   /* === 状态色系（跨层级统一）=== */
+   --success: #059669;
+   --success-soft: rgba(5, 150, 105, 0.1);
+   --success-light: #D1FAE5;
+
+   --warning: #D97706;
+   --warning-soft: rgba(217, 119, 6, 0.1);
+   --warning-light: #FEF3C7;
+
+   --danger: #DC2626;
+   --danger-soft: rgba(220, 38, 38, 0.1);
+   --danger-light: #FEE2E2;
+
+   --info: #2563EB;
+   --info-soft: rgba(37, 99, 235, 0.1);
+   --info-light: #DBEAFE;
+
+   /* === 阴影系统 === */
+   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
+   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+   --shadow-accent: 0 4px 14px var(--accent-soft);
+
+   /* === 间距系统 === */
+   --radius-sm: 0px;
+   --radius-md: 0px;
+   --radius-lg: 0px;
+   --radius-xl: 0px;
+   --radius-full: 0px;
+
+   /* === 字体系统 === */
+   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+   --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+   --font-headline: 'Space Grotesk', sans-serif;
+   --font-body: 'Inter', sans-serif;
+
+   /* === 字号系统 (统一字体大小) === */
+   --font-size-xs: 0.75rem;
+   /* 12px - 小标签/辅助文字 */
+   --font-size-sm: 0.8125rem;
+   /* 13px - 正文/按钮 */
+   --font-size-md: 0.875rem;
+   /* 14px - 正文标题 */
+   --font-size-base: 1rem;
+   /* 16px - 基础字号 */
+   --font-size-lg: 1.125rem;
+   /* 18px - 小标题 */
+   --font-size-xl: 1.25rem;
+   /* 20px - 标题 */
+   --font-size-2xl: 1.5rem;
+   /* 24px - 大标题 */
+   --font-size-3xl: 2rem;
+   /* 32px - 超大标题 */
+
+   /* === 特殊场景字号 (保留硬编码) === */
+   --font-size-eyebrow: 10px;
+   /* 眼睛标签/面包屑 */
+   --font-size-caption: 11px;
+   /* 说明文字 */
+   --font-size-code: 9px;
+   /* 代码/快捷键 */
+
+   /* === 侧边栏宽度 (统一布局) === */
+   --sidebar-width-sm: 280px;
+   --sidebar-width: 300px;
+   --sidebar-width-lg: 320px;
+
+   /* === 响应式断点 (统一布局) === */
+   --breakpoint-xs: 480px;
+   --breakpoint-sm: 640px;
+   --breakpoint-md: 768px;
+   --breakpoint-lg: 1024px;
+   --breakpoint-xl: 1280px;
+   --breakpoint-2xl: 1536px;
+
+   /* === 间距兼容 === */
+   --spacing-xs: 0.25rem;
+   --spacing-sm: 0.5rem;
+   --spacing-md: 1rem;
+   --spacing-lg: 1.5rem;
+   --spacing-xl: 2rem;
+   --spacing-2xl: 3rem;
+   --spacing-xxl: 3rem;
+
+   /* === 动画系统 === */
+   --transition-fast: 150ms ease;
+   --transition-normal: 200ms ease;
+   --transition-slow: 300ms ease;
+
+   /* === 层级z-index === */
+   --z-base: 1;
+   --z-dropdown: 100;
+   --z-sticky: 200;
+   --z-floating: 300;
+   --z-floating-overlay: 350;
+   --z-sidebar: 400;
+   --z-floating-toolbar: 500;
+   --z-panel: 600;
+   --z-modal-overlay: 1000;
+   --z-modal: 1001;
+   --z-popover: 1100;
+   --z-toast: 1200;
+   --z-max: 9999;
+
+   /* === 网格背景 === */
+   --grid-pattern: linear-gradient(var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+
+   /* === Legacy soft-design aliases === */
+   --color-bg-primary: var(--bg-primary);
+   --color-bg-secondary: var(--bg-secondary);
+   --color-bg: var(--bg-primary);
+   --color-bg-hover: var(--bg-secondary);
+   --color-bg-card: var(--surface);
+   --color-text-primary: var(--text-primary);
+   --color-text-secondary: var(--text-secondary);
+   --color-text-muted: var(--text-muted);
+   --color-text-on-dark: var(--text-on-dark);
+   --color-text: var(--text-primary);
+   --color-primary: var(--accent);
+   --color-primary-hover: var(--accent-hover);
+   --color-primary-dark: var(--accent-active);
+   --color-primary-light: var(--accent-soft);
+   --color-accent: var(--accent);
+   --color-accent-hover: var(--accent-hover);
+   --color-accent-text: var(--text-on-accent);
+   --color-purple: var(--accent);
+   --color-success: var(--success);
+   --color-success-light: var(--success-light);
+   --color-success-dark: var(--success);
+   --color-warning: var(--warning);
+   --color-warning-light: var(--warning-light);
+   --color-warning-dark: var(--warning);
+   --color-danger: var(--danger);
+   --color-danger-light: var(--danger-light);
+   --color-danger-dark: var(--danger);
+   --color-error: var(--danger);
+   --color-error-light: var(--danger-light);
+   --color-error-dark: var(--danger);
+   --color-info: var(--info);
+   --color-info-light: var(--info-light);
+   --color-info-dark: var(--info);
+   --color-border: var(--border);
+   --border-color: var(--border);
+   --color-shadow-dark: color-mix(in srgb, var(--panel) 24%, transparent);
+   --color-shadow-light: color-mix(in srgb, var(--surface) 96%, white 4%);
+}
+
+/* ========================================
+   Admin 层配色（管理层 - Tectonic Engine 工业红）
+   ======================================== */
+
+.layout--admin {
+   /* === 字体系统（覆盖全局） === */
+   --font-headline: 'Space Grotesk', sans-serif;
+   --font-body: 'Inter', sans-serif;
+   --font-family: var(--font-body);
+
+   /* === 圆角（工业直角风格） === */
+   --radius-sm: 0px;
+   --radius-md: 0px;
+   --radius-lg: 0px;
+   --radius-xl: 0px;
+
+   /* 核心强调色 - 公司红 #D8262C */
+   --layer-accent: #D8262C;
+   --layer-accent-hover: #b30018;
+   --layer-accent-active: #930011;
+   --layer-accent-soft: rgba(216, 38, 44, 0.08);
+   --layer-accent-muted: rgba(216, 38, 44, 0.15);
+   --layer-accent-light: #ffb3ad;
+
+   /* 背景色系 - 蓝图暖白 */
+   --layer-bg-primary: #fcf9f8;
+   --layer-bg-secondary: #f0eded;
+   --layer-bg-tertiary: #e4e2e1;
+
+   /* 表面 */
+   --layer-surface: #ffffff;
+   --layer-surface-hover: #f6f3f2;
+   --layer-surface-active: #eae7e7;
+
+   /* 深色面板 — stone-900 */
+   --layer-panel: #1c1917;
+   --layer-panel-strong: #0c0a09;
+   --layer-panel-soft: rgba(255, 255, 255, 0.04);
+   --layer-panel-hover: rgba(255, 255, 255, 0.06);
+
+   /* 文字 */
+   --layer-text-primary: #1b1c1c;
+   --layer-text-secondary: #454747;
+   --layer-text-muted: #78716c;
+   --layer-text-disabled: #a8a29e;
+   --layer-text-on-dark: #fafaf9;
+   --layer-text-on-dark-muted: #a8a29e;
+   --layer-text-on-accent: #ffffff;
+
+   /* 边框 — 石灰色调 */
+   --layer-border: #e7e5e4;
+   --layer-border-strong: #d6d3d1;
+   --layer-border-subtle: rgba(216, 38, 44, 0.05);
+   --layer-border-accent: rgba(216, 38, 44, 0.3);
+
+   /* Admin层使用更深红色作为danger色 */
+   --danger: #ba1a1a;
+   --danger-soft: rgba(186, 26, 26, 0.1);
+   --danger-light: #ffdad6;
+
+   --admin-accent: var(--accent);
+   --admin-accent-hover: var(--accent-hover);
+   --admin-accent-active: var(--accent-active);
+   --admin-accent-soft: var(--accent-soft);
+   --admin-accent-muted: var(--accent-muted);
+   --admin-accent-light: var(--accent-light);
+   --admin-bg-primary: var(--bg-primary);
+   --admin-bg-secondary: var(--bg-secondary);
+   --admin-bg-tertiary: var(--bg-tertiary);
+   --admin-surface: var(--surface);
+   --admin-surface-hover: var(--surface-hover);
+   --admin-surface-active: var(--surface-active);
+   --admin-panel: var(--panel);
+   --admin-panel-strong: var(--panel-strong);
+   --admin-panel-soft: var(--panel-soft);
+   --admin-panel-hover: var(--panel-hover);
+   --admin-text-primary: var(--text-primary);
+   --admin-text-secondary: var(--text-secondary);
+   --admin-text-muted: var(--text-muted);
+   --admin-text-disabled: var(--text-disabled);
+   --admin-text-on-dark: var(--text-on-dark);
+   --admin-text-on-dark-muted: var(--text-on-dark-muted);
+   --admin-text-on-accent: var(--text-on-accent);
+   --admin-border: var(--border);
+   --admin-border-strong: var(--border-strong);
+   --admin-border-subtle: var(--border-subtle);
+   --admin-border-accent: var(--border-accent);
+   --admin-success: var(--success);
+   --admin-warning: var(--warning);
+   --admin-danger: var(--danger);
+   --admin-info: var(--info);
+   --admin-shadow-sm: var(--shadow-sm);
+   --admin-radius-lg: var(--radius-lg);
+   --admin-shell-surface: var(--surface);
+   --admin-shell-surface-strong: var(--surface-hover);
+   --admin-shell-border: var(--border);
+   --admin-shell-border-strong: var(--border-strong);
+   --admin-shell-shadow: var(--shadow-sm);
+   --admin-shell-grid: var(--grid-pattern);
+   --admin-shell-text: var(--text-primary);
+   --admin-shell-muted: var(--text-secondary);
+   --admin-shell-ink: var(--text-primary);
+   --admin-shell-accent: var(--accent);
+   --admin-shell-accent-soft: var(--accent-soft);
+}
+
+/* ========================================
+   App 层配色（应用层 - 琥珀黄）
+   ======================================== */
+
+.layout--app {
+   /* === 字体系统（Tectonic Engine 对齐 Admin 层） === */
+   --font-headline: 'Space Grotesk', sans-serif;
+   --font-body: 'Inter', sans-serif;
+   --font-family: var(--font-body);
+
+   /* === 圆角（工业直角风格） === */
+   --radius-sm: 0px;
+   --radius-md: 0px;
+   --radius-lg: 0px;
+   --radius-xl: 0px;
+
+   /* 核心强调色 — 琥珀黄 #D4A017 */
+   --layer-accent: #D4A017;
+   --layer-accent-hover: #B8890E;
+   --layer-accent-active: #9A7209;
+   --layer-accent-soft: rgba(212, 160, 23, 0.08);
+   --layer-accent-muted: rgba(212, 160, 23, 0.15);
+   --layer-accent-light: #FDE68A;
+
+   /* 背景色系 — 暖白底 */
+   --layer-bg-primary: #faf9f7;
+   --layer-bg-secondary: #f0eeeb;
+   --layer-bg-tertiary: #e5e3e0;
+
+   /* 表面 */
+   --layer-surface: #ffffff;
+   --layer-surface-hover: #faf9f7;
+   --layer-surface-active: #f0eeeb;
+
+   /* 深色面板 — stone-900（与 Admin 层一致） */
+   --layer-panel: #1c1917;
+   --layer-panel-strong: #0c0a09;
+   --layer-panel-soft: rgba(255, 255, 255, 0.04);
+   --layer-panel-hover: rgba(255, 255, 255, 0.06);
+
+   /* 文字 */
+   --layer-text-primary: #1c1917;
+   --layer-text-secondary: #57534e;
+   --layer-text-muted: #78716c;
+   --layer-text-disabled: #a8a29e;
+   --layer-text-on-dark: #fafaf9;
+   --layer-text-on-dark-muted: #a8a29e;
+   --layer-text-on-accent: #422006;
+
+   /* 边框 — 石灰色调 */
+   --layer-border: #e7e5e4;
+   --layer-border-strong: #d6d3d1;
+   --layer-border-subtle: rgba(212, 160, 23, 0.04);
+   --layer-border-accent: rgba(212, 160, 23, 0.3);
+
+   --app-accent: var(--accent);
+   --app-accent-hover: var(--accent-hover);
+   --app-accent-active: var(--accent-active);
+   --app-accent-soft: var(--accent-soft);
+   --app-accent-muted: var(--accent-muted);
+   --app-accent-light: var(--accent-light);
+   --app-bg-primary: var(--bg-primary);
+   --app-bg-secondary: var(--bg-secondary);
+   --app-bg-tertiary: var(--bg-tertiary);
+   --app-surface: var(--surface);
+   --app-surface-hover: var(--surface-hover);
+   --app-surface-active: var(--surface-active);
+   --app-panel: var(--panel);
+   --app-panel-strong: var(--panel-strong);
+   --app-panel-soft: var(--panel-soft);
+   --app-panel-hover: var(--panel-hover);
+   --app-text-primary: var(--text-primary);
+   --app-text-secondary: var(--text-secondary);
+   --app-text-muted: var(--text-muted);
+   --app-text-disabled: var(--text-disabled);
+   --app-text-on-dark: var(--text-on-dark);
+   --app-text-on-dark-muted: var(--text-on-dark-muted);
+   --app-text-on-accent: var(--text-on-accent);
+   --app-border: var(--border);
+   --app-border-strong: var(--border-strong);
+   --app-border-subtle: var(--border-subtle);
+   --app-border-accent: var(--border-accent);
+}
+
+/* ========================================
+   Ops 层配色（执行层 - 活力橙）
+   ======================================== */
+
+.layout--ops {
+   /* === 字体系统（Tectonic Engine 对齐全局） === */
+   --font-headline: 'Space Grotesk', sans-serif;
+   --font-body: 'Inter', sans-serif;
+   --font-family: var(--font-body);
+
+   /* === 圆角（工业直角风格） === */
+   --radius-sm: 0px;
+   --radius-md: 0px;
+   --radius-lg: 0px;
+   --radius-xl: 0px;
+
+   /* 核心强调色 — 工业蓝 #2563EB */
+   --layer-accent: #2563EB;
+   --layer-accent-hover: #1d4ed8;
+   --layer-accent-active: #1e40af;
+   --layer-accent-soft: rgba(37, 99, 235, 0.08);
+   --layer-accent-muted: rgba(37, 99, 235, 0.15);
+   --layer-accent-light: #93c5fd;
+
+   /* 背景色系 — 冷白底 */
+   --layer-bg-primary: #f8fafc;
+   --layer-bg-secondary: #f1f5f9;
+   --layer-bg-tertiary: #e2e8f0;
+
+   /* 表面 */
+   --layer-surface: #ffffff;
+   --layer-surface-hover: #f8fafc;
+   --layer-surface-active: #f1f5f9;
+
+   /* 深色面板 — stone-900（统一侧边栏底色） */
+   --layer-panel: #1c1917;
+   --layer-panel-strong: #0c0a09;
+   --layer-panel-soft: rgba(255, 255, 255, 0.04);
+   --layer-panel-hover: rgba(255, 255, 255, 0.06);
+
+   /* 文字 */
+   --layer-text-primary: #0f172a;
+   --layer-text-secondary: #475569;
+   --layer-text-muted: #64748b;
+   --layer-text-disabled: #94a3b8;
+   --layer-text-on-dark: #f8fafc;
+   --layer-text-on-dark-muted: #94a3b8;
+   --layer-text-on-accent: #ffffff;
+
+   /* 边框 — 石板色调 */
+   --layer-border: #e2e8f0;
+   --layer-border-strong: #cbd5e1;
+   --layer-border-subtle: rgba(37, 99, 235, 0.04);
+   --layer-border-accent: rgba(37, 99, 235, 0.3);
+
+   --ops-accent: var(--accent);
+   --ops-accent-hover: var(--accent-hover);
+   --ops-accent-active: var(--accent-active);
+   --ops-accent-soft: var(--accent-soft);
+   --ops-accent-muted: var(--accent-muted);
+   --ops-accent-light: var(--accent-light);
+   --ops-bg-primary: var(--bg-primary);
+   --ops-bg-secondary: var(--bg-secondary);
+   --ops-bg-tertiary: var(--bg-tertiary);
+   --ops-surface: var(--surface);
+   --ops-surface-hover: var(--surface-hover);
+   --ops-surface-active: var(--surface-active);
+   --ops-panel: var(--panel);
+   --ops-panel-strong: var(--panel-strong);
+   --ops-panel-soft: var(--panel-soft);
+   --ops-panel-hover: var(--panel-hover);
+   --ops-text-primary: var(--text-primary);
+   --ops-text-secondary: var(--text-secondary);
+   --ops-text-muted: var(--text-muted);
+   --ops-text-disabled: var(--text-disabled);
+   --ops-text-on-dark: var(--text-on-dark);
+   --ops-text-on-dark-muted: var(--text-on-dark-muted);
+   --ops-text-on-accent: var(--text-on-accent);
+   --ops-border: var(--border);
+   --ops-border-strong: var(--border-strong);
+   --ops-border-subtle: var(--border-subtle);
+   --ops-border-accent: var(--border-accent);
+   --workspace-shell-bg: var(--bg-primary);
+   --workspace-shell-surface: var(--surface);
+   --workspace-shell-surface-strong: var(--surface-hover);
+   --workspace-shell-border: var(--border);
+   --workspace-shell-border-strong: var(--border-strong);
+   --workspace-shell-panel: var(--panel);
+   --workspace-shell-panel-strong: var(--panel-strong);
+   --workspace-shell-panel-soft: var(--panel-soft);
+   --workspace-shell-text: var(--text-primary);
+   --workspace-shell-muted: var(--text-secondary);
+   --workspace-shell-accent: var(--accent);
+   --workspace-shell-accent-soft: var(--accent-soft);
+   --workspace-shell-accent-light: var(--accent-light);
+   --workspace-shell-shadow: var(--shadow-sm);
+   --workspace-shell-grid: var(--grid-pattern);
+}
+
+/* ========================================
+   语义化组件变量（继承自基础变量）
+   ======================================== */
+
+:root {
+   /* 按钮 */
+   --btn-primary-bg: var(--accent);
+   --btn-primary-hover: var(--accent-hover);
+   --btn-primary-text: var(--text-on-accent);
+   --btn-ghost-bg: transparent;
+   --btn-ghost-hover: var(--accent-soft);
+
+   /* 输入框 */
+   --input-bg: var(--surface);
+   --input-border: var(--border);
+   --input-focus-border: var(--accent);
+   --input-focus-ring: var(--accent-soft);
+
+   /* 卡片 */
+   --card-bg: var(--surface);
+   --card-border: var(--border);
+   --card-shadow: var(--shadow-sm);
+
+   /* 导航 */
+   --nav-bg: var(--panel);
+   --nav-text: var(--text-on-dark);
+   --nav-text-muted: var(--text-on-dark-muted);
+   --nav-hover-bg: var(--panel-hover);
+   --nav-active-bg: var(--accent-soft);
+   --nav-active-border: var(--accent);
+
+   /* 表格 */
+   --table-header-bg: var(--bg-secondary);
+   --table-row-hover: var(--accent-soft);
+   --table-border: var(--border);
+
+   /* ========================================
+     Command 组件状态色映射
+     用于 command-primitives.css 等组件
+     ======================================== */
+   --command-info-bg: var(--info-soft);
+   --command-info-border: rgba(37, 99, 235, 0.16);
+   --command-info-text: var(--info);
+
+   --command-warning-bg: var(--warning-soft);
+   --command-warning-border: rgba(217, 119, 6, 0.16);
+   --command-warning-text: var(--warning);
+
+   --command-success-bg: var(--success-soft);
+   --command-success-border: rgba(5, 150, 105, 0.16);
+   --command-success-text: var(--success);
+
+   --command-danger-bg: var(--danger-soft);
+   --command-danger-border: rgba(220, 38, 38, 0.16);
+   --command-danger-text: var(--danger);
+
+   /* ========================================
+     AssetDesigner 兼容映射（默认映射到 App 层）
+     这些变量会在 .layout--app 中被覆盖
+     ======================================== */
+   --designer-shell: var(--layer-panel);
+   --designer-shell-soft: var(--layer-panel-strong);
+   --designer-panel: rgba(28, 25, 23, 0.94);
+   --designer-panel-soft: rgba(12, 10, 9, 0.94);
+   --designer-border: var(--layer-border);
+   --designer-border-strong: var(--layer-border-strong);
+   --designer-text: var(--layer-text-on-dark);
+   --designer-muted: var(--layer-text-on-dark-muted);
+   --designer-grid: var(--grid-pattern);
+
+   /* ========================================
+     Project 组件 Token 映射
+     用于 TreeGrid, TaskEditModal, GanttView 等
+     ======================================== */
+   --project-surface: var(--layer-surface);
+   --project-surface-hover: var(--layer-surface-hover);
+   --project-border: var(--layer-border);
+   --project-border-strong: var(--layer-border-strong);
+   --project-text-primary: var(--layer-text-primary);
+   --project-text-secondary: var(--layer-text-secondary);
+   --project-text-muted: var(--layer-text-muted);
+   --project-bg-secondary: var(--layer-bg-secondary);
+   --project-shadow: var(--shadow-sm);
+   --project-radius: var(--radius-lg);
+
+   /* ========================================
+     Map 组件 Token 映射
+     用于 MapOnboarding, CustomTileSourceWizard 等
+     ======================================== */
+   --map-surface: var(--layer-surface);
+   --map-border: var(--layer-border);
+   --map-text-primary: var(--layer-text-primary);
+   --map-text-secondary: var(--layer-text-secondary);
+   --map-text-muted: var(--layer-text-muted);
+   --map-accent: var(--layer-accent);
+   --map-accent-soft: var(--layer-accent-soft);
+
+   /* ========================================
+     Inventory 组件 Token 映射
+     用于 WmsDashboard, TwinWarehouseDesigner 等
+     ======================================== */
+   --inventory-surface: var(--layer-surface);
+   --inventory-border: var(--layer-border);
+   --inventory-text-primary: var(--layer-text-primary);
+   --inventory-text-secondary: var(--layer-text-secondary);
+   --inventory-accent: var(--layer-accent);
+   --inventory-accent-soft: var(--layer-accent-soft);
+}
+
+/* ========================================
+   Admin 层特有 Token 映射
+   ======================================== */
+
+.layout--admin {
+   /* AssetDesigner 在 Admin 层下的映射 */
+   --designer-shell: var(--layer-panel);
+   --designer-shell-soft: var(--layer-panel-strong);
+   --designer-border: var(--layer-border);
+   --designer-text: var(--layer-text-on-dark);
+   --designer-muted: var(--layer-text-on-dark-muted);
+
+   /* Command 组件在 Admin 层下的映射 */
+   --command-info-bg: var(--info-soft);
+   --command-warning-bg: var(--warning-soft);
+   --command-success-bg: var(--success-soft);
+   --command-danger-bg: var(--danger-soft);
+}
+
+/* ========================================
+   App 层特有 Token 映射
+   ======================================== */
+
+.layout--app {
+   /* AssetDesigner 在 App 层下的映射 */
+   --designer-shell: var(--layer-panel);
+   --designer-shell-soft: var(--layer-panel-strong);
+   --designer-border: var(--layer-border);
+   --designer-text: var(--layer-text-on-dark);
+   --designer-muted: var(--layer-text-on-dark-muted);
+
+   /* Command 组件在 App 层下的映射 */
+   --command-info-bg: var(--info-soft);
+   --command-warning-bg: var(--warning-soft);
+   --command-success-bg: var(--success-soft);
+   --command-danger-bg: var(--danger-soft);
+}
+
+/* ========================================
+   Ops 层特有 Token 映射
+   ======================================== */
+
+.layout--ops {
+   /* AssetDesigner 在 Ops 层下的映射 */
+   --designer-shell: var(--layer-panel);
+   --designer-shell-soft: var(--layer-panel-strong);
+   --designer-border: var(--layer-border);
+   --designer-text: var(--layer-text-on-dark);
+   --designer-muted: var(--layer-text-on-dark-muted);
+
+   /* Command 组件在 Ops 层下的映射 */
+   --command-info-bg: var(--info-soft);
+   --command-warning-bg: var(--warning-soft);
+   --command-success-bg: var(--success-soft);
+   --command-danger-bg: var(--danger-soft);
+}

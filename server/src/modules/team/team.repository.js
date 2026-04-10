@@ -88,10 +88,23 @@ export async function createTeamMember(data, trx = knex) {
     return row;
 }
 
+const TEAM_MEMBER_UPDATABLE_FIELDS = [
+    'employee_name', 'employee_code', 'department', 'position',
+    'member_type', 'external_engagement_type', 'phone', 'email',
+    'id_card', 'bank_account', 'bank_name', 'status', 'notes',
+];
+
 export async function updateTeamMember(orgId, teamMemberId, data, trx = knex) {
+    const updateData = {};
+    for (const key of TEAM_MEMBER_UPDATABLE_FIELDS) {
+        if (data[key] !== undefined) updateData[key] = data[key];
+    }
+    // account_user_id 仅允许通过专门的关联函数设置
+    if (data.account_user_id !== undefined) updateData.account_user_id = data.account_user_id;
+
     const [row] = await trx('team_members')
         .where({ id: teamMemberId, org_id: orgId })
-        .update({ ...data, updated_at: trx.fn.now() })
+        .update({ ...updateData, updated_at: trx.fn.now() })
         .returning('*');
     return row;
 }
@@ -101,10 +114,20 @@ export async function createUserForTeamMember(data, trx = knex) {
     return row;
 }
 
+const USER_UPDATABLE_FIELDS = [
+    'username', 'email', 'password_hash', 'role', 'status',
+    'must_change_password', 'account_source',
+];
+
 export async function updateUser(userId, data, trx = knex) {
+    const updateData = {};
+    for (const key of USER_UPDATABLE_FIELDS) {
+        if (data[key] !== undefined) updateData[key] = data[key];
+    }
+
     const [row] = await trx('users')
         .where({ id: userId })
-        .update({ ...data, updated_at: trx.fn.now() })
+        .update({ ...updateData, updated_at: trx.fn.now() })
         .returning('*');
     return row;
 }

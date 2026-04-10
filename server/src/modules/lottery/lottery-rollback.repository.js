@@ -5,8 +5,33 @@
  */
 import knex from '../../db/knex.js';
 import * as snapshotRepo from '../pipeline/snapshot.repository.js';
+import { normalizeEvent } from '../../utils/event-normalizer.js';
 
 const BATCH_SIZE = 1000;
+
+function toEventKey(event) {
+    return normalizeEvent(event || '');
+}
+
+async function decrementInventoryWithFallback(trx, orgId, raceId, rawEvent, normalizedEvent, gender, size, count) {
+    const eventCandidates = [...new Set([
+        rawEvent || 'ALL',
+        normalizedEvent || rawEvent || 'ALL',
+    ])];
+
+    for (const event of eventCandidates) {
+        const updated = await trx('clothing_limits')
+            .where({ org_id: orgId, race_id: raceId, event, gender, size })
+            .update({
+                used_count: trx.raw('GREATEST(COALESCE(used_count, 0) - ?, 0)', [count]),
+            });
+        if (updated > 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 /**
  * 检查是否有同类型执行正在 running
@@ -72,13 +97,13 @@ export async function rollbackLottery(orgId, raceId) {
                 .select('event', 'lottery_mode_override');
             const effectiveModeByEvent = new Map(
                 capacities.map(cap => [
-                    cap.event || '',
+                    toEventKey(cap.event),
                     (cap.lottery_mode_override === 'direct' || cap.lottery_mode_override === 'lottery')
                         ? cap.lottery_mode_override
                         : raceDefaultMode,
                 ]),
             );
-            const isDirectEvent = (event) => (effectiveModeByEvent.get(event || '') || raceDefaultMode) === 'direct';
+            const isDirectEvent = (event) => (effectiveModeByEvent.get(toEventKey(event)) || raceDefaultMode) === 'direct';
 
             // 1. 还原 clothing_limits：先计算中签者的库存增量，再逆向还原
             const winners = await trx('lottery_results')
@@ -99,15 +124,24 @@ export async function rollbackLottery(orgId, raceId) {
             const restoreMap = new Map();
             for (const w of winners) {
                 if (isDirectEvent(w.event)) continue;
-                const key = `${w.event || 'ALL'}|${w.gender || 'U'}|${w.clothing_size}`;
+                const rawEvent = w.event || 'ALL';
+                const normalizedEvent = toEventKey(w.event) || rawEvent;
+                const key = `${rawEvent}|${normalizedEvent}|${w.gender || 'U'}|${w.clothing_size}`;
                 restoreMap.set(key, (restoreMap.get(key) || 0) + 1);
             }
 
             for (const [key, count] of restoreMap) {
-                const [event, gender, size] = key.split('|');
-                await trx('clothing_limits')
-                    .where({ org_id: orgId, race_id: raceId, event, gender, size })
-                    .decrement('used_count', count);
+                const [rawEvent, normalizedEvent, gender, size] = key.split('|');
+                await decrementInventoryWithFallback(
+                    trx,
+                    orgId,
+                    raceId,
+                    rawEvent,
+                    normalizedEvent,
+                    gender,
+                    size,
+                    count,
+                );
             }
 
             // 2. 从快照恢复 records

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import credentialApi from '../../../api/credential'
+import { useCredentialSurface } from './useCredentialSurface'
 
 const COLOR_OPTIONS = [
     '#6B7280', '#EF4444', '#F97316', '#F59E0B', '#84CC16',
@@ -21,6 +22,7 @@ function CredentialRolePage() {
     const [searchParams] = useSearchParams()
     const raceId = searchParams.get('raceId')
     const orgId = searchParams.get('orgId') || ''
+    const { buildHref } = useCredentialSurface()
 
     const [accessAreas, setAccessAreas] = useState([])
     const [categories, setCategories] = useState([])
@@ -135,7 +137,7 @@ function CredentialRolePage() {
             <div style={styles.container}>
                 <div style={styles.empty}>
                     <p style={{ marginBottom: 16 }}>请先选择赛事</p>
-                    <Link to={`/admin/credential/select-race?orgId=${orgId}`} className="btn btn--primary">
+                    <Link to={buildHref('/credential/select-race', { orgId })} className="btn btn--primary">
                         去选择赛事
                     </Link>
                 </div>

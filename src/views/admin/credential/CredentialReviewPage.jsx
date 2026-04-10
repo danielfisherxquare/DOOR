@@ -1,381 +1,606 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import credentialApi from '../../../api/credential'
+import { useCredentialSurface } from './useCredentialSurface'
+import {
+  AdminDataTable,
+  AdminEmptyState,
+  AdminNotice,
+  AdminSectionHeader,
+  AdminStatusPill,
+  AdminSurface,
+  AdminToolbar,
+} from '../../../components/admin/AdminWorkbench'
 
 const TAB_OPTIONS = [
-    { value: 'pending', label: '待处理' },
-    { value: 'all', label: '全部请求' },
+  { value: 'pending', label: '待处理' },
+  { value: 'all', label: '全部请求' },
 ]
 
 const STATUS_OPTIONS = [
-    { value: '', label: '全部状态' },
-    { value: 'submitted', label: '待审核' },
-    { value: 'approved', label: '已通过' },
-    { value: 'rejected', label: '已驳回' },
+  { value: '', label: '全部状态' },
+  { value: 'submitted', label: '待审核' },
+  { value: 'under_review', label: '审核中' },
+  { value: 'approved', label: '已通过' },
+  { value: 'rejected', label: '已驳回' },
 ]
 
-const STATUS_BADGES = {
-    submitted: { background: '#DBEAFE', color: '#1D4ED8', label: '待审核' },
-    under_review: { background: '#FEF3C7', color: '#92400E', label: '审核中' },
-    approved: { background: '#DCFCE7', color: '#166534', label: '已通过' },
-    rejected: { background: '#FEE2E2', color: '#B91C1C', label: '已驳回' },
+const STATUS_META = {
+  submitted: { tone: 'warning', label: '待审核' },
+  under_review: { tone: 'warning', label: '审核中' },
+  approved: { tone: 'success', label: '已通过' },
+  rejected: { tone: 'danger', label: '已驳回' },
+  generated: { tone: 'success', label: '已生成' },
 }
 
-function CredentialReviewPage() {
-    const [searchParams] = useSearchParams()
-    const raceId = searchParams.get('raceId')
-    const orgId = searchParams.get('orgId') || ''
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString('zh-CN')
+}
 
-    const [requests, setRequests] = useState([])
-    const [categories, setCategories] = useState([])
-    const [accessAreas, setAccessAreas] = useState([])
-    const [loading, setLoading] = useState(true)
-    const [processing, setProcessing] = useState(false)
-    const [message, setMessage] = useState('')
-    const [activeTab, setActiveTab] = useState('pending')
-    const [statusFilter, setStatusFilter] = useState('')
-    const [selectedRequest, setSelectedRequest] = useState(null)
-    const [reviewForm, setReviewForm] = useState({
-        approved: true,
-        categoryId: '',
-        jobTitle: '',
-        accessCodes: [],
-        remark: '',
-        rejectReason: '',
+export default function CredentialReviewPage() {
+  const [searchParams] = useSearchParams()
+  const raceId = searchParams.get('raceId')
+  const orgId = searchParams.get('orgId') || ''
+  const { buildHref } = useCredentialSurface()
+  const context = useMemo(() => ({ orgId, raceId: raceId || '' }), [orgId, raceId])
+
+  const [requests, setRequests] = useState([])
+  const [categories, setCategories] = useState([])
+  const [accessAreas, setAccessAreas] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [processing, setProcessing] = useState(false)
+  const [message, setMessage] = useState('')
+  const [activeTab, setActiveTab] = useState('pending')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [selectedRequest, setSelectedRequest] = useState(null)
+  const [reviewForm, setReviewForm] = useState({
+    approved: true,
+    categoryId: '',
+    jobTitle: '',
+    accessCodes: [],
+    remark: '',
+    rejectReason: '',
+  })
+
+  const resetReviewForm = (request) => {
+    setSelectedRequest(request)
+    setReviewForm({
+      approved: request.status !== 'rejected',
+      categoryId: String(request.categoryId || ''),
+      jobTitle: request.jobTitle || '',
+      accessCodes: (request.accessAreas || []).map((item) => item.accessCode),
+      remark: request.reviewRemark || '',
+      rejectReason: request.rejectReason || '',
     })
+  }
 
-    const loadData = async () => {
-        if (!raceId) return
-        setLoading(true)
-        try {
-            const [requestRes, categoryRes, accessAreaRes] = await Promise.all([
-                credentialApi.getRequests(raceId, statusFilter ? { status: statusFilter } : {}),
-                credentialApi.getCategories(raceId),
-                credentialApi.getAccessAreas(raceId),
-            ])
-            if (requestRes.success) setRequests(requestRes.data || [])
-            if (categoryRes.success) setCategories(categoryRes.data || [])
-            if (accessAreaRes.success) setAccessAreas(accessAreaRes.data || [])
-        } catch (err) {
-            setMessage(`加载审核列表失败：${err.message}`)
-        } finally {
-            setLoading(false)
-        }
+  const loadData = async () => {
+    if (!raceId) return
+    setLoading(true)
+
+    try {
+      const [requestRes, categoryRes, accessAreaRes] = await Promise.all([
+        credentialApi.getRequests(raceId, statusFilter ? { status: statusFilter } : {}),
+        credentialApi.getCategories(raceId),
+        credentialApi.getAccessAreas(raceId),
+      ])
+
+      if (requestRes.success) setRequests(requestRes.data || [])
+      if (categoryRes.success) setCategories(categoryRes.data || [])
+      if (accessAreaRes.success) setAccessAreas(accessAreaRes.data || [])
+    } catch (err) {
+      setMessage(`加载审核列表失败：${err.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadData()
+  }, [raceId, statusFilter])
+
+  const filteredRequests = useMemo(() => {
+    const pendingStatuses = new Set(['submitted', 'under_review'])
+    return requests
+      .filter((item) => (activeTab === 'pending' ? pendingStatuses.has(item.status) : true))
+      .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))
+  }, [activeTab, requests])
+
+  useEffect(() => {
+    if (!selectedRequest) return
+
+    const nextSelected = filteredRequests.find((item) => String(item.id) === String(selectedRequest.id))
+    if (!nextSelected) {
+      setSelectedRequest(null)
+      return
     }
 
-    useEffect(() => {
-        void loadData()
-    }, [raceId, statusFilter])
+    resetReviewForm(nextSelected)
+  }, [filteredRequests])
 
-    const filteredRequests = useMemo(() => {
-        const pendingStatuses = new Set(['submitted', 'under_review'])
-        return requests
-            .filter((item) => (activeTab === 'pending' ? pendingStatuses.has(item.status) : true))
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    }, [activeTab, requests])
+  const metrics = useMemo(() => {
+    const pendingCount = requests.filter((item) => ['submitted', 'under_review'].includes(item.status)).length
+    const approvedCount = requests.filter((item) => item.status === 'approved').length
+    const rejectedCount = requests.filter((item) => item.status === 'rejected').length
 
-    const openReview = async (requestId) => {
-        try {
-            const res = await credentialApi.getRequest(raceId, requestId)
-            if (!res.success) return
-            const request = res.data
-            setSelectedRequest(request)
-            setReviewForm({
-                approved: request.status !== 'rejected',
-                categoryId: String(request.categoryId),
-                jobTitle: request.jobTitle || '',
-                accessCodes: (request.accessAreas || []).map((item) => item.accessCode),
-                remark: request.reviewRemark || '',
-                rejectReason: request.rejectReason || '',
-            })
-        } catch (err) {
-            setMessage(`加载请求详情失败：${err.message}`)
-        }
+    return [
+      { label: '审核池', value: loading ? '...' : formatNumber(pendingCount), meta: '优先处理 submitted 与 under_review。' },
+      { label: '已通过', value: loading ? '...' : formatNumber(approvedCount), meta: '通过后可继续进入制证或发放环节。' },
+      { label: '已驳回', value: loading ? '...' : formatNumber(rejectedCount), meta: '驳回原因应尽量明确，方便再次申请。' },
+    ]
+  }, [loading, requests])
+
+  const openReview = async (requestId) => {
+    try {
+      const res = await credentialApi.getRequest(raceId, requestId)
+      if (!res.success) return
+      resetReviewForm(res.data)
+    } catch (err) {
+      setMessage(`加载请求详情失败：${err.message}`)
+    }
+  }
+
+  const toggleAccessCode = (accessCode) => {
+    setReviewForm((prev) => ({
+      ...prev,
+      accessCodes: prev.accessCodes.includes(accessCode)
+        ? prev.accessCodes.filter((code) => code !== accessCode)
+        : [...prev.accessCodes, accessCode],
+    }))
+  }
+
+  const applyCategoryDefaults = (categoryId) => {
+    const category = categories.find((item) => String(item.id) === String(categoryId))
+    setReviewForm((prev) => ({
+      ...prev,
+      categoryId: String(categoryId),
+      accessCodes: category ? (category.accessAreas || []).map((item) => item.accessCode) : [],
+    }))
+  }
+
+  const submitReview = async () => {
+    if (!selectedRequest) return
+    if (!reviewForm.categoryId) {
+      setMessage('请选择证件类别')
+      return
+    }
+    if (!reviewForm.approved && !reviewForm.rejectReason.trim()) {
+      setMessage('驳回时必须填写原因')
+      return
     }
 
-    const toggleAccessCode = (accessCode) => {
-        setReviewForm((prev) => ({
-            ...prev,
-            accessCodes: prev.accessCodes.includes(accessCode)
-                ? prev.accessCodes.filter((code) => code !== accessCode)
-                : [...prev.accessCodes, accessCode],
-        }))
+    setProcessing(true)
+    setMessage('')
+
+    try {
+      await credentialApi.reviewRequest(raceId, selectedRequest.id, {
+        approved: reviewForm.approved,
+        categoryId: Number(reviewForm.categoryId),
+        jobTitle: reviewForm.jobTitle.trim() || undefined,
+        accessCodes: reviewForm.approved ? reviewForm.accessCodes : undefined,
+        remark: reviewForm.approved ? reviewForm.remark.trim() || undefined : undefined,
+        rejectReason: reviewForm.approved ? undefined : reviewForm.rejectReason.trim(),
+      })
+
+      setMessage('审核完成，列表已刷新')
+      setSelectedRequest(null)
+      await loadData()
+    } catch (err) {
+      setMessage(`审核失败：${err.message}`)
+    } finally {
+      setProcessing(false)
     }
+  }
 
-    const applyCategoryDefaults = (categoryId) => {
-        const category = categories.find((item) => String(item.id) === String(categoryId))
-        setReviewForm((prev) => ({
-            ...prev,
-            categoryId: String(categoryId),
-            accessCodes: category ? (category.accessAreas || []).map((item) => item.accessCode) : [],
-        }))
-    }
-
-    const submitReview = async () => {
-        if (!selectedRequest) return
-        if (!reviewForm.categoryId) {
-            setMessage('请选择证件类别')
-            return
-        }
-        if (!reviewForm.approved && !reviewForm.rejectReason.trim()) {
-            setMessage('驳回时必须填写原因')
-            return
-        }
-
-        setProcessing(true)
-        setMessage('')
-        try {
-            await credentialApi.reviewRequest(raceId, selectedRequest.id, {
-                approved: reviewForm.approved,
-                categoryId: Number(reviewForm.categoryId),
-                jobTitle: reviewForm.jobTitle.trim() || undefined,
-                accessCodes: reviewForm.approved ? reviewForm.accessCodes : undefined,
-                remark: reviewForm.remark.trim() || undefined,
-                rejectReason: reviewForm.approved ? undefined : reviewForm.rejectReason.trim(),
-            })
-            setMessage('审核完成')
-            setSelectedRequest(null)
-            await loadData()
-        } catch (err) {
-            setMessage(`审核失败：${err.message}`)
-        } finally {
-            setProcessing(false)
-        }
-    }
-
-    if (!raceId) {
-        return (
-            <div style={styles.container}>
-                <div style={styles.empty}>
-                    <p style={{ marginBottom: 16 }}>请先选择赛事</p>
-                    <Link to={`/admin/credential/select-race?orgId=${orgId}`} className="btn btn--primary">
-                        去选择赛事
-                    </Link>
-                </div>
-            </div>
-        )
-    }
-
+  if (!raceId) {
     return (
-        <div style={styles.container}>
-            <h1 style={styles.title}>证件审核</h1>
-            <p style={styles.subtitle}>审核时可以整体替换证件类别、职务和最终通行编码列表，不再使用加减覆盖规则。</p>
-
-            {message && (
-                <div
-                    style={{
-                        ...styles.message,
-                        backgroundColor: message.includes('失败') ? '#FEF2F2' : '#F0FDF4',
-                        color: message.includes('失败') ? '#DC2626' : '#166534',
-                    }}
-                >
-                    {message}
-                </div>
-            )}
-
-            <div style={styles.filterBar}>
-                <div style={styles.tabGroup}>
-                    {TAB_OPTIONS.map((tab) => (
-                        <button
-                            key={tab.value}
-                            className={`btn ${activeTab === tab.value ? 'btn--primary' : 'btn--ghost'}`}
-                            onClick={() => setActiveTab(tab.value)}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-                <select className="input" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={styles.select}>
-                    {STATUS_OPTIONS.map((item) => (
-                        <option key={item.value} value={item.value}>{item.label}</option>
-                    ))}
-                </select>
-            </div>
-
-            {loading ? (
-                <div style={styles.empty}>加载中...</div>
-            ) : filteredRequests.length === 0 ? (
-                <div style={styles.empty}>{activeTab === 'pending' ? '暂无待审核请求' : '暂无请求记录'}</div>
-            ) : (
-                <div style={styles.tableContainer}>
-                    <table style={styles.table}>
-                        <thead>
-                            <tr style={styles.tableHeader}>
-                                <th style={styles.th}>申请人</th>
-                                <th style={styles.th}>证件类别</th>
-                                <th style={styles.th}>职务</th>
-                                <th style={styles.th}>状态</th>
-                                <th style={styles.th}>提交时间</th>
-                                <th style={styles.th}>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredRequests.map((request) => {
-                                const badge = STATUS_BADGES[request.status] || STATUS_BADGES.submitted
-                                return (
-                                    <tr key={request.id} style={styles.row}>
-                                        <td style={styles.td}>
-                                            <div style={styles.name}>{request.personName}</div>
-                                            <div style={styles.org}>{request.orgName || '-'}</div>
-                                        </td>
-                                        <td style={styles.td}>{request.categoryName}</td>
-                                        <td style={styles.td}>{request.jobTitle || '-'}</td>
-                                        <td style={styles.td}>
-                                            <span style={{ ...styles.statusBadge, background: badge.background, color: badge.color }}>
-                                                {badge.label}
-                                            </span>
-                                        </td>
-                                        <td style={styles.td}>{new Date(request.createdAt).toLocaleString('zh-CN')}</td>
-                                        <td style={styles.td}>
-                                            <button className="btn btn--primary btn--sm" onClick={() => openReview(request.id)}>
-                                                {['submitted', 'under_review'].includes(request.status) ? '审核' : '详情'}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {selectedRequest && (
-                <div style={styles.modal}>
-                    <div style={styles.modalContent}>
-                        <h2 style={styles.modalTitle}>审核请求</h2>
-
-                        <div style={styles.summaryGrid}>
-                            <div><span style={styles.summaryLabel}>申请人</span><span style={styles.summaryValue}>{selectedRequest.personName}</span></div>
-                            <div><span style={styles.summaryLabel}>单位</span><span style={styles.summaryValue}>{selectedRequest.orgName || '-'}</span></div>
-                            <div><span style={styles.summaryLabel}>当前类别</span><span style={styles.summaryValue}>{selectedRequest.categoryName}</span></div>
-                            <div><span style={styles.summaryLabel}>提交时间</span><span style={styles.summaryValue}>{new Date(selectedRequest.createdAt).toLocaleString('zh-CN')}</span></div>
-                        </div>
-
-                        <div style={styles.field}>
-                            <label style={styles.label}>证件类别</label>
-                            <select
-                                className="input"
-                                value={reviewForm.categoryId}
-                                onChange={(e) => applyCategoryDefaults(e.target.value)}
-                                style={styles.input}
-                            >
-                                <option value="">请选择类别</option>
-                                {categories.map((item) => (
-                                    <option key={item.id} value={item.id}>{item.categoryName}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div style={styles.field}>
-                            <label style={styles.label}>职务</label>
-                            <input
-                                className="input"
-                                type="text"
-                                value={reviewForm.jobTitle}
-                                onChange={(e) => setReviewForm({ ...reviewForm, jobTitle: e.target.value })}
-                                style={styles.input}
-                            />
-                        </div>
-
-                        <div style={styles.field}>
-                            <label style={styles.label}>最终通行编码</label>
-                            <div style={styles.checkboxList}>
-                                {accessAreas.map((item) => (
-                                    <label key={item.id} style={styles.checkboxItem}>
-                                        <input
-                                            type="checkbox"
-                                            checked={reviewForm.accessCodes.includes(item.accessCode)}
-                                            onChange={() => toggleAccessCode(item.accessCode)}
-                                        />
-                                        <span style={{ ...styles.dot, backgroundColor: item.accessColor || '#3B82F6' }} />
-                                        <span>{item.accessName}</span>
-                                        <span style={styles.codeHint}>({item.accessCode})</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div style={styles.decisionRow}>
-                            <label style={styles.radioLabel}>
-                                <input
-                                    type="radio"
-                                    checked={reviewForm.approved}
-                                    onChange={() => setReviewForm({ ...reviewForm, approved: true })}
-                                />
-                                <span>通过</span>
-                            </label>
-                            <label style={styles.radioLabel}>
-                                <input
-                                    type="radio"
-                                    checked={!reviewForm.approved}
-                                    onChange={() => setReviewForm({ ...reviewForm, approved: false })}
-                                />
-                                <span>驳回</span>
-                            </label>
-                        </div>
-
-                        <div style={styles.field}>
-                            <label style={styles.label}>{reviewForm.approved ? '审核备注' : '驳回原因'}</label>
-                            <textarea
-                                className="input"
-                                value={reviewForm.approved ? reviewForm.remark : reviewForm.rejectReason}
-                                onChange={(e) => setReviewForm({
-                                    ...reviewForm,
-                                    [reviewForm.approved ? 'remark' : 'rejectReason']: e.target.value,
-                                })}
-                                style={{ ...styles.input, minHeight: 88 }}
-                            />
-                        </div>
-
-                        <div style={styles.modalActions}>
-                            <button className="btn btn--ghost" onClick={() => setSelectedRequest(null)} disabled={processing}>
-                                取消
-                            </button>
-                            <button className="btn btn--primary" onClick={submitReview} disabled={processing}>
-                                {processing ? '处理中...' : '确认提交'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
+      <AdminSurface title="先选择赛事" subtitle="证件审核始终依赖赛事上下文。">
+        <AdminEmptyState
+          title="当前没有赛事上下文"
+          description="先锁定赛事，审核池、类别和通行区域才有意义。"
+          action={<Link to={buildHref('/credential/select-race', context)} className="btn btn--primary">去选择赛事</Link>}
+        />
+      </AdminSurface>
     )
+  }
+
+  return (
+    <div style={pageStyle}>
+      <AdminSectionHeader
+        eyebrow="审核工位"
+        title="证件审核中心"
+        description="审核页已经从“列表 + 弹窗”改成了常驻审核台。左侧盯请求池，右侧直接完成类别调整、通行范围确认和通过/驳回决策，路径更适合连续处理。"
+        metrics={metrics}
+        actions={<Link to={buildHref('/credential-center', context)} className="btn btn--ghost">返回证件中心</Link>}
+      />
+
+      {message ? (
+        <AdminNotice tone={message.includes('失败') || message.includes('必须') ? 'danger' : 'success'}>
+          {message}
+        </AdminNotice>
+      ) : null}
+
+      <AdminToolbar>
+        <div style={toolbarStyle}>
+          <div style={tabGroupStyle}>
+            {TAB_OPTIONS.map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                className={`btn ${activeTab === tab.value ? 'btn--primary' : 'btn--ghost'}`}
+                onClick={() => setActiveTab(tab.value)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div style={filterGroupStyle}>
+            <select className="input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={filterSelectStyle}>
+              {STATUS_OPTIONS.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </select>
+            <AdminStatusPill tone="warning">{`当前列表 ${formatNumber(filteredRequests.length)} 条`}</AdminStatusPill>
+          </div>
+        </div>
+      </AdminToolbar>
+
+      <div style={reviewLayoutStyle}>
+        <AdminSurface
+          title="审核请求池"
+          subtitle="先从这里判断优先级，再切到右侧处理详情。"
+        >
+          {loading ? (
+            <AdminEmptyState title="正在加载请求池" description="会同步读取申请记录、类别和通行区域规则。" />
+          ) : filteredRequests.length === 0 ? (
+            <AdminEmptyState
+              title={activeTab === 'pending' ? '暂无待审核请求' : '暂无请求记录'}
+              description={activeTab === 'pending' ? '当前赛事下没有待你处理的证件请求。' : '换一个筛选条件，或者回到申请页创建新请求。'}
+            />
+          ) : (
+            <AdminDataTable>
+              <thead>
+                <tr>
+                  <th>申请人</th>
+                  <th>类别</th>
+                  <th>状态</th>
+                  <th>提交时间</th>
+                  <th>处理</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRequests.map((request) => {
+                  const status = STATUS_META[request.status] || STATUS_META.submitted
+                  const active = selectedRequest && String(selectedRequest.id) === String(request.id)
+
+                  return (
+                    <tr key={request.id} style={active ? activeRowStyle : null}>
+                      <td>
+                        <div style={primaryCellStyle}>{request.personName}</div>
+                        <div style={secondaryCellStyle}>{request.orgName || '-'}</div>
+                      </td>
+                      <td>
+                        <div style={primaryCellStyle}>{request.categoryName || '-'}</div>
+                        <div style={secondaryCellStyle}>{request.jobTitle || '未填写职务'}</div>
+                      </td>
+                      <td>
+                        <AdminStatusPill tone={status.tone}>{status.label}</AdminStatusPill>
+                      </td>
+                      <td>{new Date(request.createdAt).toLocaleString('zh-CN')}</td>
+                      <td>
+                        <button type="button" className={`btn ${active ? 'btn--secondary' : 'btn--ghost'} btn--sm`} onClick={() => openReview(request.id)}>
+                          {active ? '处理中' : ['submitted', 'under_review'].includes(request.status) ? '去审核' : '看详情'}
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </AdminDataTable>
+          )}
+        </AdminSurface>
+
+        <AdminSurface
+          title={selectedRequest ? `审核 ${selectedRequest.personName}` : '审核工作台'}
+          subtitle={selectedRequest ? '在这里直接完成最终类别、通行权限与决策。' : '从左侧点开一条申请后，审核面板会常驻在这里。'}
+          actions={selectedRequest ? (
+            <AdminStatusPill tone={(STATUS_META[selectedRequest.status] || STATUS_META.submitted).tone}>
+              {(STATUS_META[selectedRequest.status] || STATUS_META.submitted).label}
+            </AdminStatusPill>
+          ) : null}
+        >
+          {!selectedRequest ? (
+            <AdminEmptyState
+              title="还没有选中审核对象"
+              description="左侧列表会一直保留，适合连续处理多条请求，不需要每次开关弹窗。"
+            />
+          ) : (
+            <div style={reviewPanelStyle}>
+              <div style={summaryGridStyle}>
+                <div style={summaryCardStyle}>
+                  <span style={summaryLabelStyle}>申请人</span>
+                  <span style={summaryValueStyle}>{selectedRequest.personName}</span>
+                </div>
+                <div style={summaryCardStyle}>
+                  <span style={summaryLabelStyle}>所属单位</span>
+                  <span style={summaryValueStyle}>{selectedRequest.orgName || '-'}</span>
+                </div>
+                <div style={summaryCardStyle}>
+                  <span style={summaryLabelStyle}>当前类别</span>
+                  <span style={summaryValueStyle}>{selectedRequest.categoryName || '-'}</span>
+                </div>
+                <div style={summaryCardStyle}>
+                  <span style={summaryLabelStyle}>提交时间</span>
+                  <span style={summaryValueStyle}>{new Date(selectedRequest.createdAt).toLocaleString('zh-CN')}</span>
+                </div>
+              </div>
+
+              <div style={fieldGridStyle}>
+                <label style={fieldStyle}>
+                  <span style={fieldLabelStyle}>最终证件类别</span>
+                  <select
+                    className="input"
+                    value={reviewForm.categoryId}
+                    onChange={(event) => applyCategoryDefaults(event.target.value)}
+                  >
+                    <option value="">请选择类别</option>
+                    {categories.map((item) => (
+                      <option key={item.id} value={item.id}>{item.categoryName}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label style={fieldStyle}>
+                  <span style={fieldLabelStyle}>最终职务</span>
+                  <input
+                    className="input"
+                    type="text"
+                    value={reviewForm.jobTitle}
+                    onChange={(event) => setReviewForm((prev) => ({ ...prev, jobTitle: event.target.value }))}
+                    placeholder="审核后显示在证件上的职务"
+                  />
+                </label>
+              </div>
+
+              <div style={decisionStripStyle}>
+                <button
+                  type="button"
+                  className={`btn ${reviewForm.approved ? 'btn--primary' : 'btn--ghost'}`}
+                  onClick={() => setReviewForm((prev) => ({ ...prev, approved: true }))}
+                >
+                  审核通过
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${reviewForm.approved ? 'btn--ghost' : 'btn--primary'}`}
+                  onClick={() => setReviewForm((prev) => ({ ...prev, approved: false }))}
+                >
+                  驳回申请
+                </button>
+                <AdminStatusPill tone={reviewForm.approved ? 'success' : 'danger'}>
+                  {reviewForm.approved ? '将进入后续制证' : '会要求申请方重新提交'}
+                </AdminStatusPill>
+              </div>
+
+              <div style={fieldStyle}>
+                <span style={fieldLabelStyle}>最终通行区域</span>
+                <div style={accessGridStyle}>
+                  {accessAreas.map((item) => (
+                    <label key={item.id} style={{ ...accessChipStyle, ...(reviewForm.accessCodes.includes(item.accessCode) ? accessChipActiveStyle : null) }}>
+                      <input
+                        type="checkbox"
+                        checked={reviewForm.accessCodes.includes(item.accessCode)}
+                        onChange={() => toggleAccessCode(item.accessCode)}
+                        disabled={!reviewForm.approved}
+                        style={hiddenCheckboxStyle}
+                      />
+                      <span style={{ ...accessDotStyle, background: item.accessColor || '#f97316' }} />
+                      <span style={accessNameStyle}>{item.accessName}</span>
+                      <span style={accessCodeStyle}>{item.accessCode}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <label style={fieldStyle}>
+                <span style={fieldLabelStyle}>{reviewForm.approved ? '审核备注' : '驳回原因'}</span>
+                <textarea
+                  className="input"
+                  value={reviewForm.approved ? reviewForm.remark : reviewForm.rejectReason}
+                  onChange={(event) => setReviewForm((prev) => ({
+                    ...prev,
+                    [reviewForm.approved ? 'remark' : 'rejectReason']: event.target.value,
+                  }))}
+                  style={textareaStyle}
+                  placeholder={reviewForm.approved ? '说明这次审核调整了什么。' : '明确告诉申请人为什么不能通过。'}
+                />
+              </label>
+
+              <div style={actionRowStyle}>
+                <button type="button" className="btn btn--ghost" onClick={() => setSelectedRequest(null)} disabled={processing}>
+                  暂不处理
+                </button>
+                <button type="button" className="btn btn--primary" onClick={submitReview} disabled={processing}>
+                  {processing ? '提交中...' : '确认审核结果'}
+                </button>
+              </div>
+            </div>
+          )}
+        </AdminSurface>
+      </div>
+    </div>
+  )
 }
 
-const styles = {
-    container: { padding: 24, maxWidth: 1440, margin: '0 auto' },
-    title: { fontSize: 24, fontWeight: 700, marginBottom: 8 },
-    subtitle: { fontSize: 14, color: '#6B7280', marginBottom: 20 },
-    message: { padding: '12px 16px', borderRadius: 8, marginBottom: 16, fontSize: 14 },
-    filterBar: { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', marginBottom: 20, padding: '16px 20px', background: '#FFFFFF', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
-    tabGroup: { display: 'flex', gap: 8 },
-    select: { minWidth: 180 },
-    empty: { textAlign: 'center', padding: 64, color: '#6B7280' },
-    tableContainer: { background: '#FFFFFF', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' },
-    table: { width: '100%', borderCollapse: 'collapse' },
-    tableHeader: { background: '#F9FAFB', borderBottom: '1px solid #E5E7EB' },
-    th: { textAlign: 'left', padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#6B7280' },
-    row: { borderBottom: '1px solid #F3F4F6' },
-    td: { padding: '16px', fontSize: 14, color: '#374151' },
-    name: { fontWeight: 600, color: '#111827' },
-    org: { marginTop: 4, fontSize: 12, color: '#6B7280' },
-    statusBadge: { padding: '4px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700 },
-    modal: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24 },
-    modalContent: { background: '#FFFFFF', borderRadius: 12, width: '100%', maxWidth: 760, maxHeight: '90vh', overflowY: 'auto', padding: 24 },
-    modalTitle: { fontSize: 18, fontWeight: 600, marginBottom: 20 },
-    summaryGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20, paddingBottom: 20, borderBottom: '1px solid #E5E7EB' },
-    summaryLabel: { display: 'block', fontSize: 13, color: '#6B7280', marginBottom: 4 },
-    summaryValue: { fontSize: 14, color: '#374151' },
-    field: { display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 },
-    label: { fontSize: 14, fontWeight: 500, color: '#374151' },
-    input: { padding: '10px 12px', border: '1px solid #D1D5DB', borderRadius: 6, fontSize: 14 },
-    checkboxList: { display: 'flex', flexDirection: 'column', gap: 8, border: '1px solid #E5E7EB', borderRadius: 8, padding: 12, maxHeight: 220, overflowY: 'auto' },
-    checkboxItem: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' },
-    dot: { width: 12, height: 12, borderRadius: '50%', flexShrink: 0 },
-    codeHint: { fontSize: 12, color: '#6B7280' },
-    decisionRow: { display: 'flex', gap: 24, marginBottom: 16 },
-    radioLabel: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer' },
-    modalActions: { display: 'flex', justifyContent: 'flex-end', gap: 12 },
+const pageStyle = {
+  display: 'grid',
+  gap: 18,
 }
 
-export default CredentialReviewPage
+const toolbarStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  gap: 12,
+  flexWrap: 'wrap',
+  alignItems: 'center',
+}
+
+const tabGroupStyle = {
+  display: 'flex',
+  gap: 8,
+  flexWrap: 'wrap',
+}
+
+const filterGroupStyle = {
+  display: 'flex',
+  gap: 10,
+  alignItems: 'center',
+  flexWrap: 'wrap',
+}
+
+const filterSelectStyle = {
+  minWidth: 180,
+}
+
+const reviewLayoutStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1.1fr) minmax(360px, 0.9fr)',
+  gap: 18,
+  alignItems: 'start',
+}
+
+const activeRowStyle = {
+  outline: '1px solid rgba(249, 115, 22, 0.24)',
+}
+
+const primaryCellStyle = {
+  fontWeight: 700,
+  letterSpacing: '-0.02em',
+}
+
+const secondaryCellStyle = {
+  marginTop: 4,
+  color: '#66717f',
+  fontSize: 12,
+}
+
+const reviewPanelStyle = {
+  display: 'grid',
+  gap: 16,
+}
+
+const summaryGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gap: 10,
+}
+
+const summaryCardStyle = {
+  display: 'grid',
+  gap: 6,
+  padding: '14px 16px',
+  borderRadius: 18,
+  background: 'rgba(15, 23, 42, 0.04)',
+  border: '1px solid rgba(17, 24, 39, 0.08)',
+}
+
+const summaryLabelStyle = {
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: '#66717f',
+}
+
+const summaryValueStyle = {
+  fontWeight: 700,
+  lineHeight: 1.5,
+}
+
+const fieldGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+  gap: 12,
+}
+
+const fieldStyle = {
+  display: 'grid',
+  gap: 8,
+}
+
+const fieldLabelStyle = {
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: '#66717f',
+}
+
+const decisionStripStyle = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 10,
+  alignItems: 'center',
+  padding: '14px 16px',
+  borderRadius: 18,
+  background: 'rgba(15, 23, 42, 0.04)',
+}
+
+const accessGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+  gap: 10,
+}
+
+const accessChipStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  padding: '12px 14px',
+  borderRadius: 16,
+  border: '1px solid rgba(17, 24, 39, 0.08)',
+  background: 'rgba(248, 250, 252, 0.88)',
+  cursor: 'pointer',
+  position: 'relative',
+}
+
+const accessChipActiveStyle = {
+  borderColor: 'rgba(249, 115, 22, 0.28)',
+  background: 'rgba(249, 115, 22, 0.08)',
+}
+
+const hiddenCheckboxStyle = {
+  position: 'absolute',
+  opacity: 0,
+  pointerEvents: 'none',
+}
+
+const accessDotStyle = {
+  width: 12,
+  height: 12,
+  borderRadius: 999,
+  flexShrink: 0,
+}
+
+const accessNameStyle = {
+  fontWeight: 600,
+  minWidth: 0,
+}
+
+const accessCodeStyle = {
+  marginLeft: 'auto',
+  fontSize: 12,
+  color: '#66717f',
+}
+
+const textareaStyle = {
+  minHeight: 96,
+}
+
+const actionRowStyle = {
+  display: 'flex',
+  justifyContent: 'flex-end',
+  gap: 10,
+  flexWrap: 'wrap',
+}

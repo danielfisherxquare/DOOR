@@ -1,0 +1,527 @@
+/**
+ * Projects Components Styles
+ * 项目组件样式 - TreeGrid, TaskEditModal, GanttView
+ */
+
+/* ==================== TreeGrid ==================== */
+
+.tree-grid-container {
+    padding: 20px;
+    background: var(--layer-surface);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.tree-grid-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.tree-grid-title {
+    font-size: var(--font-size-lg);
+    margin: 0;
+    color: var(--layer-text-primary);
+}
+
+.tree-grid-add-btn {
+    padding: 6px 12px;
+    background: var(--layer-accent);
+    color: var(--layer-text-on-accent);
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+}
+
+.tree-grid-add-btn:hover {
+    background: var(--layer-accent-hover);
+}
+
+.tree-grid-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: var(--font-size-md);
+}
+
+.tree-grid-header-row {
+    background: var(--layer-bg-secondary);
+    border-bottom: 1px solid var(--layer-border);
+}
+
+.tree-grid-header-cell {
+    padding: 12px;
+    font-weight: 600;
+    color: var(--layer-text-primary);
+}
+
+.tree-grid-row {
+    border-bottom: 1px solid var(--layer-border);
+}
+
+.tree-grid-cell {
+    padding: 8px 12px;
+}
+
+.tree-grid-cell--name {
+    display: flex;
+    align-items: center;
+}
+
+.tree-grid-indent {
+    flex-shrink: 0;
+}
+
+.tree-toggle-btn {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    color: var(--layer-text-secondary);
+}
+
+.tree-toggle-btn:hover {
+    background: var(--layer-bg-secondary);
+    border-radius: var(--radius-sm);
+}
+
+.tree-toggle-icon {
+    width: 12px;
+    height: 12px;
+}
+
+.tree-toggle-icon--expanded {
+    transform: rotate(90deg);
+}
+
+.tree-input {
+    border: none;
+    background: transparent;
+    outline: none;
+    width: 100%;
+    font-size: var(--font-size-sm);
+    color: var(--layer-text-primary);
+}
+
+.tree-input--root {
+    font-weight: 600;
+}
+
+.tree-input--nested {
+    font-weight: 400;
+}
+
+.tree-select {
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: var(--font-size-sm);
+    color: var(--layer-text-primary);
+    cursor: pointer;
+}
+
+.tree-btn--ghost {
+    padding: 4px 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--layer-text-secondary);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+    min-width: auto;
+}
+
+.tree-btn--ghost:hover {
+    background: var(--layer-bg-secondary);
+    border-radius: var(--radius-sm);
+}
+
+.tree-date-input {
+    border: 1px solid var(--layer-border);
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    background: var(--layer-surface);
+    color: var(--layer-text-primary);
+}
+
+.tree-action-btn--add {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--success);
+    font-size: var(--font-size-lg);
+    margin-right: 8px;
+}
+
+.tree-action-btn--edit {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--info);
+    font-size: var(--font-size-md);
+    margin-right: 8px;
+}
+
+.tree-action-btn--delete {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--danger);
+    font-size: var(--font-size-md);
+}
+
+.tree-empty-cell {
+    padding: 20px;
+    text-align: center;
+    color: var(--layer-text-secondary);
+}
+
+/* ==================== TaskEditModal ==================== */
+
+.task-edit-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.task-edit-card {
+    background: var(--layer-surface);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    width: 640px;
+    max-width: 92%;
+    box-shadow: var(--shadow-lg);
+}
+
+.task-edit-title {
+    margin: 0 0 16px;
+    font-size: var(--font-size-lg);
+    color: var(--layer-text-primary);
+}
+
+.task-edit-field {
+    margin-bottom: 12px;
+}
+
+.task-edit-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.task-edit-row>* {
+    flex: 1;
+}
+
+.task-edit-label {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--layer-text-secondary);
+    margin-bottom: 4px;
+}
+
+.task-edit-mini-label {
+    font-size: var(--font-size-xs);
+    color: var(--layer-text-secondary);
+    margin-bottom: 4px;
+}
+
+.task-edit-input,
+.task-edit-select,
+.task-edit-textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--layer-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    background: var(--layer-surface);
+    color: var(--layer-text-primary);
+}
+
+.task-edit-input:focus,
+.task-edit-select:focus,
+.task-edit-textarea:focus {
+    outline: none;
+    border-color: var(--layer-accent);
+    box-shadow: 0 0 0 3px var(--layer-accent-soft);
+}
+
+.task-edit-textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.task-edit-search-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.task-edit-search-input {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+.task-edit-candidate-list {
+    max-height: 280px;
+    overflow: auto;
+    border: 1px solid var(--layer-border);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    display: grid;
+    gap: 8px;
+}
+
+.task-edit-candidate-empty {
+    color: var(--layer-text-secondary);
+    font-size: var(--font-size-sm);
+    text-align: center;
+    padding: 16px;
+}
+
+.task-edit-candidate-card {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 8px;
+    border-radius: var(--radius-sm);
+    background: var(--layer-bg-secondary);
+    cursor: pointer;
+}
+
+.task-edit-candidate-card:hover {
+    background: var(--layer-bg-tertiary);
+}
+
+.task-edit-candidate-card input[type="checkbox"] {
+    margin-top: 4px;
+}
+
+.task-edit-candidate-info {
+    flex: 1;
+}
+
+.task-edit-candidate-name {
+    font-weight: 600;
+    color: var(--layer-text-primary);
+}
+
+.task-edit-candidate-meta {
+    font-size: var(--font-size-xs);
+    color: var(--layer-text-secondary);
+    margin-top: 4px;
+}
+
+.task-edit-candidate-position {
+    margin-top: 8px;
+}
+
+.task-edit-candidate-position-input {
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.task-edit-selected-summary {
+    margin-top: 8px;
+    font-size: var(--font-size-xs);
+    color: var(--layer-text-secondary);
+    display: grid;
+    gap: 4px;
+}
+
+.task-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+/* ==================== GanttView ==================== */
+
+.gantt-container {
+    padding: 20px;
+    background: var(--layer-surface);
+    border-radius: 0;
+    border: 1px solid var(--layer-border);
+    box-shadow: var(--shadow-sm);
+}
+
+.gantt-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.gantt-title {
+    font-size: var(--font-size-lg);
+    margin: 0;
+    color: var(--layer-text-primary);
+    font-family: var(--font-headline);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.gantt-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.gantt-scale-btn {
+    padding: 4px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--layer-border);
+    background: var(--layer-surface);
+    color: var(--layer-text-secondary);
+    cursor: pointer;
+    font-size: var(--font-size-xs);
+}
+
+.gantt-scale-btn:hover {
+    background: var(--layer-bg-secondary);
+}
+
+.gantt-scale-btn--active {
+    background: var(--layer-accent-soft);
+    color: var(--layer-accent);
+}
+
+.gantt-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--layer-border);
+    border-radius: 0;
+}
+
+.gantt-grid {
+    display: grid;
+    grid-template-columns: minmax(200px, max-content) minmax(100px, max-content) repeat(var(--gantt-columns, 30), minmax(var(--gantt-column-width, 40px), 1fr));
+    min-width: 100%;
+}
+
+.gantt-header-cell {
+    padding: 12px 16px;
+    font-weight: 600;
+    background: var(--layer-bg-secondary);
+    border-bottom: 1px solid var(--layer-border);
+    border-right: 1px solid var(--layer-border);
+}
+
+.gantt-header-cell--sticky {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+}
+
+.gantt-header-cell--sticky-2 {
+    position: sticky;
+    left: 200px;
+    z-index: 10;
+}
+
+.gantt-header-label {
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    color: var(--layer-text-primary);
+    text-align: center;
+}
+
+.gantt-header-sub-label {
+    font-size: var(--font-size-caption);
+    color: var(--layer-text-secondary);
+    text-align: center;
+}
+
+.gantt-column {
+    border-right: 1px dashed var(--layer-border-subtle);
+}
+
+.gantt-cell {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--layer-border);
+    border-right: 1px solid var(--layer-border);
+}
+
+.gantt-cell--sticky {
+    position: sticky;
+    left: 0;
+    background: var(--layer-surface);
+    z-index: 5;
+}
+
+.gantt-cell--sticky-2 {
+    position: sticky;
+    left: 200px;
+    background: var(--layer-surface);
+    z-index: 5;
+}
+
+.gantt-cell--name {
+    font-size: var(--font-size-md);
+    color: var(--layer-text-primary);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.gantt-cell--assignee {
+    font-size: var(--font-size-sm);
+    color: var(--layer-text-secondary);
+}
+
+.gantt-row-track {
+    grid-column: 3 / -1;
+    background: var(--layer-surface);
+    border-bottom: 1px solid var(--layer-border);
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(var(--gantt-columns, 30), 1fr);
+}
+
+.gantt-task-bar {
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    background: var(--gantt-task-color, var(--layer-text-secondary));
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    color: var(--layer-text-on-accent);
+    font-size: var(--font-size-caption);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.gantt-task-bar:hover {
+    opacity: 0.8;
+}
+
+.gantt-task-bar--done {
+    background: var(--success);
+}
+
+.gantt-task-bar--in-progress {
+    background: var(--info);
+}
+
+.gantt-task-bar--todo {
+    background: var(--layer-text-secondary);
+}
+
+.gantt-loading {
+    padding: 20px;
+    text-align: center;
+    color: var(--layer-text-secondary);
+}

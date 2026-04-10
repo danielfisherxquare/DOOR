@@ -39,6 +39,7 @@ export const userMapper = {
             emailVerified: row.email_verified,
             status: row.status,
             mustChangePassword: row.must_change_password,
+            preferences: row.preferences || {},
             createdAt: row.created_at,
             updatedAt: row.updated_at,
         };

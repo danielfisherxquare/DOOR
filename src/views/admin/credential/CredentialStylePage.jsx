@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import credentialApi from '../../../api/credential'
+import { useCredentialSurface } from './useCredentialSurface'
 
 const STATUS_OPTIONS = [
     { value: '', label: '全部状态' },
@@ -24,6 +25,8 @@ const EMPTY_TEMPLATE = {
 function CredentialStylePage() {
     const [searchParams] = useSearchParams()
     const raceId = searchParams.get('raceId')
+    const orgId = searchParams.get('orgId') || ''
+    const { buildHref } = useCredentialSurface()
 
     const [templates, setTemplates] = useState([])
     const [loading, setLoading] = useState(true)
@@ -134,7 +137,7 @@ function CredentialStylePage() {
             <div style={styles.container}>
                 <div style={styles.empty}>
                     <p style={{ marginBottom: 16 }}>请先选择赛事</p>
-                    <Link to={`/admin/credential/select-race?orgId=${searchParams.get('orgId') || ''}`} className="btn btn--primary">
+                    <Link to={buildHref('/credential/select-race', { orgId })} className="btn btn--primary">
                         去选择赛事
                     </Link>
                 </div>

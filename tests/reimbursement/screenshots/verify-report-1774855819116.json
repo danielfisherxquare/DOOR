@@ -1,0 +1,104 @@
+{
+  "timestamp": "2026-03-30T07:29:37.084Z",
+  "tests": [
+    {
+      "name": "后端服务健康检查",
+      "passed": false,
+      "error": "HTTP 401",
+      "timestamp": "2026-03-30T07:29:37.662Z"
+    },
+    {
+      "name": "前端应用可访问",
+      "passed": true,
+      "error": null,
+      "timestamp": "2026-03-30T07:29:58.053Z"
+    },
+    {
+      "name": "登录成功",
+      "passed": false,
+      "error": "未跳转，当前 URL: http://127.0.0.1:3000/login, 错误：未知错误",
+      "timestamp": "2026-03-30T07:30:12.958Z"
+    },
+    {
+      "name": "导航到报销页面",
+      "passed": false,
+      "error": "未找到报销相关元素",
+      "timestamp": "2026-03-30T07:30:19.109Z"
+    },
+    {
+      "name": "找到配置按钮",
+      "passed": false,
+      "error": null,
+      "timestamp": "2026-03-30T07:30:19.112Z"
+    },
+    {
+      "name": "LLM 配置状态",
+      "passed": false,
+      "error": "无法确定配置状态",
+      "timestamp": "2026-03-30T07:30:19.114Z"
+    },
+    {
+      "name": "未自动退回登录页",
+      "passed": false,
+      "error": "被自动 redirect 到登录页",
+      "timestamp": "2026-03-30T07:30:19.114Z"
+    },
+    {
+      "name": "上传发票按钮",
+      "passed": false,
+      "error": null,
+      "timestamp": "2026-03-30T07:30:19.116Z"
+    },
+    {
+      "name": "上传付款凭证按钮",
+      "passed": false,
+      "error": null,
+      "timestamp": "2026-03-30T07:30:19.116Z"
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "frontend-home",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\reimbursement\\screenshots\\verify-frontend-home-1774855793361.png"
+    },
+    {
+      "name": "reimbursement-page",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\reimbursement\\screenshots\\verify-reimbursement-page-1774855819033.png"
+    }
+  ],
+  "issues": [
+    {
+      "test": "后端服务健康检查",
+      "error": "HTTP 401"
+    },
+    {
+      "test": "登录成功",
+      "error": "未跳转，当前 URL: http://127.0.0.1:3000/login, 错误：未知错误"
+    },
+    {
+      "test": "导航到报销页面",
+      "error": "未找到报销相关元素"
+    },
+    {
+      "test": "找到配置按钮",
+      "error": null
+    },
+    {
+      "test": "LLM 配置状态",
+      "error": "无法确定配置状态"
+    },
+    {
+      "test": "未自动退回登录页",
+      "error": "被自动 redirect 到登录页"
+    },
+    {
+      "test": "上传发票按钮",
+      "error": null
+    },
+    {
+      "test": "上传付款凭证按钮",
+      "error": null
+    }
+  ],
+  "passed": false
+}

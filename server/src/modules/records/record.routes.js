@@ -20,7 +20,7 @@ async function resolveScopedOrgId(req, raceId) {
         return access.operatorOrgId;
     }
 
-    if (['race_editor', 'race_viewer'].includes(req.authContext.role)) {
+    if (['race_admin', 'user'].includes(req.authContext.role)) {
         throw Object.assign(new Error('当前角色必须指定 raceId'), { status: 400, expose: true });
     }
 

@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
 process.env.DATABASE_URL = DATABASE_URL;
+process.env.NODE_ENV = 'test';
 
 const { default: knex } = await import('../src/db/knex.js');
 const migration = await import('../src/db/migrations/20260317000007_migrate_legacy_credential_data.js');
@@ -23,30 +24,23 @@ async function createUser({ username, email, password, role, orgId }) {
     return user;
 }
 
+async function resetDatabase() {
+    const result = await knex.raw(`
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+          AND tablename NOT IN ('knex_migrations', 'knex_migrations_lock')
+    `);
+    const tableNames = result.rows.map((row) => `"${row.tablename}"`);
+    if (tableNames.length > 0) {
+        await knex.raw(`TRUNCATE TABLE ${tableNames.join(', ')} RESTART IDENTITY CASCADE`);
+    }
+}
+
 test('legacy credential data migrates into categories, access areas, requests, and credential snapshots', async (t) => {
     await knex.migrate.rollback(undefined, true);
     await knex.migrate.latest();
-
-    await knex('credential_credential_access_areas').del();
-    await knex('credential_request_access_areas').del();
-    await knex('credential_requests').del();
-    await knex('credential_category_access_areas').del();
-    await knex('credential_categories').del();
-    await knex('credential_access_areas').del();
-    await knex('credential_credential_zones').del();
-    await knex('credential_credentials').del();
-    await knex('credential_application_zone_overrides').del();
-    await knex('credential_applications').del();
-    await knex('credential_role_template_zones').del();
-    await knex('credential_role_templates').del();
-    await knex('credential_style_templates').del();
-    await knex('credential_zones').del();
-    await knex('user_race_permissions').del();
-    await knex('org_race_permissions').del();
-    await knex('refresh_tokens').del();
-    await knex('users').del();
-    await knex('races').del();
-    await knex('organizations').del();
+    await resetDatabase();
 
     const [org] = await knex('organizations').insert({ name: 'Credential Org', slug: 'credential-org' }).returning('*');
     const [race] = await knex('races').insert({
@@ -66,7 +60,7 @@ test('legacy credential data migrates into categories, access areas, requests, a
         username: 'credential_applicant',
         email: 'credential_applicant@test.com',
         password: 'applicant123',
-        role: 'race_editor',
+        role: 'race_admin',
         orgId: org.id,
     });
 

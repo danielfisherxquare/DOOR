@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import projectsApi from '../../api/projects'
 import TaskEditModal from './TaskEditModal'
+import './projects-components.css'
 
 const emptyTask = (projectId, parentId = null) => ({
   title: '',
@@ -92,70 +93,70 @@ export default function TreeGrid({ projectId }) {
 
   const visibleRows = flattenNodes(tasks)
 
-  if (loading) return <div style={{ padding: 20 }}>加载任务中...</div>
+  if (loading) return <div className="tree-grid-loading">加载任务中...</div>
 
   return (
-    <div style={{ padding: 20, background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h3 style={{ fontSize: 18, margin: 0, color: '#374151' }}>任务列表</h3>
-        <button onClick={() => void handleCreateTask()} className="btn btn--primary" style={primaryButtonStyle}>+ 根任务</button>
+    <div className="tree-grid-container">
+      <div className="tree-grid-header">
+        <h3 className="tree-grid-title">任务列表</h3>
+        <button onClick={() => void handleCreateTask()} className="tree-grid-add-btn">+ 根任务</button>
       </div>
 
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ minWidth: 980, width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: 14 }}>
+        <table className="tree-grid-table">
           <thead>
-            <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-              <th style={{ padding: '12px', width: '28%' }}>任务名称</th>
-              <th style={{ padding: '12px', width: '10%' }}>状态</th>
-              <th style={{ padding: '12px', width: '18%' }}>负责人</th>
-              <th style={{ padding: '12px', width: '12%' }}>开始日期</th>
-              <th style={{ padding: '12px', width: '12%' }}>结束日期</th>
-              <th style={{ padding: '12px', width: '8%', textAlign: 'center' }}>里程碑</th>
-              <th style={{ padding: '12px', width: '12%', textAlign: 'right' }}>操作</th>
+            <tr className="tree-grid-header-row">
+              <th className="tree-grid-header-cell" style={{ width: '28%' }}>任务名称</th>
+              <th className="tree-grid-header-cell" style={{ width: '10%' }}>状态</th>
+              <th className="tree-grid-header-cell" style={{ width: '18%' }}>负责人</th>
+              <th className="tree-grid-header-cell" style={{ width: '12%' }}>开始日期</th>
+              <th className="tree-grid-header-cell" style={{ width: '12%' }}>结束日期</th>
+              <th className="tree-grid-header-cell" style={{ width: '8%', textAlign: 'center' }}>里程碑</th>
+              <th className="tree-grid-header-cell" style={{ width: '12%', textAlign: 'right' }}>操作</th>
             </tr>
           </thead>
           <tbody>
             {visibleRows.length === 0 ? (
-              <tr><td colSpan={7} style={{ padding: 20, textAlign: 'center', color: '#6b7280' }}>暂无任务</td></tr>
+              <tr><td colSpan={7} className="tree-grid-cell tree-empty-cell">暂无任务</td></tr>
             ) : visibleRows.map((row) => (
-              <tr key={row.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                <td style={{ padding: '8px 12px', display: 'flex', alignItems: 'center' }}>
-                  <div style={{ width: row.depth * 20, flexShrink: 0 }} />
-                  <button onClick={() => toggleExpand(row.id)} style={treeToggleStyle}>
+              <tr key={row.id} className="tree-grid-row">
+                <td className="tree-grid-cell tree-grid-cell--name">
+                  <div className="tree-grid-indent" style={{ width: row.depth * 20 }} />
+                  <button onClick={() => toggleExpand(row.id)} className="tree-toggle-btn">
                     {row.children?.length > 0 ? (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: row.isExpanded ? 'rotate(90deg)' : 'rotate(0)' }}>
+                      <svg className="tree-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: row.isExpanded ? 'rotate(90deg)' : 'rotate(0)' }}>
                         <polyline points="9 18 15 12 9 6" />
                       </svg>
                     ) : <span style={{ width: 12 }} />}
                   </button>
-                  <input value={row.title} onChange={(event) => void handleUpdateTask(row.id, { title: event.target.value })} style={{ border: 'none', background: 'transparent', outline: 'none', width: '100%', fontWeight: row.depth === 0 ? 600 : 400 }} placeholder="输入任务名称" />
+                  <input className={`tree-input ${row.depth === 0 ? 'tree-input--root' : 'tree-input--nested'}`} value={row.title} onChange={(event) => void handleUpdateTask(row.id, { title: event.target.value })} placeholder="输入任务名称" />
                 </td>
-                <td style={{ padding: '8px 12px' }}>
-                  <select value={row.status} onChange={(event) => void handleUpdateTask(row.id, { status: event.target.value })} style={{ border: 'none', background: 'transparent', outline: 'none' }}>
+                <td className="tree-grid-cell">
+                  <select className="tree-select" value={row.status} onChange={(event) => void handleUpdateTask(row.id, { status: event.target.value })}>
                     <option value="TODO">待办</option>
                     <option value="IN_PROGRESS">进行中</option>
                     <option value="DONE">已完成</option>
                     <option value="CANCELLED">已取消</option>
                   </select>
                 </td>
-                <td style={{ padding: '8px 12px' }}>
-                  <button className="btn btn--ghost btn--sm" onClick={() => setEditingTask(row)} style={{ minWidth: 'auto' }}>
+                <td className="tree-grid-cell">
+                  <button className="tree-btn--ghost" onClick={() => setEditingTask(row)}>
                     {row.assignee_summary || row.responsible_group || '设置负责人'}
                   </button>
                 </td>
-                <td style={{ padding: '8px 12px' }}>
-                  <input type="date" value={row.start_date ? row.start_date.substring(0, 10) : ''} onChange={(event) => void handleUpdateTask(row.id, { start_date: event.target.value ? new Date(event.target.value).toISOString() : null })} style={dateInputStyle} />
+                <td className="tree-grid-cell">
+                  <input type="date" className="tree-date-input" value={row.start_date ? row.start_date.substring(0, 10) : ''} onChange={(event) => void handleUpdateTask(row.id, { start_date: event.target.value ? new Date(event.target.value).toISOString() : null })} />
                 </td>
-                <td style={{ padding: '8px 12px' }}>
-                  <input type="date" value={row.end_date ? row.end_date.substring(0, 10) : ''} onChange={(event) => void handleUpdateTask(row.id, { end_date: event.target.value ? new Date(event.target.value).toISOString() : null })} style={dateInputStyle} />
+                <td className="tree-grid-cell">
+                  <input type="date" className="tree-date-input" value={row.end_date ? row.end_date.substring(0, 10) : ''} onChange={(event) => void handleUpdateTask(row.id, { end_date: event.target.value ? new Date(event.target.value).toISOString() : null })} />
                 </td>
-                <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                <td className="tree-grid-cell" style={{ textAlign: 'center' }}>
                   <input type="checkbox" checked={row.is_milestone} onChange={(event) => void handleUpdateTask(row.id, { is_milestone: event.target.checked })} />
                 </td>
-                <td style={{ padding: '8px 12px', textAlign: 'right' }}>
-                  <button onClick={() => void handleCreateTask(row.id)} title="添加子任务" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#10b981', marginRight: 8, fontSize: 16 }}>+</button>
-                  <button onClick={() => setEditingTask(row)} title="编辑" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#2563eb', marginRight: 8, fontSize: 14 }}>编辑</button>
-                  <button onClick={() => void handleDeleteTask(row.id)} title="删除" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14 }}>&times;</button>
+                <td className="tree-grid-cell" style={{ textAlign: 'right' }}>
+                  <button className="tree-action-btn--add" onClick={() => void handleCreateTask(row.id)} title="添加子任务">+</button>
+                  <button className="tree-action-btn--edit" onClick={() => setEditingTask(row)} title="编辑">编辑</button>
+                  <button className="tree-action-btn--delete" onClick={() => void handleDeleteTask(row.id)} title="删除">&times;</button>
                 </td>
               </tr>
             ))}
@@ -203,30 +204,4 @@ function toggleNode(task, taskId) {
   return { ...task, children: task.children.map((child) => toggleNode(child, taskId)) }
 }
 
-const primaryButtonStyle = {
-  padding: '6px 12px',
-  background: '#2563eb',
-  color: '#fff',
-  borderRadius: 4,
-  border: 'none',
-  cursor: 'pointer',
-}
-
-const treeToggleStyle = {
-  width: 20,
-  height: 20,
-  border: 'none',
-  background: 'none',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: 0,
-}
-
-const dateInputStyle = {
-  border: '1px solid #e5e7eb',
-  padding: '4px',
-  borderRadius: 4,
-  fontSize: 13,
-}
+// 样式已迁移到 projects-components.css

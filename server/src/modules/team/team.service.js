@@ -169,7 +169,7 @@ async function createLinkedUser(orgId, teamMember, operatorId, accountSource, tr
         username,
         email,
         password_hash: passwordHash,
-        role: 'race_viewer',
+        role: 'user',
         status: 'active',
         must_change_password: true,
         created_by: operatorId,

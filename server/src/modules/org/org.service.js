@@ -3,7 +3,6 @@
  */
 import bcrypt from 'bcryptjs';
 import knex from '../../db/knex.js';
-import { listEffectiveRacePermissionsForUser, listVisibleRacesForOrg } from '../races/race-access.service.js';
 
 // ── 成员管理 ─────────────────────────────────────────
 
@@ -40,9 +39,9 @@ export async function getOrgUser(orgId, userId) {
     return { ...user, racePermissions: permissions };
 }
 
-export async function createOrgUser(orgId, operatorId, { username, email, password, role = 'race_editor' }) {
-    if (!['race_editor', 'race_viewer'].includes(role)) {
-        throw Object.assign(new Error('只能创建 race_editor 或 race_viewer 角色'), { status: 400, expose: true });
+export async function createOrgUser(orgId, operatorId, { username, email, password, role = 'race_admin' }) {
+    if (!['race_admin', 'user'].includes(role)) {
+        throw Object.assign(new Error('只能创建 race_admin 或 user 角色'), { status: 400, expose: true });
     }
     const passwordHash = await bcrypt.hash(password, 10);
     const [user] = await knex('users')
@@ -72,8 +71,8 @@ export async function updateOrgUser(orgId, userId, fields) {
         if (fields[key] !== undefined) data[key] = fields[key];
     }
 
-    if (data.role && !['race_editor', 'race_viewer'].includes(data.role)) {
-        throw Object.assign(new Error('只能设置 race_editor 或 race_viewer 角色'), { status: 400, expose: true });
+    if (data.role && !['race_admin', 'user'].includes(data.role)) {
+        throw Object.assign(new Error('只能设置 race_admin 或 user 角色'), { status: 400, expose: true });
     }
     if (Object.keys(data).length === 0) {
         throw Object.assign(new Error('无有效字段'), { status: 400, expose: true });
@@ -112,129 +111,6 @@ export async function deleteOrgUser(orgId, userId, operatorContext) {
     });
 
     return { message: `成员 ${user.username} 已删除` };
-}
-
-// ── 赛事权限管理 ─────────────────────────────────────
-
-export async function getUserRacePermissions(orgId, userId) {
-    const uQuery = knex('users').where({ id: userId });
-    if (orgId) uQuery.andWhere({ org_id: orgId });
-    const user = await uQuery.first();
-    if (!user) throw Object.assign(new Error('用户不存在或不属于本机构'), { status: 404, expose: true });
-
-    const scopedOrgId = orgId || user.org_id || null;
-    if (!scopedOrgId) {
-        throw Object.assign(new Error('目标用户未绑定机构，无法配置赛事权限'), { status: 400, expose: true });
-    }
-
-    const allRaces = await listVisibleRacesForOrg(scopedOrgId);
-    const raceNameMap = new Map(allRaces.map((race) => [Number(race.id), race.name]));
-    const permissions = (await listEffectiveRacePermissionsForUser({
-        userId: user.id,
-        role: user.role,
-        orgId: scopedOrgId,
-    })).map((row) => ({
-        race_id: row.raceId,
-        access_level: row.accessLevel,
-        race_name: raceNameMap.get(Number(row.raceId)) || null,
-        source: row.source,
-    }));
-
-    return { permissions, allRaces };
-}
-
-export async function setUserRacePermissions(orgId, userId, operatorId, permissionsList) {
-    const uQuery = knex('users').where({ id: userId });
-    if (orgId) uQuery.andWhere({ org_id: orgId });
-    const user = await uQuery.first();
-    if (!user) throw Object.assign(new Error('用户不存在或不属于本机构'), { status: 404, expose: true });
-
-    const scopedOrgId = orgId || user.org_id || null;
-    if (!scopedOrgId) {
-        throw Object.assign(new Error('目标用户未绑定机构，无法配置赛事权限'), { status: 400, expose: true });
-    }
-
-    for (const item of permissionsList) {
-        if (!['editor', 'viewer'].includes(item.accessLevel || 'editor')) {
-            throw Object.assign(new Error(`赛事 ${item.raceId} 的 accessLevel 无效`), { status: 400, expose: true });
-        }
-    }
-
-    const visibleRaces = await listVisibleRacesForOrg(scopedOrgId);
-    const visibleRaceMap = new Map(visibleRaces.map((race) => [Number(race.id), race]));
-
-    const desired = new Map();
-    for (const item of permissionsList) {
-        const raceId = Number(item.raceId);
-        if (!Number.isFinite(raceId) || raceId <= 0) {
-            throw Object.assign(new Error(`赛事 ${item.raceId} 无效`), { status: 400, expose: true });
-        }
-        if (!visibleRaceMap.has(raceId)) {
-            throw Object.assign(new Error(`赛事 ${raceId} 不在机构可授权范围内`), { status: 400, expose: true });
-        }
-        const raceInfo = visibleRaceMap.get(raceId);
-        if (raceInfo.orgAccessLevel === 'viewer' && (item.accessLevel || 'editor') !== 'viewer') {
-            throw Object.assign(new Error(`赛事 ${raceId} 对当前机构仅开放只读授权，成员不可设置为 editor`), { status: 400, expose: true });
-        }
-        desired.set(raceId, item.accessLevel || 'editor');
-    }
-
-    const existing = await knex('user_race_permissions')
-        .where({ user_id: userId, org_id: scopedOrgId })
-        .select('race_id', 'access_level');
-    const existingMap = new Map(existing.map((row) => [Number(row.race_id), row.access_level]));
-
-    const toInsert = [];
-    const toUpdate = [];
-    const toDelete = [];
-
-    for (const [raceId, accessLevel] of desired.entries()) {
-        if (!existingMap.has(raceId)) {
-            toInsert.push({ raceId, accessLevel });
-            continue;
-        }
-        if (existingMap.get(raceId) !== accessLevel) {
-            toUpdate.push({ raceId, accessLevel });
-        }
-    }
-
-    for (const raceId of existingMap.keys()) {
-        if (!desired.has(raceId)) {
-            toDelete.push(raceId);
-        }
-    }
-
-    await knex.transaction(async (trx) => {
-        if (toDelete.length > 0) {
-            await trx('user_race_permissions')
-                .where({ user_id: userId, org_id: scopedOrgId })
-                .whereIn('race_id', toDelete)
-                .del();
-        }
-
-        for (const row of toUpdate) {
-            await trx('user_race_permissions')
-                .where({ user_id: userId, org_id: scopedOrgId, race_id: row.raceId })
-                .update({
-                    access_level: row.accessLevel,
-                    created_by: operatorId,
-                });
-        }
-
-        if (toInsert.length > 0) {
-            await trx('user_race_permissions').insert(
-                toInsert.map((row) => ({
-                    user_id: userId,
-                    org_id: scopedOrgId,
-                    race_id: row.raceId,
-                    access_level: row.accessLevel,
-                    created_by: operatorId,
-                })),
-            );
-        }
-    });
-
-    return { message: `已为用户 ${user.username} 设置 ${permissionsList.length} 个赛事权限` };
 }
 
 // ── 成员密码重置 ─────────────────────────────────────

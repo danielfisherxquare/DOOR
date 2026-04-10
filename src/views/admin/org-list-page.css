@@ -1,0 +1,38 @@
+.org-list-page {
+  display: grid;
+  gap: 18px;
+}
+
+.org-list-page__toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.org-list-page__search {
+  min-width: 240px;
+  flex: 1 1 280px;
+}
+
+.org-list-page__primary-cell {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--command-text, #0f172a);
+}
+
+.org-list-page__secondary-cell {
+  margin-top: 4px;
+  color: var(--command-muted, #64748b);
+  font-size: var(--font-size-xs);
+}
+
+.org-list-page__action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.org-list-page__danger-action {
+  color: var(--danger);
+}

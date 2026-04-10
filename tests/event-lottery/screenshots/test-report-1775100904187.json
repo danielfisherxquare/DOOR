@@ -1,0 +1,124 @@
+{
+  "timestamp": "2026-04-02T03:34:06.195Z",
+  "tests": [
+    {
+      "name": "登录系统",
+      "passed": true,
+      "timestamp": "2026-04-02T03:34:22.982Z"
+    },
+    {
+      "name": "导航到导入页面",
+      "passed": {
+        "error": "locator.count: Unexpected token \"=\" while parsing css selector \".import-dropzone, text=拖拽报名文件\". Did you mean to CSS.escape it?"
+      },
+      "timestamp": "2026-04-02T03:34:31.206Z"
+    },
+    {
+      "name": "选择赛事",
+      "passed": false,
+      "timestamp": "2026-04-02T03:34:31.210Z"
+    },
+    {
+      "name": "上传测试名单",
+      "passed": false,
+      "timestamp": "2026-04-02T03:34:31.212Z"
+    },
+    {
+      "name": "字段映射",
+      "passed": false,
+      "timestamp": "2026-04-02T03:34:35.330Z"
+    },
+    {
+      "name": "数据清洗",
+      "passed": true,
+      "timestamp": "2026-04-02T03:34:39.442Z"
+    },
+    {
+      "name": "预览确认导入",
+      "passed": true,
+      "timestamp": "2026-04-02T03:34:43.559Z"
+    },
+    {
+      "name": "导航到抽签页面",
+      "passed": false,
+      "timestamp": "2026-04-02T03:34:43.559Z"
+    },
+    {
+      "name": "配置抽签容量",
+      "passed": true,
+      "timestamp": "2026-04-02T03:34:50.766Z"
+    },
+    {
+      "name": "配置起点沙盘",
+      "passed": true,
+      "timestamp": "2026-04-02T03:34:54.854Z"
+    },
+    {
+      "name": "配置成绩筛选",
+      "passed": true,
+      "timestamp": "2026-04-02T03:34:57.969Z"
+    },
+    {
+      "name": "执行最终抽签",
+      "passed": true,
+      "timestamp": "2026-04-02T03:35:01.070Z"
+    },
+    {
+      "name": "验证抽签结果",
+      "passed": true,
+      "timestamp": "2026-04-02T03:35:04.187Z"
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "login-page",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\event-lottery\\screenshots\\login-page-1775100854095.png"
+    },
+    {
+      "name": "after-login-attempt",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\event-lottery\\screenshots\\after-login-attempt-1775100862850.png"
+    },
+    {
+      "name": "import-page",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\event-lottery\\screenshots\\import-page-1775100869095.png"
+    },
+    {
+      "name": "mapping-page",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\event-lottery\\screenshots\\mapping-page-1775100873220.png"
+    },
+    {
+      "name": "cleaning-page",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\event-lottery\\screenshots\\cleaning-page-1775100877340.png"
+    },
+    {
+      "name": "preview-page",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\event-lottery\\screenshots\\preview-page-1775100881451.png"
+    },
+    {
+      "name": "capacity-config",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\event-lottery\\screenshots\\capacity-config-1775100885560.png"
+    },
+    {
+      "name": "capacity-saved",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\event-lottery\\screenshots\\capacity-saved-1775100889665.png"
+    },
+    {
+      "name": "zone-config",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\event-lottery\\screenshots\\zone-config-1775100892771.png"
+    },
+    {
+      "name": "performance-filter",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\event-lottery\\screenshots\\performance-filter-1775100896870.png"
+    },
+    {
+      "name": "inventory-matcher",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\event-lottery\\screenshots\\inventory-matcher-1775100899979.png"
+    },
+    {
+      "name": "lottery-results",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\event-lottery\\screenshots\\lottery-results-1775100903086.png"
+    }
+  ],
+  "issues": [],
+  "metrics": {}
+}

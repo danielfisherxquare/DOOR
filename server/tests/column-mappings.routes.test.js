@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
 process.env.DATABASE_URL = DATABASE_URL;
+process.env.NODE_ENV = 'test';
 
 const { default: knex } = await import('../src/db/knex.js');
 const { default: app } = await import('../src/app.js');
@@ -40,15 +41,23 @@ async function createUser({ username, email, password, role, userOrgId = null })
         .returning('*');
 }
 
+async function resetDatabase() {
+    const result = await knex.raw(`
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+          AND tablename NOT IN ('knex_migrations', 'knex_migrations_lock')
+    `);
+    const tableNames = result.rows.map((row) => `"${row.tablename}"`);
+    if (tableNames.length > 0) {
+        await knex.raw(`TRUNCATE TABLE ${tableNames.join(', ')} RESTART IDENTITY CASCADE`);
+    }
+}
+
 describe('column mapping routes', () => {
     before(async () => {
         await knex.migrate.latest();
-
-        await knex('column_mappings').del();
-        await knex('refresh_tokens').del();
-        await knex('users').del();
-        await knex('races').del();
-        await knex('organizations').del();
+        await resetDatabase();
 
         const [org] = await knex('organizations')
             .insert({ name: 'Column Mapping Org', slug: 'column-mapping-org' })
@@ -72,7 +81,7 @@ describe('column mapping routes', () => {
             username: 'cm_editor',
             email: 'cm_editor@test.com',
             password: 'editor123',
-            role: 'race_editor',
+            role: 'race_admin',
             userOrgId: orgId,
         });
 
@@ -82,7 +91,7 @@ describe('column mapping routes', () => {
         for (const [key, credentials] of [
             ['super_admin', { login: superAdmin.username, password: 'super123' }],
             ['org_admin', { login: orgAdmin.username, password: 'admin123' }],
-            ['race_editor', { login: editor.username, password: 'editor123' }],
+            ['race_admin', { login: editor.username, password: 'editor123' }],
         ]) {
             const response = await api('/api/auth/login', {
                 method: 'POST',
@@ -94,17 +103,13 @@ describe('column mapping routes', () => {
     });
 
     after(async () => {
-        await knex('column_mappings').del();
-        await knex('refresh_tokens').del();
-        await knex('users').del();
-        await knex('races').del();
-        await knex('organizations').del();
+        await resetDatabase();
         server?.close();
         await knex.destroy();
     });
 
     it('supports org defaults plus user overrides in effective reads', async () => {
-        const orgCreate = await api('/api/column-mappings', {
+        const orgCreate = await api('/api/admin/column-mappings', {
             method: 'POST',
             headers: authHeader('org_admin'),
             body: JSON.stringify({
@@ -117,9 +122,9 @@ describe('column mapping routes', () => {
         });
         assert.equal(orgCreate.status, 201);
 
-        const userCreate = await api('/api/column-mappings', {
+        const userCreate = await api('/api/admin/column-mappings', {
             method: 'POST',
-            headers: authHeader('race_editor'),
+            headers: authHeader('org_admin'),
             body: JSON.stringify({
                 scope: 'user',
                 mappings: [
@@ -129,8 +134,8 @@ describe('column mapping routes', () => {
         });
         assert.equal(userCreate.status, 201);
 
-        const effective = await api('/api/column-mappings', {
-            headers: authHeader('race_editor'),
+        const effective = await api('/api/admin/column-mappings', {
+            headers: authHeader('org_admin'),
         });
         assert.equal(effective.status, 200);
         assert.equal(effective.body.data.length, 2);
@@ -143,12 +148,12 @@ describe('column mapping routes', () => {
     });
 
     it('restricts org scope reads to org admins and above', async () => {
-        const forbidden = await api('/api/column-mappings?scope=org', {
-            headers: authHeader('race_editor'),
+        const forbidden = await api('/api/admin/column-mappings?scope=org', {
+            headers: authHeader('race_admin'),
         });
         assert.equal(forbidden.status, 403);
 
-        const allowed = await api('/api/column-mappings?scope=org', {
+        const allowed = await api('/api/admin/column-mappings?scope=org', {
             headers: authHeader('org_admin'),
         });
         assert.equal(allowed.status, 200);
@@ -156,15 +161,15 @@ describe('column mapping routes', () => {
     });
 
     it('falls back to org defaults after deleting a user override', async () => {
-        const userScope = await api('/api/column-mappings?scope=user', {
-            headers: authHeader('race_editor'),
+        const userScope = await api('/api/admin/column-mappings?scope=user', {
+            headers: authHeader('org_admin'),
         });
         assert.equal(userScope.status, 200);
         assert.equal(userScope.body.data.length, 1);
 
-        const deleteResponse = await api('/api/column-mappings', {
+        const deleteResponse = await api('/api/admin/column-mappings', {
             method: 'DELETE',
-            headers: authHeader('race_editor'),
+            headers: authHeader('org_admin'),
             body: JSON.stringify({
                 scope: 'user',
                 ids: [userScope.body.data[0].id],
@@ -172,8 +177,8 @@ describe('column mapping routes', () => {
         });
         assert.equal(deleteResponse.status, 200);
 
-        const effective = await api('/api/column-mappings', {
-            headers: authHeader('race_editor'),
+        const effective = await api('/api/admin/column-mappings', {
+            headers: authHeader('org_admin'),
         });
         assert.equal(effective.status, 200);
         const phoneMapping = effective.body.data.find((item) => item.sourceColumn === 'Phone');
@@ -182,12 +187,12 @@ describe('column mapping routes', () => {
     });
 
     it('requires orgId for super_admin scoped requests', async () => {
-        const missingScope = await api('/api/column-mappings', {
+        const missingScope = await api('/api/admin/column-mappings', {
             headers: authHeader('super_admin'),
         });
         assert.equal(missingScope.status, 400);
 
-        const scoped = await api(`/api/column-mappings?orgId=${orgId}`, {
+        const scoped = await api(`/api/admin/column-mappings?orgId=${orgId}`, {
             headers: authHeader('super_admin'),
         });
         assert.equal(scoped.status, 200);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import bibTrackingApi from '../../api/bibTracking'
 import credentialApi from '../../api/credential'
+import { CommandEmptyState, CommandNotice, CommandPanel, CommandStatusTag } from '../../components/command/CommandPrimitives'
 
 const BIB_STATUS_LABELS = {
   receipt_printed: '凭条已打印',
@@ -18,11 +19,11 @@ const CREDENTIAL_STATUS_LABELS = {
   active: '使用中',
 }
 
-const INFO_STYLES = {
-  success: { color: '#166534', background: '#DCFCE7', border: '1px solid #86EFAC' },
-  neutral: { color: '#334155', background: '#F8FAFC', border: '1px solid #CBD5E1' },
-  error: { color: '#991B1B', background: '#FEF2F2', border: '1px solid #FECACA' },
-  warning: { color: '#92400E', background: '#FEF3C7', border: '1px solid #FDE68A' },
+const INFO_TONE_MAP = {
+  success: 'success',
+  neutral: 'info',
+  error: 'danger',
+  warning: 'warning',
 }
 
 function getBibInfoState(item) {
@@ -58,7 +59,15 @@ function getCredentialInfoState(item) {
   return null
 }
 
-/* ── Bib Result Card ── */
+function ResultField({ label, value }) {
+  return (
+    <div className="command-definition-list__row">
+      <div className="command-definition-list__label">{label}</div>
+      <div className="command-definition-list__value">{value || '-'}</div>
+    </div>
+  )
+}
+
 function BibResultCard({ item, token }) {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -71,7 +80,7 @@ function BibResultCard({ item, token }) {
     setSubmitError('')
     try {
       const response = await bibTrackingApi.pickup(token)
-      setCurrent((prev) => prev ? { ...prev, ...response.data } : prev)
+      setCurrent((prev) => (prev ? { ...prev, ...response.data } : prev))
     } catch (err) {
       setSubmitError(err.message || '领取更新失败')
     } finally {
@@ -80,100 +89,57 @@ function BibResultCard({ item, token }) {
   }
 
   return (
-    <>
-      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700, color: '#3B82F6' }}>号码布</div>
-      <div style={{ display: 'grid', gap: 12, borderRadius: 20, background: '#F8FAFC', padding: 16 }}>
-        <div>
-          <div style={{ fontSize: 12, color: '#64748B' }}>姓名</div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>{current.name || '-'}</div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 12, color: '#64748B' }}>号码布号</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{current.bibNumber}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#64748B' }}>当前状态</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{BIB_STATUS_LABELS[current.status] || current.status}</div>
-          </div>
-        </div>
+    <div className="command-stack">
+      <div className="command-actions-row">
+        <CommandStatusTag tone="info">号码布</CommandStatusTag>
+        <CommandStatusTag>{BIB_STATUS_LABELS[current.status] || current.status}</CommandStatusTag>
+      </div>
+      <div className="command-field-grid">
+        <ResultField label="姓名" value={current.name} />
+        <ResultField label="号码布号" value={current.bibNumber} />
       </div>
 
-      {submitError && <div style={{ color: '#DC2626' }}>{submitError}</div>}
-
-      {infoState && (
-        <div style={{ borderRadius: 14, padding: '12px 14px', fontSize: 14, ...INFO_STYLES[infoState.tone] }}>
-          {infoState.message}
-        </div>
-      )}
+      {submitError ? <CommandNotice tone="danger">{submitError}</CommandNotice> : null}
+      {infoState ? <CommandNotice tone={INFO_TONE_MAP[infoState.tone] || 'info'}>{infoState.message}</CommandNotice> : null}
 
       {current.nextAction === 'pickup' ? (
-        <button className="btn btn--primary" onClick={handlePickup} disabled={submitting}>
-          {submitting ? '提交中...' : '确认已领取'}
-        </button>
+        <div className="command-actions-row">
+          <button className="btn btn--primary" onClick={handlePickup} disabled={submitting}>
+            {submitting ? '提交中...' : '确认已领取'}
+          </button>
+        </div>
       ) : null}
-    </>
+    </div>
   )
 }
 
-/* ── Credential Result Card ── */
 function CredentialResultCard({ item }) {
   const infoState = getCredentialInfoState(item)
   const accessAreas = item.accessAreas || item.accessCodeList || ''
 
   return (
-    <>
-      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 700, color: '#8B5CF6' }}>工作证件</div>
-      <div style={{ display: 'grid', gap: 12, borderRadius: 20, background: '#F8FAFC', padding: 16 }}>
-        <div>
-          <div style={{ fontSize: 12, color: '#64748B' }}>持证人</div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>{item.personName || '-'}</div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 12, color: '#64748B' }}>证件编号</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{item.credentialNo || '-'}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 12, color: '#64748B' }}>类别/岗位</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{item.categoryName || '-'}</div>
-          </div>
-        </div>
-        {item.orgName && (
-          <div>
-            <div style={{ fontSize: 12, color: '#64748B' }}>单位</div>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>{item.orgName}</div>
-          </div>
-        )}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 12, color: '#64748B' }}>当前状态</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{CREDENTIAL_STATUS_LABELS[item.status] || item.status}</div>
-          </div>
-          {accessAreas && (
-            <div>
-              <div style={{ fontSize: 12, color: '#64748B' }}>可通行区域</div>
-              <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.5 }}>{accessAreas}</div>
-            </div>
-          )}
-        </div>
+    <div className="command-stack">
+      <div className="command-actions-row">
+        <CommandStatusTag tone="warning">工作证件</CommandStatusTag>
+        <CommandStatusTag>{CREDENTIAL_STATUS_LABELS[item.status] || item.status}</CommandStatusTag>
       </div>
-
-      {infoState && (
-        <div style={{ borderRadius: 14, padding: '12px 14px', fontSize: 14, ...INFO_STYLES[infoState.tone] }}>
-          {infoState.message}
-        </div>
-      )}
-    </>
+      <div className="command-field-grid">
+        <ResultField label="持证人" value={item.personName} />
+        <ResultField label="证件编号" value={item.credentialNo} />
+        <ResultField label="类别 / 岗位" value={item.categoryName} />
+        <ResultField label="单位" value={item.orgName} />
+      </div>
+      {accessAreas ? <ResultField label="可通行区域" value={accessAreas} /> : null}
+      {infoState ? <CommandNotice tone={INFO_TONE_MAP[infoState.tone] || 'info'}>{infoState.message}</CommandNotice> : null}
+    </div>
   )
 }
 
-/* ── ScanResult (Main) ── */
 function ScanResult() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const token = searchParams.get('t') || ''
-  const [resultType, setResultType] = useState(null)   // 'bib' | 'credential'
+  const [resultType, setResultType] = useState(null)
   const [item, setItem] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -192,7 +158,6 @@ function ScanResult() {
     setResultType(null)
     setLoadError('')
 
-    // 先尝试号码布解析，失败则尝试证件解析
     bibTrackingApi.resolveScan(token)
       .then((response) => {
         if (!cancelled) {
@@ -200,16 +165,13 @@ function ScanResult() {
           setItem(response.data)
         }
       })
-      .catch(() => {
-        // 号码布解析失败，尝试证件
-        return credentialApi.resolveCredential(token)
-          .then((response) => {
-            if (!cancelled) {
-              setResultType('credential')
-              setItem(response.data)
-            }
-          })
-      })
+      .catch(() => credentialApi.resolveCredential(token)
+        .then((response) => {
+          if (!cancelled) {
+            setResultType('credential')
+            setItem(response.data)
+          }
+        }))
       .catch((err) => {
         if (!cancelled) setLoadError(err.message || '二维码无效或已失效')
       })
@@ -217,28 +179,32 @@ function ScanResult() {
         if (!cancelled) setLoading(false)
       })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [token])
 
   return (
-    <div style={{ background: '#fff', borderRadius: 24, padding: 20, boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)', display: 'grid', gap: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 22, fontWeight: 800 }}>扫码结果</div>
-        <button className="btn btn--ghost" onClick={() => navigate('/scan')}>继续扫码</button>
-      </div>
+    <div className="command-page surface-ops command-page--narrow">
+      <CommandPanel
+        title="扫码结果"
+        subtitle="系统已经解析当前二维码，并给出可执行动作。继续扫码会直接返回执行端采集页。"
+        actions={<button className="btn btn--ghost" onClick={() => navigate('/ops/scan')}>继续扫码</button>}
+      >
+        {loading ? <CommandNotice tone="info">正在读取二维码状态...</CommandNotice> : null}
 
-      {loading && <div>正在读取二维码状态...</div>}
-      {!loading && loadError && <div style={{ color: '#DC2626' }}>{loadError}</div>}
+        {!loading && loadError ? (
+          <CommandEmptyState
+            title="未能解析当前二维码"
+            description={loadError}
+            action={<Link to="/ops/scan" className="btn btn--primary">返回扫码首页</Link>}
+            icon="ERR"
+          />
+        ) : null}
 
-      {!loading && item && resultType === 'bib' && (
-        <BibResultCard item={item} token={token} />
-      )}
-
-      {!loading && item && resultType === 'credential' && (
-        <CredentialResultCard item={item} />
-      )}
-
-      <Link to="/scan" style={{ color: '#2563EB', textDecoration: 'none', fontWeight: 600 }}>返回扫码首页</Link>
+        {!loading && item && resultType === 'bib' ? <BibResultCard item={item} token={token} /> : null}
+        {!loading && item && resultType === 'credential' ? <CredentialResultCard item={item} /> : null}
+      </CommandPanel>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
 process.env.DATABASE_URL = DATABASE_URL;
+process.env.NODE_ENV = 'test';
 
 const { default: knex } = await import('../src/db/knex.js');
 const { default: app } = await import('../src/app.js');
@@ -13,7 +14,7 @@ let baseUrl;
 let orgAId;
 let orgBId;
 let raceAId;
-let raceEditorBId;
+let raceAdminBId;
 const tokens = {};
 
 async function api(path, options = {}) {
@@ -29,23 +30,32 @@ function authHeader(role) {
     return { Authorization: `Bearer ${tokens[role]}` };
 }
 
+async function resetDatabase() {
+    const result = await knex.raw(`
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+          AND tablename NOT IN ('knex_migrations', 'knex_migrations_lock')
+    `);
+    const tableNames = result.rows.map((row) => `"${row.tablename}"`);
+    if (tableNames.length > 0) {
+        await knex.raw(`TRUNCATE TABLE ${tableNames.join(', ')} RESTART IDENTITY CASCADE`);
+    }
+}
+
 describe('organization race permissions', () => {
     before(async () => {
         await knex.migrate.latest();
-
-        await knex('org_race_permissions').del();
-        await knex('user_race_permissions').del();
-        await knex('refresh_tokens').del();
-        await knex('users').del();
-        await knex('races').del();
-        await knex('organizations').del();
+        await resetDatabase();
 
         const [orgA] = await knex('organizations').insert({ name: 'Org A', slug: 'org-a' }).returning('*');
         const [orgB] = await knex('organizations').insert({ name: 'Org B', slug: 'org-b' }).returning('*');
         orgAId = orgA.id;
         orgBId = orgB.id;
 
-        const [raceA] = await knex('races').insert({ org_id: orgAId, name: 'Org A Race' }).returning('*');
+        const [raceA] = await knex('races')
+            .insert({ org_id: orgAId, name: 'Org A Race', date: '2026-03-31' })
+            .returning('*');
         raceAId = raceA.id;
 
         await knex('users').insert([
@@ -75,12 +85,12 @@ describe('organization race permissions', () => {
                 username: 'org_perm_editor_b',
                 email: 'org_perm_editor_b@test.com',
                 password_hash: await bcrypt.hash('pass123', 10),
-                role: 'race_editor',
+                role: 'race_admin',
                 status: 'active',
                 must_change_password: false,
             })
             .returning('*');
-        raceEditorBId = editorB.id;
+        raceAdminBId = editorB.id;
 
         server = app.listen(0);
         baseUrl = `http://localhost:${server.address().port}`;
@@ -88,7 +98,7 @@ describe('organization race permissions', () => {
         for (const [role, login] of [
             ['super_admin', 'org_perm_super'],
             ['org_admin_b', 'org_perm_admin_b'],
-            ['race_editor_b', 'org_perm_editor_b'],
+            ['race_admin_b', 'org_perm_editor_b'],
         ]) {
             const response = await api('/api/auth/login', {
                 method: 'POST',
@@ -100,18 +110,13 @@ describe('organization race permissions', () => {
     });
 
     after(async () => {
-        await knex('org_race_permissions').del();
-        await knex('user_race_permissions').del();
-        await knex('refresh_tokens').del();
-        await knex('users').del();
-        await knex('races').del();
-        await knex('organizations').del();
+        await resetDatabase();
         server?.close();
         await knex.destroy();
     });
 
-    it('lets super_admin grant viewer access to another org', async () => {
-        const response = await api(`/api/admin/orgs/${orgBId}/race-permissions`, {
+    it('lets super_admin grant viewer access to another org through identity center', async () => {
+        const response = await api(`/api/admin/identity-center/org-race-matrix?orgId=${orgBId}`, {
             method: 'PUT',
             headers: authHeader('super_admin'),
             body: JSON.stringify({ permissions: [{ raceId: raceAId, accessLevel: 'viewer' }] }),
@@ -120,11 +125,15 @@ describe('organization race permissions', () => {
     });
 
     it('lets org_admin see granted races but blocks viewer writes', async () => {
-        const listResponse = await api('/api/races', { headers: authHeader('org_admin_b') });
-        assert.equal(listResponse.status, 200);
-        assert.ok(listResponse.body.data.find((race) => Number(race.id) === Number(raceAId)));
+        const contextResponse = await api('/api/profile/context-options', { headers: authHeader('org_admin_b') });
+        assert.equal(contextResponse.status, 200);
+        assert.ok(
+            contextResponse.body.data.races.some(
+                (item) => Number(item.raceId) === Number(raceAId) && item.accessLevel === 'viewer',
+            ),
+        );
 
-        const updateResponse = await api(`/api/races/${raceAId}`, {
+        const updateResponse = await api(`/api/admin/races/${raceAId}`, {
             method: 'PUT',
             headers: authHeader('org_admin_b'),
             body: JSON.stringify({ name: 'viewer grant should not write' }),
@@ -132,8 +141,8 @@ describe('organization race permissions', () => {
         assert.equal(updateResponse.status, 403);
     });
 
-    it('lets super_admin upgrade granted access to editor', async () => {
-        const response = await api(`/api/admin/orgs/${orgBId}/race-permissions`, {
+    it('lets super_admin upgrade granted access to editor through identity center', async () => {
+        const response = await api(`/api/admin/identity-center/org-race-matrix?orgId=${orgBId}`, {
             method: 'PUT',
             headers: authHeader('super_admin'),
             body: JSON.stringify({ permissions: [{ raceId: raceAId, accessLevel: 'editor' }] }),
@@ -142,29 +151,37 @@ describe('organization race permissions', () => {
     });
 
     it('lets org members inherit editor access from the organization grant', async () => {
-        const listResponse = await api('/api/races', { headers: authHeader('race_editor_b') });
-        assert.equal(listResponse.status, 200);
-        assert.ok(listResponse.body.data.find((race) => Number(race.id) === Number(raceAId)));
+        const contextResponse = await api('/api/profile/context-options', { headers: authHeader('race_admin_b') });
+        assert.equal(contextResponse.status, 200);
+        assert.ok(
+            contextResponse.body.data.races.some(
+                (item) => Number(item.raceId) === Number(raceAId) && item.accessLevel === 'editor',
+            ),
+        );
 
-        const updateResponse = await api(`/api/races/${raceAId}`, {
-            method: 'PUT',
-            headers: authHeader('race_editor_b'),
-            body: JSON.stringify({ location: 'inherited org grant can edit' }),
-        });
-        assert.equal(updateResponse.status, 200);
+        const meResponse = await api('/api/auth/me', { headers: authHeader('race_admin_b') });
+        assert.equal(meResponse.status, 200);
+        assert.ok(
+            meResponse.body.data.racePermissions.some(
+                (item) => Number(item.raceId) === Number(raceAId) && item.accessLevel === 'editor',
+            ),
+        );
     });
 
     it('lets explicit user viewer assignment downgrade inherited editor access', async () => {
-        const setResponse = await api(`/api/org/users/${raceEditorBId}/race-permissions`, {
+        const setResponse = await api(`/api/admin/identity-center/user-race-matrix?orgId=${orgBId}`, {
             method: 'PUT',
             headers: authHeader('super_admin'),
             body: JSON.stringify({
-                permissions: [{ raceId: raceAId, accessLevel: 'viewer' }],
+                updates: [{
+                    userId: raceAdminBId,
+                    explicitPermissions: [{ raceId: raceAId, accessLevel: 'viewer' }],
+                }],
             }),
         });
         assert.equal(setResponse.status, 200);
 
-        const meResponse = await api('/api/auth/me', { headers: authHeader('race_editor_b') });
+        const meResponse = await api('/api/auth/me', { headers: authHeader('race_admin_b') });
         assert.equal(meResponse.status, 200);
         assert.ok(
             meResponse.body.data.racePermissions.some(
@@ -172,11 +189,26 @@ describe('organization race permissions', () => {
             ),
         );
 
-        const updateResponse = await api(`/api/races/${raceAId}`, {
-            method: 'PUT',
-            headers: authHeader('race_editor_b'),
-            body: JSON.stringify({ name: 'downgraded viewer should fail to write' }),
+        const contextResponse = await api('/api/profile/context-options', {
+            headers: authHeader('race_admin_b'),
         });
-        assert.equal(updateResponse.status, 403);
+        assert.equal(contextResponse.status, 200);
+        assert.ok(
+            contextResponse.body.data.races.some(
+                (item) => Number(item.raceId) === Number(raceAId) && item.accessLevel === 'viewer',
+            ),
+        );
+    });
+
+    it('returns 404 for removed org and user race permission endpoints', async () => {
+        const orgResponse = await api(`/api/admin/orgs/${orgBId}/race-permissions`, {
+            headers: authHeader('super_admin'),
+        });
+        assert.equal(orgResponse.status, 404);
+
+        const userResponse = await api(`/api/admin/org/users/${raceAdminBId}/race-permissions?orgId=${orgBId}`, {
+            headers: authHeader('super_admin'),
+        });
+        assert.equal(userResponse.status, 404);
     });
 });

@@ -10,6 +10,23 @@ import {
     lotteryRuleMapper,
     lotteryWeightMapper,
 } from '../../db/mappers/lottery.js';
+import { normalizeEvent } from '../../utils/event-normalizer.js';
+
+function parseExecutionResult(result) {
+    if (!result) return null;
+    if (typeof result === 'object') return result;
+
+    try {
+        const parsed = JSON.parse(result);
+        if (parsed && typeof parsed === 'object') {
+            return parsed;
+        }
+    } catch {
+        return null;
+    }
+
+    return null;
+}
 
 function isMissingLotteryListUpsertConstraint(err) {
     return err?.code === '42P10'
@@ -85,7 +102,11 @@ export async function getRaceCapacity(orgId, raceId) {
 }
 
 export async function saveRaceCapacity(orgId, raceId, data) {
-    const row = raceCapacityMapper.toDbInsert({ ...data, raceId }, orgId);
+    const row = raceCapacityMapper.toDbInsert({
+        ...data,
+        raceId,
+        event: normalizeEvent(data?.event),
+    }, orgId);
     const [result] = await knex('race_capacity')
         .insert(row)
         .onConflict(['org_id', 'race_id', 'event'])
@@ -93,6 +114,7 @@ export async function saveRaceCapacity(orgId, raceId, data) {
             target_count: row.target_count,
             draw_ratio: row.draw_ratio,
             reserved_ratio: row.reserved_ratio,
+            lottery_mode_override: row.lottery_mode_override,
             updated_at: knex.fn.now(),
         })
         .returning('*');
@@ -313,6 +335,42 @@ export async function deleteAllWeights(orgId, raceId) {
 // ═══════════════════════════════════════════════════════════════════════
 
 export async function getLotteryResults(orgId, raceId) {
+    const [latestExecution, latestRollback] = await Promise.all([
+        knex('pipeline_executions')
+            .where({
+                org_id: orgId,
+                race_id: raceId,
+                execution_type: 'lottery',
+                status: 'succeeded',
+            })
+            .orderBy([{ column: 'completed_at', order: 'desc' }, { column: 'id', order: 'desc' }])
+            .first('id', 'completed_at', 'result'),
+        knex('pipeline_executions')
+            .where({
+                org_id: orgId,
+                race_id: raceId,
+                execution_type: 'rollback_lottery',
+                status: 'succeeded',
+            })
+            .orderBy([{ column: 'completed_at', order: 'desc' }, { column: 'id', order: 'desc' }])
+            .first('id', 'completed_at'),
+    ]);
+
+    const latestLotteryCompletedAt = latestExecution?.completed_at
+        ? new Date(latestExecution.completed_at).getTime()
+        : 0;
+    const latestRollbackCompletedAt = latestRollback?.completed_at
+        ? new Date(latestRollback.completed_at).getTime()
+        : 0;
+    const shouldUseExecutionResult = latestExecution && latestLotteryCompletedAt >= latestRollbackCompletedAt;
+
+    const executionResult = shouldUseExecutionResult
+        ? parseExecutionResult(latestExecution?.result)
+        : null;
+    if (executionResult) {
+        return executionResult;
+    }
+
     // 总计
     const summary = await knex('lottery_results')
         .where({ org_id: orgId, race_id: raceId })
@@ -335,7 +393,6 @@ export async function getLotteryResults(orgId, raceId) {
         )
         .orderBy('bucket_name');
 
-    // 整理 bucket breakdown
     const bucketMap = {};
     for (const row of buckets) {
         const b = row.bucket_name || '(未分组)';
@@ -345,11 +402,40 @@ export async function getLotteryResults(orgId, raceId) {
         else bucketMap[b].waitlisted = row.count;
     }
 
+    const bucketBreakdown = Object.entries(bucketMap).map(([bucket, counts]) => ({
+        bucket,
+        candidates: Number(counts.winners || 0) + Number(counts.losers || 0) + Number(counts.waitlisted || 0),
+        winners: Number(counts.winners || 0),
+        losers: Number(counts.losers || 0),
+        waitlisted: Number(counts.waitlisted || 0),
+        fused: false,
+        qualifiedCount: 0,
+        generalCount: 0,
+        qualifiedWinners: 0,
+        generalWinners: 0,
+    }));
+
     return {
         winners: summary?.winners || 0,
         losers: summary?.losers || 0,
         waitlisted: summary?.waitlisted || 0,
         total: summary?.total || 0,
-        bucketBreakdown: bucketMap,
+        selectedTotal: summary?.winners || 0,
+        winnersByEvent: {},
+        lockedByEvent: {},
+        bucketBreakdown,
+        inventoryReport: [],
+        unselectedStats: {
+            qualified_inventory: 0,
+            qualified_lottery: 0,
+            general_inventory: 0,
+            general_lottery: 0,
+            general_capacity: 0,
+            unknown_gender_excluded: 0,
+        },
+        genderStats: {},
+        inventoryWarnings: [],
+        warnings: [],
+        errors: [],
     };
 }

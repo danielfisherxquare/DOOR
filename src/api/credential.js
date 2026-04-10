@@ -1,34 +1,43 @@
 import request from '../utils/request'
+import { resolveSurfacePrefix } from '../utils/surfaceApi'
+
+function getBasePath() {
+    return resolveSurfacePrefix({
+        admin: '/admin/credentials',
+        ops: '/ops/credentials',
+        app: '/app/credentials',
+    }, 'admin')
+}
 
 const credentialApi = {
-    getAccessAreas: (raceId) => request.get(`/credential/access-areas/${raceId}`),
-    createAccessArea: (raceId, data) => request.post(`/credential/access-areas/${raceId}`, data),
-    updateAccessArea: (raceId, accessAreaId, data) => request.put(`/credential/access-areas/${raceId}/${accessAreaId}`, data),
-    deleteAccessArea: (raceId, accessAreaId) => request.delete(`/credential/access-areas/${raceId}/${accessAreaId}`),
+    getAccessAreas: (raceId) => request.get(`${getBasePath()}/access-areas/${raceId}`),
+    createAccessArea: (raceId, data) => request.post(`${getBasePath()}/access-areas/${raceId}`, data),
+    updateAccessArea: (raceId, accessAreaId, data) => request.put(`${getBasePath()}/access-areas/${raceId}/${accessAreaId}`, data),
+    deleteAccessArea: (raceId, accessAreaId) => request.delete(`${getBasePath()}/access-areas/${raceId}/${accessAreaId}`),
 
-    getCategories: (raceId) => request.get(`/credential/categories/${raceId}`),
-    createCategory: (raceId, data) => request.post(`/credential/categories/${raceId}`, data),
-    updateCategory: (raceId, categoryId, data) => request.put(`/credential/categories/${raceId}/${categoryId}`, data),
-    deleteCategory: (raceId, categoryId) => request.delete(`/credential/categories/${raceId}/${categoryId}`),
+    getCategories: (raceId) => request.get(`${getBasePath()}/categories/${raceId}`),
+    createCategory: (raceId, data) => request.post(`${getBasePath()}/categories/${raceId}`, data),
+    updateCategory: (raceId, categoryId, data) => request.put(`${getBasePath()}/categories/${raceId}/${categoryId}`, data),
+    deleteCategory: (raceId, categoryId) => request.delete(`${getBasePath()}/categories/${raceId}/${categoryId}`),
 
-    getStyleTemplates: (raceId, options = {}) => request.get(`/credential/style-templates/${raceId}`, { params: options }),
-    getStyleTemplate: (raceId, templateId) => request.get(`/credential/style-templates/${raceId}/${templateId}`),
-    createStyleTemplate: (raceId, data) => request.post(`/credential/style-templates/${raceId}`, data),
-    updateStyleTemplate: (raceId, templateId, data) => request.put(`/credential/style-templates/${raceId}/${templateId}`, data),
-    deleteStyleTemplate: (raceId, templateId) => request.delete(`/credential/style-templates/${raceId}/${templateId}`),
+    getStyleTemplates: (raceId, options = {}) => request.get(`${getBasePath()}/style-templates/${raceId}`, { params: options }),
+    getStyleTemplate: (raceId, templateId) => request.get(`${getBasePath()}/style-templates/${raceId}/${templateId}`),
+    createStyleTemplate: (raceId, data) => request.post(`${getBasePath()}/style-templates/${raceId}`, data),
+    updateStyleTemplate: (raceId, templateId, data) => request.put(`${getBasePath()}/style-templates/${raceId}/${templateId}`, data),
+    deleteStyleTemplate: (raceId, templateId) => request.delete(`${getBasePath()}/style-templates/${raceId}/${templateId}`),
 
-    getRequests: (raceId, options = {}) => request.get(`/credential/requests/${raceId}`, { params: options }),
-    getRequest: (raceId, requestId) => request.get(`/credential/requests/${raceId}/${requestId}`),
-    createRequest: (raceId, data) => request.post(`/credential/requests/${raceId}`, data),
-    reviewRequest: (raceId, requestId, data) => request.post(`/credential/requests/${raceId}/${requestId}/review`, data),
+    getRequests: (raceId, options = {}) => request.get(`${getBasePath()}/requests/${raceId}`, { params: options }),
+    getRequest: (raceId, requestId) => request.get(`${getBasePath()}/requests/${raceId}/${requestId}`),
+    createRequest: (raceId, data) => request.post(`${getBasePath()}/requests/${raceId}`, data),
+    reviewRequest: (raceId, requestId, data) => request.post(`${getBasePath()}/requests/${raceId}/${requestId}/review`, data),
 
-    getCredentials: (raceId, options = {}) => request.get(`/credential/credentials/${raceId}`, { params: options }),
-    getCredential: (raceId, credentialId) => request.get(`/credential/credentials/${raceId}/${credentialId}`),
-    resolveCredential: (qrPayload) => request.post('/credential/scan/resolve', { qrPayload }),
-    voidCredential: (raceId, credentialId, data) => request.post(`/credential/credentials/${raceId}/${credentialId}/void`, data),
-    issueCredential: (raceId, credentialId, data) => request.post(`/credential/credentials/${raceId}/${credentialId}/issue`, data),
-    reissueCredential: (raceId, credentialId, data) => request.post(`/credential/credentials/${raceId}/${credentialId}/reissue`, data),
-    getCredentialStats: (raceId) => request.get(`/credential/stats/${raceId}`),
+    getCredentials: (raceId, options = {}) => request.get(`${getBasePath()}/credentials/${raceId}`, { params: options }),
+    getCredential: (raceId, credentialId) => request.get(`${getBasePath()}/credentials/${raceId}/${credentialId}`),
+    resolveCredential: (qrPayload) => request.post(`${getBasePath()}/scan/resolve`, { qrPayload }),
+    voidCredential: (raceId, credentialId, data) => request.post(`${getBasePath()}/credentials/${raceId}/${credentialId}/void`, data),
+    issueCredential: (raceId, credentialId, data) => request.post(`${getBasePath()}/credentials/${raceId}/${credentialId}/issue`, data),
+    reissueCredential: (raceId, credentialId, data) => request.post(`${getBasePath()}/credentials/${raceId}/${credentialId}/reissue`, data),
+    getCredentialStats: (raceId) => request.get(`${getBasePath()}/stats/${raceId}`),
 }
 
 export default credentialApi

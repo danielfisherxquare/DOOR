@@ -49,7 +49,7 @@ function Register() {
             TP
           </div>
           <h1 className="login-card__title">创建账号</h1>
-          <p className="login-card__subtitle">注册以访问工具门户</p>
+          <p className="login-card__subtitle">注册以访问 DOOR Workspace</p>
         </div>
 
         <form className="login-card__form" onSubmit={handleSubmit}>
@@ -58,7 +58,7 @@ function Register() {
               padding: '12px 16px',
               borderRadius: 'var(--radius-md)',
               background: 'rgba(239, 68, 68, 0.1)',
-              color: 'var(--color-danger)',
+              color: 'var(--danger)',
               fontSize: 'var(--font-size-sm)'
             }}>
               {error}
@@ -66,7 +66,7 @@ function Register() {
           )}
 
           <div className="input-group">
-            <label htmlFor="orgName" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+            <label htmlFor="orgName" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
               组织名称
             </label>
             <input
@@ -81,7 +81,7 @@ function Register() {
           </div>
 
           <div className="input-group">
-            <label htmlFor="username" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+            <label htmlFor="username" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
               用户名
             </label>
             <input
@@ -97,7 +97,7 @@ function Register() {
           </div>
 
           <div className="input-group">
-            <label htmlFor="email" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+            <label htmlFor="email" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
               邮箱
             </label>
             <input
@@ -113,7 +113,7 @@ function Register() {
           </div>
 
           <div className="input-group">
-            <label htmlFor="password" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+            <label htmlFor="password" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
               密码
             </label>
             <input
@@ -129,7 +129,7 @@ function Register() {
           </div>
 
           <div className="input-group">
-            <label htmlFor="confirmPassword" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+            <label htmlFor="confirmPassword" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
               确认密码
             </label>
             <input
@@ -170,10 +170,10 @@ function Register() {
           marginTop: 16,
           textAlign: 'center',
           fontSize: 'var(--font-size-sm)',
-          color: 'var(--color-text-secondary)'
+          color: 'var(--text-secondary)'
         }}>
           已有账号？{' '}
-          <Link to="/login" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>
+          <Link to="/login" style={{ color: 'var(--accent)', textDecoration: 'none' }}>
             立即登录
           </Link>
         </p>

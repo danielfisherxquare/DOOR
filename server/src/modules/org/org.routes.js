@@ -107,43 +107,4 @@ router.post('/users/:userId/reset-password', async (req, res, next) => {
     }
 });
 
-router.get('/users/:userId/race-permissions', async (req, res, next) => {
-    try {
-        const orgId = await getOrgId(req);
-        if (!orgId && req.authContext.role !== 'super_admin') {
-            return res.status(400).json({ success: false, message: 'Missing orgId' });
-        }
-
-        const result = await orgService.getUserRacePermissions(orgId, req.params.userId);
-        res.json({ success: true, data: result });
-    } catch (err) {
-        next(err);
-    }
-});
-
-router.put('/users/:userId/race-permissions', async (req, res, next) => {
-    try {
-        const orgId = await getOrgId(req);
-        if (!orgId && req.authContext.role !== 'super_admin') {
-            return res.status(400).json({ success: false, message: 'Missing orgId' });
-        }
-
-        const { permissions } = req.body;
-        if (!Array.isArray(permissions)) {
-            return res.status(400).json({ success: false, message: 'permissions must be an array' });
-        }
-
-        const result = await orgService.setUserRacePermissions(
-            orgId,
-            req.params.userId,
-            req.authContext.userId,
-            permissions,
-        );
-
-        res.json({ success: true, data: result });
-    } catch (err) {
-        next(err);
-    }
-});
-
 export default router;

@@ -17,7 +17,7 @@ function MemberCreatePage() {
     const [username, setUsername] = useState('')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('Abc123456')
-    const [role, setRole] = useState('race_editor')
+    const [role, setRole] = useState('race_admin')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
@@ -68,18 +68,22 @@ function MemberCreatePage() {
     }
 
     const cardStyle = {
-        background: 'var(--color-bg-card, #fff)', borderRadius: 12, padding: 32,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06)', maxWidth: 520,
+        background: 'linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), var(--surface))',
+        borderRadius: 0,
+        padding: 32,
+        border: '1px solid var(--border)',
+        boxShadow: 'var(--shadow-sm)',
+        maxWidth: 520,
     }
     const inputGroupStyle = { display: 'grid', gap: 8, marginBottom: 16 }
-    const labelStyle = { fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary, #555)' }
+    const labelStyle = { fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }
 
     return (
         <div>
             <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 24 }}>+ 新建成员</h1>
 
             {error && (
-                <div style={{ padding: '12px 16px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', color: 'var(--color-danger)', fontSize: 14, marginBottom: 16, maxWidth: 520 }}>
+                <div style={{ padding: '12px 16px', borderRadius: 0, background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid color-mix(in srgb, var(--danger) 28%, transparent)', fontSize: 14, marginBottom: 16, maxWidth: 520 }}>
                     {error}
                 </div>
             )}
@@ -113,13 +117,13 @@ function MemberCreatePage() {
                 <div style={inputGroupStyle}>
                     <label style={labelStyle}>初始密码</label>
                     <input className="input" value={password} onChange={(e) => setPassword(e.target.value)} disabled={loading} />
-                    <span style={{ fontSize: 12, color: 'var(--color-warning)', fontWeight: 600 }}>成员首次登录将被要求修改密码</span>
+                    <span style={{ fontSize: 12, color: 'var(--warning)', fontWeight: 700 }}>成员首次登录将被要求修改密码</span>
                 </div>
                 <div style={inputGroupStyle}>
                     <label style={labelStyle}>角色</label>
                     <select className="input" value={role} onChange={(e) => setRole(e.target.value)} disabled={loading}>
-                        <option value="race_editor">赛事编辑 — 可读写被分配的赛事</option>
-                        <option value="race_viewer">赛事只读 — 只可查看被分配的赛事</option>
+                        <option value="race_admin">赛事管理员 — 可读写被分配的赛事</option>
+                        <option value="user">普通用户 — 只可查看被分配的赛事</option>
                     </select>
                 </div>
                 <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>

@@ -1,8 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import adminApi from '../../api/adminApi'
+import {
+  AdminDataTable,
+  AdminEmptyState,
+  AdminPagination,
+  AdminSectionHeader,
+  AdminStatusPill,
+  AdminSurface,
+  AdminToolbar,
+} from '../../components/admin/AdminWorkbench'
+import './org-list-page.css'
 
-function OrgListPage() {
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString('zh-CN')
+}
+
+export default function OrgListPage() {
   const [orgs, setOrgs] = useState([])
   const [loading, setLoading] = useState(true)
   const [keyword, setKeyword] = useState('')
@@ -45,79 +59,105 @@ function OrgListPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / limit))
 
+  const metrics = useMemo(() => ([
+    { label: '当前页机构', value: loading ? '...' : formatNumber(orgs.length), meta: '列表页当前返回结果。' },
+    { label: '机构总量', value: loading ? '...' : formatNumber(total), meta: '平台治理的组织基数。' },
+    { label: '平均赛事覆盖', value: loading || orgs.length === 0 ? '...' : formatNumber(Math.round(orgs.reduce((sum, org) => sum + Number(org.activeRaceCount ?? org.raceCount ?? 0), 0) / orgs.length)), meta: '粗略看机构承载的赛事规模。' },
+  ]), [loading, orgs, total])
+
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700 }}>机构管理</h1>
-        <Link to="/admin/orgs/new" className="btn btn--primary">+ 新建机构</Link>
-      </div>
+    <div className="org-list-page">
+      <AdminSectionHeader
+        eyebrow="平台治理"
+        title="机构管理"
+        description="机构是整个平台的一级对象。成员、账号、赛事、项目都会从这里继续展开，所以这一页不只是列表，更像平台组织地图。"
+        actions={<Link to="/admin/orgs/new" className="btn btn--primary">新建机构</Link>}
+        metrics={metrics}
+      />
 
-      <form onSubmit={handleSearch} style={{ marginBottom: 16, display: 'flex', gap: 8 }}>
-        <input className="input" placeholder="搜索机构名称" value={keyword} onChange={(event) => setKeyword(event.target.value)} style={{ maxWidth: 300 }} />
-        <button type="submit" className="btn btn--secondary">搜索</button>
-      </form>
+      <AdminToolbar>
+        <form onSubmit={handleSearch} className="org-list-page__toolbar">
+          <input
+            className="input org-list-page__search"
+            placeholder="搜索机构名称或 slug"
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+          />
+          <button type="submit" className="btn btn--secondary">筛选</button>
+        </form>
+      </AdminToolbar>
 
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-secondary)' }}>加载中...</div>
-      ) : (
-        <>
-          <div style={{ background: 'var(--color-bg-card, #fff)', borderRadius: 12, overflow: 'hidden', boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-color, #e5e7eb)', background: 'var(--color-bg-secondary, #fafafa)' }}>
-                  <th style={thStyle}>机构名称</th>
-                  <th style={thStyle}>团队人数</th>
-                  <th style={thStyle}>正式成员</th>
-                  <th style={thStyle}>外援</th>
-                  <th style={thStyle}>账号数</th>
-                  <th style={thStyle}>项目数</th>
-                  <th style={thStyle}>赛事数</th>
-                  <th style={thStyle}>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orgs.map((org) => (
-                  <tr key={org.id} style={{ borderBottom: '1px solid var(--border-color, #f0f0f0)' }}>
-                    <td style={tdStyle}>
-                      <div style={{ fontWeight: 600 }}>{org.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{org.slug}</div>
+      <AdminSurface
+        title="组织总表"
+        subtitle="把组织规模、成员结构和赛事承载能力放在同一张表里看，方便超管快速判断机构健康度。"
+        footer={
+          <AdminPagination
+            page={page}
+            totalPages={totalPages}
+            onPrev={() => setPage((current) => current - 1)}
+            onNext={() => setPage((current) => current + 1)}
+          />
+        }
+      >
+        {loading ? (
+          <AdminEmptyState title="机构数据加载中" description="正在汇总组织规模、账号与赛事信息，请稍候。" />
+        ) : orgs.length === 0 ? (
+          <AdminEmptyState
+            title="还没有符合条件的机构"
+            description="可以先放宽筛选条件，或者直接创建新的机构条目，补齐后续成员与赛事的承接关系。"
+            action={<Link to="/admin/orgs/new" className="btn btn--primary">创建首个机构</Link>}
+          />
+        ) : (
+          <AdminDataTable>
+            <thead>
+              <tr>
+                <th>机构</th>
+                <th>团队人数</th>
+                <th>正式成员</th>
+                <th>外援</th>
+                <th>账号</th>
+                <th>项目</th>
+                <th>赛事</th>
+                <th>状态</th>
+                <th>动作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orgs.map((org) => {
+                const raceCount = Number(org.activeRaceCount ?? org.raceCount ?? 0)
+                const accountCount = Number(org.loginAccountCount ?? 0)
+
+                return (
+                  <tr key={org.id}>
+                    <td>
+                      <div className="org-list-page__primary-cell">{org.name}</div>
+                      <div className="org-list-page__secondary-cell">{org.slug}</div>
                     </td>
-                    <td style={tdStyle}>{org.teamMemberCount ?? 0}</td>
-                    <td style={tdStyle}>{org.employeeCount ?? 0}</td>
-                    <td style={tdStyle}>{org.externalSupportCount ?? 0}</td>
-                    <td style={tdStyle}>{org.loginAccountCount ?? 0}</td>
-                    <td style={tdStyle}>{org.projectCount ?? 0}</td>
-                    <td style={tdStyle}>{org.activeRaceCount ?? org.raceCount ?? 0}</td>
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <td>{formatNumber(org.teamMemberCount)}</td>
+                    <td>{formatNumber(org.employeeCount)}</td>
+                    <td>{formatNumber(org.externalSupportCount)}</td>
+                    <td>{formatNumber(accountCount)}</td>
+                    <td>{formatNumber(org.projectCount)}</td>
+                    <td>{formatNumber(raceCount)}</td>
+                    <td>
+                      <AdminStatusPill tone={raceCount > 0 ? 'success' : 'warning'}>
+                        {raceCount > 0 ? '已承接赛事' : '待接赛事'}
+                      </AdminStatusPill>
+                    </td>
+                    <td>
+                      <div className="org-list-page__action-row">
                         <Link className="btn btn--ghost btn--sm" to={`/admin/orgs/${org.id}`}>详情</Link>
                         <Link className="btn btn--ghost btn--sm" to={`/admin/team?orgId=${org.id}`}>团队</Link>
-                        <button className="btn btn--ghost btn--sm" onClick={() => handleDeleteOrg(org)} style={{ color: 'var(--color-danger)' }}>删除</button>
+                        <button className="btn btn--ghost btn--sm org-list-page__danger-action" onClick={() => handleDeleteOrg(org)}>删除</button>
                       </div>
                     </td>
                   </tr>
-                ))}
-                {orgs.length === 0 && (
-                  <tr><td colSpan={8} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary)' }}>暂无机构</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {totalPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 16 }}>
-              <button className="btn btn--ghost btn--sm" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>上一页</button>
-              <span style={{ padding: '6px 12px', fontSize: 14 }}>{page} / {totalPages}</span>
-              <button className="btn btn--ghost btn--sm" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>下一页</button>
-            </div>
-          )}
-        </>
-      )}
+                )
+              })}
+            </tbody>
+          </AdminDataTable>
+        )}
+      </AdminSurface>
     </div>
   )
 }
-
-const thStyle = { padding: '12px 16px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary, #666)' }
-const tdStyle = { padding: '12px 16px', fontSize: 14 }
-
-export default OrgListPage

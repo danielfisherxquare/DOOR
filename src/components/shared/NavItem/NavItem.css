@@ -1,0 +1,59 @@
+/* ========================================
+   NavItem 导航项样式
+   ======================================== */
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  margin: 2px 8px;
+  color: var(--text-on-dark-muted);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-on-dark);
+}
+
+.nav-item--active {
+  background: var(--accent-soft);
+  color: var(--accent-light);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.nav-item__badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.nav-item--active .nav-item__badge {
+  background: var(--accent-muted);
+}
+
+.nav-item__title {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Collapsed state */
+.nav-item--collapsed {
+  justify-content: center;
+  padding: 10px;
+  margin: 2px 4px;
+}
+
+.nav-item--collapsed .nav-item__badge {
+  font-size: 11px;
+  padding: 6px 8px;
+}

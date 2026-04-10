@@ -1,0 +1,155 @@
+/**
+ * MapErrorBoundary.css
+ * 地图错误边界样式
+ */
+
+.map-error-boundary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--layer-accent-soft, rgba(212, 160, 23, 0.08)) 60%, transparent), transparent 28%),
+    var(--layer-bg-secondary, var(--background));
+  padding: 24px;
+}
+
+.error-content {
+  position: relative;
+  overflow: hidden;
+  max-width: 520px;
+  padding: 28px 30px;
+  text-align: left;
+  background: var(--layer-surface, var(--surface));
+  border: 1px solid var(--layer-border, var(--border));
+  border-top: 4px solid var(--danger);
+  box-shadow: var(--shadow-sm);
+}
+
+.error-content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--grid-pattern, linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px));
+  background-size: 16px 16px;
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+.error-content > * {
+  position: relative;
+  z-index: 1;
+}
+
+.error-kicker {
+  margin-bottom: 12px;
+  font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--danger);
+}
+
+.error-icon {
+  font-size: 44px;
+  margin-bottom: 12px;
+}
+
+.error-title {
+  margin: 0 0 8px 0;
+  font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--layer-text-primary, var(--text-primary));
+}
+
+.error-message {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: var(--layer-text-secondary, var(--text-secondary));
+  line-height: 1.6;
+}
+
+.error-details {
+  margin: 16px 0;
+  text-align: left;
+}
+
+.error-details details {
+  background: var(--layer-bg-secondary, var(--surface));
+  border: 1px solid var(--layer-border, var(--border));
+  padding: 12px;
+}
+
+.error-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--layer-text-secondary, var(--text-secondary));
+  margin-bottom: 8px;
+}
+
+.error-details pre {
+  margin: 8px 0 0 0;
+  padding: 8px;
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--danger);
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.error-stack {
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.error-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.error-btn {
+  padding: 10px 24px;
+  border: 1px solid transparent;
+  font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.error-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-on-accent, #fff);
+}
+
+.error-btn.primary:hover {
+  background: color-mix(in srgb, var(--accent) 80%, black);
+}
+
+.error-btn.secondary {
+  background: var(--layer-bg-secondary, var(--surface-hover));
+  border-color: var(--layer-border, var(--border));
+  color: var(--layer-text-primary, var(--text-primary));
+}
+
+.error-btn.secondary:hover {
+  background: var(--surface-active);
+}
+
+.error-hint {
+  margin: 16px 0 0 0;
+  font-size: 12px;
+  color: var(--layer-text-muted, var(--text-tertiary));
+}

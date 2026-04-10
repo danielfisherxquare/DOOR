@@ -1,0 +1,978 @@
+/**
+ * Invoice Processing Center Styles
+ * 发票处理中心样式
+ * 对齐 DOOR 设计系统 - Tectonic Engine
+ */
+
+/* ==================== 状态徽章 ==================== */
+
+.invoice-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 20px;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-eyebrow);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.invoice-status-badge--pending {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.invoice-status-badge--processing {
+    background: var(--info-soft);
+    color: var(--info);
+}
+
+.invoice-status-badge--completed {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.invoice-status-badge--error {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+/* ==================== 已导入徽章 ==================== */
+
+.invoice-imported-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--success-soft);
+    color: var(--success);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+}
+
+/* ==================== 主页面布局 ==================== */
+
+.invoice-processing-page {
+    min-height: 100vh;
+    background: var(--bg-secondary);
+}
+
+/* ==================== 统计条 - 对齐 command-stat-strip ==================== */
+
+.invoice-stats-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.invoice-stat-card {
+    display: grid;
+    gap: 6px;
+    padding: 14px 16px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-subtle, rgba(15, 23, 42, 0.08));
+    background: color-mix(in srgb, var(--surface-hover) 94%, var(--surface) 6%);
+    text-align: center;
+}
+
+.invoice-stat-card--processing {
+    background: var(--info-soft);
+    border-color: rgba(37, 99, 235, 0.16);
+}
+
+.invoice-stat-card--completed {
+    background: var(--success-soft);
+    border-color: rgba(5, 150, 105, 0.16);
+}
+
+.invoice-stat-card--error {
+    background: var(--danger-soft);
+    border-color: rgba(220, 38, 38, 0.16);
+}
+
+.invoice-stat-value {
+    font-size: clamp(1.1rem, 0.95rem + 0.45vw, 1.5rem);
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.03em;
+}
+
+.invoice-stat-card--processing .invoice-stat-value {
+    color: var(--info);
+}
+
+.invoice-stat-card--completed .invoice-stat-value {
+    color: var(--success);
+}
+
+.invoice-stat-card--error .invoice-stat-value {
+    color: var(--danger);
+}
+
+.invoice-stat-label {
+    color: var(--text-secondary);
+    font-size: var(--font-size-caption);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* ==================== 工具栏 - 对齐 command-toolbar ==================== */
+
+.invoice-processing-toolbar {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    margin-bottom: 16px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 97%, var(--bg-secondary) 3%);
+    box-shadow: var(--shadow-sm);
+}
+
+.invoice-processing-toolbar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--grid-pattern);
+    background-size: 16px 16px;
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+.invoice-processing-toolbar > * {
+    position: relative;
+    z-index: 1;
+}
+
+.invoice-processing-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* ==================== 主布局 ==================== */
+
+.invoice-processing-layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 16px;
+    min-height: calc(100vh - 280px);
+}
+
+/* ==================== 发票列表 ==================== */
+
+.invoice-list-panel {
+    min-height: 0;
+    overflow: hidden;
+}
+
+.invoice-thumbnail-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: calc(100vh - 400px);
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.invoice-thumbnail-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.invoice-thumbnail-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.invoice-thumbnail-list::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: var(--radius-sm);
+}
+
+/* 发票卡片 - 对齐 command-metric-card */
+
+.invoice-card {
+    display: flex;
+    gap: 12px;
+    padding: 12px 14px;
+    background: color-mix(in srgb, var(--surface-hover) 94%, var(--surface) 6%);
+    border: 1px solid var(--border-subtle, rgba(15, 23, 42, 0.08));
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.invoice-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 25%, rgba(15, 23, 42, 0.12));
+    transform: translateY(-1px);
+}
+
+.invoice-card.selected {
+    border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+    background: color-mix(in srgb, var(--accent-soft) 82%, white 18%);
+    box-shadow: var(--shadow-sm);
+}
+
+.invoice-card-thumbnail {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--bg-secondary);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.invoice-card-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.invoice-card-placeholder {
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.invoice-card-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.invoice-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.invoice-card-name {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 140px;
+}
+
+.invoice-card-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: var(--font-size-xs);
+}
+
+.invoice-card-amount {
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.invoice-card-date {
+    color: var(--text-muted);
+}
+
+.invoice-card-error {
+    font-size: var(--font-size-caption);
+    color: var(--danger);
+    background: var(--danger-soft);
+    padding: 4px 6px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.invoice-card-category {
+    font-size: var(--font-size-caption);
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    display: inline-block;
+}
+
+/* ==================== 详情面板 ==================== */
+
+.invoice-detail-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ==================== 处理进度轨 - 对齐 command-step-rail ==================== */
+
+.processing-status-rail {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 18px 20px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 98%, var(--bg-secondary) 2%);
+    box-shadow: var(--shadow-sm);
+}
+
+.processing-status-rail::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--grid-pattern);
+    background-size: 16px 16px;
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+.processing-status-rail > * {
+    position: relative;
+    z-index: 1;
+}
+
+.status-rail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.status-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+}
+
+.status-processing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--font-size-xs);
+    color: var(--accent);
+}
+
+.spinner-mini {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.status-rail-content {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.step-indicator {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 140px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border-subtle, rgba(15, 23, 42, 0.12));
+    background: color-mix(in srgb, var(--surface) 96%, var(--bg-secondary) 4%);
+    color: var(--text-primary);
+    text-align: left;
+    transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.step-indicator:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--accent) 25%, rgba(15, 23, 42, 0.12));
+}
+
+.step-dot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 28px;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    font-size: var(--font-size-caption);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: all 0.2s ease;
+}
+
+.step-dot.active {
+    background: var(--accent);
+    color: var(--text-on-accent);
+}
+
+.step-dot.completed {
+    background: var(--success);
+    color: var(--text-on-accent);
+}
+
+.step-dot.pending {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+}
+
+.step-dot svg {
+    width: 14px;
+    height: 14px;
+}
+
+.step-label {
+    display: grid;
+    gap: 4px;
+}
+
+.step-label-text {
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.step-label-desc {
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+}
+
+/* 处理日志 */
+
+.processing-log {
+    padding-top: 16px;
+    border-top: 1px solid var(--border-subtle, rgba(15, 23, 42, 0.08));
+}
+
+.processing-log-header {
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    color: var(--text-secondary);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.processing-log-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.log-entry {
+    display: flex;
+    gap: 8px;
+    font-size: var(--font-size-caption);
+    padding: 4px 8px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+}
+
+.log-time {
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.log-message {
+    color: var(--text-primary);
+}
+
+/* 错误状态 */
+
+.processing-status-rail.error-state {
+    border-color: color-mix(in srgb, var(--danger) 24%, var(--border));
+    background: var(--danger-soft);
+}
+
+.error-message {
+    font-size: var(--font-size-sm);
+    color: var(--danger);
+    margin-top: 8px;
+    padding: 8px;
+    background: var(--danger-soft);
+    border-radius: var(--radius-sm);
+}
+
+/* ==================== 发票预览区 ==================== */
+
+.invoice-preview-pane {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.invoice-preview-image-section {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 20px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 98%, var(--bg-secondary) 2%);
+    box-shadow: var(--shadow-sm);
+    max-height: 50vh;
+}
+
+.invoice-preview-image-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--grid-pattern);
+    background-size: 16px 16px;
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+.invoice-preview-image-section > * {
+    position: relative;
+    z-index: 1;
+}
+
+.invoice-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.invoice-preview-header h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+}
+
+.invoice-file-name {
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+}
+
+.invoice-image-container {
+    flex: 1;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+}
+
+.invoice-image-container img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.invoice-image-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    color: var(--text-muted);
+}
+
+.invoice-image-placeholder svg {
+    opacity: 0.5;
+}
+
+.invoice-preview-ocr-section {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 18px 20px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 98%, var(--bg-secondary) 2%);
+    box-shadow: var(--shadow-sm);
+    flex: 1;
+    overflow-y: auto;
+}
+
+.invoice-preview-ocr-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: var(--grid-pattern);
+    background-size: 16px 16px;
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+.invoice-preview-ocr-section > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* ==================== OCR 结果表单 ==================== */
+
+.ocr-result-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.ocr-form-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-subtle, rgba(15, 23, 42, 0.08));
+}
+
+.ocr-form-header h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+}
+
+.ocr-form-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.ocr-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.ocr-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ocr-form-field--wide {
+    grid-column: span 2;
+}
+
+.ocr-form-field label {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.ocr-form-field input,
+.ocr-form-field select {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    background: var(--surface);
+    color: var(--text-primary);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ocr-form-field select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 36px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2378716c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 16px;
+    cursor: pointer;
+}
+
+.ocr-form-field input:hover,
+.ocr-form-field select:hover {
+    border-color: var(--border-strong);
+}
+
+.ocr-form-field input:focus,
+.ocr-form-field select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.ocr-form-value {
+    font-size: var(--font-size-md);
+    color: var(--text-primary);
+    padding: 8px 0;
+}
+
+.ocr-empty-state {
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-secondary);
+}
+
+.ocr-empty-state .hint {
+    font-size: var(--font-size-xs);
+    color: var(--accent);
+    margin-top: 8px;
+}
+
+.ocr-empty-state .error {
+    font-size: var(--font-size-xs);
+    color: var(--danger);
+    margin-top: 8px;
+}
+
+/* ==================== 上传弹窗 - 对齐 processing-modal ==================== */
+
+.invoice-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
+    animation: modal-fade-in 0.15s ease-out;
+}
+
+.invoice-modal-content {
+    width: 100%;
+    max-width: 500px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: var(--shadow-lg);
+    animation: modal-slide-up 0.2s ease-out;
+}
+
+.invoice-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--border-subtle, rgba(15, 23, 42, 0.08));
+}
+
+.invoice-modal-header h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+}
+
+.invoice-modal-close {
+    border: none;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    min-width: 36px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: var(--font-size-xl);
+    transition: background 0.15s ease;
+}
+
+.invoice-modal-close:hover {
+    background: var(--bg-tertiary);
+}
+
+.invoice-modal-body {
+    padding: 0 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.upload-hint {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.invoice-modal-body input[type="file"] {
+    padding: 12px;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-md);
+    width: 100%;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.invoice-modal-body input[type="file"]:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.uploading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+}
+
+.invoice-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.uploading-state p {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+/* ==================== 空状态和加载状态 ==================== */
+
+.invoice-empty-state {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    padding: 36px 16px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.invoice-empty-state p {
+    margin: 0 0 16px;
+}
+
+.invoice-loading-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px;
+    color: var(--text-secondary);
+}
+
+/* ==================== 按钮样式扩展 ==================== */
+
+.btn--sm {
+    padding: 4px 10px;
+    font-size: var(--font-size-xs);
+}
+
+.btn--ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+}
+
+.btn--ghost:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-accent);
+    color: var(--text-primary);
+}
+
+.btn--primary {
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    color: var(--text-on-accent);
+}
+
+.btn--primary:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.btn--primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn--secondary {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+}
+
+.btn--secondary:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-strong);
+}
+
+/* ==================== 动画 ==================== */
+
+@keyframes modal-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes modal-slide-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== 响应式设计 ==================== */
+
+@media (max-width: 1024px) {
+    .invoice-processing-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .invoice-list-panel {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .invoice-thumbnail-list {
+        max-height: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .invoice-processing-toolbar,
+    .processing-status-rail,
+    .invoice-preview-image-section,
+    .invoice-preview-ocr-section {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+
+    .invoice-stats-strip {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .ocr-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ocr-form-field--wide {
+        grid-column: span 1;
+    }
+}

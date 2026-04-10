@@ -1,6 +1,37 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import adminApi from '../../api/adminApi'
+import { buildIdentityCenterHref } from '../../components/admin/adminConfig'
+import {
+  CommandDataTable,
+  CommandEmptyState,
+  CommandMetricGrid,
+  CommandNotice,
+  CommandPanel,
+  CommandShell,
+  CommandStatusTag,
+} from '../../components/command/CommandPrimitives'
+
+function formatDate(value) {
+  if (!value) return '-'
+  return new Date(value).toLocaleString('zh-CN')
+}
+
+function getMemberTypeLabel(item) {
+  if (item.member_type === 'external_support') {
+    if (item.external_engagement_type === 'long_term') return '外援 / 长期'
+    if (item.external_engagement_type === 'temporary') return '外援 / 临时'
+    return '外援'
+  }
+  return '正式成员'
+}
+
+function getStatusTone(status) {
+  if (status === 'active' || status === 'enabled') return 'success'
+  if (status === 'pending') return 'warning'
+  if (status === 'disabled' || status === 'inactive') return 'danger'
+  return 'neutral'
+}
 
 function OrgDetailPage() {
   const { orgId } = useParams()
@@ -16,9 +47,7 @@ function OrgDetailPage() {
       setError('')
       try {
         const res = await adminApi.getOrgDetail(orgId)
-        if (!cancelled && res.success) {
-          setData(res.data)
-        }
+        if (!cancelled && res.success) setData(res.data)
       } catch (err) {
         if (!cancelled) setError(err.message)
       } finally {
@@ -32,177 +61,207 @@ function OrgDetailPage() {
     }
   }, [orgId])
 
-  if (loading) return <div style={{ padding: 24 }}>加载中...</div>
-  if (error) return <div style={{ padding: 24, color: 'var(--color-danger)' }}>{error}</div>
-  if (!data) return <div style={{ padding: 24 }}>未找到机构。</div>
+  const overview = data?.overview || {}
+  const users = data?.users || []
+  const races = data?.races || []
+  const teamMembers = data?.teamMembers || []
+  const projects = data?.projects || []
 
-  const overview = data.overview || {}
-  const users = data.users || []
-  const races = data.races || []
-  const teamMembers = data.teamMembers || []
-  const projects = data.projects || []
+  const metrics = useMemo(() => ([
+    {
+      key: 'team',
+      label: '团队人数',
+      value: overview.teamMemberCount ?? teamMembers.length,
+      meta: '机构下已登记的成员总数。',
+      pill: 'TM',
+    },
+    {
+      key: 'accounts',
+      label: '账号数',
+      value: overview.loginAccountCount ?? users.length,
+      meta: '已绑定到该机构的登录账号。',
+      pill: 'IAM',
+    },
+    {
+      key: 'projects',
+      label: '项目数',
+      value: overview.projectCount ?? projects.length,
+      meta: '机构当前承接的项目计划数量。',
+      pill: 'PJ',
+    },
+    {
+      key: 'races',
+      label: '赛事数',
+      value: overview.activeRaceCount ?? races.length,
+      meta: '已挂接到该机构的赛事规模。',
+      pill: 'RC',
+    },
+  ]), [overview, projects.length, races.length, teamMembers.length, users.length])
 
-  return (
-    <div style={{ display: 'grid', gap: 20 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 28 }}>{data.name}</h1>
-          <div style={{ marginTop: 8, color: '#6b7280' }}>机构视角总览与团队、账号、项目、赛事概况</div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Link className="btn btn--secondary" to={`/admin/team?orgId=${data.id}`}>进入团队管理</Link>
-          <Link className="btn btn--secondary" to={`/admin/projects?orgId=${data.id}`}>查看项目计划</Link>
-          <Link className="btn btn--secondary" to={`/admin/race-permissions?orgId=${data.id}`}>赛事授权</Link>
-        </div>
+  if (loading) {
+    return (
+      <div className="command-page surface-admin">
+        <CommandPanel title="机构详情加载中" subtitle="正在汇总团队、账号、赛事和项目信息。">
+          <CommandNotice tone="info">请稍候，控制台正在拉取机构画像。</CommandNotice>
+        </CommandPanel>
       </div>
+    )
+  }
 
-      <div style={metricGridStyle}>
-        <MetricCard title="团队人数" value={overview.teamMemberCount ?? teamMembers.length} />
-        <MetricCard title="正式成员" value={overview.employeeCount ?? 0} />
-        <MetricCard title="外援人数" value={overview.externalSupportCount ?? 0} />
-        <MetricCard title="账号数" value={overview.loginAccountCount ?? 0} />
-        <MetricCard title="项目数" value={overview.projectCount ?? projects.length} />
-        <MetricCard title="赛事数" value={overview.activeRaceCount ?? races.length} />
+  if (error) {
+    return (
+      <div className="command-page surface-admin">
+        <CommandPanel title="机构详情加载失败" subtitle="未能完成机构画像同步。">
+          <CommandNotice tone="danger">{error}</CommandNotice>
+        </CommandPanel>
       </div>
+    )
+  }
 
-      <div style={sectionGridStyle}>
-        <section style={panelStyle}>
-          <SectionHeader title="团队成员" extra={`${teamMembers.length} 人`} />
-          <SimpleTable
-            columns={['工号', '姓名', '岗位 / 部门', '类型', '状态']}
-            rows={teamMembers.slice(0, 8).map((item) => ([
-              item.employee_code,
-              item.employee_name,
-              `${item.position || '-'} / ${item.department || '-'}`,
-              item.member_type === 'external_support'
-                ? `外援${item.external_engagement_type === 'long_term' ? ' · 长期' : item.external_engagement_type === 'temporary' ? ' · 临时' : ''}`
-                : '正式成员',
-              item.status,
-            ]))}
-            emptyText="暂无团队成员"
-          />
-        </section>
-
-        <section style={panelStyle}>
-          <SectionHeader title="账号概况" extra={`${users.length} 个`} />
-          <SimpleTable
-            columns={['用户名', '绑定成员', '角色', '来源', '待改密']}
-            rows={users.slice(0, 8).map((item) => ([
-              item.username,
-              item.team_member_name || '-',
-              item.role,
-              item.account_source || 'manual',
-              item.must_change_password ? '是' : '否',
-            ]))}
-            emptyText="暂无账号"
-          />
-        </section>
-
-        <section style={panelStyle}>
-          <SectionHeader title="项目计划" extra={`${projects.length} 个`} />
-          <SimpleTable
-            columns={['项目名称', '关联赛事', '更新时间']}
-            rows={projects.slice(0, 8).map((item) => ([
-              item.name,
-              item.race_id || '-',
-              item.updated_at ? new Date(item.updated_at).toLocaleString() : '-',
-            ]))}
-            emptyText="暂无项目"
-          />
-        </section>
-
-        <section style={panelStyle}>
-          <SectionHeader title="赛事列表" extra={`${races.length} 场`} />
-          <SimpleTable
-            columns={['赛事名称', '日期', '地点']}
-            rows={races.slice(0, 8).map((item) => ([
-              item.name,
-              item.date ? new Date(item.date).toLocaleDateString() : '-',
-              item.location || '-',
-            ]))}
-            emptyText="暂无赛事"
-          />
-        </section>
+  if (!data) {
+    return (
+      <div className="command-page surface-admin">
+        <CommandPanel title="未找到机构" subtitle="请返回机构列表重新选择。">
+          <CommandEmptyState title="没有可展示的机构详情" description="当前机构不存在，或你没有访问该机构详情的权限。" icon="ORG" />
+        </CommandPanel>
       </div>
-    </div>
-  )
-}
+    )
+  }
 
-function MetricCard({ title, value }) {
   return (
-    <div style={panelStyle}>
-      <div style={{ fontSize: 13, color: '#6b7280' }}>{title}</div>
-      <div style={{ marginTop: 10, fontSize: 28, fontWeight: 700 }}>{value}</div>
-    </div>
-  )
-}
-
-function SectionHeader({ title, extra }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-      <h2 style={{ margin: 0, fontSize: 18 }}>{title}</h2>
-      <span style={{ fontSize: 12, color: '#6b7280' }}>{extra}</span>
-    </div>
-  )
-}
-
-function SimpleTable({ columns, rows, emptyText }) {
-  return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead>
-        <tr>
-          {columns.map((column) => (
-            <th key={column} style={thStyle}>{column}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.length > 0 ? rows.map((row, rowIndex) => (
-          <tr key={rowIndex} style={{ borderTop: '1px solid #e5e7eb' }}>
-            {row.map((cell, cellIndex) => (
-              <td key={cellIndex} style={tdStyle}>{cell}</td>
-            ))}
-          </tr>
-        )) : (
-          <tr>
-            <td colSpan={columns.length} style={{ ...tdStyle, textAlign: 'center', color: '#6b7280' }}>{emptyText}</td>
-          </tr>
+    <div className="command-page surface-admin">
+      <CommandShell
+        eyebrow="平台治理"
+        title={data.name}
+        summary="从机构维度查看团队、账号、项目和赛事承接关系，帮助超管快速判断组织健康度与后续治理动作。"
+        actions={(
+          <div className="command-actions-row">
+            <Link className="btn btn--secondary" to={`/admin/team?orgId=${data.id}`}>团队管理</Link>
+            <Link className="btn btn--secondary" to={`/admin/projects?orgId=${data.id}`}>项目计划</Link>
+            <Link className="btn btn--secondary" to={buildIdentityCenterHref('org-race', { selectedOrgId: data.id })}>身份中心</Link>
+          </div>
         )}
-      </tbody>
-    </table>
+      >
+        <CommandMetricGrid items={metrics} />
+      </CommandShell>
+
+      <div className="command-grid command-grid--two">
+        <CommandPanel title="团队成员" subtitle={`当前展示前 ${Math.min(teamMembers.length, 8)} 名成员`}>
+          {teamMembers.length === 0 ? (
+            <CommandEmptyState title="暂无团队成员" description="可以先到团队管理页导入成员，再继续开通账号与赛事权限。" icon="TM" />
+          ) : (
+            <CommandDataTable>
+              <thead>
+                <tr>
+                  <th>工号</th>
+                  <th>姓名</th>
+                  <th>岗位 / 部门</th>
+                  <th>类型</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teamMembers.slice(0, 8).map((item) => (
+                  <tr key={item.id || `${item.employee_code}-${item.employee_name}`}>
+                    <td>{item.employee_code || '-'}</td>
+                    <td>{item.employee_name || '-'}</td>
+                    <td>{`${item.position || '-'} / ${item.department || '-'}`}</td>
+                    <td>{getMemberTypeLabel(item)}</td>
+                    <td>
+                      <CommandStatusTag tone={getStatusTone(item.status)}>{item.status || '未标记'}</CommandStatusTag>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </CommandDataTable>
+          )}
+        </CommandPanel>
+
+        <CommandPanel title="账号概况" subtitle={`当前展示前 ${Math.min(users.length, 8)} 个账号`}>
+          {users.length === 0 ? (
+            <CommandEmptyState title="暂无账号" description="机构还没有可登录账号，可以先从身份中心或团队页继续开通。" icon="ID" />
+          ) : (
+            <CommandDataTable>
+              <thead>
+                <tr>
+                  <th>用户名</th>
+                  <th>绑定成员</th>
+                  <th>角色</th>
+                  <th>来源</th>
+                  <th>待改密</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.slice(0, 8).map((item) => (
+                  <tr key={item.id || item.username}>
+                    <td>{item.username}</td>
+                    <td>{item.team_member_name || '-'}</td>
+                    <td>{item.role || '-'}</td>
+                    <td>{item.account_source || 'manual'}</td>
+                    <td>
+                      <CommandStatusTag tone={item.must_change_password ? 'warning' : 'success'}>
+                        {item.must_change_password ? '待修改' : '已完成'}
+                      </CommandStatusTag>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </CommandDataTable>
+          )}
+        </CommandPanel>
+
+        <CommandPanel title="项目计划" subtitle={`当前展示前 ${Math.min(projects.length, 8)} 个项目`}>
+          {projects.length === 0 ? (
+            <CommandEmptyState title="暂无项目" description="可以先创建项目计划，再补齐项目阶段与赛事归属。" icon="PJ" />
+          ) : (
+            <CommandDataTable>
+              <thead>
+                <tr>
+                  <th>项目名称</th>
+                  <th>关联赛事</th>
+                  <th>更新时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projects.slice(0, 8).map((item) => (
+                  <tr key={item.id || item.name}>
+                    <td>{item.name}</td>
+                    <td>{item.race_id || '-'}</td>
+                    <td>{formatDate(item.updated_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </CommandDataTable>
+          )}
+        </CommandPanel>
+
+        <CommandPanel title="赛事列表" subtitle={`当前展示前 ${Math.min(races.length, 8)} 场赛事`}>
+          {races.length === 0 ? (
+            <CommandEmptyState title="暂无赛事" description="机构还没有承接赛事，可以先到赛事管理页创建或挂接赛事。" icon="RC" />
+          ) : (
+            <CommandDataTable>
+              <thead>
+                <tr>
+                  <th>赛事名称</th>
+                  <th>日期</th>
+                  <th>地点</th>
+                </tr>
+              </thead>
+              <tbody>
+                {races.slice(0, 8).map((item) => (
+                  <tr key={item.id || item.name}>
+                    <td>{item.name}</td>
+                    <td>{item.date ? new Date(item.date).toLocaleDateString('zh-CN') : '-'}</td>
+                    <td>{item.location || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </CommandDataTable>
+          )}
+        </CommandPanel>
+      </div>
+    </div>
   )
-}
-
-const panelStyle = {
-  background: '#fff',
-  borderRadius: 16,
-  padding: 20,
-  boxShadow: '0 10px 30px rgba(15,23,42,0.06)',
-}
-
-const metricGridStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-  gap: 16,
-}
-
-const sectionGridStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))',
-  gap: 16,
-}
-
-const thStyle = {
-  textAlign: 'left',
-  fontSize: 13,
-  color: '#6b7280',
-  padding: '10px 8px',
-}
-
-const tdStyle = {
-  padding: '12px 8px',
-  fontSize: 14,
-  verticalAlign: 'top',
 }
 
 export default OrgDetailPage

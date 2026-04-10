@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
 process.env.DATABASE_URL = DATABASE_URL;
+process.env.NODE_ENV = 'test';
 
 const { default: knex } = await import('../src/db/knex.js');
 const { default: app } = await import('../src/app.js');
@@ -55,31 +56,37 @@ async function createUser({ username, email, password, role, userOrgId }) {
     return user;
 }
 
+async function resetDatabase() {
+    const result = await knex.raw(`
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+          AND tablename NOT IN ('knex_migrations', 'knex_migrations_lock')
+    `);
+    const tableNames = result.rows.map((row) => `"${row.tablename}"`);
+    if (tableNames.length > 0) {
+        await knex.raw(`TRUNCATE TABLE ${tableNames.join(', ')} RESTART IDENTITY CASCADE`);
+    }
+}
+
 describe('bib routes', () => {
     before(async () => {
         await knex.migrate.latest();
-
-        await knex('pipeline_executions').del();
-        await knex('bib_assignments').del();
-        await knex('user_race_permissions').del();
-        await knex('org_race_permissions').del();
-        await knex('refresh_tokens').del();
-        await knex('records').del();
-        await knex('users').del();
-        await knex('races').del();
-        await knex('organizations').del();
+        await resetDatabase();
 
         const [org] = await knex('organizations').insert({ name: 'Bib Route Org', slug: 'bib-route-org' }).returning('*');
         orgId = org.id;
 
-        const [race] = await knex('races').insert({ name: 'Bib Route Race', org_id: orgId }).returning('*');
+        const [race] = await knex('races')
+            .insert({ name: 'Bib Route Race', org_id: orgId, date: '2026-03-31' })
+            .returning('*');
         raceId = Number(race.id);
 
         const editor = await createUser({
             username: 'bib_route_editor',
             email: 'bib_route_editor@test.com',
             password: 'editor123',
-            role: 'race_editor',
+            role: 'org_admin',
             userOrgId: orgId,
         });
 
@@ -169,21 +176,13 @@ describe('bib routes', () => {
     });
 
     after(async () => {
-        await knex('pipeline_executions').del();
-        await knex('bib_assignments').del();
-        await knex('user_race_permissions').del();
-        await knex('org_race_permissions').del();
-        await knex('refresh_tokens').del();
-        await knex('records').del();
-        await knex('users').del();
-        await knex('races').del();
-        await knex('organizations').del();
+        await resetDatabase();
         server?.close();
         await knex.destroy();
     });
 
     it('returns planner-ready overview fields', async () => {
-        const response = await api(`/api/bib/overview/${raceId}`, {
+        const response = await api(`/api/admin/bib/overview/${raceId}`, {
             headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -207,7 +206,7 @@ describe('bib routes', () => {
     });
 
     it('returns execution dataset without S zone runners and marks skipped ids', async () => {
-        const response = await api(`/api/bib/execution-dataset/${raceId}`, {
+        const response = await api(`/api/admin/bib/execution-dataset/${raceId}`, {
             headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -231,25 +230,25 @@ describe('bib routes', () => {
     });
 
     it('creates and queries bib snapshot independently from lottery snapshot', async () => {
-        const beforeResponse = await api(`/api/bib/has-snapshot/${raceId}`, {
+        const beforeResponse = await api(`/api/admin/bib/has-snapshot/${raceId}`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         assert.equal(beforeResponse.status, 200);
         assert.equal(beforeResponse.body.data.hasSnapshot, false);
 
-        const createResponse = await api(`/api/bib/snapshot/${raceId}`, {
+        const createResponse = await api(`/api/admin/bib/snapshot/${raceId}`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
         });
         assert.equal(createResponse.status, 200);
 
-        const afterResponse = await api(`/api/bib/has-snapshot/${raceId}`, {
+        const afterResponse = await api(`/api/admin/bib/has-snapshot/${raceId}`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         assert.equal(afterResponse.status, 200);
         assert.equal(afterResponse.body.data.hasSnapshot, true);
 
-        const lotterySnapshotResponse = await api(`/api/lottery/has-snapshot/${raceId}`, {
+        const lotterySnapshotResponse = await api(`/api/admin/lottery/has-snapshot/${raceId}`, {
             headers: { Authorization: `Bearer ${token}` },
         });
         assert.equal(lotterySnapshotResponse.status, 200);
@@ -257,7 +256,7 @@ describe('bib routes', () => {
     });
 
     it('bulk assign can rerun without hitting stale bib assignment unique conflicts', async () => {
-        const firstRun = await api(`/api/bib/bulk-assign/${raceId}`, {
+        const firstRun = await api(`/api/admin/bib/bulk-assign/${raceId}`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({
@@ -272,7 +271,7 @@ describe('bib routes', () => {
         });
         assert.equal(firstRun.status, 200);
 
-        const secondRun = await api(`/api/bib/bulk-assign/${raceId}`, {
+        const secondRun = await api(`/api/admin/bib/bulk-assign/${raceId}`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({

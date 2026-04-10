@@ -1,9 +1,9 @@
 /**
- * Clothing Repository — 服装库存 数据访问层
- * 多租户隔离：所有查询必须带 org_id
+ * Clothing Repository 鈥?鏈嶈搴撳瓨 鏁版嵁璁块棶灞? * 澶氱鎴烽殧绂伙細鎵€鏈夋煡璇㈠繀椤诲甫 org_id
  */
 import knex from '../../db/knex.js';
 import { clothingLimitMapper } from '../../db/mappers/clothing.js';
+import { normalizeEvent } from '../../utils/event-normalizer.js';
 
 export async function getLimits(orgId, raceId) {
     const rows = await knex('clothing_limits')
@@ -47,16 +47,15 @@ export async function saveLimit(orgId, data) {
 }
 
 /**
- * 增减已用量 — 支持 4 步降级链回退
- * ⚠️ 允许超扣（used_count > total_inventory），不抛异常，记日志警告
+ * 澧炲噺宸茬敤閲?鈥?鏀寔 4 姝ラ檷绾ч摼鍥為€€
+ * 鈿狅笍 鍏佽瓒呮墸锛坲sed_count > total_inventory锛夛紝涓嶆姏寮傚父锛岃鏃ュ織璀﹀憡
  *
  * @param {string} orgId
  * @param {number} raceId
  * @param {string} event
  * @param {string} gender
  * @param {string} size
- * @param {number} delta - 增减量（正数扣减，负数回退）
- * @returns {{ matched: boolean, overstock: boolean }}
+ * @param {number} delta - 澧炲噺閲忥紙姝ｆ暟鎵ｅ噺锛岃礋鏁板洖閫€锛? * @returns {{ matched: boolean, overstock: boolean }}
  */
 export async function incrementUsed(orgId, raceId, event, gender, size, delta = 1) {
     const updated = await knex('clothing_limits')
@@ -64,7 +63,7 @@ export async function incrementUsed(orgId, raceId, event, gender, size, delta = 
         .increment('used_count', delta);
 
     if (updated > 0) {
-        // 检查是否超扣
+        // 妫€鏌ユ槸鍚﹁秴鎵?
         const row = await knex('clothing_limits')
             .where({ org_id: orgId, race_id: raceId, event, gender, size })
             .first();
@@ -75,18 +74,29 @@ export async function incrementUsed(orgId, raceId, event, gender, size, delta = 
 }
 
 /**
- * 4 步降级链库存扣减（给单个选手）
- * 依次尝试: event:gender:size → event:U:size → ALL:gender:size → ALL:U:size
+ * 4 姝ラ檷绾ч摼搴撳瓨鎵ｅ噺锛堢粰鍗曚釜閫夋墜锛? * 渚濇灏濊瘯: event:gender:size 鈫?event:U:size 鈫?ALL:gender:size 鈫?ALL:U:size
  *
  * @returns {{ matched: boolean, matchedKey: string|null, overstock: boolean }}
  */
 export async function reserveClothingForRunner(orgId, raceId, eventKey, genderKey, sizeKey) {
-    const tryKeys = [
-        { event: eventKey, gender: genderKey },       // 1. event:gender:size
-        { event: eventKey, gender: 'U' },             // 2. event:U:size（男女同款）
-        { event: 'ALL', gender: genderKey },       // 3. ALL:gender:size
-        { event: 'ALL', gender: 'U' },             // 4. ALL:U:size（全通用）
-    ];
+    const eventCandidates = [...new Set([
+        eventKey || 'ALL',
+        normalizeEvent(eventKey || '') || eventKey || 'ALL',
+    ])];
+    const tryKeys = [];
+
+    for (const event of eventCandidates) {
+        if (!event || event === 'ALL') continue;
+        tryKeys.push(
+            { event, gender: genderKey },
+            { event, gender: 'U' },
+        );
+    }
+
+    tryKeys.push(
+        { event: 'ALL', gender: genderKey },
+        { event: 'ALL', gender: 'U' },
+    );
 
     for (const k of tryKeys) {
         const result = await incrementUsed(orgId, raceId, k.event, k.gender, sizeKey);
@@ -114,7 +124,7 @@ export async function getStatistics(orgId, raceId) {
             knex.raw('(total_inventory - used_count) AS remaining'),
             knex.raw(`CASE WHEN total_inventory > 0 
                 THEN ROUND((used_count::numeric / total_inventory) * 100, 1)
-                ELSE 0 END AS usage_pct`)
+                ELSE 0 END AS usage_pct`),
         )
         .orderBy(['event', 'gender', 'size']);
 
@@ -123,7 +133,7 @@ export async function getStatistics(orgId, raceId) {
         .select(
             knex.raw('SUM(total_inventory)::int AS total_inventory'),
             knex.raw('SUM(used_count)::int AS total_used'),
-            knex.raw('SUM(total_inventory - used_count)::int AS total_remaining')
+            knex.raw('SUM(total_inventory - used_count)::int AS total_remaining'),
         )
         .first();
 

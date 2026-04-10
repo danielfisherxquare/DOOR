@@ -1,5 +1,5 @@
 ﻿/**
- * Race Routes - race CRUD API
+ * Race Routes - race CRUD API and bib tracking
  */
 import { Router } from 'express';
 import * as raceRepo from './race.repository.js';
@@ -7,8 +7,12 @@ import { requireRoles } from '../../middleware/require-roles.js';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import knex from '../../db/knex.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
+import bibTrackingRoutes from './bib-tracking/bib-tracking.routes.js';
 
 const router = Router();
+
+// Mount bib-tracking routes under /bibs
+router.use('/bibs', bibTrackingRoutes);
 
 function normalizeOrgId(value) {
     if (value === undefined || value === null || value === '') return null;

@@ -16,7 +16,7 @@ function ScanLayout({ children }) {
         <div style={{
           background: '#0F172A',
           color: '#E2E8F0',
-          borderRadius: 24,
+          borderRadius: 0,
           padding: '20px 18px'
         }}>
           <div style={{ fontSize: 12, opacity: 0.72, marginBottom: 6 }}>Bib Tracking</div>

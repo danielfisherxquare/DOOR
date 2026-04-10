@@ -185,51 +185,62 @@ export async function analysis(orgId, raceId, { keyword, filters } = {}) {
     }
     applyFilters(base, filters);
 
-    // 总数
-    const [{ count }] = await base.clone().count('* as count');
+    // ── 并行执行所有统计查询（5 → 1 次往返）──────────────
+    const [
+        [{ count }],
+        genderByEvent,
+        clothingSizeByEvent,
+        nationality,
+        province,
+        city,
+    ] = await Promise.all([
+        // 总数
+        base.clone().count('* as count'),
+
+        // 按项目+性别统计
+        base.clone()
+            .select('event')
+            .select(knex.raw("count(*) filter (where gender = 'M' or gender = '男') as m"))
+            .select(knex.raw("count(*) filter (where gender = 'F' or gender = '女') as f"))
+            .select(knex.raw('count(*) as total'))
+            .groupBy('event'),
+
+        // 按项目+衣服尺码统计
+        base.clone()
+            .select('event', 'clothing_size as size')
+            .count('* as count')
+            .where('clothing_size', '!=', '')
+            .groupBy('event', 'clothing_size'),
+
+        // 国籍分布
+        base.clone()
+            .select('country as label')
+            .count('* as count')
+            .where('country', '!=', '')
+            .groupBy('country')
+            .orderBy('count', 'desc')
+            .limit(50),
+
+        // 省份分布
+        base.clone()
+            .select('province as label')
+            .count('* as count')
+            .where('province', '!=', '')
+            .groupBy('province')
+            .orderBy('count', 'desc')
+            .limit(50),
+
+        // 城市分布
+        base.clone()
+            .select('city as label')
+            .count('* as count')
+            .where('city', '!=', '')
+            .groupBy('city')
+            .orderBy('count', 'desc')
+            .limit(50),
+    ]);
+
     const total = parseInt(count, 10);
-
-    // 按项目+性别统计
-    const genderByEvent = await base.clone()
-        .select('event')
-        .select(knex.raw("count(*) filter (where gender = 'M' or gender = '男') as m"))
-        .select(knex.raw("count(*) filter (where gender = 'F' or gender = '女') as f"))
-        .select(knex.raw('count(*) as total'))
-        .groupBy('event');
-
-    // 按项目+衣服尺码统计
-    const clothingSizeByEvent = await base.clone()
-        .select('event', 'clothing_size as size')
-        .count('* as count')
-        .where('clothing_size', '!=', '')
-        .groupBy('event', 'clothing_size');
-
-    // 国籍分布
-    const nationality = await base.clone()
-        .select('country as label')
-        .count('* as count')
-        .where('country', '!=', '')
-        .groupBy('country')
-        .orderBy('count', 'desc')
-        .limit(50);
-
-    // 省份分布
-    const province = await base.clone()
-        .select('province as label')
-        .count('* as count')
-        .where('province', '!=', '')
-        .groupBy('province')
-        .orderBy('count', 'desc')
-        .limit(50);
-
-    // 城市分布
-    const city = await base.clone()
-        .select('city as label')
-        .count('* as count')
-        .where('city', '!=', '')
-        .groupBy('city')
-        .orderBy('count', 'desc')
-        .limit(50);
 
     return {
         total,
@@ -337,21 +348,35 @@ export async function bulkUpdate(orgId, updates) {
         return { updated: 0 };
     }
 
+    // 收集有效的 recordId 列表
+    const validItems = [];
+    for (const item of updates) {
+        const recordId = Number(item?.id);
+        if (Number.isFinite(recordId) && recordId > 0) {
+            validItems.push({ recordId, data: item?.data || {} });
+        }
+    }
+    if (validItems.length === 0) return { updated: 0 };
+
     let updated = 0;
     await knex.transaction(async (trx) => {
-        for (const item of updates) {
-            const recordId = Number(item?.id);
-            if (!Number.isFinite(recordId) || recordId <= 0) continue;
+        // ── 批量获取所有 race_id（1 次查询替代 N 次）──────────
+        const allIds = validItems.map(v => v.recordId);
+        const existingRows = await trx('records')
+            .whereIn('id', allIds)
+            .select('id', 'race_id');
 
-            // 获取现有记录的 raceId
-            const existing = await trx('records')
-                .where({ id: recordId })
-                .select('race_id')
-                .first();
+        const raceIdMap = new Map();
+        for (const row of existingRows) {
+            raceIdMap.set(row.id, row.race_id);
+        }
 
-            if (!existing) continue;
+        // ── 逐条 UPDATE（因每条加密数据不同，无法完全批量化）──
+        for (const { recordId, data } of validItems) {
+            const raceId = raceIdMap.get(recordId);
+            if (raceId === undefined) continue;
 
-            const row = recordMapper.toDbUpdate(item?.data || {}, orgId, existing.race_id);
+            const row = recordMapper.toDbUpdate(data, orgId, raceId);
             if (Object.keys(row).length === 0) continue;
 
             const q = trx('records').where({ id: recordId });
@@ -427,7 +452,7 @@ export async function importVerificationResults(orgId, raceId, results) {
         throw new Error('Invalid raceId');
     }
 
-    // 分组：Full / Half
+    // ── 分组：Full / Half ─────────────────────────────────
     const fullMap = new Map();   // idNumber → pbJson
     const halfMap = new Map();
 
@@ -446,51 +471,64 @@ export async function importVerificationResults(orgId, raceId, results) {
         target.set(res.idNumber.trim(), pbJson);
     }
 
+    // ── 预计算所有 blind index（CPU 密集，在事务外完成）──
+    /** @param {Map<string, string>} inputMap @returns {Array<{hash: string, pbJson: string}>} */
+    function precomputeHashes(inputMap) {
+        const items = [];
+        for (const [idNum, pbJson] of inputMap) {
+            const hash = idNumberBlindIndex(idNum);
+            if (hash) items.push({ hash, pbJson });
+        }
+        return items;
+    }
+
+    const fullItems = fullMap.size > 0 ? precomputeHashes(fullMap) : [];
+    const halfItems = halfMap.size > 0 ? precomputeHashes(halfMap) : [];
+
+    if (fullItems.length === 0 && halfItems.length === 0) {
+        return { updated: 0 };
+    }
+
     let totalUpdated = 0;
+    const BATCH = 500;
 
     await knex.transaction(async (trx) => {
-        // 1. 更新 Full
-        if (fullMap.size > 0) {
-            const entries = Array.from(fullMap.entries());
-            const BATCH = 500;
-            for (let i = 0; i < entries.length; i += BATCH) {
-                const batch = entries.slice(i, i + BATCH);
-                for (const [idNum, pbJson] of batch) {
-                    // 🔐 使用 blind index 匹配加密的 id_number
-                    const hash = idNumberBlindIndex(idNum);
-                    if (!hash) continue;
-                    const fullQ = trx('records').where({ race_id: safeRaceId, id_number_hash: hash });
-                    if (orgId) fullQ.andWhere({ org_id: orgId });
-                    const cnt = await fullQ
-                        .update({
-                            personal_best_full: pbJson,
-                            updated_at: knex.fn.now(),
-                        });
-                    totalUpdated += cnt;
-                }
+        // ── 批量 CASE UPDATE（每 BATCH 条一次 SQL）────────
+        async function batchCaseUpdate(items, column) {
+            for (let i = 0; i < items.length; i += BATCH) {
+                const batch = items.slice(i, i + BATCH);
+                const hashes = batch.map(b => b.hash);
+                const whenClauses = batch.map(() => 'WHEN id_number_hash = ? THEN ?::text').join(' ');
+                const whenParams = batch.flatMap(b => [b.hash, b.pbJson]);
+
+                const orgClause = orgId ? 'AND org_id = ?' : '';
+                const orgParams = orgId ? [orgId] : [];
+
+                const sql = `
+                    UPDATE records
+                    SET ${column} = CASE ${whenClauses} END,
+                        updated_at = NOW()
+                    WHERE race_id = ?
+                      AND id_number_hash IN (${hashes.map(() => '?').join(',')})
+                      ${orgClause}
+                `;
+
+                const result = await trx.raw(sql, [
+                    ...whenParams,
+                    safeRaceId,
+                    ...hashes,
+                    ...orgParams,
+                ]);
+
+                totalUpdated += result.rowCount || 0;
             }
         }
 
-        // 2. 更新 Half
-        if (halfMap.size > 0) {
-            const entries = Array.from(halfMap.entries());
-            const BATCH = 500;
-            for (let i = 0; i < entries.length; i += BATCH) {
-                const batch = entries.slice(i, i + BATCH);
-                for (const [idNum, pbJson] of batch) {
-                    // 🔐 使用 blind index 匹配加密的 id_number
-                    const hash = idNumberBlindIndex(idNum);
-                    if (!hash) continue;
-                    const halfQ = trx('records').where({ race_id: safeRaceId, id_number_hash: hash });
-                    if (orgId) halfQ.andWhere({ org_id: orgId });
-                    const cnt = await halfQ
-                        .update({
-                            personal_best_half: pbJson,
-                            updated_at: knex.fn.now(),
-                        });
-                    totalUpdated += cnt;
-                }
-            }
+        if (fullItems.length > 0) {
+            await batchCaseUpdate(fullItems, 'personal_best_full');
+        }
+        if (halfItems.length > 0) {
+            await batchCaseUpdate(halfItems, 'personal_best_half');
         }
     });
 

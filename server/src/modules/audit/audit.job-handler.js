@@ -23,8 +23,13 @@ import {
     idNumberBlindIndex,
     normalizeIdNumber,
 } from '../../utils/crypto.js';
+import { normalizeEvent } from '../../utils/event-normalizer.js';
 
 const BATCH_SIZE = 1000;
+
+function toEventKey(event) {
+    return normalizeEvent(event || '');
+}
 
 function parseDateOnly(value) {
     if (!value) return null;
@@ -411,13 +416,13 @@ registerHandler('audit:direct_lock', async (job, { knex, heartbeat }) => {
         .select('event', 'lottery_mode_override');
     const effectiveModeByEvent = new Map(
         capacities.map(cap => [
-            cap.event || '',
+            toEventKey(cap.event),
             (cap.lottery_mode_override === 'direct' || cap.lottery_mode_override === 'lottery')
                 ? cap.lottery_mode_override
                 : raceDefaultMode,
         ]),
     );
-    const isDirectEvent = (event) => (effectiveModeByEvent.get(event || '') || raceDefaultMode) === 'direct';
+    const isDirectEvent = (event) => (effectiveModeByEvent.get(toEventKey(event)) || raceDefaultMode) === 'direct';
 
     await heartbeat(20, `发现 ${directRunners.length} 名直通选手，正在锁定`);
 
@@ -446,7 +451,7 @@ registerHandler('audit:direct_lock', async (job, { knex, heartbeat }) => {
 
     for (const runner of directRunners) {
         if (isDirectEvent(runner.event)) continue;
-        const eventKey = runner.event || 'ALL';
+        const eventKey = toEventKey(runner.event) || 'ALL';
         const genderKey = runner.gender || 'U';
         const sizeKey = runner.clothing_size || '';
         if (!sizeKey) continue; // 无衣服尺码则跳过

@@ -1,0 +1,47 @@
+{
+  "timestamp": "2026-03-30T05:33:15.528Z",
+  "tests": [
+    {
+      "name": "登录系统",
+      "passed": true,
+      "timestamp": "2026-03-30T05:33:34.704Z"
+    },
+    {
+      "name": "创建项目",
+      "passed": false,
+      "error": "page.goto: Target page, context or browser has been closed",
+      "timestamp": "2026-03-30T05:33:34.705Z"
+    },
+    {
+      "name": "上传发票",
+      "passed": false,
+      "error": "locator.count: Target page, context or browser has been closed",
+      "timestamp": "2026-03-30T05:33:34.706Z"
+    },
+    {
+      "name": "上传付款凭证",
+      "passed": false,
+      "error": "locator.count: Target page, context or browser has been closed",
+      "timestamp": "2026-03-30T05:33:34.706Z"
+    },
+    {
+      "name": "汇总表格",
+      "passed": false,
+      "error": "locator.count: Target page, context or browser has been closed",
+      "timestamp": "2026-03-30T05:33:34.707Z"
+    },
+    {
+      "name": "导出文件",
+      "passed": false,
+      "error": "locator.count: Target page, context or browser has been closed",
+      "timestamp": "2026-03-30T05:33:34.707Z"
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "login-page",
+      "path": "C:\\Users\\Xquare\\.gemini\\antigravity\\scratch\\door\\tests\\reimbursement\\screenshots\\login-page-1774848799934.png"
+    }
+  ],
+  "issues": []
+}

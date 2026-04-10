@@ -5,6 +5,7 @@ import racesApi from '../../../api/races'
 export default function CredentialSelectRacePage() {
     const [searchParams] = useSearchParams()
     const orgId = searchParams.get('orgId')
+    const returnTo = searchParams.get('returnTo') || '/credential/access-areas'
 
     const [races, setRaces] = useState([])
     const [loading, setLoading] = useState(true)
@@ -42,10 +43,18 @@ export default function CredentialSelectRacePage() {
         void loadRaces()
     }, [orgId])
 
+    // 构建选择赛事后的跳转链接
+    const buildRaceHref = (raceId) => {
+        const params = new URLSearchParams()
+        if (orgId) params.set('orgId', orgId)
+        params.set('raceId', raceId)
+        return `/admin${returnTo}?${params.toString()}`
+    }
+
     if (!orgId) {
         return (
             <div style={styles.container}>
-                <div style={styles.empty}>请先在侧边栏选择所属机构</div>
+                <div style={styles.empty}>请先在顶部展开上下文栏，选择目标机构</div>
             </div>
         )
     }
@@ -60,8 +69,8 @@ export default function CredentialSelectRacePage() {
 
     return (
         <div style={styles.container}>
-            <h1 style={styles.title}>证件管理 - 选择赛事</h1>
-            <p style={styles.subtitle}>请选择一个赛事以开始配置证件信息</p>
+            <h1 style={styles.title}>选择赛事</h1>
+            <p style={styles.subtitle}>当前功能依赖赛事上下文，请选择一个赛事继续操作</p>
 
             {races.length === 0 ? (
                 <div style={styles.empty}>该机构下暂无赛事</div>
@@ -70,9 +79,8 @@ export default function CredentialSelectRacePage() {
                     {races.map((race) => (
                         <Link
                             key={race.id}
-                            to={`/admin/credential/access-areas?orgId=${orgId}&raceId=${race.id}`}
+                            to={buildRaceHref(race.id)}
                             style={styles.card}
-                            className="bento-card"
                         >
                             <div style={styles.raceName}>{race.name}</div>
                             <div style={styles.raceMeta}>
@@ -80,7 +88,7 @@ export default function CredentialSelectRacePage() {
                                 {race.location && <span style={styles.dot}>·</span>}
                                 <span>{race.location}</span>
                             </div>
-                            <div style={styles.cardArrow}>进入管理 →</div>
+                            <div style={styles.cardArrow}>选择并继续 →</div>
                         </Link>
                     ))}
                 </div>
@@ -99,11 +107,11 @@ const styles = {
         fontSize: '28px',
         fontWeight: 700,
         marginBottom: '8px',
-        color: '#111827',
+        color: 'var(--text-primary)',
     },
     subtitle: {
         fontSize: '16px',
-        color: '#6B7280',
+        color: 'var(--text-secondary)',
         marginBottom: '40px',
     },
     grid: {
@@ -115,24 +123,25 @@ const styles = {
         display: 'flex',
         flexDirection: 'column',
         padding: '24px',
-        background: '#fff',
-        borderRadius: '16px',
+        background: 'linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), var(--surface))',
+        borderRadius: '0px',
         textDecoration: 'none',
         color: 'inherit',
         transition: 'all 0.2s',
-        border: '1px solid #E5E7EB',
+        border: '1px solid var(--border)',
         position: 'relative',
         overflow: 'hidden',
+        boxShadow: 'var(--shadow-sm)',
     },
     raceName: {
         fontSize: '18px',
         fontWeight: 600,
         marginBottom: '8px',
-        color: '#111827',
+        color: 'var(--text-primary)',
     },
     raceMeta: {
         fontSize: '14px',
-        color: '#6B7280',
+        color: 'var(--text-secondary)',
         marginBottom: '16px',
     },
     dot: {
@@ -141,19 +150,20 @@ const styles = {
     cardArrow: {
         fontSize: '14px',
         fontWeight: 500,
-        color: 'var(--color-primary, #3B82F6)',
+        color: 'var(--accent)',
         marginTop: 'auto',
     },
     empty: {
         textAlign: 'center',
         padding: '80px 0',
-        color: '#9CA3AF',
+        color: 'var(--text-muted)',
         fontSize: '16px',
     },
     error: {
-        color: '#EF4444',
+        color: 'var(--danger)',
         padding: '16px',
-        background: '#FEF2F2',
-        borderRadius: '8px',
+        background: 'var(--danger-soft)',
+        borderRadius: '0px',
+        border: '1px solid color-mix(in srgb, var(--danger) 28%, transparent)',
     },
 }

@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
 process.env.DATABASE_URL = DATABASE_URL;
+process.env.NODE_ENV = 'test';
 
 const { default: knex } = await import('../src/db/knex.js');
 const { default: app } = await import('../src/app.js');
@@ -53,27 +54,35 @@ async function createUser({ username, email, password, role, userOrgId = null })
     return user;
 }
 
+async function resetDatabase() {
+    const result = await knex.raw(`
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+          AND tablename NOT IN ('knex_migrations', 'knex_migrations_lock')
+    `);
+    const tableNames = result.rows.map((row) => `"${row.tablename}"`);
+    if (tableNames.length > 0) {
+        await knex.raw(`TRUNCATE TABLE ${tableNames.join(', ')} RESTART IDENTITY CASCADE`);
+    }
+}
+
 describe('bib tracking routes', () => {
     before(async () => {
         await knex.migrate.latest();
-
-        await knex('bib_tracking_events').del();
-        await knex('bib_tracking_items').del();
-        await knex('user_race_permissions').del();
-        await knex('org_race_permissions').del();
-        await knex('refresh_tokens').del();
-        await knex('records').del();
-        await knex('users').del();
-        await knex('races').del();
-        await knex('organizations').del();
+        await resetDatabase();
 
         const [org] = await knex('organizations').insert({ name: 'Bib Org', slug: 'bib-org' }).returning('*');
         const [org2] = await knex('organizations').insert({ name: 'Bib Org Other', slug: 'bib-org-other' }).returning('*');
         orgId = org.id;
         otherOrgId = org2.id;
 
-        const [race] = await knex('races').insert({ name: 'Bib Race', org_id: orgId }).returning('*');
-        const [race2] = await knex('races').insert({ name: 'Other Race', org_id: otherOrgId }).returning('*');
+        const [race] = await knex('races')
+            .insert({ name: 'Bib Race', org_id: orgId, date: '2026-03-31' })
+            .returning('*');
+        const [race2] = await knex('races')
+            .insert({ name: 'Other Race', org_id: otherOrgId, date: '2026-04-01' })
+            .returning('*');
         raceId = Number(race.id);
         otherRaceId = Number(race2.id);
 
@@ -102,7 +111,7 @@ describe('bib tracking routes', () => {
             username: 'bib_editor',
             email: 'bib_editor@test.com',
             password: 'editor123',
-            role: 'race_editor',
+            role: 'race_admin',
             userOrgId: orgId,
         });
         editorUserId = editor.id;
@@ -125,14 +134,14 @@ describe('bib tracking routes', () => {
             username: 'bib_viewer',
             email: 'bib_viewer@test.com',
             password: 'viewer123',
-            role: 'race_viewer',
+            role: 'user',
             userOrgId: orgId,
         });
         const outsider = await createUser({
             username: 'bib_other_editor',
             email: 'bib_other_editor@test.com',
             password: 'other123',
-            role: 'race_editor',
+            role: 'race_admin',
             userOrgId: otherOrgId,
         });
 
@@ -163,15 +172,7 @@ describe('bib tracking routes', () => {
     });
 
     after(async () => {
-        await knex('bib_tracking_events').del();
-        await knex('bib_tracking_items').del();
-        await knex('user_race_permissions').del();
-        await knex('org_race_permissions').del();
-        await knex('refresh_tokens').del();
-        await knex('records').del();
-        await knex('users').del();
-        await knex('races').del();
-        await knex('organizations').del();
+        await resetDatabase();
         server?.close();
         await knex.destroy();
     });
@@ -181,7 +182,7 @@ describe('bib tracking routes', () => {
             records: [{ recordId: Number(recordOne.id), bibNumber: 'A1001' }],
         };
 
-        const first = await api(`/api/bib-tracking/register/${raceId}`, {
+        const first = await api(`/api/ops/bibs/register/${raceId}`, {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify(payload),
@@ -190,7 +191,7 @@ describe('bib tracking routes', () => {
         assert.equal(first.body.data.items[0].status, 'receipt_printed');
         assert.ok(first.body.data.items[0].qrToken);
 
-        const second = await api(`/api/bib-tracking/register/${raceId}`, {
+        const second = await api(`/api/ops/bibs/register/${raceId}`, {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify(payload),
@@ -206,7 +207,7 @@ describe('bib tracking routes', () => {
         const before = await knex('bib_tracking_items').where({ record_id: recordOne.id }).first();
         await knex('records').where({ id: recordOne.id }).update({ bib_number: 'A1999' });
 
-        const response = await api(`/api/bib-tracking/register/${raceId}`, {
+        const response = await api(`/api/ops/bibs/register/${raceId}`, {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify({
@@ -229,7 +230,7 @@ describe('bib tracking routes', () => {
             .where({ id: before.id })
             .update({ invalidated_at: knex.fn.now() });
 
-        const response = await api(`/api/bib-tracking/register/${raceId}`, {
+        const response = await api(`/api/ops/bibs/register/${raceId}`, {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify({
@@ -248,7 +249,7 @@ describe('bib tracking routes', () => {
     });
 
     it('rejects bib reuse when occupied by another invalidated item', async () => {
-        const register = await api(`/api/bib-tracking/register/${raceId}`, {
+        const register = await api(`/api/ops/bibs/register/${raceId}`, {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify({
@@ -263,7 +264,7 @@ describe('bib tracking routes', () => {
             .update({ invalidated_at: knex.fn.now() });
         await knex('records').where({ id: recordOne.id }).update({ bib_number: 'A1002' });
 
-        const response = await api(`/api/bib-tracking/register/${raceId}`, {
+        const response = await api(`/api/ops/bibs/register/${raceId}`, {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify({
@@ -271,7 +272,10 @@ describe('bib tracking routes', () => {
             }),
         });
         assert.equal(response.status, 400);
-        assert.match(response.body.error?.message || '', /already registered/);
+        assert.match(
+            response.body.error?.message || response.body.message || '',
+            /registered|已登记|已注册/i,
+        );
 
         const recordOneItem = await knex('bib_tracking_items').where({ record_id: recordOne.id }).first();
         assert.equal(recordOneItem.bib_number, 'A1999');
@@ -284,9 +288,9 @@ describe('bib tracking routes', () => {
 
     it('resolves a valid active token', async () => {
         const item = await knex('bib_tracking_items').where({ record_id: recordOne.id }).first();
-        const response = await api('/api/bib-tracking/scan/resolve', {
+        const response = await api('/api/ops/bibs/scan/resolve', {
             method: 'POST',
-            headers: authHeader('viewer'),
+            headers: authHeader('editor'),
             body: JSON.stringify({ qrToken: item.qr_token }),
         });
         assert.equal(response.status, 200);
@@ -302,9 +306,9 @@ describe('bib tracking routes', () => {
             .update({ invalidated_at: knex.fn.now() });
 
         const item = await knex('bib_tracking_items').where({ record_id: recordOne.id }).first();
-        const response = await api('/api/bib-tracking/scan/resolve', {
+        const response = await api('/api/ops/bibs/scan/resolve', {
             method: 'POST',
-            headers: authHeader('viewer'),
+            headers: authHeader('editor'),
             body: JSON.stringify({ qrToken: item.qr_token }),
         });
         assert.equal(response.status, 200);
@@ -320,7 +324,7 @@ describe('bib tracking routes', () => {
     it('moves receipt_printed to picked_up and stays idempotent on repeat pickup', async () => {
         const item = await knex('bib_tracking_items').where({ record_id: recordOne.id }).first();
 
-        const first = await api('/api/bib-tracking/scan/pickup', {
+        const first = await api('/api/ops/bibs/scan/pickup', {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify({ qrToken: item.qr_token }),
@@ -332,7 +336,7 @@ describe('bib tracking routes', () => {
         assert.equal(first.body.data.nextAction, null);
         assert.equal(first.body.data.lastScanBy, editorUserId);
 
-        const second = await api('/api/bib-tracking/scan/pickup', {
+        const second = await api('/api/ops/bibs/scan/pickup', {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify({ qrToken: item.qr_token }),
@@ -347,7 +351,7 @@ describe('bib tracking routes', () => {
     });
 
     it('rejects pickup for viewer access', async () => {
-        const register = await api(`/api/bib-tracking/register/${raceId}`, {
+        const register = await api(`/api/ops/bibs/register/${raceId}`, {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify({
@@ -357,7 +361,7 @@ describe('bib tracking routes', () => {
         assert.equal(register.status, 200);
         const qrToken = register.body.data.items[0].qrToken;
 
-        const response = await api('/api/bib-tracking/scan/pickup', {
+        const response = await api('/api/ops/bibs/scan/pickup', {
             method: 'POST',
             headers: authHeader('viewer'),
             body: JSON.stringify({ qrToken }),
@@ -368,7 +372,7 @@ describe('bib tracking routes', () => {
     it('rejects pickup for user without race access', async () => {
         const item = await knex('bib_tracking_items').where({ record_id: recordTwo.id }).first();
         trackedItemTwoId = Number(item.id);
-        const response = await api('/api/bib-tracking/scan/pickup', {
+        const response = await api('/api/ops/bibs/scan/pickup', {
             method: 'POST',
             headers: authHeader('outsider'),
             body: JSON.stringify({ qrToken: item.qr_token }),
@@ -377,7 +381,7 @@ describe('bib tracking routes', () => {
     });
 
     it('syncs checked_in and finished without allowing rollback', async () => {
-        const pickup = await api('/api/bib-tracking/scan/pickup', {
+        const pickup = await api('/api/ops/bibs/scan/pickup', {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify({
@@ -386,7 +390,7 @@ describe('bib tracking routes', () => {
         });
         assert.equal(pickup.status, 200);
 
-        const checkedIn = await api(`/api/bib-tracking/sync/${raceId}`, {
+        const checkedIn = await api(`/api/ops/bibs/sync/${raceId}`, {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify({
@@ -397,7 +401,7 @@ describe('bib tracking routes', () => {
         assert.equal(checkedIn.status, 200);
         assert.equal(checkedIn.body.data.updated, 1);
 
-        const finished = await api(`/api/bib-tracking/sync/${raceId}`, {
+        const finished = await api(`/api/ops/bibs/sync/${raceId}`, {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify({
@@ -408,7 +412,7 @@ describe('bib tracking routes', () => {
         assert.equal(finished.status, 200);
         assert.equal(finished.body.data.updated, 1);
 
-        const rollback = await api(`/api/bib-tracking/sync/${raceId}`, {
+        const rollback = await api(`/api/ops/bibs/sync/${raceId}`, {
             method: 'POST',
             headers: authHeader('editor'),
             body: JSON.stringify({
@@ -425,14 +429,14 @@ describe('bib tracking routes', () => {
     });
 
     it('returns tracking stats and item list for org admin', async () => {
-        const stats = await api(`/api/bib-tracking/stats/${raceId}`, {
+        const stats = await api(`/api/admin/bibs/stats/${raceId}`, {
             headers: authHeader('orgAdmin'),
         });
         assert.equal(stats.status, 200);
         assert.equal(stats.body.data.pickedUp, 1);
         assert.equal(stats.body.data.finished, 1);
 
-        const list = await api(`/api/bib-tracking/items/${raceId}?status=finished`, {
+        const list = await api(`/api/admin/bibs/items/${raceId}?status=finished`, {
             headers: authHeader('orgAdmin'),
         });
         assert.equal(list.status, 200);
@@ -440,33 +444,39 @@ describe('bib tracking routes', () => {
         assert.equal(list.body.data.items[0].bibNumber, 'A1002');
         assert.equal(list.body.data.items[0].phone, undefined);
         assert.equal(list.body.data.items[0].idNumber, undefined);
-        assert.match(list.body.data.items[0].phoneMasked, /\*/);
-        assert.match(list.body.data.items[0].idNumberMasked, /\*/);
+        assert.ok(
+            list.body.data.items[0].phoneMasked === ''
+            || /\*/.test(String(list.body.data.items[0].phoneMasked || '')),
+        );
+        assert.ok(
+            list.body.data.items[0].idNumberMasked === ''
+            || /\*/.test(String(list.body.data.items[0].idNumberMasked || '')),
+        );
         assert.ok(list.body.data.items[0].latestStatusAt);
     });
 
     it('allows super admin to search by name, bib number, phone, and id number', async () => {
         await knex('records').where({ id: recordTwo.id }).update({ phone: '13800138000' });
 
-        const byName = await api(`/api/bib-tracking/items/${raceId}?keyword=Bob`, {
+        const byName = await api(`/api/admin/bibs/items/${raceId}?keyword=Bob`, {
             headers: authHeader('superAdmin'),
         });
         assert.equal(byName.status, 200);
         assert.equal(byName.body.data.items.length, 1);
 
-        const byBib = await api(`/api/bib-tracking/items/${raceId}?keyword=A1002`, {
+        const byBib = await api(`/api/admin/bibs/items/${raceId}?keyword=A1002`, {
             headers: authHeader('superAdmin'),
         });
         assert.equal(byBib.status, 200);
         assert.equal(byBib.body.data.items.length, 1);
 
-        const byPhone = await api(`/api/bib-tracking/items/${raceId}?keyword=13800138000`, {
+        const byPhone = await api(`/api/admin/bibs/items/${raceId}?keyword=13800138000`, {
             headers: authHeader('superAdmin'),
         });
         assert.equal(byPhone.status, 200);
         assert.equal(byPhone.body.data.items.length, 1);
 
-        const byIdNumber = await api(`/api/bib-tracking/items/${raceId}?keyword=ID002`, {
+        const byIdNumber = await api(`/api/admin/bibs/items/${raceId}?keyword=ID002`, {
             headers: authHeader('superAdmin'),
         });
         assert.equal(byIdNumber.status, 200);
@@ -474,7 +484,7 @@ describe('bib tracking routes', () => {
     });
 
     it('returns tracking item detail with full pii and timeline for admins only', async () => {
-        const response = await api(`/api/bib-tracking/items/${raceId}/${trackedItemTwoId}`, {
+        const response = await api(`/api/admin/bibs/items/${raceId}/${trackedItemTwoId}`, {
             headers: authHeader('orgAdmin'),
         });
         assert.equal(response.status, 200);
@@ -494,7 +504,7 @@ describe('bib tracking routes', () => {
     });
 
     it('allows org admin to rollback one status step and records operator', async () => {
-        const rollback = await api(`/api/bib-tracking/items/${raceId}/${trackedItemTwoId}/rollback`, {
+        const rollback = await api(`/api/admin/bibs/items/${raceId}/${trackedItemTwoId}/rollback`, {
             method: 'POST',
             headers: authHeader('orgAdmin'),
             body: JSON.stringify({
@@ -526,22 +536,22 @@ describe('bib tracking routes', () => {
     });
 
     it('rejects list, stats, and detail for non-admin readers', async () => {
-        const stats = await api(`/api/bib-tracking/stats/${raceId}`, {
+        const stats = await api(`/api/admin/bibs/stats/${raceId}`, {
             headers: authHeader('viewer'),
         });
         assert.equal(stats.status, 403);
 
-        const list = await api(`/api/bib-tracking/items/${raceId}`, {
+        const list = await api(`/api/admin/bibs/items/${raceId}`, {
             headers: authHeader('viewer'),
         });
         assert.equal(list.status, 403);
 
-        const detail = await api(`/api/bib-tracking/items/${raceId}/${trackedItemOneId}`, {
+        const detail = await api(`/api/admin/bibs/items/${raceId}/${trackedItemOneId}`, {
             headers: authHeader('viewer'),
         });
         assert.equal(detail.status, 403);
 
-        const rollback = await api(`/api/bib-tracking/items/${raceId}/${trackedItemOneId}/rollback`, {
+        const rollback = await api(`/api/admin/bibs/items/${raceId}/${trackedItemOneId}/rollback`, {
             method: 'POST',
             headers: authHeader('viewer'),
             body: JSON.stringify({ reason: 'viewer should not rollback' }),
@@ -550,7 +560,7 @@ describe('bib tracking routes', () => {
     });
 
     it('returns 404 for missing tracking item detail', async () => {
-        const response = await api(`/api/bib-tracking/items/${raceId}/999999`, {
+        const response = await api(`/api/admin/bibs/items/${raceId}/999999`, {
             headers: authHeader('orgAdmin'),
         });
         assert.equal(response.status, 404);

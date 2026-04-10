@@ -2,10 +2,15 @@ import app from './app.js';
 import { env } from './config/env.js';
 import knex from './db/knex.js';
 import { verifyEncryptionKeys } from './utils/key-guard.js';
+import { ensureSuperAdmin } from './bootstrap/ensure-super-admin.js';
 
 // ── 启动前验证加密密钥一致性 ──────────────────────────────────
 try {
   await verifyEncryptionKeys(knex);
+  const superAdminBootstrap = await ensureSuperAdmin();
+  if (superAdminBootstrap.created) {
+    console.log(`[auth-bootstrap] seeded super admin: ${superAdminBootstrap.username}`);
+  }
 } catch (err) {
   console.error(err.message);
   process.exit(1);

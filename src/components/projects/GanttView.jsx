@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import projectsApi from '../../api/projects';
 import TaskEditModal from './TaskEditModal';
+import './projects-components.css';
 
 export default function GanttView({ projectId }) {
     const [tasks, setTasks] = useState([]);
@@ -166,26 +167,18 @@ export default function GanttView({ projectId }) {
         };
     };
 
-    if (loading) return <div style={{ padding: 20 }}>加载甘特图中...</div>;
+    if (loading) return <div className="gantt-loading">加载甘特图中...</div>;
 
     return (
-        <div style={{ padding: 20, background: '#fff', borderRadius: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                <h3 style={{ fontSize: 18, margin: 0, color: '#374151' }}>项目时间轴</h3>
-                <div style={{ display: 'flex', gap: 8 }}>
+        <div className="gantt-container">
+            <div className="gantt-header">
+                <h3 className="gantt-title">项目时间轴</h3>
+                <div className="gantt-controls">
                     {['Day', 'Week', 'Month'].map(scale => (
                         <button
                             key={scale}
                             onClick={() => setZoomScale(scale)}
-                            style={{
-                                padding: '4px 12px',
-                                borderRadius: 4,
-                                border: '1px solid #d1d5db',
-                                background: zoomScale === scale ? '#e5e7eb' : '#fff',
-                                color: '#374151',
-                                cursor: 'pointer',
-                                fontSize: 12
-                            }}
+                            className={`gantt-scale-btn ${zoomScale === scale ? 'gantt-scale-btn--active' : ''}`}
                         >
                             {scale === 'Day' ? '日' : scale === 'Week' ? '周' : '月'}
                         </button>
@@ -193,55 +186,47 @@ export default function GanttView({ projectId }) {
                 </div>
             </div>
 
-            <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 8 }}>
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: `minmax(200px, max-content) minmax(100px, max-content) repeat(${displayColumns.length}, minmax(${zoomScale === 'Day' ? '40px' : zoomScale === 'Week' ? '80px' : '120px'}, 1fr))`,
-                    minWidth: '100%'
+            <div className="gantt-scroll">
+                <div className="gantt-grid" style={{
+                    gridTemplateColumns: `minmax(200px, max-content) minmax(100px, max-content) repeat(${displayColumns.length}, minmax(${zoomScale === 'Day' ? '40px' : zoomScale === 'Week' ? '80px' : '120px'}, 1fr))`
                 }}>
                     {/* Header Row */}
-                    <div style={{ padding: '12px 16px', fontWeight: 'bold', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', position: 'sticky', left: 0, zIndex: 10 }}>任务名称</div>
-                    <div style={{ padding: '12px 16px', fontWeight: 'bold', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', position: 'sticky', left: 200, zIndex: 10 }}>责任组</div>
+                    <div className="gantt-header-cell gantt-header-cell--sticky">任务名称</div>
+                    <div className="gantt-header-cell gantt-header-cell--sticky-2">责任组</div>
 
                     {displayColumns.map((col, idx) => (
-                        <div key={idx} style={{ padding: '8px 4px', textAlign: 'center', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb' }}>
-                            <div style={{ fontSize: 13, fontWeight: 'bold', color: '#111827' }}>{col.label}</div>
-                            {col.subLabel && <div style={{ fontSize: 11, color: '#6b7280' }}>{col.subLabel}</div>}
+                        <div key={idx} className="gantt-header-cell">
+                            <div className="gantt-header-label">{col.label}</div>
+                            {col.subLabel && <div className="gantt-header-sub-label">{col.subLabel}</div>}
                         </div>
                     ))}
 
                     {/* Task Rows */}
                     {tasks.map((task) => {
                         const spanState = zoomScale === 'Day' ? calculateTaskSpan(task) : getScaleSpan(task);
+                        const taskBarClass = `gantt-task-bar ${task.status === 'DONE' ? 'gantt-task-bar--done' : task.status === 'IN_PROGRESS' ? 'gantt-task-bar--in-progress' : 'gantt-task-bar--todo'}`;
                         return (
                             <React.Fragment key={task.id}>
-                                <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', borderRight: '1px solid #e5e7eb', position: 'sticky', left: 0, background: '#fff', zIndex: 5, fontSize: 14, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }} title={task.title}>
+                                <div className="gantt-cell gantt-cell--sticky gantt-cell--name" title={task.title}>
                                     {task.title}
                                 </div>
-                                <div style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', borderRight: '1px solid #e5e7eb', position: 'sticky', left: 200, background: '#fff', zIndex: 5, fontSize: 13, color: '#6b7280' }} title={task.assignee_summary || task.responsible_group || '-'}>
+                                <div className="gantt-cell gantt-cell--sticky-2 gantt-cell--assignee">
                                     {task.assignee_summary || task.responsible_group || '-'}
                                 </div>
 
                                 {/* Grid body track */}
-                                <div style={{ gridColumn: `3 / -1`, background: '#fff', borderBottom: '1px solid #f3f4f6', position: 'relative', display: 'grid', gridTemplateColumns: `repeat(${displayColumns.length}, 1fr)` }}>
+                                <div className="gantt-row-track">
                                     {displayColumns.map((_, i) => (
-                                        <div key={i} style={{ borderRight: '1px dashed #f3f4f6', height: '100%' }}></div>
+                                        <div key={i} className="gantt-column"></div>
                                     ))}
 
                                     {spanState && (
                                         <div
                                             onClick={() => setEditingTask(task)}
+                                            className={taskBarClass}
                                             style={{
-                                                position: 'absolute',
-                                                top: 6, bottom: 6,
                                                 left: `calc(${(spanState.gridColumnStart - 1) / displayColumns.length * 100}%)`,
-                                                width: `calc(${(spanState.gridColumnEnd - spanState.gridColumnStart) / displayColumns.length * 100}%)`,
-                                                background: task.status === 'DONE' ? '#10b981' : task.status === 'IN_PROGRESS' ? '#3b82f6' : '#6b7280',
-                                                borderRadius: 6,
-                                                cursor: 'pointer',
-                                                transition: 'opacity 0.2s',
-                                                display: 'flex', alignItems: 'center', padding: '0 8px', color: '#fff', fontSize: 11,
-                                                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                                                width: `calc(${(spanState.gridColumnEnd - spanState.gridColumnStart) / displayColumns.length * 100}%)`
                                             }}
                                             onMouseEnter={e => e.currentTarget.style.opacity = 0.8}
                                             onMouseLeave={e => e.currentTarget.style.opacity = 1}

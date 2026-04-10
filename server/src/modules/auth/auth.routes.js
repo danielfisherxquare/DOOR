@@ -122,10 +122,66 @@ router.post('/race-permissions', requireAuth, requireRoles('org_admin', 'super_a
         if (!targetUserId || !raceId) {
             return res.status(400).json({ success: false, message: '缺少 targetUserId 或 raceId' });
         }
-        if (role && !['race_editor', 'race_viewer', 'editor', 'viewer'].includes(role)) {
-            return res.status(400).json({ success: false, message: '赛事角色无效，支持 race_editor/race_viewer/editor/viewer' });
+        if (role && !['race_admin', 'user', 'race_editor', 'race_viewer', 'editor', 'viewer'].includes(role)) {
+            return res.status(400).json({ success: false, message: '赛事角色无效，支持 race_admin/user（兼容 race_editor/race_viewer/editor/viewer）' });
         }
         const result = await authService.assignRaceRole(req.authContext, targetUserId, raceId, role);
+        res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /api/auth/forgot-password — 忘记密码（公开）
+router.post('/forgot-password', async (req, res, next) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ success: false, message: '缺少邮箱地址' });
+        }
+        const result = await authService.forgotPassword(email);
+        res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// POST /api/auth/reset-password/:token — 重置密码（公开）
+router.post('/reset-password/:token', async (req, res, next) => {
+    try {
+        const { token } = req.params;
+        const { password } = req.body;
+        if (!token) {
+            return res.status(400).json({ success: false, message: '缺少重置令牌' });
+        }
+        if (!password) {
+            return res.status(400).json({ success: false, message: '缺少新密码' });
+        }
+        if (password.length < 6) {
+            return res.status(400).json({ success: false, message: '密码长度至少 6 位' });
+        }
+        const result = await authService.resetPassword(token, password);
+        res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// GET /api/auth/preferences — 获取用户偏好（需要认证）
+router.get('/preferences', requireAuth, async (req, res, next) => {
+    try {
+        const result = await authService.getPreferences(req.authContext.userId);
+        res.json({ success: true, data: result });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// PATCH /api/auth/preferences — 更新用户偏好（需要认证）
+router.patch('/preferences', requireAuth, async (req, res, next) => {
+    try {
+        const { lastOrgId, lastRaceId } = req.body;
+        const result = await authService.updatePreferences(req.authContext.userId, { lastOrgId, lastRaceId });
         res.json({ success: true, data: result });
     } catch (err) {
         next(err);

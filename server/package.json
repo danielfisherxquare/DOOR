@@ -1,7 +1,7 @@
 {
   "name": "door-server",
   "version": "1.0.0",
-  "description": "DOOR 工具门户后端服务",
+  "description": "DOOR Workspace 后端服务",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -9,9 +9,10 @@
     "dev": "node --env-file-if-exists=.env --watch src/index.js",
     "worker": "node --env-file-if-exists=.env src/worker.js",
     "worker:dev": "node --env-file-if-exists=.env --watch src/worker.js",
-    "migrate": "node --env-file-if-exists=.env node_modules/knex/bin/cli.js migrate:latest --knexfile knexfile.js",
-    "migrate:make": "node --env-file-if-exists=.env node_modules/knex/bin/cli.js migrate:make --knexfile knexfile.js",
-    "test": "node --env-file-if-exists=.env --test",
+    "migrate": "node node_modules/knex/bin/cli.js migrate:latest --knexfile knexfile.js",
+    "migrate:make": "node node_modules/knex/bin/cli.js migrate:make --knexfile knexfile.js",
+    "seed:demo": "node --env-file-if-exists=.env scripts/seed-demo-data.mjs",
+    "test": "node --env-file-if-exists=.env --test --test-concurrency=1",
     "load:bib-tracking": "node --env-file-if-exists=.env scripts/load-bib-tracking.mjs"
   },
   "dependencies": {
@@ -19,6 +20,7 @@
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "docx": "^9.6.1",
+    "exceljs": "^4.4.0",
     "express": "^4.18.2",
     "express-rate-limit": "^8.2.1",
     "form-data": "^4.0.5",
@@ -29,6 +31,7 @@
     "pg": "^8.13.0",
     "rate-limit-redis": "^4.2.1",
     "redis": "^4.7.0",
+    "sharp": "^0.34.5",
     "uuid": "^9.0.1"
   },
   "devDependencies": {

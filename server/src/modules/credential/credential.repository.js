@@ -232,7 +232,7 @@ export async function findCredentialsByRaceId(orgId, raceId, options = {}) {
     if (printBatchId) query.where({ 'cc.print_batch_id': printBatchId });
 
     return query
-        .select('cc.*', 'issued_user.name as issued_user_name')
+        .select('cc.*', 'issued_user.username as issued_user_name')
         .orderBy('cc.created_at', 'desc');
 }
 
@@ -245,7 +245,7 @@ export async function findCredentialById(orgId, id) {
         query.andWhere({ 'cc.org_id': orgId });
     }
 
-    return query.first('cc.*', 'issued_user.name as issued_user_name');
+    return query.first('cc.*', 'issued_user.username as issued_user_name');
 }
 
 export async function findCredentialByQrPayload(qrPayload) {

@@ -10,6 +10,8 @@ const authApi = {
   forgotPassword: (email) => request.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => request.post(`/auth/reset-password/${token}`, { password }),
   changePassword: (data) => request.post('/auth/change-password', data),
+  getPreferences: () => request.get('/auth/preferences'),
+  updatePreferences: (data) => request.patch('/auth/preferences', data),
 }
 
 export default authApi

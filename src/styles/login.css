@@ -1,0 +1,541 @@
+/* ========================================
+   DOOR 登录页 — Industrial Red / Tectonic Engine
+   基于 Stitch 设计稿还原
+   ======================================== */
+
+/* ── 工业化背景纹理 ── */
+.industrial-grid {
+  background-size: 32px 32px;
+  background-image:
+    linear-gradient(to right, rgba(216, 38, 44, 0.1) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(216, 38, 44, 0.1) 1px, transparent 1px);
+}
+
+.blueprint-underlay {
+  background-image: radial-gradient(circle at 2px 2px, rgba(255, 255, 255, 0.05) 1px, transparent 0);
+  background-size: 16px 16px;
+}
+
+.scanline {
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/* Material Symbols 基准设置 */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* ── 登录页全屏画布 ── */
+.login-canvas {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+  background-color: #D8262C;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── 背景建筑元素 ── */
+.login-canvas__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.login-canvas__bg-right {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 33.333%;
+  height: 100%;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.login-canvas__bg-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 25%;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  opacity: 0.5;
+}
+
+/* 巨型装饰水印文字 */
+.login-canvas__watermark-top {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  font-family: 'Space Grotesk', sans-serif;
+  color: rgba(255, 255, 255, 0.1);
+  font-size: clamp(4rem, 10vw, 9rem);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  user-select: none;
+  line-height: 1;
+}
+
+.login-canvas__watermark-bottom {
+  position: absolute;
+  bottom: 40px;
+  right: 40px;
+  font-family: 'Space Grotesk', sans-serif;
+  color: rgba(255, 255, 255, 0.1);
+  font-size: clamp(2rem, 5vw, 3.75rem);
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  user-select: none;
+  text-transform: uppercase;
+}
+
+/* ── 登录模块（双栏） ── */
+.login-module {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 56rem;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 24px 24px 0px 0px rgba(0, 0, 0, 0.2);
+}
+
+@media (min-width: 768px) {
+  .login-module {
+    flex-direction: row;
+  }
+}
+
+/* ── 左侧品牌区 ── */
+.login-brand {
+  width: 100%;
+  background: #fcf9f8;
+  padding: 48px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .login-brand {
+    width: 41.667%;
+  }
+}
+
+.login-brand__accent-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: #D8262C;
+}
+
+.login-brand__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.login-brand__icon-box {
+  width: 32px;
+  height: 32px;
+  background: #D8262C;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-brand__icon-box .material-symbols-outlined {
+  color: #fff;
+  font-size: 14px;
+}
+
+.login-brand__name {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 900;
+  font-size: 1.5rem;
+  letter-spacing: -0.05em;
+  color: #1b1c1c;
+}
+
+.login-brand__eyebrow {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: var(--font-size-eyebrow);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: #b30018;
+  text-transform: uppercase;
+}
+
+.login-brand__title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: #1b1c1c;
+  line-height: 1;
+  text-transform: uppercase;
+  margin-top: 16px;
+}
+
+.login-brand__description {
+  font-size: var(--font-size-md);
+  color: #5c403d;
+  font-weight: 500;
+  max-width: 240px;
+  margin-top: 16px;
+  line-height: 1.5;
+}
+
+/* 底部状态指示区 */
+.login-brand__status {
+  margin-top: 48px;
+}
+
+.login-brand__status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.login-brand__status-dot {
+  width: 8px;
+  height: 8px;
+  background: #D8262C;
+}
+
+.login-brand__status-text {
+  font-size: var(--font-size-eyebrow);
+  font-weight: 700;
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #5c403d;
+}
+
+.login-brand__status-panel {
+  background: #f0eded;
+  padding: 16px;
+  border-left: 2px solid #D8262C;
+}
+
+.login-brand__status-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--font-size-code);
+  font-weight: 700;
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: -0.02em;
+  color: #5c403d;
+}
+
+.login-brand__progress-track {
+  margin-top: 8px;
+  height: 4px;
+  background: #e4e2e1;
+  width: 100%;
+  overflow: hidden;
+}
+
+.login-brand__progress-fill {
+  height: 100%;
+  background: #D8262C;
+  width: 66.7%;
+}
+
+/* ── 右侧表单区 ── */
+.login-form-side {
+  width: 100%;
+  padding: 48px;
+  background: #303030;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+@media (min-width: 768px) {
+  .login-form-side {
+    width: 58.333%;
+  }
+}
+
+.login-form-side form {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* 输入组 */
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.login-field__label {
+  display: block;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: var(--font-size-eyebrow);
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+}
+
+.login-field__wrapper {
+  position: relative;
+}
+
+.login-field__input {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid rgba(144, 111, 108, 0.3);
+  font-size: 1.125rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: #fff;
+  padding: 12px 40px 12px 0;
+  transition: border-color 0.3s ease;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.login-field__input::placeholder {
+  color: rgba(255, 255, 255, 0.1);
+}
+
+.login-field__input:focus {
+  border-bottom-color: #D8262C;
+}
+
+.login-field__icon {
+  position: absolute;
+  right: 0;
+  bottom: 12px;
+  color: rgba(255, 255, 255, 0.2);
+}
+
+/* 记住我行 */
+.login-remember-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: -16px;
+}
+
+.login-remember-row input[type="checkbox"] {
+  accent-color: #D8262C;
+  width: 14px;
+  height: 14px;
+}
+
+.login-remember-row label {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: var(--font-size-eyebrow);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* 提交按钮 */
+.login-submit {
+  width: 100%;
+  background: #D8262C;
+  color: #fff;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 900;
+  padding: 20px 32px;
+  text-align: center;
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 0.2s ease;
+}
+
+.login-submit:hover:not(:disabled) {
+  background: #b30018;
+}
+
+.login-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-submit__text {
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-size: var(--font-size-md);
+}
+
+.login-submit__icon {
+  transition: transform 0.2s ease;
+}
+
+.login-submit:hover:not(:disabled) .login-submit__icon {
+  transform: translateX(8px);
+}
+
+/* 底部链接行 */
+.login-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: var(--font-size-eyebrow);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.login-footer-row a {
+  color: rgba(255, 255, 255, 0.3);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.login-footer-row a:hover {
+  color: #D8262C;
+}
+
+.login-footer-row__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.login-footer-row__status-dot {
+  width: 6px;
+  height: 6px;
+  background: #22c55e;
+}
+
+/* 错误通知 */
+.login-error {
+  background: rgba(186, 26, 26, 0.15);
+  border-left: 3px solid #ba1a1a;
+  color: #ffb3ad;
+  padding: 12px 16px;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* ── 装饰浮层 ── */
+.login-qr-panel {
+  position: absolute;
+  top: 48px;
+  right: 48px;
+  z-index: 20;
+}
+
+.login-qr-panel__inner {
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.login-qr-panel__code {
+  width: 64px;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.login-qr-panel__label {
+  font-size: var(--font-size-code);
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  color: #D8262C;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.login-qr-panel__desc {
+  font-size: var(--font-size-eyebrow);
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.3;
+  margin-top: 4px;
+}
+
+/* 系统日志装饰 */
+.login-syslog {
+  position: absolute;
+  bottom: 48px;
+  left: 48px;
+  z-index: 20;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: var(--font-size-code);
+  color: rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  line-height: 2;
+}
+
+.login-syslog__highlight {
+  color: #D8262C;
+}
+
+/* 外框装饰 */
+.login-canvas__outer-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  border: 32px solid rgba(0, 0, 0, 0.1);
+  mix-blend-mode: overlay;
+}
+
+/* ── 响应式 ── */
+@media (max-width: 767px) {
+  .login-brand {
+    padding: 32px;
+  }
+
+  .login-form-side {
+    padding: 32px;
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .login-qr-panel,
+  .login-syslog,
+  .login-canvas__watermark-top,
+  .login-canvas__watermark-bottom {
+    display: none;
+  }
+
+  .login-canvas__outer-frame {
+    border-width: 12px;
+  }
+}

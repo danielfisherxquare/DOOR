@@ -3,6 +3,20 @@ import { useSearchParams } from 'react-router-dom'
 import bibTrackingApi from '../../api/bibTracking'
 import racesApi from '../../api/races'
 import useAuthStore from '../../stores/authStore'
+import {
+    CommandDataTable,
+    CommandDetailPane,
+    CommandEmptyState,
+    CommandFilterBar,
+    CommandMetricGrid,
+    CommandNotice,
+    CommandPanel,
+    CommandShell,
+    CommandStatusTag,
+    CommandToolbar,
+    ContextRequirementState,
+} from '../../components/command/CommandPrimitives'
+
 
 const STATUS_OPTIONS = [
     { value: '', label: '全部状态' },
@@ -17,25 +31,6 @@ const STATUS_LABELS = {
     picked_up: '已领取',
     checked_in: '已检录',
     finished: '已完赛',
-}
-
-const STATUS_BADGE_STYLES = {
-    receipt_printed: {
-        background: 'var(--badge-yellow-bg, #fef3c7)',
-        color: 'var(--badge-yellow-text, #92400e)',
-    },
-    picked_up: {
-        background: 'var(--badge-blue-bg, #dbeafe)',
-        color: 'var(--badge-blue-text, #1d4ed8)',
-    },
-    checked_in: {
-        background: 'var(--badge-purple-bg, #e9d5ff)',
-        color: 'var(--badge-purple-text, #6d28d9)',
-    },
-    finished: {
-        background: 'var(--badge-green-bg, #dcfce7)',
-        color: 'var(--badge-green-text, #166534)',
-    },
 }
 
 const EMPTY_STATS = {
@@ -59,17 +54,16 @@ function statusLabel(value) {
     return STATUS_LABELS[value] || value || '-'
 }
 
-function statusBadgeStyle(value) {
-    return {
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minWidth: 88,
-        padding: '4px 10px',
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 700,
-        ...STATUS_BADGE_STYLES[value],
+function statusTone(value) {
+    switch (value) {
+        case 'receipt_printed':
+            return 'warning'
+        case 'finished':
+            return 'success'
+        case 'picked_up':
+        case 'checked_in':
+        default:
+            return 'neutral'
     }
 }
 
@@ -350,151 +344,161 @@ function BibTrackingPage() {
 
     const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT))
     const hasValidRace = selectedRaceId && races.some((race) => String(race.id) === String(selectedRaceId))
+    const metrics = [
+        { key: 'tracked', label: '总追踪数', value: stats.totalTracked, meta: '当前赛事已纳入状态追踪的人数。', pill: 'ALL' },
+        { key: 'receipt', label: '已出回执', value: stats.receiptPrinted, meta: '已打印或生成回执。', pill: 'RCP' },
+        { key: 'pickup', label: '已领取', value: stats.pickedUp, meta: '已完成号码布领取。', pill: 'PK' },
+        { key: 'checkin', label: '已检录', value: stats.checkedIn, meta: '已通过检录节点。', pill: 'CHK' },
+        { key: 'finish', label: '已完赛', value: stats.finished, meta: '已进入完赛状态。', pill: 'FIN' },
+    ]
 
     return (
-        <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-                <div>
-                    <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>号码布状态</h1>
-                    <div style={{ fontSize: 14, color: 'var(--color-text-secondary, #666)', marginTop: 6 }}>
-                        按赛事查看号码布当前状态、搜索命中并追踪状态时间线。
-                    </div>
-                </div>
-                <button type="button" className="btn btn--secondary" onClick={handleRefresh} disabled={!hasValidRace || loadingData}>
-                    刷新
-                </button>
-            </div>
+        <div className="command-page surface-admin">
+            <CommandShell
+                eyebrow="选手管理"
+                title="号码布状态"
+                summary="按赛事查看号码布状态、检索命中记录，并在同一页里追踪时间线与撤回动作。"
+                actions={(
+                    <button type="button" className="btn btn--secondary" onClick={handleRefresh} disabled={!hasValidRace || loadingData}>
+                        刷新
+                    </button>
+                )}
+            >
+                <CommandMetricGrid items={metrics} />
+            </CommandShell>
 
             {isSuperAdmin && !selectedOrgId && (
-                <div style={warningStyle}>
+                <CommandNotice tone="warning">
                     未选择机构：当前可从全部可见赛事中选择目标赛事。
-                </div>
+                </CommandNotice>
             )}
 
             {message && (
-                <div style={errorStyle}>{message}</div>
+                <CommandNotice tone="danger">{message}</CommandNotice>
             )}
 
-            <div style={panelStyle}>
-                <form onSubmit={handleSearch} className="bib-tracking-filters">
-                    <div>
-                        <label style={labelStyle} htmlFor="bib-race">赛事</label>
-                        <select
-                            id="bib-race"
-                            className="input"
-                            value={selectedRaceId}
-                            onChange={handleRaceChange}
-                            disabled={loadingRaces}
-                        >
-                            <option value="">{loadingRaces ? '加载赛事中...' : '请选择赛事'}</option>
-                            {races.map((race) => (
-                                <option key={race.id} value={race.id}>
-                                    {race.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+            <CommandPanel title="筛选条件" subtitle="先锁定赛事，再按状态或关键词查看号码布流转。">
+                <CommandToolbar>
+                    <form onSubmit={handleSearch} className="bib-tracking-filters">
+                        <CommandFilterBar>
+                            <div className="bib-tracking-field">
+                                <label className="bib-tracking-label" htmlFor="bib-race">赛事</label>
+                                <select
+                                    id="bib-race"
+                                    className="input"
+                                    value={selectedRaceId}
+                                    onChange={handleRaceChange}
+                                    disabled={loadingRaces}
+                                >
+                                    <option value="">{loadingRaces ? '加载赛事中...' : '请选择赛事'}</option>
+                                    {races.map((race) => (
+                                        <option key={race.id} value={race.id}>
+                                            {race.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
 
-                    <div>
-                        <label style={labelStyle} htmlFor="bib-status">状态</label>
-                        <select
-                            id="bib-status"
-                            className="input"
-                            value={draftStatus}
-                            onChange={(event) => setDraftStatus(event.target.value)}
-                        >
-                            {STATUS_OPTIONS.map((option) => (
-                                <option key={option.value || 'all'} value={option.value}>{option.label}</option>
-                            ))}
-                        </select>
-                    </div>
+                            <div className="bib-tracking-filter-grid">
+                                <div className="bib-tracking-field">
+                                    <label className="bib-tracking-label" htmlFor="bib-status">状态</label>
+                                    <select
+                                        id="bib-status"
+                                        className="input"
+                                        value={draftStatus}
+                                        onChange={(event) => setDraftStatus(event.target.value)}
+                                    >
+                                        {STATUS_OPTIONS.map((option) => (
+                                            <option key={option.value || 'all'} value={option.value}>{option.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
 
-                    <div className="bib-tracking-filters__keyword">
-                        <label style={labelStyle} htmlFor="bib-keyword">关键词</label>
-                        <input
-                            id="bib-keyword"
-                            className="input"
-                            placeholder="号码布 / 姓名 / 证件号 / 手机号"
-                            value={draftKeyword}
-                            onChange={(event) => setDraftKeyword(event.target.value)}
-                        />
-                    </div>
+                                <div className="bib-tracking-field bib-tracking-filters__keyword">
+                                    <label className="bib-tracking-label" htmlFor="bib-keyword">关键词</label>
+                                    <input
+                                        id="bib-keyword"
+                                        className="input"
+                                        placeholder="号码布 / 姓名 / 证件号 / 手机号"
+                                        value={draftKeyword}
+                                        onChange={(event) => setDraftKeyword(event.target.value)}
+                                    />
+                                </div>
 
-                    <div className="bib-tracking-filters__actions">
-                        <button type="submit" className="btn btn--primary" disabled={!selectedRaceId}>查询</button>
-                        <button type="button" className="btn btn--ghost" onClick={handleReset}>重置</button>
-                    </div>
-                </form>
-            </div>
+                                <div className="bib-tracking-filters__actions">
+                                    <button type="submit" className="btn btn--primary" disabled={!selectedRaceId}>查询</button>
+                                    <button type="button" className="btn btn--ghost" onClick={handleReset}>重置</button>
+                                </div>
+                            </div>
+                        </CommandFilterBar>
+                    </form>
+                </CommandToolbar>
+            </CommandPanel>
 
             {!hasValidRace ? (
-                <div style={{ ...panelStyle, padding: '40px 24px', textAlign: 'center', color: 'var(--color-text-secondary, #666)' }}>
-                    {loadingRaces ? '正在加载赛事列表...' : (races.length === 0 ? '当前机构下没有可查看的赛事。' : '请选择一个赛事后查看号码布状态。')}
-                </div>
+                <ContextRequirementState
+                    title={loadingRaces ? '正在加载赛事列表...' : '请先选择赛事'}
+                    description={loadingRaces ? '控制台正在同步可查看赛事。' : (races.length === 0 ? '当前机构下没有可查看的赛事。' : '请选择一个赛事后查看号码布状态。')}
+                />
             ) : (
                 <>
-                    <div className="bib-tracking-stats">
-                        <StatCard title="总追踪数" value={stats.totalTracked} />
-                        <StatCard title="已出回执" value={stats.receiptPrinted} />
-                        <StatCard title="已领取" value={stats.pickedUp} />
-                        <StatCard title="已检录" value={stats.checkedIn} />
-                        <StatCard title="已完赛" value={stats.finished} />
-                    </div>
-
-                    <div style={panelStyle}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-                            <div style={{ fontSize: 16, fontWeight: 700 }}>号码布列表</div>
-                            <div style={{ fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>
+                    <CommandPanel title="号码布列表" subtitle="按状态节点、身份信息和时间线快速定位记录。">
+                        <div className="bib-tracking-list-head">
+                            <div className="bib-tracking-list-meta">
                                 共 {total.toLocaleString()} 条
                             </div>
                         </div>
 
-                        <div className="bib-tracking-table">
-                            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1080 }}>
+                        <CommandDataTable className="bib-tracking-table">
+                            <table className="bib-tracking-table__table">
                                 <thead>
-                                    <tr style={{ background: 'var(--color-bg-secondary, #f8fafc)', borderBottom: '1px solid var(--color-border, #e5e7eb)' }}>
-                                        <th style={thStyle}>号码布</th>
-                                        <th style={thStyle}>姓名</th>
-                                        <th style={thStyle}>手机号</th>
-                                        <th style={thStyle}>证件号</th>
-                                        <th style={thStyle}>状态</th>
-                                        <th style={thStyle}>出回执</th>
-                                        <th style={thStyle}>领取</th>
-                                        <th style={thStyle}>检录</th>
-                                        <th style={thStyle}>完赛</th>
-                                        <th style={thStyle}>最近状态时间</th>
-                                        <th style={thStyle}>操作</th>
+                                    <tr>
+                                        <th>号码布</th>
+                                        <th>姓名</th>
+                                        <th>手机号</th>
+                                        <th>证件号</th>
+                                        <th>状态</th>
+                                        <th>出回执</th>
+                                        <th>领取</th>
+                                        <th>检录</th>
+                                        <th>完赛</th>
+                                        <th>最近状态时间</th>
+                                        <th>操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {loadingData ? (
                                         <tr>
-                                            <td colSpan={11} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary, #666)' }}>
+                                            <td colSpan={11} className="bib-tracking-table__empty">
                                                 加载中...
                                             </td>
                                         </tr>
                                     ) : items.length === 0 ? (
                                         <tr>
-                                            <td colSpan={11} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-secondary, #666)' }}>
-                                                暂无符合条件的号码布记录
+                                            <td colSpan={11} className="bib-tracking-table__empty">
+                                                <CommandEmptyState
+                                                    title="暂无符合条件的号码布记录"
+                                                    description="调整赛事、状态或关键词后再试一次。"
+                                                    icon="BIB"
+                                                />
                                             </td>
                                         </tr>
                                     ) : (
                                         items.map((item) => (
-                                            <tr key={item.itemId} style={{ borderBottom: '1px solid var(--color-border, #f1f5f9)' }}>
-                                                <td style={tdStyle}><strong>{item.bibNumber}</strong></td>
-                                                <td style={tdStyle}>{item.name || '-'}</td>
-                                                <td style={tdStyle}>{item.phoneMasked || '-'}</td>
-                                                <td style={tdStyle}>{item.idNumberMasked || '-'}</td>
-                                                <td style={tdStyle}>
-                                                    <span style={statusBadgeStyle(item.status)}>{statusLabel(item.status)}</span>
+                                            <tr key={item.itemId}>
+                                                <td><strong>{item.bibNumber}</strong></td>
+                                                <td>{item.name || '-'}</td>
+                                                <td>{item.phoneMasked || '-'}</td>
+                                                <td>{item.idNumberMasked || '-'}</td>
+                                                <td>
+                                                    <CommandStatusTag tone={statusTone(item.status)}>{statusLabel(item.status)}</CommandStatusTag>
                                                 </td>
-                                                <td style={tdStyle}>{formatDateTime(item.receiptPrintedAt)}</td>
-                                                <td style={tdStyle}>{formatDateTime(item.pickedUpAt)}</td>
-                                                <td style={tdStyle}>{formatDateTime(item.checkedInAt)}</td>
-                                                <td style={tdStyle}>{formatDateTime(item.finishedAt)}</td>
-                                                <td style={tdStyle}>{formatDateTime(item.latestStatusAt)}</td>
-                                                <td style={tdStyle}>
+                                                <td>{formatDateTime(item.receiptPrintedAt)}</td>
+                                                <td>{formatDateTime(item.pickedUpAt)}</td>
+                                                <td>{formatDateTime(item.checkedInAt)}</td>
+                                                <td>{formatDateTime(item.finishedAt)}</td>
+                                                <td>{formatDateTime(item.latestStatusAt)}</td>
+                                                <td>
                                                     <button type="button" className="btn btn--ghost btn--sm bib-tracking-focusable" onClick={() => handleOpenDetail(item.itemId)}>
                                                         查看详情
                                                     </button>
@@ -504,10 +508,10 @@ function BibTrackingPage() {
                                     )}
                                 </tbody>
                             </table>
-                        </div>
+                        </CommandDataTable>
 
                         {total > PAGE_LIMIT && (
-                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 16 }}>
+                            <div className="bib-tracking-pagination">
                                 <button
                                     type="button"
                                     className="btn btn--ghost btn--sm"
@@ -516,7 +520,7 @@ function BibTrackingPage() {
                                 >
                                     上一页
                                 </button>
-                                <span style={{ fontSize: 14 }}>
+                                <span className="bib-tracking-pagination__status">
                                     {currentPage} / {totalPages}
                                 </span>
                                 <button
@@ -529,40 +533,39 @@ function BibTrackingPage() {
                                 </button>
                             </div>
                         )}
-                    </div>
+                    </CommandPanel>
                 </>
             )}
 
             {detailOpen && (
                 <div className="bib-tracking-drawer-overlay" onClick={closeDetail}>
-                    <aside className="bib-tracking-drawer" onClick={(event) => event.stopPropagation()}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                            <div>
-                                <div style={{ fontSize: 12, color: 'var(--color-text-secondary, #666)' }}>号码布详情</div>
-                                <div style={{ fontSize: 22, fontWeight: 700 }}>{detail?.item?.bibNumber || '-'}</div>
-                            </div>
+                    <CommandDetailPane
+                        className="bib-tracking-drawer"
+                        title={detail?.item?.bibNumber || '-'}
+                        subtitle="号码布详情"
+                        actions={(
                             <button type="button" className="btn btn--ghost bib-tracking-focusable" onClick={closeDetail}>
                                 关闭
                             </button>
-                        </div>
-
-                        {loadingDetail && <div style={{ color: 'var(--color-text-secondary, #666)' }}>正在加载详情...</div>}
-
-                        {!loadingDetail && detail?.error && (
-                            <div style={errorStyle}>{detail.error}</div>
                         )}
+                    >
+                        {loadingDetail ? <div className="bib-tracking-muted">正在加载详情...</div> : null}
 
-                        {!loadingDetail && detail?.item && (
+                        {!loadingDetail && detail?.error ? (
+                            <CommandNotice tone="danger">{detail.error}</CommandNotice>
+                        ) : null}
+
+                        {!loadingDetail && detail?.item ? (
                             <>
-                                {detailNotice && (
-                                    <div style={detailNotice.type === 'error' ? errorStyle : successStyle}>
+                                {detailNotice ? (
+                                    <CommandNotice tone={detailNotice.type === 'error' ? 'danger' : 'success'}>
                                         {detailNotice.text}
-                                    </div>
-                                )}
+                                    </CommandNotice>
+                                ) : null}
 
                                 <div className="bib-tracking-detail-grid">
                                     <DetailField label="姓名" value={detail.item.name || '-'} />
-                                    <DetailField label="状态" value={statusLabel(detail.item.status)} />
+                                    <DetailField label="状态" value={<CommandStatusTag tone={statusTone(detail.item.status)}>{statusLabel(detail.item.status)}</CommandStatusTag>} />
                                     <DetailField label="手机号" value={detail.item.phone || '-'} />
                                     <DetailField label="证件号" value={detail.item.idNumber || '-'} />
                                     <DetailField label="出回执" value={formatDateTime(detail.item.receiptPrintedAt)} />
@@ -575,29 +578,29 @@ function BibTrackingPage() {
                                     <DetailField label="最近撤回人" value={detail.lastRollback?.operatorName || '-'} />
                                 </div>
 
-                                <div style={{ marginTop: 20 }}>
-                                    <div style={{ ...panelStyle, padding: 16, boxShadow: 'none', border: '1px solid var(--color-border, #e5e7eb)' }}>
-                                        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>状态管理</div>
-                                        <div style={{ fontSize: 13, color: 'var(--color-text-secondary, #666)', marginBottom: 12 }}>
+                                <section className="bib-tracking-section">
+                                    <div className="bib-tracking-section-card">
+                                        <div className="bib-tracking-section-title">状态管理</div>
+                                        <div className="bib-tracking-section-summary">
                                             仅支持按状态回退一步，用于撤回误扫描。每次撤回都会记录操作时间和账号。
                                         </div>
 
                                         {detail.rollbackAction?.canRollback ? (
                                             <>
-                                                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>
+                                                <div className="bib-tracking-rollback-copy">
                                                     当前可从“{detail.rollbackAction.fromStatusLabel}”撤回到“{detail.rollbackAction.targetStatusLabel}”
                                                 </div>
-                                                <label style={labelStyle} htmlFor="bib-rollback-reason">撤回原因（选填）</label>
+                                                <label className="bib-tracking-label" htmlFor="bib-rollback-reason">撤回原因（选填）</label>
                                                 <textarea
                                                     id="bib-rollback-reason"
                                                     value={rollbackReason}
                                                     maxLength={200}
                                                     onChange={(event) => setRollbackReason(event.target.value)}
                                                     placeholder="例如：窗口误扫、重复检录、完赛枪误同步"
-                                                    style={textareaStyle}
+                                                    className="bib-tracking-textarea"
                                                 />
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 12, flexWrap: 'wrap' }}>
-                                                    <div style={{ fontSize: 12, color: 'var(--color-text-secondary, #666)' }}>
+                                                <div className="bib-tracking-rollback-actions">
+                                                    <div className="bib-tracking-muted">
                                                         {rollbackReason.trim().length}/200
                                                     </div>
                                                     <button
@@ -611,242 +614,73 @@ function BibTrackingPage() {
                                                 </div>
                                             </>
                                         ) : (
-                                            <div style={infoStyle}>
+                                            <CommandNotice tone="info">
                                                 当前状态不能继续撤回。
-                                            </div>
+                                            </CommandNotice>
                                         )}
                                     </div>
-                                </div>
+                                </section>
 
-                                <div style={{ marginTop: 20 }}>
-                                    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>撤回记录</div>
-                                    <div style={{ display: 'grid', gap: 12 }}>
+                                <section className="bib-tracking-section">
+                                    <div className="bib-tracking-section-title">撤回记录</div>
+                                    <div className="bib-tracking-stack">
                                         {(detail.rollbackHistory || []).map((entry) => (
-                                            <div key={entry.id} style={{ border: '1px solid var(--color-border, #e5e7eb)', borderRadius: 12, padding: 14 }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                                                    <div style={{ fontSize: 14, fontWeight: 700 }}>
+                                            <article key={entry.id} className="bib-tracking-timeline-card">
+                                                <div className="bib-tracking-timeline-card__head">
+                                                    <div className="bib-tracking-timeline-card__title">
                                                         {entry.fromStatusLabel} → {entry.toStatusLabel}
                                                     </div>
-                                                    <span style={{ fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>
-                                                        {formatDateTime(entry.occurredAt)}
-                                                    </span>
+                                                    <span className="bib-tracking-muted">{formatDateTime(entry.occurredAt)}</span>
                                                 </div>
-                                                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>
+                                                <div className="bib-tracking-timeline-card__meta">
                                                     操作人：{entry.operatorName || '-'} · 来源：{entry.source || '-'}
                                                 </div>
-                                                <div style={{ marginTop: 6, fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>
+                                                <div className="bib-tracking-timeline-card__meta">
                                                     原因：{entry.reason || '-'}
                                                 </div>
-                                            </div>
+                                            </article>
                                         ))}
-                                        {(!detail.rollbackHistory || detail.rollbackHistory.length === 0) && (
-                                            <div style={{ fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>暂无撤回记录</div>
-                                        )}
+                                        {(!detail.rollbackHistory || detail.rollbackHistory.length === 0) ? (
+                                            <div className="bib-tracking-muted">暂无撤回记录</div>
+                                        ) : null}
                                     </div>
-                                </div>
+                                </section>
 
-                                <div style={{ marginTop: 20 }}>
-                                    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>状态时间线</div>
-                                    <div style={{ display: 'grid', gap: 12 }}>
+                                <section className="bib-tracking-section">
+                                    <div className="bib-tracking-section-title">状态时间线</div>
+                                    <div className="bib-tracking-stack">
                                         {(detail.timeline || []).map((entry) => (
-                                            <div key={entry.status} style={{ border: '1px solid var(--color-border, #e5e7eb)', borderRadius: 12, padding: 14 }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                                                    <span style={statusBadgeStyle(entry.status)}>{entry.label}</span>
-                                                    <span style={{ fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>{formatDateTime(entry.occurredAt)}</span>
+                                            <article key={entry.status} className="bib-tracking-timeline-card">
+                                                <div className="bib-tracking-timeline-card__head">
+                                                    <CommandStatusTag tone={statusTone(entry.status)}>{entry.label}</CommandStatusTag>
+                                                    <span className="bib-tracking-muted">{formatDateTime(entry.occurredAt)}</span>
                                                 </div>
-                                                <div style={{ marginTop: 8, fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>
+                                                <div className="bib-tracking-timeline-card__meta">
                                                     操作人：{entry.operatorName || '-'} · 来源：{entry.source || '-'}
                                                 </div>
-                                            </div>
+                                            </article>
                                         ))}
-                                        {(!detail.timeline || detail.timeline.length === 0) && (
-                                            <div style={{ fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>暂无状态时间线</div>
-                                        )}
+                                        {(!detail.timeline || detail.timeline.length === 0) ? (
+                                            <div className="bib-tracking-muted">暂无状态时间线</div>
+                                        ) : null}
                                     </div>
-                                </div>
+                                </section>
                             </>
-                        )}
-                    </aside>
+                        ) : null}
+                    </CommandDetailPane>
                 </div>
             )}
-
-            <style>{`
-                .bib-tracking-filters {
-                    display: grid;
-                    grid-template-columns: 220px 160px minmax(240px, 1fr) auto;
-                    gap: 12px;
-                    align-items: end;
-                }
-                .bib-tracking-filters__keyword {
-                    min-width: 0;
-                }
-                .bib-tracking-filters__actions {
-                    display: flex;
-                    gap: 8px;
-                    flex-wrap: wrap;
-                }
-                .bib-tracking-stats {
-                    display: grid;
-                    grid-template-columns: repeat(5, minmax(0, 1fr));
-                    gap: 12px;
-                    margin: 20px 0;
-                }
-                .bib-tracking-table {
-                    overflow-x: auto;
-                }
-                .bib-tracking-drawer-overlay {
-                    position: fixed;
-                    inset: 0;
-                    background: rgba(15, 23, 42, 0.3);
-                    display: flex;
-                    justify-content: flex-end;
-                    z-index: 50;
-                }
-                .bib-tracking-drawer {
-                    width: min(520px, 100%);
-                    height: 100%;
-                    background: #fff;
-                    padding: 24px;
-                    overflow-y: auto;
-                    display: grid;
-                    align-content: start;
-                    gap: 16px;
-                    box-shadow: -8px 0 24px rgba(15, 23, 42, 0.12);
-                }
-                .bib-tracking-detail-grid {
-                    display: grid;
-                    grid-template-columns: repeat(2, minmax(0, 1fr));
-                    gap: 12px;
-                }
-                .bib-tracking-focusable:focus-visible,
-                .bib-tracking-drawer button:focus-visible,
-                .bib-tracking-filters .input:focus-visible,
-                .bib-tracking-filters .btn:focus-visible {
-                    outline: 2px solid var(--color-primary, #2563eb);
-                    outline-offset: 2px;
-                }
-                @media (max-width: 1100px) {
-                    .bib-tracking-stats {
-                        grid-template-columns: repeat(2, minmax(0, 1fr));
-                    }
-                }
-                @media (max-width: 900px) {
-                    .bib-tracking-filters {
-                        grid-template-columns: 1fr;
-                    }
-                    .bib-tracking-detail-grid {
-                        grid-template-columns: 1fr;
-                    }
-                }
-                @media (max-width: 640px) {
-                    .bib-tracking-stats {
-                        grid-template-columns: 1fr;
-                    }
-                    .bib-tracking-drawer {
-                        width: 100%;
-                        padding: 18px;
-                    }
-                }
-            `}</style>
-        </div>
-    )
-}
-
-function StatCard({ title, value }) {
-    return (
-        <div style={panelStyle}>
-            <div style={{ fontSize: 13, color: 'var(--color-text-secondary, #666)' }}>{title}</div>
-            <div style={{ marginTop: 8, fontSize: 30, fontWeight: 800, color: 'var(--color-primary, #2563eb)' }}>
-                {Number(value || 0).toLocaleString()}
-            </div>
         </div>
     )
 }
 
 function DetailField({ label, value }) {
     return (
-        <div style={{ border: '1px solid var(--color-border, #e5e7eb)', borderRadius: 12, padding: 12 }}>
-            <div style={{ fontSize: 12, color: 'var(--color-text-secondary, #666)', marginBottom: 6 }}>{label}</div>
-            <div style={{ fontSize: 14, fontWeight: 600, wordBreak: 'break-all' }}>{value}</div>
+        <div className="bib-tracking-detail-field">
+            <div className="bib-tracking-detail-field__label">{label}</div>
+            <div className="bib-tracking-detail-field__value">{value}</div>
         </div>
     )
-}
-
-const panelStyle = {
-    background: 'var(--color-bg-card, #fff)',
-    borderRadius: 14,
-    padding: 18,
-    boxShadow: 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.06))',
-}
-
-const warningStyle = {
-    padding: '12px 16px',
-    marginBottom: 16,
-    borderRadius: 10,
-    background: 'rgba(245,158,11,0.12)',
-    color: 'var(--badge-yellow-text, #92400e)',
-    fontSize: 14,
-}
-
-const errorStyle = {
-    padding: '12px 16px',
-    marginBottom: 16,
-    borderRadius: 10,
-    background: 'rgba(239,68,68,0.1)',
-    color: 'var(--color-danger, #b91c1c)',
-    fontSize: 14,
-}
-
-const successStyle = {
-    padding: '12px 16px',
-    marginBottom: 16,
-    borderRadius: 10,
-    background: 'rgba(34,197,94,0.12)',
-    color: 'var(--badge-green-text, #166534)',
-    fontSize: 14,
-}
-
-const infoStyle = {
-    padding: '12px 16px',
-    borderRadius: 10,
-    background: 'var(--color-bg-secondary, #f8fafc)',
-    color: 'var(--color-text-secondary, #475569)',
-    fontSize: 14,
-}
-
-const labelStyle = {
-    display: 'block',
-    fontSize: 13,
-    fontWeight: 600,
-    marginBottom: 6,
-    color: 'var(--color-text-secondary, #555)',
-}
-
-const thStyle = {
-    padding: '12px 14px',
-    textAlign: 'left',
-    fontSize: 13,
-    fontWeight: 700,
-    color: 'var(--color-text-secondary, #64748b)',
-    whiteSpace: 'nowrap',
-}
-
-const tdStyle = {
-    padding: '12px 14px',
-    fontSize: 14,
-    verticalAlign: 'top',
-    whiteSpace: 'nowrap',
-}
-
-const textareaStyle = {
-    width: '100%',
-    minHeight: 88,
-    padding: '10px 12px',
-    borderRadius: 10,
-    border: '1px solid var(--color-border, #d1d5db)',
-    fontSize: 14,
-    resize: 'vertical',
-    boxSizing: 'border-box',
 }
 
 export default BibTrackingPage

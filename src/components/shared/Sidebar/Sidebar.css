@@ -1,0 +1,254 @@
+/* ========================================
+   Sidebar 侧边栏样式
+   ======================================== */
+
+.sidebar {
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+
+  width: var(--sidebar-width);
+  background: var(--panel);
+  color: var(--text-on-dark);
+  display: flex;
+  flex-direction: column;
+  transition: width 280ms ease-out;
+  overflow: hidden;
+}
+
+.sidebar--collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+/* ========================================
+   Brand Row
+   ======================================== */
+
+.sidebar__brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar__brand {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+
+.sidebar__eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-on-dark-muted);
+}
+
+.sidebar__title {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar__collapse {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-on-dark-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.sidebar__collapse:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-on-dark);
+}
+
+/* ========================================
+   Navigation
+   ======================================== */
+
+.sidebar__nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 0;
+}
+
+/* ========================================
+   Shortcuts
+   ======================================== */
+
+.sidebar__shortcuts {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar__shortcuts-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-on-dark-muted);
+  margin-bottom: 8px;
+}
+
+.sidebar__shortcut {
+  display: block;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-on-dark-muted);
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.sidebar__shortcut:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-on-dark);
+}
+
+/* ========================================
+   Footer / User Card
+   ======================================== */
+
+.sidebar__footer {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sidebar__user-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar__avatar {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+
+.sidebar__user-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar__user-name {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar__user-role {
+  font-size: 12px;
+  color: var(--text-on-dark-muted);
+}
+
+/* ========================================
+   Switch Links
+   ======================================== */
+
+.sidebar__switch-links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar__switch-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-on-dark-muted);
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.sidebar__switch-link:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-on-dark);
+}
+
+.sidebar__switch-icon {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+}
+
+/* ========================================
+   Actions
+   ======================================== */
+
+.sidebar__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar__action {
+  width: 100%;
+}
+
+/* ========================================
+   Collapsed State
+   ======================================== */
+
+.sidebar--collapsed .sidebar__brand-row {
+  padding: 12px;
+  justify-content: center;
+}
+
+.sidebar--collapsed .sidebar__brand {
+  align-items: center;
+}
+
+.sidebar--collapsed .sidebar__eyebrow {
+  display: none;
+}
+
+.sidebar--collapsed .sidebar__title {
+  font-size: 13px;
+}
+
+.sidebar--collapsed .sidebar__user-meta,
+.sidebar--collapsed .sidebar__actions,
+.sidebar--collapsed .sidebar__switch-links,
+.sidebar--collapsed .sidebar__shortcuts {
+  display: none;
+}
+
+.sidebar--collapsed .sidebar__user-card {
+  justify-content: center;
+}

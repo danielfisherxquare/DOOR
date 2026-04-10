@@ -13,6 +13,7 @@ const { default: knex } = await import('../src/db/knex.js');
 const { default: authRoutes } = await import('../src/modules/auth/auth.routes.js');
 
 let app, server, baseUrl;
+const EXPLICIT_MODULE_ID = 'app:map';
 
 async function api(path, options = {}) {
     const res = await fetch(`${baseUrl}${path}`, {
@@ -64,21 +65,31 @@ describe('Auth Routes', () => {
         assert.ok(res.body.data.user, '应返回 user');
         assert.equal(res.body.data.user.username, 'testadmin');
         assert.equal(res.body.data.user.passwordHash, undefined, 'user 不应含 passwordHash');
+        await knex('users')
+            .where({ username: 'testadmin' })
+            .update({ role: 'user' });
+        const user = await knex('users').where({ username: 'testadmin' }).first('id', 'org_id');
+        await knex('user_module_access').insert({
+            user_id: user.id,
+            org_id: user.org_id,
+            module_id: EXPLICIT_MODULE_ID,
+            granted_by: user.id,
+        });
         accessToken = res.body.data.accessToken;
         refreshToken = res.body.data.refreshToken;
     });
 
-    it('重复注册相同用户名/邮箱 → 409', async () => {
+    it('不同机构可创建同名账号，但不会影响原账号登录链路', async () => {
         const res = await api('/api/auth/register', {
             method: 'POST',
             body: JSON.stringify({
                 username: 'testadmin',
-                email: 'testadmin@test.com',
+                email: 'testadmin-second@test.com',
                 password: 'pass456',
                 orgName: '另一个组织',
             }),
         });
-        assert.equal(res.status, 409);
+        assert.equal(res.status, 201);
     });
 
     it('缺少必填字段 → 400', async () => {
@@ -92,11 +103,15 @@ describe('Auth Routes', () => {
     it('登录正确密码 → 返回 token 对', async () => {
         const res = await api('/api/auth/login', {
             method: 'POST',
-            body: JSON.stringify({ login: 'testadmin', password: 'pass123' }),
+            body: JSON.stringify({ login: 'testadmin@test.com', password: 'pass123' }),
         });
         assert.equal(res.status, 200);
         assert.ok(res.body.data.accessToken);
         assert.ok(res.body.data.refreshToken);
+        assert.deepEqual(
+            res.body.data.user.moduleAccess.sort(),
+            ['app:home', 'app:profile', EXPLICIT_MODULE_ID].sort(),
+        );
         accessToken = res.body.data.accessToken;
         refreshToken = res.body.data.refreshToken;
     });
@@ -104,7 +119,7 @@ describe('Auth Routes', () => {
     it('登录错误密码 → 401', async () => {
         const res = await api('/api/auth/login', {
             method: 'POST',
-            body: JSON.stringify({ login: 'testadmin', password: 'wrong' }),
+            body: JSON.stringify({ login: 'testadmin@test.com', password: 'wrong' }),
         });
         assert.equal(res.status, 401);
     });
@@ -118,6 +133,10 @@ describe('Auth Routes', () => {
         assert.ok(res.body.data.accessToken, '应返回新 accessToken');
         assert.ok(res.body.data.refreshToken, '应返回新 refreshToken');
         assert.notEqual(res.body.data.refreshToken, refreshToken, '新旧 refreshToken 应不同');
+        assert.deepEqual(
+            res.body.data.user.moduleAccess.sort(),
+            ['app:home', 'app:profile', EXPLICIT_MODULE_ID].sort(),
+        );
 
         // 旧 token 失效
         const res2 = await api('/api/auth/refresh', {
@@ -139,6 +158,10 @@ describe('Auth Routes', () => {
         assert.ok(res.body.data.orgId, '应含 orgId');
         assert.ok(res.body.data.org, '应含 org 对象');
         assert.ok(res.body.data.org.name, '组织应含 name');
+        assert.deepEqual(
+            res.body.data.moduleAccess.sort(),
+            ['app:home', 'app:profile', EXPLICIT_MODULE_ID].sort(),
+        );
     });
 
     it('GET /api/auth/me 无 token → 401', async () => {

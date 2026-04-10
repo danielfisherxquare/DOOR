@@ -1,32 +1,30 @@
 import { Suspense, lazy, useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 import Navbar from './components/Navbar'
-import Footer from './components/Footer'
-import AdminProtectedRoute from './components/AdminProtectedRoute'
-import ScanProtectedRoute from './components/ScanProtectedRoute'
+import SurfaceProtectedRoute from './components/SurfaceProtectedRoute'
+import CapabilityProtectedRoute from './components/CapabilityProtectedRoute'
 import useAuthStore from './stores/authStore'
 
-const Home = lazy(() => import('./views/Home'))
 const Login = lazy(() => import('./views/Login'))
-const ChangePassword = lazy(() => import('./views/ChangePassword'))
 const ForgotPassword = lazy(() => import('./views/ForgotPassword'))
 const ResetPassword = lazy(() => import('./views/ResetPassword'))
-const ToolDetail = lazy(() => import('./views/ToolDetail'))
-const AdminLayout = lazy(() => import('./components/admin/AdminLayout'))
-const ScanLayout = lazy(() => import('./components/scan/ScanLayout'))
-const ScanLogin = lazy(() => import('./views/scan/ScanLogin'))
-const ScanHome = lazy(() => import('./views/scan/ScanHome'))
-const ScanResult = lazy(() => import('./views/scan/ScanResult'))
-const InterviewForm = lazy(() => import('./views/interview/InterviewForm'))
-const InterviewList = lazy(() => import('./views/interview/InterviewList'))
-const InterviewCompare = lazy(() => import('./views/interview/InterviewCompare'))
 const AssessmentPublicPage = lazy(() => import('./views/assessment/AssessmentPublicPage'))
+const ToolDetail = lazy(() => import('./views/ToolDetail'))
+
+const AppLayout = lazy(() => import('./components/app/AppLayout'))
+const OpsLayout = lazy(() => import('./components/ops/OpsLayout'))
+const AdminLayout = lazy(() => import('./components/admin/AdminLayout'))
+const AssetDesigner = lazy(() => import('./views/asset-designer/AssetDesigner'))
 
 function RouteLoader({ compact = false }) {
   return (
     <div className={compact ? 'route-loader route-loader--compact' : 'route-loader'}>
-      <div className="route-loader__spinner" aria-hidden="true" />
-      <span>加载中...</span>
+      <div className="route-loader__content">
+        <div className="route-loader__spinner" aria-hidden="true" />
+        <span>加载中...</span>
+      </div>
     </div>
   )
 }
@@ -39,23 +37,34 @@ function withSuspense(element, options = {}) {
   )
 }
 
-function PortalLayout() {
+function RootRedirect() {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const isBootstrapping = useAuthStore((state) => state.isBootstrapping)
+  const getDefaultLandingPath = useAuthStore((state) => state.getDefaultLandingPath)
+
+  if (isBootstrapping) {
+    return <RouteLoader compact />
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <Navigate to={getDefaultLandingPath()} replace />
+}
+
+/**
+ * 公开页布局 — 仅顶部 Navbar + 内容
+ */
+function PublicPageLayout({ children }) {
   return (
     <>
       <Navbar />
       <main className="main-content">
         <Suspense fallback={<RouteLoader compact />}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/tool/:id" element={<ToolDetail />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/change-password" element={<ChangePassword />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password/:token" element={<ResetPassword />} />
-          </Routes>
+          {children}
         </Suspense>
       </main>
-      <Footer />
     </>
   )
 }
@@ -64,48 +73,113 @@ function App() {
   const bootstrapAuth = useAuthStore((state) => state.bootstrapAuth)
 
   useEffect(() => {
-    bootstrapAuth()
+    // Wait for zustand persist hydration to complete before bootstrapAuth
+    // This fixes the race condition where bootstrapAuth runs before localStorage state is restored
+    const unsubscribe = useAuthStore.persist.onFinishHydration(() => {
+      bootstrapAuth()
+    })
+
+    // If hydration already finished (e.g., on subsequent mounts), run bootstrapAuth immediately
+    if (useAuthStore.persist.hasHydrated()) {
+      bootstrapAuth()
+    }
+
+    return unsubscribe
   }, [bootstrapAuth])
 
   return (
     <div className="app">
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        theme="light"
+        toastStyle={{
+          borderRadius: 'var(--radius-md)',
+          fontFamily: 'var(--font-family)',
+          fontSize: 'var(--font-size-sm)',
+        }}
+      />
       <Routes>
+        {/* ============================================
+            🔓 公开页 — 无需登录
+            ============================================ */}
+        {/* 认证页 — 独立全屏布局，不含 Navbar */}
+        <Route path="/login" element={withSuspense(<Login />)} />
+        <Route path="/forgot-password" element={withSuspense(<ForgotPassword />)} />
+        <Route path="/reset-password/:token" element={withSuspense(<ResetPassword />)} />
+        <Route
+          path="/app/assessment/public/:campaignId"
+          element={withSuspense(<AssessmentPublicPage />)}
+        />
+        {/* 公开工具 */}
+        <Route
+          path="/tool/:id"
+          element={withSuspense(<ToolDetail />)}
+        />
+
+        {/* ============================================
+            🏠 应用层 — 需登录且具备 app 入口权限
+            ============================================ */}
+        <Route
+          path="/app/*"
+          element={(
+            <SurfaceProtectedRoute surface="app">
+              {withSuspense(<AppLayout />)}
+            </SurfaceProtectedRoute>
+          )}
+        />
+
+        {/* ============================================
+            🧭 执行端 — 需登录且具备 ops 入口权限
+            ============================================ */}
+        <Route
+          path="/ops/*"
+          element={(
+            <SurfaceProtectedRoute surface="ops">
+              {withSuspense(<OpsLayout />)}
+            </SurfaceProtectedRoute>
+          )}
+        />
+
+        {/* ============================================
+            ⚙️ 管理后台 — 需具备 admin 入口权限
+            ============================================ */}
         <Route
           path="/admin/*"
           element={(
-            <AdminProtectedRoute>
+            <SurfaceProtectedRoute surface="admin">
               {withSuspense(<AdminLayout />)}
-            </AdminProtectedRoute>
+            </SurfaceProtectedRoute>
           )}
         />
 
+        {/* ============================================
+            🎨 沉浸式工具 — 需管理员
+            ============================================ */}
         <Route
-          path="/scan/login"
-          element={withSuspense(
-            <ScanLayout>
-              <ScanLogin />
-            </ScanLayout>,
-          )}
-        />
-
-        <Route
-          path="/scan/*"
+          path="/asset-designer"
           element={(
-            <ScanProtectedRoute>
-              {withSuspense(<ScanLayout />)}
-            </ScanProtectedRoute>
+            <SurfaceProtectedRoute surface="app">
+              <CapabilityProtectedRoute scope="inventory" capability="3d_studio">
+                {withSuspense(<AssetDesigner />)}
+              </CapabilityProtectedRoute>
+            </SurfaceProtectedRoute>
           )}
-        >
-          <Route index element={withSuspense(<ScanHome />, { compact: true })} />
-          <Route path="result" element={withSuspense(<ScanResult />, { compact: true })} />
-        </Route>
+        />
 
-        <Route path="/interview" element={withSuspense(<InterviewForm />)} />
-        <Route path="/interview/records" element={withSuspense(<InterviewList />)} />
-        <Route path="/interview/compare" element={withSuspense(<InterviewCompare />)} />
-        <Route path="/assessment/:campaignId" element={withSuspense(<AssessmentPublicPage />)} />
 
-        <Route path="*" element={<PortalLayout />} />
+
+        {/* ============================================
+            ↪️ 兼容重定向
+            ============================================ */}
+        <Route path="/map" element={<Navigate to="/app/map" replace />} />
+
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="*" element={<RootRedirect />} />
       </Routes>
     </div>
   )

@@ -1,18 +1,16 @@
 import { useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { WrenchScrewdriverIcon, ExclamationTriangleIcon } from '@heroicons/react/24/solid'
 import useToolsStore from '../stores/toolsStore'
+import { CommandEmptyState, CommandNotice, CommandPanel, CommandStatusTag } from '../components/command/CommandPrimitives'
 
 // 导入工具组件
 import MechanicalClock from '../components/tools/MechanicalClock'
 import MechanicalClock3D from '../components/tools/MechanicalClock3D'
-import AppDownload from '../components/tools/AppDownload'
 
 // 工具组件映射
 const TOOL_COMPONENTS = {
   'MechanicalClock': MechanicalClock,
   'MechanicalClock3D': MechanicalClock3D,
-  'AppDownload': AppDownload,
 }
 
 function ToolDetail() {
@@ -42,23 +40,21 @@ function ToolDetail() {
     // 如果工具离线或维护中
     if (currentTool?.status === 'offline') {
       return (
-        <div className="tool-detail__offline">
-          <div className="flex items-center justify-center gap-2">
-            <ExclamationTriangleIcon className="w-6 h-6 text-yellow-500" />
-            <p>该工具当前离线，请稍后再试</p>
-          </div>
-        </div>
+        <CommandEmptyState
+          title="该工具当前离线"
+          description="请稍后再试，或返回首页切换到其他可用工具。"
+          icon="OFF"
+        />
       )
     }
 
     if (currentTool?.status === 'maintenance') {
       return (
-        <div className="tool-detail__maintenance">
-          <div className="flex items-center justify-center gap-2">
-            <WrenchScrewdriverIcon className="w-6 h-6 text-gray-500" />
-            <p>该工具正在维护中，敬请期待</p>
-          </div>
-        </div>
+        <CommandEmptyState
+          title="该工具正在维护中"
+          description="维护完成后将恢复可用，请稍后再进入。"
+          icon="MA"
+        />
       )
     }
 
@@ -90,10 +86,11 @@ function ToolDetail() {
 
   if (isLoading || !currentTool) {
     return (
-      <div className="tool-detail">
-        <div className="loading-state">
-          <div className="loading-state__spinner"></div>
-          加载中...
+      <div className="command-tool-page surface-public">
+        <div className="command-tool-page__wrap">
+          <CommandPanel title="工具加载中" subtitle="正在读取工具配置与状态。">
+            <CommandNotice tone="info">加载中...</CommandNotice>
+          </CommandPanel>
         </div>
       </div>
     )
@@ -104,38 +101,11 @@ function ToolDetail() {
   if (componentName === 'MechanicalClock' || componentName === 'MechanicalClock3D') {
     const ToolComponent = TOOL_COMPONENTS[componentName]
     return (
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'var(--color-bg-card)',
-        zIndex: 100,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        {/* 左上角圆形 Soft Design 返回按钮 */}
+      <div className="command-tool-fullscreen">
         <button
           onClick={() => navigate('/')}
-          className="clock-back-btn"
+          className="command-tool-back"
           title="返回首页"
-          style={{
-            position: 'fixed',
-            top: '3vh',
-            left: '3vh',
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
-            border: 'none',
-            background: 'var(--color-bg-secondary)',
-            color: 'var(--color-text-secondary)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: 'var(--shadow-sm)',
-            transition: 'all 150ms ease',
-            zIndex: 101,
-          }}
         >
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="19" y1="12" x2="5" y2="12" />
@@ -149,40 +119,26 @@ function ToolDetail() {
   }
 
   return (
-    <div className="tool-detail">
-      {/* 返回按钮 */}
-      <Link
-        to="/"
-        className="btn btn--ghost"
-        style={{ marginBottom: 'var(--spacing-lg)', alignSelf: 'flex-start' }}
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-        返回首页
-      </Link>
+    <div className="command-tool-page surface-public">
+      <div className="command-tool-page__wrap">
+        <CommandPanel
+          title={currentTool.name}
+          subtitle={currentTool.description}
+          actions={(
+            <div className="command-actions-row">
+              <Link to="/" className="btn btn--ghost">返回首页</Link>
+              <CommandStatusTag tone={currentTool.status === 'online' ? 'success' : currentTool.status === 'maintenance' ? 'warning' : 'danger'}>
+                {statusText[currentTool.status]}
+              </CommandStatusTag>
+            </div>
+          )}
+        >
+          {currentTool.apiEndpoint ? <div className="command-token">{currentTool.apiEndpoint}</div> : null}
+        </CommandPanel>
 
-      {/* 工具头部信息 */}
-      <div className="tool-detail__header">
-        <div className="tool-detail__icon">
-          {currentTool.icon || <WrenchScrewdriverIcon className="w-10 h-10" />}
-        </div>
-        <div className="tool-detail__info">
-          <h1>{currentTool.name}</h1>
-          <p>{currentTool.description}</p>
-          <div className="tool-detail__status-row">
-            <span className={`tool-card__status tool-card__status--${currentTool.status}`}>
-              <span className={`status-dot status-dot--${currentTool.status}`}></span>
-              {statusText[currentTool.status]}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 工具内容区域 */}
-      <div className="tool-detail__content">
-        {renderToolContent()}
+        <CommandPanel title="工具内容" subtitle="公开工具也对齐为轻量版指挥台语言，保留工具本体但统一外围壳层。">
+          {renderToolContent()}
+        </CommandPanel>
       </div>
     </div>
   )

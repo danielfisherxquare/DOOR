@@ -2,6 +2,18 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import authApi from '../api/auth'
 
+function getSurfacePath(surface) {
+  switch (surface) {
+    case 'admin':
+      return '/admin'
+    case 'ops':
+      return '/ops'
+    case 'app':
+    default:
+      return '/app'
+  }
+}
+
 const useAuthStore = create(
   persist(
     (set, get) => ({
@@ -36,7 +48,21 @@ const useAuthStore = create(
       },
 
       hasRole: (...roles) => roles.includes(get().user?.role),
-      canAccessAdmin: () => ['org_admin', 'super_admin'].includes(get().user?.role),
+      canAccessSurface: (surface) => Boolean(get().user?.surfaceAccess?.[surface]),
+      hasCapability: (scope, capability) => {
+        const scoped = get().user?.scopedCapabilities || {}
+        return Array.isArray(scoped[scope]) && scoped[scope].includes(capability)
+      },
+      getDefaultLandingPath: () => {
+        const user = get().user
+        if (user?.mustChangePassword) {
+          return '/app/settings'
+        }
+        return getSurfacePath(user?.defaultSurface)
+      },
+      canAccessAdmin: () => get().canAccessSurface('admin'),
+      canAccessOps: () => get().canAccessSurface('ops'),
+      canAccessApp: () => get().canAccessSurface('app'),
 
       login: async (username, password, rememberMe = false) => {
         set({ isLoading: true, error: null })
@@ -52,7 +78,11 @@ const useAuthStore = create(
               isLoading: false,
               error: null,
             })
-            return { success: true, mustChangePassword: Boolean(user?.mustChangePassword) }
+            return {
+              success: true,
+              mustChangePassword: Boolean(user?.mustChangePassword),
+              defaultSurface: user?.defaultSurface || 'app',
+            }
           }
           set({ isLoading: false, error: response.message || '登录失败' })
           return { success: false, error: response.message }
@@ -153,6 +183,38 @@ const useAuthStore = create(
       checkAuth: () => Boolean(get().token),
 
       clearError: () => set({ error: null }),
+
+      loadPreferences: async () => {
+        try {
+          const response = await authApi.getPreferences()
+          if (response.success) {
+            const user = get().user
+            set({
+              user: user ? { ...user, preferences: response.data } : null,
+            })
+            return response.data
+          }
+          return null
+        } catch {
+          return null
+        }
+      },
+
+      updatePreferences: async (updates) => {
+        try {
+          const response = await authApi.updatePreferences(updates)
+          if (response.success) {
+            const user = get().user
+            set({
+              user: user ? { ...user, preferences: response.data } : null,
+            })
+            return response.data
+          }
+          return null
+        } catch {
+          return null
+        }
+      },
     }),
     {
       name: 'auth-storage',

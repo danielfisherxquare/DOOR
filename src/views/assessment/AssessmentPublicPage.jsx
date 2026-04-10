@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import assessmentPublicApi from '../../api/assessmentPublic'
+import {
+  CommandEmptyState,
+  CommandNotice,
+  CommandPanel,
+  CommandShell,
+  CommandStatusTag,
+} from '../../components/command/CommandPrimitives'
 
 const STORAGE_KEY_PREFIX = 'assessment-session:'
 
@@ -74,7 +81,7 @@ function StarScoreInput({ item, value, onChange }) {
             style={{
               border: activeValue === 0 ? '1px solid rgba(59,130,246,0.28)' : '1px solid #e5e7eb',
               background: activeValue === 0 ? 'rgba(59,130,246,0.08)' : '#fff',
-              color: activeValue === 0 ? '#1d4ed8' : '#6b7280',
+              color: activeValue === 0 ? 'var(--info)' : 'var(--text-secondary)',
               borderRadius: 999,
               padding: '7px 10px',
               cursor: 'pointer',
@@ -107,7 +114,7 @@ function StarScoreInput({ item, value, onChange }) {
                   cursor: 'pointer',
                   fontSize: 26,
                   lineHeight: 1,
-                  color: active ? getStarColor(index) : '#d1d5db',
+                  color: active ? getStarColor(index) : 'var(--border-strong)',
                   transform: active ? 'scale(1.02)' : 'scale(1)',
                   transition: 'color 120ms ease, transform 120ms ease',
                 }}
@@ -123,9 +130,9 @@ function StarScoreInput({ item, value, onChange }) {
             style={{
               minWidth: 88,
               padding: '6px 10px',
-              borderRadius: 999,
-              background: activeValue !== '' ? 'rgba(245,158,11,0.12)' : '#f3f4f6',
-              color: activeValue !== '' ? '#b45309' : '#6b7280',
+              borderRadius: 0,
+              background: activeValue !== '' ? 'var(--warning-soft)' : 'var(--bg-secondary)',
+              color: activeValue !== '' ? 'var(--warning)' : 'var(--text-secondary)',
               fontWeight: 700,
               textAlign: 'center',
             }}
@@ -145,7 +152,7 @@ function StarScoreInput({ item, value, onChange }) {
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#9ca3af', fontSize: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-disabled)', fontSize: 12 }}>
         <span>{item.scoreMin} 分</span>
         <span>{item.scoreMax} 分</span>
       </div>
@@ -349,78 +356,78 @@ function AssessmentPublicPage() {
   }
 
   if (loading) {
-    return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>加载中...</div>
+    return (
+      <div className="command-tool-page surface-public">
+        <div className="command-tool-page__wrap command-page">
+          <CommandPanel title="考评页面加载中" subtitle="正在读取活动元数据与当前邀请码进度。">
+            <CommandNotice tone="info">加载中...</CommandNotice>
+          </CommandPanel>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f7f7fb', padding: isCompactLayout ? 12 : 24 }}>
-      <div style={{ maxWidth: 1240, margin: '0 auto', display: 'grid', gap: 16 }}>
-        <div style={panelStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isCompactLayout ? 'flex-start' : 'center', gap: 16, flexWrap: 'wrap' }}>
-            <div style={{ minWidth: 0 }}>
-              <h1 style={{ margin: 0, fontSize: 28 }}>{meta?.campaign?.name || '考评活动'}</h1>
-              <div style={{ color: '#6b7280', marginTop: 8 }}>
-                {meta?.campaign?.raceName || ''}
-                {meta?.memberCount ? `，待评分人数 ${meta.memberCount}` : ''}
-              </div>
-            </div>
-            {token && (
-              <button className="btn btn--ghost" onClick={handleLogout}>退出邀请码会话</button>
-            )}
+    <div className="command-tool-page surface-public">
+      <div className="command-tool-page__wrap command-page">
+        <CommandShell
+          eyebrow="公开考评"
+          title={meta?.campaign?.name || '考评活动'}
+          summary={`${meta?.campaign?.raceName || ''}${meta?.memberCount ? `，待评分人数 ${meta.memberCount}` : ''}`}
+          actions={token ? <button className="btn btn--ghost" onClick={handleLogout}>退出邀请码会话</button> : null}
+        >
+          <div className="command-actions-row">
+            <CommandStatusTag>{meta?.campaign?.raceName || '未关联赛事'}</CommandStatusTag>
+            {progress ? <CommandStatusTag tone="info">已完成 {progress.completedCount || 0} / {progress.totalCount || 0}</CommandStatusTag> : null}
           </div>
-        </div>
+        </CommandShell>
 
-        {message && <div style={{ ...panelStyle, background: 'rgba(59,130,246,0.08)' }}>{message}</div>}
+        {message ? <CommandNotice tone={saveState === 'error' ? 'danger' : 'info'}>{message}</CommandNotice> : null}
 
         {!token ? (
-          <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? 'minmax(0, 1fr)' : '400px minmax(0, 1fr)', gap: 16 }}>
-            <div style={panelStyle}>
-              <h2 style={{ marginTop: 0 }}>输入邀请码继续评分</h2>
-              <form onSubmit={handleLogin} style={{ display: 'grid', gap: 12 }}>
+          <div className="command-grid command-grid--two">
+            <CommandPanel title="输入邀请码继续评分" subtitle="使用邀请码即可进入当前赛事评分，系统会自动恢复上次未完成的位置并持续保存草稿。">
+              <form onSubmit={handleLogin} className="command-stack">
                 <input className="input" value={inviteCode} onChange={(event) => setInviteCode(event.target.value.toUpperCase())} placeholder="请输入邀请码" />
-                <button className="btn btn--primary" type="submit" disabled={authLoading || !inviteCode.trim()} style={{ width: '100%' }}>
+                <button className="btn btn--primary" type="submit" disabled={authLoading || !inviteCode.trim()}>
                   {authLoading ? '登录中...' : '进入评分'}
                 </button>
               </form>
-              <div style={{ marginTop: 12, color: '#6b7280', fontSize: 14 }}>
-                使用邀请码即可进入当前赛事评分。系统会自动恢复上次未完成的位置，并实时自动保存草稿。
-              </div>
-            </div>
+            </CommandPanel>
 
-            <div style={panelStyle}>
-              <div style={{ fontWeight: 700, marginBottom: 12 }}>待评分成员预览</div>
-              <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
-                {membersPreview.map((member) => (
-                  <div
-                    key={member.id}
-                    style={{
-                      padding: 12,
-                      borderRadius: 12,
-                      background: '#f8fafc',
-                      border: '1px solid #e5e7eb',
-                      userSelect: 'none',
-                      WebkitUserSelect: 'none',
-                    }}
-                  >
-                    <div style={memberDisplayNameStyle}>{member.employeeCode} {member.employeeName}</div>
-                    <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>所在岗位：{member.position || '未填写岗位'}</div>
-                  </div>
-                ))}
-                {membersPreview.length === 0 && <div style={{ color: '#6b7280' }}>当前还没有可评分成员。</div>}
-              </div>
-            </div>
+            <CommandPanel title="待评分成员预览" subtitle="预览当前活动中待评分的成员名单。">
+              {membersPreview.length === 0 ? (
+                <CommandEmptyState title="当前还没有可评分成员" description="请联系后台先完成成员导入或邀请码分配。" icon="MB" />
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+                  {membersPreview.map((member) => (
+                    <div
+                      key={member.id}
+                      style={{
+                        padding: 12,
+                        borderRadius: 12,
+                        background: '#f8fafc',
+                        border: '1px solid #e5e7eb',
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
+                      }}
+                    >
+                      <div style={memberDisplayNameStyle}>{member.employeeCode} {member.employeeName}</div>
+                      <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>所在岗位：{member.position || '未填写岗位'}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CommandPanel>
           </div>
         ) : progress?.completedCount >= progress?.totalCount ? (
-          <div style={panelStyle}>
-            <h2 style={{ marginTop: 0 }}>已完成全部评分</h2>
-            <div>该邀请码对应的评分任务已经全部提交完成。</div>
-          </div>
+          <CommandPanel title="已完成全部评分" subtitle="该邀请码对应的评分任务已经全部提交完成。">
+            <CommandEmptyState title="评分任务已全部完成" description="如需再次进入，请联系后台重新分配成员或邀请码。" icon="OK" />
+          </CommandPanel>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: isCompactLayout ? 'minmax(0, 1fr)' : '320px minmax(0, 1fr)', gap: 16 }}>
-            <div style={panelStyle}>
-              <div style={{ fontWeight: 700, marginBottom: 12 }}>评分进度</div>
-              <div style={{ color: '#6b7280', marginBottom: 12 }}>已完成 {progress?.completedCount || 0} / {progress?.totalCount || 0}</div>
-              <div style={{ display: 'grid', gap: 8 }}>
+          <div className="command-grid" style={{ gridTemplateColumns: isCompactLayout ? '1fr' : '320px minmax(0, 1fr)' }}>
+            <CommandPanel title="评分进度" subtitle={`已完成 ${progress?.completedCount || 0} / ${progress?.totalCount || 0}`}>
+              <div className="command-stack">
                 {(progress?.items || []).map((member) => (
                   <button
                     key={member.id}
@@ -440,14 +447,14 @@ function AssessmentPublicPage() {
                   </button>
                 ))}
               </div>
-            </div>
+            </CommandPanel>
 
-            <div style={panelStyle}>
+            <CommandPanel title="成员评分" subtitle="评分项会自动保存草稿，提交后进入下一位成员。">
               {!currentMember || !template ? (
-                <div>请选择一位成员继续评分。</div>
+                <CommandEmptyState title="请选择一位成员继续评分" description="左侧进度列表会展示当前邀请码分配到的成员。" icon="SC" />
               ) : (
                 <div style={{ display: 'grid', gap: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isCompactLayout ? 'flex-start' : 'center', gap: 16, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: isCompactLayout ? 'flex-start' : 'center', gap: 16, flexWrap: 'wrap' }}>
                     <div style={{ minWidth: 0 }}>
                       <div
                         style={{
@@ -459,17 +466,17 @@ function AssessmentPublicPage() {
                       >
                         {currentMember.employeeCode} {currentMember.employeeName}
                       </div>
-                      <div style={{ color: '#6b7280', marginTop: 4 }}>所在岗位：{currentMember.position || '未填写岗位'}</div>
+                      <div style={{ color: 'var(--text-secondary)', marginTop: 4 }}>所在岗位：{currentMember.position || '未填写岗位'}</div>
                     </div>
-                    <div style={{ color: saveState === 'error' ? '#dc2626' : '#6b7280', width: isCompactLayout ? '100%' : 'auto' }}>
+                    <CommandStatusTag tone={saveState === 'error' ? 'danger' : saveState === 'saved' ? 'success' : 'neutral'}>
                       {SAVE_STATE_LABELS[saveState] || SAVE_STATE_LABELS.idle}
-                    </div>
+                    </CommandStatusTag>
                   </div>
 
                   {(template.items || []).map((item, index) => (
-                    <div key={item.id} style={{ borderTop: '1px solid #e5e7eb', paddingTop: 14 }}>
+                    <div key={item.id} style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
                       <div style={{ fontWeight: 700 }}>{index + 1}. {item.title}</div>
-                      <div style={{ color: '#6b7280', fontSize: 14, margin: '6px 0 10px' }}>{item.description}</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '6px 0 10px' }}>{item.description}</div>
                       <StarScoreInput item={item} value={scores[index]?.score ?? ''} onChange={(value) => handleScoreChange(index, value)} />
                     </div>
                   ))}
@@ -485,31 +492,22 @@ function AssessmentPublicPage() {
                         setDirty(true)
                       }}
                     />
-                    <div style={{ color: '#9ca3af', fontSize: 12, marginTop: 8 }}>
+                    <div style={{ color: 'var(--text-disabled)', fontSize: 12, marginTop: 8 }}>
                       备注同样会自动保存，无需手动点击保存。
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div className="command-actions-row">
                     <button className="btn btn--primary" onClick={handleSubmit}>提交当前成员评分</button>
                   </div>
                 </div>
               )}
-            </div>
+            </CommandPanel>
           </div>
         )}
       </div>
     </div>
   )
-}
-
-const panelStyle = {
-  background: '#fff',
-  borderRadius: 16,
-  padding: 20,
-  boxShadow: '0 10px 30px rgba(15,23,42,0.06)',
-  minWidth: 0,
-  overflowWrap: 'break-word',
 }
 
 const memberDisplayNameStyle = {

@@ -56,7 +56,7 @@ async function askVlm(client, prompt, fileBuffer, mimeType, isPdf, modelName) {
     }
 
     const payload = {
-        model: modelName || 'qwen-vl-plus',
+        model: modelName || 'qwen3.5-plus',
         messages: [
             {
                 role: "user",

@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import { unwrapData } from '../utils/apiResponse'
 
 /**
  * 审核 API — 对应后端 /api/audit
@@ -25,7 +26,7 @@ async function pollJobResult(jobId, options = {}) {
 
     while (true) {
         const resp = await request.get(`/jobs/${jobId}`)
-        const job = resp.data
+        const job = unwrapData(resp)
 
         if (!job) throw new Error('Job 不存在')
 
@@ -56,11 +57,11 @@ async function pollJobResult(jobId, options = {}) {
 export const auditApi = {
     // ── 统计 ──────────────────────────────────────────────────
     getPrepStats: (raceId) =>
-        request.get(`/audit/prep-stats/${raceId}`),
+        request.get(`/audit/prep-stats/${raceId}`).then(unwrapData),
 
     // ── 重置 ──────────────────────────────────────────────────
     resetAudit: (raceId) =>
-        request.post(`/audit/reset/${raceId}`),
+        request.post(`/audit/reset/${raceId}`).then(unwrapData),
 
     // ── 5 步审核（含 Job 轮询封装）──────────────────────────
     /**
@@ -73,7 +74,7 @@ export const auditApi = {
      */
     runAuditStep: async (stepName, raceId, payload = {}, options = {}) => {
         const resp = await request.post(`/audit/step/${stepName}/${raceId}`, payload)
-        const { jobId } = resp.data
+        const { jobId } = unwrapData(resp)
         return pollJobResult(jobId, options)
     },
 

@@ -1,0 +1,179 @@
+/**
+ * MapShortcutsModal.css
+ * 快捷键帮助弹窗样式
+ */
+
+.shortcuts-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--map-overlay, rgba(15, 23, 42, 0.55));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal-overlay);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.shortcuts-modal {
+  background: var(--layer-surface);
+  border: 1px solid var(--layer-border);
+  border-top: 4px solid var(--layer-accent);
+  width: 480px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.shortcuts-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--layer-border);
+}
+
+.shortcuts-modal-header h3 {
+  margin: 0;
+  font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--layer-text-primary);
+}
+
+.shortcuts-close-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: var(--layer-bg-secondary);
+  color: var(--layer-text-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.shortcuts-close-btn:hover {
+  background: color-mix(in srgb, var(--danger) 30%, transparent);
+  color: var(--danger);
+}
+
+.shortcuts-modal-content {
+  padding: 16px 20px;
+  overflow-y: auto;
+  max-height: calc(80vh - 120px);
+}
+
+.shortcuts-category {
+  margin-bottom: 16px;
+}
+
+.shortcuts-category:last-child {
+  margin-bottom: 0;
+}
+
+.category-title {
+  font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--layer-accent);
+  margin: 0 0 8px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--layer-border);
+}
+
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shortcut-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--layer-bg-secondary);
+  border-radius: var(--radius-sm);
+  transition: background 0.2s;
+}
+
+.shortcut-item:hover {
+  background: var(--layer-bg-tertiary);
+}
+
+.shortcut-action {
+  font-size: 13px;
+  color: var(--layer-text-primary);
+}
+
+.shortcut-keys {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.shortcut-key {
+  display: inline-block;
+  padding: 4px 8px;
+  background: var(--layer-bg-primary);
+  border: 1px solid var(--layer-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 11px;
+  color: var(--layer-text-primary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.shortcut-plus {
+  font-size: 11px;
+  color: var(--layer-text-muted);
+}
+
+.shortcuts-modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--layer-border);
+  text-align: center;
+}
+
+.shortcuts-modal-footer p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--layer-text-muted);
+}
+
+.shortcuts-modal-footer kbd {
+  padding: 2px 6px;
+  background: var(--layer-bg-primary);
+  border: 1px solid var(--layer-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono, 'IBM Plex Mono', monospace);
+  font-size: 10px;
+}

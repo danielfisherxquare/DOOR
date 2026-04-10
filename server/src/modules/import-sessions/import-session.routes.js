@@ -7,7 +7,7 @@ import knex from '../../db/knex.js';
 
 const router = Router();
 
-router.use(requireRoles('org_admin', 'super_admin', 'race_editor'));
+router.use(requireRoles('org_admin', 'super_admin', 'race_admin'));
 
 function badRequest(message) {
     return Object.assign(new Error(message), { status: 400, expose: true });

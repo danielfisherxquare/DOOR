@@ -1,0 +1,215 @@
+/**
+ * MapOnboarding.css
+ * 新手引导样式
+ */
+
+.onboarding-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--map-overlay, rgba(15, 23, 42, 0.55));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal-overlay);
+  animation: fadeIn 0.3s ease;
+}
+
+.onboarding-modal {
+  position: relative;
+  overflow: hidden;
+  background: var(--layer-surface);
+  border: 1px solid var(--layer-border);
+  border-top: 4px solid var(--layer-accent);
+  width: 460px;
+  max-width: 90vw;
+  padding: 28px 30px 24px;
+  box-shadow: var(--shadow-lg);
+  animation: scaleIn 0.3s ease;
+}
+
+.onboarding-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--layer-border);
+  background: var(--layer-bg-secondary, rgba(255, 255, 255, 0.04));
+  color: var(--layer-text-secondary);
+  cursor: pointer;
+  z-index: calc(var(--z-base) + 1);
+  transition: all 0.2s ease;
+}
+
+.onboarding-close:hover {
+  border-color: var(--layer-accent);
+  color: var(--layer-text-primary);
+}
+
+.onboarding-modal::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--grid-pattern);
+  background-size: 16px 16px;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.onboarding-modal>* {
+  position: relative;
+  z-index: var(--z-base);
+}
+
+.onboarding-kicker {
+  margin-bottom: 18px;
+  font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--layer-accent);
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 进度指示器 */
+.onboarding-progress {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.progress-dot {
+  width: 18px;
+  height: 4px;
+  background: var(--layer-border);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.progress-dot:hover {
+  background: var(--layer-border-hover, var(--border));
+}
+
+.progress-dot.active {
+  background: var(--layer-accent);
+  transform: scaleX(1.1);
+}
+
+.progress-dot.completed {
+  background: var(--layer-accent);
+  opacity: 0.5;
+}
+
+/* 内容区域 */
+.onboarding-content {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.onboarding-icon {
+  font-size: 56px;
+  margin-bottom: 12px;
+  font-variation-settings:
+    'FILL' 1,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 48;
+  color: var(--layer-accent);
+}
+
+.onboarding-title {
+  margin: 0 0 12px 0;
+  font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--layer-text-primary);
+}
+
+.onboarding-description {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--layer-text-secondary);
+}
+
+/* 操作按钮 */
+.onboarding-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.onboarding-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.onboarding-btn {
+  padding: 10px 20px;
+  border: 1px solid transparent;
+  font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.onboarding-btn.skip {
+  background: transparent;
+  color: var(--layer-text-muted);
+}
+
+.onboarding-btn.skip:hover {
+  color: var(--layer-text-secondary);
+}
+
+.onboarding-btn.secondary {
+  background: var(--layer-bg-secondary);
+  border-color: var(--layer-border);
+  color: var(--layer-text-primary);
+}
+
+.onboarding-btn.secondary:hover {
+  background: var(--layer-bg-tertiary);
+}
+
+.onboarding-btn.primary {
+  background: var(--layer-accent);
+  border-color: var(--layer-accent);
+  color: var(--layer-text-on-accent);
+}
+
+.onboarding-btn.primary:hover {
+  background: color-mix(in srgb, var(--layer-accent) 80%, black);
+}
+
+/* 步骤计数 */
+.onboarding-counter {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--layer-text-secondary);
+}

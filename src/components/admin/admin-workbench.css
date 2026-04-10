@@ -1,0 +1,58 @@
+.admin-workbench-compat__shell,
+.admin-workbench-compat__panel,
+.admin-workbench-compat__toolbar {
+  width: 100%;
+}
+
+.admin-workbench-compat__stats {
+  margin-top: 2px;
+}
+
+.admin-workbench-compat__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.admin-workbench-compat__pagination-status {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admin-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(15, 23, 42, 0.06) 0%,
+    rgba(15, 23, 42, 0.12) 48%,
+    rgba(15, 23, 42, 0.06) 100%
+  );
+  background-size: 220% 100%;
+  animation: admin-skeleton-shimmer 1.3s linear infinite;
+}
+
+.admin-skeleton--text {
+  min-height: 14px;
+}
+
+.admin-skeleton--title {
+  min-height: 28px;
+}
+
+.admin-skeleton--card {
+  min-height: 120px;
+}
+
+@keyframes admin-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -20% 0;
+  }
+}

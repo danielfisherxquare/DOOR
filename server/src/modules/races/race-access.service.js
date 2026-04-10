@@ -27,7 +27,7 @@ function normalizeAccessLevel(accessLevel) {
 function capAccessLevelByRole(role, accessLevel) {
     const normalized = normalizeAccessLevel(accessLevel);
     if (!normalized) return null;
-    if (role === 'race_viewer') return 'viewer';
+    if (role === 'user') return 'viewer';
     return normalized;
 }
 

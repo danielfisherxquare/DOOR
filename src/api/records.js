@@ -47,6 +47,63 @@ export const recordsApi = {
         request.get(`/records/quick-stats/${raceId}`, {
             params: statuses ? { statuses } : {},
         }),
+
+    /**
+     * 更新单条记录
+     */
+    update: (recordId, data) => request.put(`/records/${recordId}`, data),
+
+    /**
+     * 批量更新记录
+     */
+    bulkUpdate: (updates) => request.post('/records/bulk-update', { updates }),
+
+    /**
+     * 清空赛事数据
+     */
+    clearByRace: (raceId) => request.delete(`/records/race/${raceId}`),
+
+    /**
+     * 流式导出(NDJSON)
+     */
+    export: (raceId) => request.get(`/records/export/${raceId}`),
+
+    /**
+     * 校验成绩导入
+     */
+    importVerification: (raceId, results) => request.post(`/records/import-verification/${raceId}`, results),
+}
+
+/**
+ * 全量拉取某赛事的选手记录（分批 1000 条/次循环获取）。
+ *
+ * ⚠️ 当记录超过数万条时可能占用较多内存，
+ *    后续应考虑后端聚合或流式替代。
+ *
+ * @param {number|string} raceId - 赛事 ID
+ * @returns {Promise<Array>}
+ */
+export async function fetchAllRecords(raceId) {
+  const { unwrapRecordsQueryResult } = await import('../utils/apiResponse')
+  const all = []
+  let offset = 0
+  const limit = 1000
+
+  while (true) {
+    const response = await recordsApi.query({
+      raceId: Number(raceId),
+      offset,
+      limit,
+      sort: { field: 'id', direction: 'asc' },
+    })
+    const result = unwrapRecordsQueryResult(response)
+    const batch = result.records || []
+    all.push(...batch)
+    if (batch.length < limit) break
+    offset += limit
+  }
+
+  return all
 }
 
 export default recordsApi

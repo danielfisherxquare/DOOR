@@ -9,7 +9,12 @@ import { env } from '../config/env.js';
 const ROLE_MIGRATION_MAP = {
     owner: 'org_admin',
     admin: 'org_admin',
-    member: 'race_editor' // 旧系统 member 目前先映射为更高权限的 editor，以防阻断现有业务
+    org_finance: 'org_admin',
+    member: 'user',
+    race_editor: 'race_admin',
+    race_viewer: 'user',
+    editor: 'race_admin',
+    viewer: 'user',
 };
 
 export async function requireAuth(req, res, next) {
@@ -39,6 +44,13 @@ export async function requireAuth(req, res, next) {
         // 兼容遗留代码 (原本的 tenantContext 设置)
         req.tenantContext = req.authContext;
         req.user = decoded;
+
+        // 兼容 inventory 模块的 orgAccess
+        req.orgAccess = {
+            orgId: decoded.orgId || null,
+            userId: decoded.userId,
+            role: normalizedRole,
+        };
 
         next();
     } catch (err) {
