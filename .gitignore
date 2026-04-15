@@ -69,3 +69,21 @@ server/uploads/apps/*.zip
 # Playwright
 .playwright-cli/
 .playwright-mcp/
+
+# Git backup (auto-created, never needed)
+.git_disabled/
+
+# Build/runtime output
+output/
+dist/
+
+# Test baselines & regression screenshots
+test-baselines/
+tests/**/screenshots/
+
+# Python scripts in server (debug one-offs)
+server/scripts/*.py
+
+# Server runtime directories
+server/venv/
+server/pgdata/

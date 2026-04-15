@@ -30,6 +30,7 @@ function isPlaneNormalExtrude(plane) {
 export default function PushPullTool() {
   const selectedGeometry = useEditor((state) => state.selectedGeometry)
   const setDirty = useEditor((state) => state.setDirty)
+  const pushPullPreview = useEditor((state) => state.pushPullPreview)
   const setPushPullPreview = useEditor((state) => state.setPushPullPreview)
   const document = useModelingDocument((state) => state.document)
   const commitDocument = useModelingDocument((state) => state.commitDocument)
