@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Studio3DApp } from '../../3d-studio'
 import { buildAppHref } from '../../components/app/appConfig'
@@ -9,6 +9,7 @@ import { getTemplateSceneSnapshot, inferObjectTypeFromText } from '../../utils/m
 import useAuthStore from '../../stores/authStore'
 import { buildFocusZoneWorkbenchContext, extractFocusZoneTerrainPatch, extractFocusZoneWorkbenchScene } from '../../utils/map/focusZoneContext'
 import { buildFocusZoneObjectContext, summarizeFocusZoneObjects } from '../../utils/map/focusZoneSpatialObjects'
+import { buildFocusZoneStudioScene, getFocusZoneSceneImportState } from '../../utils/map/focusZoneStudioScene'
 import { generateThumbnail } from '../../utils/shareUtils'
 import {
   createBlankStudioScene,
@@ -127,6 +128,7 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
   const [focusZoneObjects, setFocusZoneObjects] = useState([])
   const [assetTemplates, setAssetTemplates] = useState([])
   const [terrainPatchGenerating, setTerrainPatchGenerating] = useState(false)
+  const initialFocusZoneSnapshotPersistedRef = useRef(new Set())
   const editorModeLabel = useMemo(() => getEditorModeLabel(project?.projectType || requestedProjectType), [project?.projectType, requestedProjectType])
   const focusZoneContext = useMemo(() => (
     focusZone ? buildFocusZoneWorkbenchContext(focusZone) : null
@@ -352,20 +354,114 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
     editableSnapshot ? getStudioHierarchy(editableSnapshot) : { activeBuilding: null, activeLevel: null, activeWarehouse: null }
   ), [editableSnapshot])
 
-  const workbenchInitialScene = useMemo(() => (
+  const savedFocusZoneScene = useMemo(() => (
     extractFocusZoneWorkbenchScene(focusZone)
-      || (() => {
-        const templateSceneObject = focusZoneObjects.find((item) => {
-          const template = assetTemplates.find((templateItem) => templateItem.id === item?.templateId)
-          return Boolean(getTemplateSceneSnapshot(template))
-        })
-        if (!templateSceneObject) return null
-        const template = assetTemplates.find((templateItem) => templateItem.id === templateSceneObject.templateId)
-        return getTemplateSceneSnapshot(template)
-      })()
-      || editableHierarchy.activeWarehouse?.sceneSnapshot
-      || null
-  ), [assetTemplates, editableHierarchy.activeWarehouse?.sceneSnapshot, focusZone, focusZoneObjects])
+  ), [focusZone])
+
+  const generatedFocusZoneScene = useMemo(() => {
+    if (!requestedFocusZoneId || !focusZone) return null
+    return buildFocusZoneStudioScene({
+      focusZone,
+      objects: focusZoneObjects,
+      project,
+      assetTemplates,
+    })
+  }, [assetTemplates, focusZone, focusZoneObjects, project, requestedFocusZoneId])
+
+  const focusZoneSceneImportState = useMemo(() => (
+    requestedFocusZoneId
+      ? getFocusZoneSceneImportState({
+        scene: savedFocusZoneScene || generatedFocusZoneScene,
+        focusZone,
+        objects: focusZoneObjects,
+      })
+      : null
+  ), [focusZone, focusZoneObjects, generatedFocusZoneScene, requestedFocusZoneId, savedFocusZoneScene])
+
+  const workbenchInitialScene = useMemo(() => {
+    if (requestedFocusZoneId) {
+      return savedFocusZoneScene || generatedFocusZoneScene || null
+    }
+
+    const templateSceneObject = focusZoneObjects.find((item) => {
+      const template = assetTemplates.find((templateItem) => templateItem.id === item?.templateId)
+      return Boolean(getTemplateSceneSnapshot(template))
+    })
+    if (templateSceneObject) {
+      const template = assetTemplates.find((templateItem) => templateItem.id === templateSceneObject.templateId)
+      return getTemplateSceneSnapshot(template)
+    }
+
+    return editableHierarchy.activeWarehouse?.sceneSnapshot || null
+  }, [
+    assetTemplates,
+    editableHierarchy.activeWarehouse?.sceneSnapshot,
+    focusZoneObjects,
+    generatedFocusZoneScene,
+    requestedFocusZoneId,
+    savedFocusZoneScene,
+  ])
+
+  useEffect(() => {
+    if (
+      !requestedFocusZoneId
+      || !focusZone?.id
+      || !generatedFocusZoneScene
+      || savedFocusZoneScene
+      || terrainPatchGenerating
+      || !extractFocusZoneTerrainPatch(focusZone)
+    ) return
+    if (initialFocusZoneSnapshotPersistedRef.current.has(focusZone.id)) return
+
+    let active = true
+    initialFocusZoneSnapshotPersistedRef.current.add(focusZone.id)
+    const savedAt = new Date().toISOString()
+
+    studioProjectApi.updateTerrainWorkZone(focusZone.id, {
+      snapshotJson: {
+        ...(focusZone.snapshotJson || {}),
+        kind: 'studio-focus-zone-snapshot',
+        focusZoneId: focusZone.id,
+        projectId: project?.id || effectiveProjectId || null,
+        savedAt,
+        generatedFrom: 'gis-focus-zone-import',
+        sceneType: generatedFocusZoneScene.sceneType,
+        warehouseId: generatedFocusZoneScene.warehouse?.id || null,
+        warehouseName: generatedFocusZoneScene.warehouse?.name || null,
+        warehouseScene: generatedFocusZoneScene,
+        focusZoneContext: focusZoneContext || null,
+      },
+      metadata: {
+        ...(focusZone.metadata || {}),
+        studioInitialSnapshotGeneratedAt: savedAt,
+        studioGeometrySource: 'gis-focus-zone-import',
+      },
+      status: 'ready',
+    }, orgId || undefined)
+      .then((result) => {
+        if (!active || !result?.data) return
+        setFocusZone(result.data)
+      })
+      .catch((error) => {
+        if (!active) return
+        initialFocusZoneSnapshotPersistedRef.current.delete(focusZone.id)
+        console.warn('[StudioProjectPage] Failed to persist generated focus-zone scene:', error)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [
+    effectiveProjectId,
+    focusZone,
+    focusZoneContext,
+    generatedFocusZoneScene,
+    orgId,
+    project?.id,
+    requestedFocusZoneId,
+    savedFocusZoneScene,
+    terrainPatchGenerating,
+  ])
 
   const warehouseMeta = useMemo(() => {
     if (!editableHierarchy.activeWarehouse) return null
@@ -445,6 +541,7 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
         const savedAt = new Date().toISOString()
         const zoneResult = await studioProjectApi.updateTerrainWorkZone(requestedFocusZoneId, {
           snapshotJson: {
+            ...(focusZone?.snapshotJson || {}),
             kind: 'studio-focus-zone-snapshot',
             focusZoneId: requestedFocusZoneId,
             projectId: project?.id || effectiveProjectId || null,
@@ -662,6 +759,7 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
           focusZoneContext={focusZoneContext}
           focusZoneObjectsContext={focusZoneObjectsContext}
           focusZoneObjectSummary={focusZoneObjectSummary}
+          focusZoneSceneImportState={focusZoneSceneImportState}
           preferredSidebarTab="structure"
           compactChrome
           embedded

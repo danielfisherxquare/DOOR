@@ -15,10 +15,8 @@ const OpsHome = lazy(() => import('../../views/ops/OpsHome'))
 const ScanHome = lazy(() => import('../../views/scan/ScanHome'))
 const ScanResult = lazy(() => import('../../views/scan/ScanResult'))
 const BibPickupPage = lazy(() => import('../../views/ops/BibPickupPage'))
-const InboundCenter = lazy(() => import('../../views/inventory/InboundCenter'))
-const OutboundCenter = lazy(() => import('../../views/inventory/OutboundCenter'))
-const ControlCenter = lazy(() => import('../../views/inventory/ControlCenter'))
 const CredentialIssuePage = lazy(() => import('../../views/admin/credential/CredentialIssuePage'))
+const WarehouseWorkbench = lazy(() => import('../../views/ops/WarehouseWorkbench'))
 
 function OpsRouteLoader() {
   return (
@@ -289,9 +287,7 @@ export default function OpsLayout() {
               <Route path="scan/result" element={<ScanResult />} />
               <Route path="bibs/pickup" element={<BibPickupPage />} />
               <Route path="credentials/issue" element={<CredentialIssuePage />} />
-              <Route path="warehouse/inbound" element={<InboundCenter />} />
-              <Route path="warehouse/outbound" element={<OutboundCenter />} />
-              <Route path="warehouse/count" element={<ControlCenter />} />
+              <Route path="warehouse/*" element={<WarehouseWorkbench />} />
               <Route path="*" element={<Navigate to={buildOpsHref('', currentContext)} replace />} />
             </Routes>
           </Suspense>

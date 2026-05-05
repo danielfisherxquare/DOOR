@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import axios from 'axios'
 
 const basePath = '/app/3d-studio'
 
@@ -41,6 +42,25 @@ const studioProjectApi = {
   generateTerrainWorkZonePublishManifest: (zoneId, orgId) => request.post(`${basePath}/terrain-work-zones/${zoneId}/publish-manifest`, {}, { params: withOrgId(orgId) }),
   generateTerrainWorkZoneExportPackage: (zoneId, orgId) => request.post(`${basePath}/terrain-work-zones/${zoneId}/export-package`, {}, { params: withOrgId(orgId) }),
   executeTerrainWorkZoneExport: (zoneId, orgId) => request.post(`${basePath}/terrain-work-zones/${zoneId}/execute-export`, {}, { params: withOrgId(orgId) }),
+  syncTerrainWorkZoneOsmBuildings: (zoneId, data = {}, orgId) => request.post(`${basePath}/terrain-work-zones/${zoneId}/osm-buildings/sync`, data, { params: withOrgId(orgId) }),
+  syncTerrainWorkZoneTerrainPatch: (zoneId, data = {}, orgId) => request.post(`${basePath}/terrain-work-zones/${zoneId}/terrain-patch/sync`, data, { params: withOrgId(orgId) }),
+  createTerrainWorkZoneSceneExportJob: (projectId, zoneId, data = {}, orgId) => request.post(`${basePath}/projects/${projectId}/terrain-work-zones/${zoneId}/scene-export-jobs`, data, { params: withOrgId(orgId) }),
+  getSceneExportJob: (jobId, orgId) => request.get(`${basePath}/scene-export-jobs/${jobId}`, { params: withOrgId(orgId) }),
+  getGeneratedScene: (sceneId, orgId) => request.get(`${basePath}/generated-scenes/${sceneId}`, { params: withOrgId(orgId) }),
+  downloadGeneratedScene: (sceneId, { asset = 'glb', orgId } = {}) => axios.get(`${(import.meta.env.VITE_API_BASE_URL || '/api')}${basePath}/generated-scenes/${sceneId}/download`, {
+    params: withOrgId(orgId, { asset }),
+    responseType: 'blob',
+    headers: (() => {
+      try {
+        const persisted = JSON.parse(window.localStorage.getItem('auth-storage') || '{}')
+        const token = persisted?.state?.token || ''
+        return token ? { Authorization: `Bearer ${token}` } : {}
+      } catch {
+        return {}
+      }
+    })(),
+  }),
+  importGeneratedSceneToStudio: (sceneId, data = {}, orgId) => request.post(`${basePath}/generated-scenes/${sceneId}/import-to-studio`, data, { params: withOrgId(orgId) }),
   getTerrainWorkZoneRuntimePreview: (zoneId, orgId) => request.get(`${basePath}/terrain-work-zones/${zoneId}/runtime-preview`, { params: withOrgId(orgId) }),
   deleteTerrainWorkZone: (zoneId, orgId) => request.delete(`${basePath}/terrain-work-zones/${zoneId}`, { params: withOrgId(orgId) }),
   listAssetTemplates: (orgId) => request.get(`${basePath}/asset-templates`, { params: withOrgId(orgId) }),

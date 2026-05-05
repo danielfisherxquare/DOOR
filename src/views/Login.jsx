@@ -45,89 +45,71 @@ function Login() {
   }
 
   return (
-    <div className="login-canvas industrial-grid">
-      {/* ── 背景装饰层 ── */}
-      <div className="login-canvas__bg">
-        <div className="login-canvas__bg-right blueprint-underlay" />
-        <div className="login-canvas__bg-bottom" />
-        <div className="login-canvas__watermark-top">DOOR_SYS</div>
-        <div className="login-canvas__watermark-bottom">System_Active</div>
-      </div>
+    <div className="login-canvas">
+      <div className="login-canvas__aside" aria-hidden="true" />
 
-      {/* ── 主登录模块 ── */}
       <div className="login-module">
-        {/* 左侧 — 品牌身份区 */}
         <div className="login-brand">
-          <div className="login-brand__accent-bar" />
-
-          <div>
-            {/* Logo 头 */}
+          <div className="login-brand__content">
             <div className="login-brand__header">
               <div className="login-brand__icon-box">
-                <span className="material-symbols-outlined">settings_input_component</span>
+                <span className="material-symbols-outlined">door_open</span>
               </div>
-              <span className="login-brand__name">DOOR_ADMIN</span>
+              <div>
+                <span className="login-brand__name">Powered by Xquare</span>
+              </div>
             </div>
 
-            {/* 主标题区 */}
             <div>
-              <p className="login-brand__eyebrow">[SYSTEM_AUTH_REQUIRED]</p>
-              <h1 className="login-brand__title">
-                指挥入口
-                <br />
-                Access_V1
-              </h1>
+              <p className="login-brand__eyebrow">赛事运营中台</p>
+              <h1 className="login-brand__title">统一登录</h1>
               <p className="login-brand__description">
-                DOOR 统一认证接口。登录后根据权限自动分配至管理后台、应用层或执行端工作面。
+                使用组织账号进入管理后台、应用工作台或现场执行端。权限范围会按当前组织与赛事自动生效。
               </p>
             </div>
           </div>
 
-          {/* 底部系统状态 */}
           <div className="login-brand__status">
             <div className="login-brand__status-row">
               <div className="login-brand__status-dot" />
-              <span className="login-brand__status-text">System Status: ARMED</span>
+              <span className="login-brand__status-text">当前服务正常</span>
             </div>
             <div className="login-brand__status-panel">
-              <div className="login-brand__status-meta">
-                <span>ENCRYPTION: AES-256</span>
-                <span>FREQ: 44.1KHZ</span>
-              </div>
-              <div className="login-brand__progress-track">
-                <div className="login-brand__progress-fill" />
-              </div>
+              <span>管理后台</span>
+              <span>应用工作台</span>
+              <span>执行端</span>
             </div>
           </div>
         </div>
 
-        {/* 右侧 — 表单交互区 */}
         <div className="login-form-side">
+          <div className="login-form-side__header">
+            <p>账号登录</p>
+            <span>内部系统</span>
+          </div>
+
           <form onSubmit={handleSubmit}>
-            {/* 错误提示 */}
             {error ? <div className="login-error">{error}</div> : null}
 
-            {/* 用户名 */}
             <div className="login-field">
-              <label htmlFor="username" className="login-field__label">Corporate ID</label>
+              <label htmlFor="username" className="login-field__label">账号</label>
               <div className="login-field__wrapper">
                 <input
                   id="username"
                   type="text"
                   className="login-field__input"
-                  placeholder="EMP_ID_XXXX"
+                  placeholder="请输入用户名"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   disabled={isLoading}
                   autoComplete="username"
                 />
-                <span className="login-field__icon material-symbols-outlined">fingerprint</span>
+                <span className="login-field__icon material-symbols-outlined">person</span>
               </div>
             </div>
 
-            {/* 密码 */}
             <div className="login-field">
-              <label htmlFor="password" className="login-field__label">Security Access Key</label>
+              <label htmlFor="password" className="login-field__label">密码</label>
               <div className="login-field__wrapper">
                 <input
                   id="password"
@@ -139,70 +121,38 @@ function Login() {
                   disabled={isLoading}
                   autoComplete="current-password"
                 />
-                <span className="login-field__icon material-symbols-outlined">key</span>
+                <span className="login-field__icon material-symbols-outlined">lock</span>
               </div>
             </div>
 
-            {/* 记住我 */}
-            <div className="login-remember-row">
-              <input
-                id="remember-me"
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                disabled={isLoading}
-              />
-              <label htmlFor="remember-me">Remember Terminal</label>
+            <div className="login-form-options">
+              <label className="login-remember-row" htmlFor="remember-me">
+                <input
+                  id="remember-me"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={isLoading}
+                />
+                <span>记住账号</span>
+              </label>
+              <Link to="/forgot-password">忘记密码？</Link>
             </div>
 
-            {/* 提交 */}
-            <div>
-              <button type="submit" className="login-submit" disabled={isLoading}>
-                <span className="login-submit__text">
-                  {isLoading ? '认证中...' : 'Initiate Access'}
-                </span>
-                <span className="login-submit__icon material-symbols-outlined">arrow_forward</span>
-              </button>
-            </div>
+            <button type="submit" className="login-submit" disabled={isLoading}>
+              <span className="login-submit__text">
+                {isLoading ? '正在登录...' : '登录'}
+              </span>
+              <span className="login-submit__icon material-symbols-outlined">arrow_forward</span>
+            </button>
 
-            {/* 底部链接 */}
             <div className="login-footer-row">
-              <Link to="/forgot-password">Reset Security Token</Link>
-              <div className="login-footer-row__status">
-                <span className="login-footer-row__status-dot" />
-                <span>NODE_ALPHA_CONNECTED</span>
-              </div>
+              <span>请使用已分配的组织账号登录。</span>
+              <span>需要权限变更时联系管理员。</span>
             </div>
           </form>
         </div>
       </div>
-
-      {/* ── 装饰：QR 面板 (桌面端) ── */}
-      <div className="login-qr-panel">
-        <div className="login-qr-panel__inner">
-          <div className="login-qr-panel__code">
-            <span className="material-symbols-outlined" style={{ fontSize: 40, color: 'rgba(255,255,255,0.3)' }}>qr_code_2</span>
-          </div>
-          <div>
-            <p className="login-qr-panel__label">Mobile Link</p>
-            <p className="login-qr-panel__desc">
-              SCAN FOR<br />BIOMETRIC<br />OVERRIDE
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 装饰：系统日志 (桌面端) ── */}
-      <div className="login-syslog">
-        <p>&gt; BOOT_SEQ: SUCCESS</p>
-        <p>&gt; KERNEL_LOAD: OK</p>
-        <p className="login-syslog__highlight">&gt; WAIT_FOR_USER_AUTH...</p>
-        <p>&gt; [42.102.33.19] CONNECTED</p>
-      </div>
-
-      {/* ── 外框装饰 ── */}
-      <div className="login-canvas__outer-frame" />
-      <div className="scanline" style={{ opacity: 0.1 }} />
     </div>
   )
 }

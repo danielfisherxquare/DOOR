@@ -49,7 +49,7 @@ function Register() {
             TP
           </div>
           <h1 className="login-card__title">创建账号</h1>
-          <p className="login-card__subtitle">注册以访问 DOOR Workspace</p>
+          <p className="login-card__subtitle">注册以访问 Powered by Xquare</p>
         </div>
 
         <form className="login-card__form" onSubmit={handleSubmit}>

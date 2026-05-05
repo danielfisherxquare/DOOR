@@ -14,8 +14,17 @@ const VERTEX_COLOR = '#f8fafc'
 const VERTEX_SELECTED = '#f59e0b'
 const INSTANCE_FILL = '#8b9bb0'
 const INSTANCE_SELECTED = '#3767cf'
+const TERRAIN_FILL = '#d9e4d0'
+const TERRAIN_SELECTED = '#9ac2a3'
 const HANDLE_COLOR = '#fef3c7'
 const PUSHPULL_PREVIEW_COLOR = '#60a5fa'
+
+function traceGeometry(event, data = {}) {
+  if (!import.meta.env.DEV || typeof window === 'undefined' || !window.__DOOR_TRACE_GEOMETRY__) return
+  const entry = { at: Number(performance.now().toFixed(1)), event, ...data }
+  window.__DOOR_GEOMETRY_TIMINGS__ = [...(window.__DOOR_GEOMETRY_TIMINGS__ || []), entry]
+  console.info('[door-geometry]', event, data)
+}
 
 function buildLookup(document) {
   return new Map(document.vertices.map((vertex) => [vertex.id, vertex]))
@@ -32,6 +41,56 @@ function buildProfileShape(document, profile, vertexLookup) {
   }
   shape.closePath()
   return shape
+}
+
+function sampleProfileFromMaps(document, profile, vertexLookup, segmentById, planeById) {
+  const pointForVertex = (vertex, planeId) => {
+    const plane = planeById.get(planeId || vertex?.metadata?.planeId || 'plane-ground') || getSketchPlaneById(document, planeId || vertex?.metadata?.planeId || 'plane-ground')
+    return worldPointToLocal(plane, [vertex.x, vertex.y, vertex.z])
+  }
+
+  const normalizedVertexIds = Array.isArray(profile?.vertexIds) ? profile.vertexIds.filter(Boolean) : []
+  const cycleVertexIds = normalizedVertexIds.length > 1 && normalizedVertexIds[0] === normalizedVertexIds[normalizedVertexIds.length - 1]
+    ? normalizedVertexIds.slice(0, -1)
+    : normalizedVertexIds
+
+  if (profile?.segmentIds?.length) {
+    const sampled = []
+    for (let segmentIndex = 0; segmentIndex < profile.segmentIds.length; segmentIndex += 1) {
+      const segment = segmentById.get(profile.segmentIds[segmentIndex])
+      if (!segment) continue
+      if (segment.kind && segment.kind !== 'line') return sampleProfile(document, profile.id)
+      const start = vertexLookup.get(segment.startVertexId)
+      const end = vertexLookup.get(segment.endVertexId)
+      if (!start || !end) continue
+      let points = [
+        pointForVertex(start, segment.planeId || segment.metadata?.planeId),
+        pointForVertex(end, segment.planeId || segment.metadata?.planeId),
+      ]
+      if (cycleVertexIds.length === profile.segmentIds.length) {
+        const fromVertexId = cycleVertexIds[segmentIndex]
+        const toVertexId = cycleVertexIds[(segmentIndex + 1) % cycleVertexIds.length]
+        if (segment.startVertexId === toVertexId && segment.endVertexId === fromVertexId) {
+          points = points.reverse()
+        }
+      }
+      points.forEach((point, pointIndex) => {
+        const previous = sampled[sampled.length - 1]
+        if (previous && pointIndex === 0 && Math.hypot(previous[0] - point[0], previous[1] - point[1]) < 0.001) return
+        sampled.push(point)
+      })
+    }
+    if (sampled.length >= 3) {
+      const first = sampled[0]
+      const last = sampled[sampled.length - 1]
+      return Math.hypot(first[0] - last[0], first[1] - last[1]) < 0.001 ? sampled.slice(0, -1) : sampled
+    }
+  }
+
+  return normalizedVertexIds
+    .map((vertexId) => vertexLookup.get(vertexId))
+    .filter(Boolean)
+    .map((vertex) => pointForVertex(vertex, profile?.planeId))
 }
 
 function faceGeometry(shape, elevation = 0.04, plane = null) {
@@ -92,6 +151,47 @@ function extrudedGeometry(shape, solid, document, profile, plane) {
   })
   geometry.rotateX(Math.PI / 2)
   geometry.translate(0, solid.baseElevation + solid.height, 0)
+  return geometry
+}
+
+function buildBatchedSolidGeometry(document, entries, planeById, vertexLookup, segmentById, { computeNormals = true } = {}) {
+  const vertices = []
+  const indices = []
+
+  entries.forEach(({ solid, profile }) => {
+    const plane = planeById.get(profile.planeId || 'plane-ground') || getSketchPlaneById(document, profile.planeId || 'plane-ground')
+    const points = sampleProfileFromMaps(document, profile, vertexLookup, segmentById, planeById)
+    if (points.length < 3) return
+    const capPoints = points.map((point) => new THREE.Vector2(point[0], point[1]))
+    const triangles = THREE.ShapeUtils.triangulateShape(capPoints, [])
+    const offset = vertices.length / 3
+    const depth = Math.max(Number(solid?.height) || 0.1, 0.1)
+
+    points.forEach((point) => vertices.push(...localPointToWorld(plane, point, 0)))
+    points.forEach((point) => vertices.push(...localPointToWorld(plane, point, depth)))
+
+    triangles.forEach((triangle) => {
+      indices.push(offset + triangle[2], offset + triangle[1], offset + triangle[0])
+      indices.push(offset + triangle[0] + points.length, offset + triangle[1] + points.length, offset + triangle[2] + points.length)
+    })
+    for (let index = 0; index < points.length; index += 1) {
+      const next = (index + 1) % points.length
+      indices.push(
+        offset + index,
+        offset + next,
+        offset + next + points.length,
+        offset + index,
+        offset + next + points.length,
+        offset + index + points.length,
+      )
+    }
+  })
+
+  if (!vertices.length || !indices.length) return null
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3))
+  geometry.setIndex(indices)
+  if (computeNormals) geometry.computeVertexNormals()
   return geometry
 }
 
@@ -272,18 +372,22 @@ function ProfileFace({ document, profile, vertexLookup, selected, onSelect, elev
 
 function SolidMesh({ document, solid, profile, vertexLookup, selected, onSelect, openings, plane, selectionMode, selectionLocked }) {
   const shape = useMemo(() => buildProfileShape(document, profile, vertexLookup), [document, profile, vertexLookup])
-  const wallHost = useMemo(() => deriveWallOpeningHost({
-    version: 2,
-    sketchPlanes: [],
-    vertices: [...vertexLookup.values()],
-    profiles: [profile],
-    solids: [solid],
-    openings: openings || [],
-    segments: [],
-    instances: [],
-    history: [],
-    metadata: {},
-  }, solid.id), [openings, profile, solid, vertexLookup])
+  const hasOpenings = Boolean(openings?.length)
+  const wallHost = useMemo(() => {
+    if (!hasOpenings) return null
+    return deriveWallOpeningHost({
+      version: 2,
+      sketchPlanes: [],
+      vertices: [...vertexLookup.values()],
+      profiles: [profile],
+      solids: [solid],
+      openings: openings || [],
+      segments: [],
+      instances: [],
+      history: [],
+      metadata: {},
+    }, solid.id)
+  }, [hasOpenings, openings, profile, solid, vertexLookup])
   const geometry = useMemo(() => {
     if (wallHost) return wallGeometryWithOpenings(wallHost, openings || [])
     return shape ? extrudedGeometry(shape, solid, document, profile, plane) : null
@@ -298,6 +402,31 @@ function SolidMesh({ document, solid, profile, vertexLookup, selected, onSelect,
   return (
     <mesh castShadow geometry={geometry} onPointerDown={(event) => { if (selectionLocked || selectionMode === 'edge' || selectionMode === 'vertex') return; event.stopPropagation(); onSelect(event) }} position={meshPosition} receiveShadow rotation={meshRotation}>
       <meshStandardMaterial color={selected ? SOLID_SELECTED : solid.color || SOLID_FILL} metalness={0.04} roughness={0.9} />
+    </mesh>
+  )
+}
+
+function BatchedSolidMesh({ document, entries, lightweight, planeById, segmentById, vertexLookup }) {
+  const geometry = useMemo(() => {
+    traceGeometry('batched-solid-build:start', { entries: entries.length, lightweight })
+    const startedAt = performance.now()
+    const nextGeometry = buildBatchedSolidGeometry(document, entries, planeById, vertexLookup, segmentById, { computeNormals: !lightweight })
+    traceGeometry('batched-solid-build:done', {
+      entries: entries.length,
+      milliseconds: Number((performance.now() - startedAt).toFixed(1)),
+      vertices: nextGeometry?.getAttribute('position')?.count || 0,
+    })
+    return nextGeometry
+  }, [document, entries, lightweight, planeById, segmentById, vertexLookup])
+
+  if (!geometry) return null
+  return (
+    <mesh geometry={geometry}>
+      {lightweight ? (
+        <meshBasicMaterial color={SOLID_FILL} />
+      ) : (
+        <meshStandardMaterial color={SOLID_FILL} metalness={0.04} roughness={0.9} />
+      )}
     </mesh>
   )
 }
@@ -383,6 +512,65 @@ function SurfaceMesh({ document, surface, selected, onSelect }) {
   )
 }
 
+function TerrainMesh({ lightweight, mesh, selected, onSelect }) {
+  const simplifyTerrain = lightweight && (mesh?.vertices?.length || 0) > 6000
+  const showWire = !simplifyTerrain && (mesh?.vertices?.length || 0) <= 6000 && (mesh?.indices?.length || 0) <= 12000
+  const geometry = useMemo(() => {
+    if (!mesh?.vertices?.length || !mesh?.indices?.length) return null
+    const nextGeometry = new THREE.BufferGeometry()
+    if (simplifyTerrain) {
+      let minX = Infinity
+      let maxX = -Infinity
+      let minZ = Infinity
+      let maxZ = -Infinity
+      let minY = Infinity
+      for (let index = 0; index < mesh.vertices.length; index += 3) {
+        const x = Number(mesh.vertices[index])
+        const y = Number(mesh.vertices[index + 1])
+        const z = Number(mesh.vertices[index + 2])
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue
+        minX = Math.min(minX, x)
+        maxX = Math.max(maxX, x)
+        minY = Math.min(minY, y)
+        minZ = Math.min(minZ, z)
+        maxZ = Math.max(maxZ, z)
+      }
+      if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) return null
+      const y = Number.isFinite(minY) ? minY - 0.02 : 0
+      nextGeometry.setAttribute('position', new THREE.Float32BufferAttribute([
+        minX, y, minZ,
+        maxX, y, minZ,
+        maxX, y, maxZ,
+        minX, y, maxZ,
+      ], 3))
+      nextGeometry.setIndex([0, 1, 2, 0, 2, 3])
+      return nextGeometry
+    }
+    nextGeometry.setAttribute('position', new THREE.Float32BufferAttribute(mesh.vertices, 3))
+    const safeIndexCount = Math.floor(mesh.indices.length / 3) * 3
+    nextGeometry.setIndex(safeIndexCount === mesh.indices.length ? mesh.indices : mesh.indices.slice(0, safeIndexCount))
+    if (!lightweight) nextGeometry.computeVertexNormals()
+    return nextGeometry
+  }, [lightweight, mesh, simplifyTerrain])
+
+  if (!geometry) return null
+  return (
+    <mesh geometry={geometry} onPointerDown={(event) => { event.stopPropagation(); onSelect() }} receiveShadow={!lightweight}>
+      {lightweight ? (
+        <meshBasicMaterial color={selected ? TERRAIN_SELECTED : mesh.color || TERRAIN_FILL} opacity={0.54} side={THREE.DoubleSide} transparent />
+      ) : (
+        <meshStandardMaterial color={selected ? TERRAIN_SELECTED : mesh.color || TERRAIN_FILL} metalness={0.01} opacity={0.66} roughness={0.95} side={THREE.DoubleSide} transparent />
+      )}
+      {showWire ? (
+        <lineSegments renderOrder={2}>
+          <edgesGeometry args={[geometry]} />
+          <lineBasicMaterial color="#8ea08b" depthTest={false} opacity={0.22} transparent />
+        </lineSegments>
+      ) : null}
+    </mesh>
+  )
+}
+
 function PushPullPreview({ document, profileId, height }) {
   const geometry = useMemo(() => {
     const profile = document.profiles.find((p) => p.id === profileId)
@@ -410,11 +598,23 @@ function PushPullPreview({ document, profileId, height }) {
   )
 }
 
-export default function GeometryRenderer({ document }) {
-  const normalized = useMemo(() => normalizeEditorDocument(document), [document])
+export default function GeometryRenderer({ document, lightweight = false }) {
+  const normalized = useMemo(() => {
+    traceGeometry('normalize:start')
+    const startedAt = performance.now()
+    const nextDocument = normalizeEditorDocument(document)
+    traceGeometry('normalize:done', {
+      milliseconds: Number((performance.now() - startedAt).toFixed(1)),
+      vertices: nextDocument.vertices.length,
+      profiles: nextDocument.profiles.length,
+      solids: nextDocument.solids.length,
+    })
+    return nextDocument
+  }, [document])
   const vertexLookup = useMemo(() => buildLookup(normalized), [normalized])
   const planeElevationById = useMemo(() => new Map(normalized.sketchPlanes.map((plane) => [plane.id, getSketchPlaneElevation(normalized, plane.id)])), [normalized])
   const planeById = useMemo(() => new Map(normalized.sketchPlanes.map((plane) => [plane.id, plane])), [normalized])
+  const segmentById = useMemo(() => new Map(normalized.segments.map((segment) => [segment.id, segment])), [normalized.segments])
   const selectionMode = useEditor((state) => state.selectionMode)
   const activeTool = useEditor((state) => state.activeTool)
   const selectedGeometry = useEditor((state) => state.selectedGeometry)
@@ -431,12 +631,40 @@ export default function GeometryRenderer({ document }) {
   ), [selectedGeometry])
 
   const standaloneProfiles = useMemo(() => normalized.profiles.filter((profile) => !profile.solidId), [normalized.profiles])
+  const profileById = useMemo(() => new Map(normalized.profiles.map((profile) => [profile.id, profile])), [normalized.profiles])
+  const openingsBySolidId = useMemo(() => {
+    const nextMap = new Map()
+    normalized.openings.forEach((opening) => {
+      const solidOpenings = nextMap.get(opening.solidId) || []
+      solidOpenings.push(opening)
+      nextMap.set(opening.solidId, solidOpenings)
+    })
+    return nextMap
+  }, [normalized.openings])
+  const needsOpeningHosts = normalized.openings.length > 0 || Boolean(openingPlacement?.solidId)
   const solidsWithProfiles = useMemo(() => normalized.solids.map((solid) => ({
     solid,
-    profile: normalized.profiles.find((profile) => profile.id === solid.profileId),
-    openings: normalized.openings.filter((opening) => opening.solidId === solid.id),
-    host: deriveWallOpeningHost(normalized, solid.id),
-  })).filter((entry) => entry.profile), [normalized, normalized.openings, normalized.profiles, normalized.solids])
+    profile: profileById.get(solid.profileId),
+    openings: openingsBySolidId.get(solid.id) || [],
+    host: needsOpeningHosts ? deriveWallOpeningHost(normalized, solid.id) : null,
+  })).filter((entry) => entry.profile), [needsOpeningHosts, normalized, openingsBySolidId, profileById])
+  const interactiveSegments = useMemo(() => (
+    selectionMode === 'edge'
+      ? normalized.segments
+      : normalized.segments.filter((segment) => selectedIds.has(segment.id))
+  ), [normalized.segments, selectedIds, selectionMode])
+  const useBatchedSolids = solidsWithProfiles.length > 120 && normalized.openings.length === 0 && !openingPlacement
+  const showPassiveEdges = !lightweight || normalized.segments.length <= 1600
+  const batchedSolidEntries = useMemo(() => (
+    useBatchedSolids
+      ? solidsWithProfiles.filter(({ solid, openings }) => !selectedIds.has(solid.id) && !openings.length)
+      : []
+  ), [selectedIds, solidsWithProfiles, useBatchedSolids])
+  const individualSolidEntries = useMemo(() => (
+    useBatchedSolids
+      ? solidsWithProfiles.filter(({ solid, profile, openings }) => selectedIds.has(solid.id) || selectedIds.has(profile.id) || openings.length)
+      : solidsWithProfiles
+  ), [selectedIds, solidsWithProfiles, useBatchedSolids])
 
   return (
     <group>
@@ -463,7 +691,11 @@ export default function GeometryRenderer({ document }) {
         />
       ))}
 
-      {solidsWithProfiles.map(({ solid, profile, openings }) => (
+      {useBatchedSolids ? (
+        <BatchedSolidMesh document={normalized} entries={batchedSolidEntries} lightweight={lightweight} planeById={planeById} segmentById={segmentById} vertexLookup={vertexLookup} />
+      ) : null}
+
+      {individualSolidEntries.map(({ solid, profile, openings }) => (
         <SolidMesh
           key={solid.id}
           document={normalized}
@@ -588,9 +820,27 @@ export default function GeometryRenderer({ document }) {
         />
       ))}
 
-      <BatchedSegmentLines segments={normalized.segments.filter((s) => !selectedIds.has(s.id))} vertexLookup={vertexLookup} />
+      {normalized.terrainMeshes.map((mesh) => (
+        <TerrainMesh
+          key={mesh.id}
+          lightweight={lightweight}
+          mesh={mesh}
+          onSelect={() => {
+            if (selectionLocked) return
+            setSelectedGeometry({
+              kind: 'object',
+              entityId: mesh.id,
+              label: mesh.name,
+              meta: { entityType: 'terrain-mesh', terrainMeshId: mesh.id },
+            })
+          }}
+          selected={selectedIds.has(mesh.id)}
+        />
+      ))}
 
-      {normalized.segments.map((segment) => {
+      {showPassiveEdges ? <BatchedSegmentLines segments={normalized.segments.filter((s) => !selectedIds.has(s.id))} vertexLookup={vertexLookup} /> : null}
+
+      {interactiveSegments.map((segment) => {
         const isSelected = selectedIds.has(segment.id)
         const start = vertexLookup.get(segment.startVertexId)
         const end = vertexLookup.get(segment.endVertexId)
@@ -652,34 +902,34 @@ export default function GeometryRenderer({ document }) {
                 visible={selectedIds.has(segment.id) || selectedGeometry?.meta?.segmentId === segment.id}
               />
             ) : null}
-            <mesh
-              onPointerDown={(event) => {
-                event.stopPropagation()
-                if (selectionLocked) return
-                if (selectionMode !== 'edge') return
-                setSelectedGeometry({
-                  kind: 'edge',
-                  entityId: segment.id,
-                  label: segment.kind === 'line' ? segment.id : `${segment.kind} · ${segment.id}`,
-                  meta: { entityType: 'segment' },
-                })
-              }}
-              position={hitPosition}
-              rotation={hitRotation}
-            >
-              <boxGeometry args={hitArgs} />
-              <meshBasicMaterial transparent opacity={0} />
-            </mesh>
+            {selectionMode === 'edge' ? (
+              <mesh
+                onPointerDown={(event) => {
+                  event.stopPropagation()
+                  if (selectionLocked) return
+                  setSelectedGeometry({
+                    kind: 'edge',
+                    entityId: segment.id,
+                    label: segment.kind === 'line' ? segment.id : `${segment.kind} · ${segment.id}`,
+                    meta: { entityType: 'segment' },
+                  })
+                }}
+                position={hitPosition}
+                rotation={hitRotation}
+              >
+                <boxGeometry args={hitArgs} />
+                <meshBasicMaterial transparent opacity={0} />
+              </mesh>
+            ) : null}
           </group>
         )
       })}
 
-      {normalized.vertices.map((vertex) => (
+      {selectionMode === 'vertex' ? normalized.vertices.map((vertex) => (
         <VertexHandle
           key={vertex.id}
           onSelect={() => {
             if (selectionLocked) return
-            if (selectionMode !== 'vertex') return
             setSelectedGeometry({
               kind: 'vertex',
               entityId: vertex.id,
@@ -689,9 +939,8 @@ export default function GeometryRenderer({ document }) {
           }}
           selected={selectedIds.has(vertex.id)}
           vertex={vertex}
-          visible={selectionMode === 'vertex'}
         />
-      ))}
+      )) : null}
 
       {pushPullPreview ? (
         <PushPullPreview document={normalized} profileId={pushPullPreview.profileId} height={pushPullPreview.height} />

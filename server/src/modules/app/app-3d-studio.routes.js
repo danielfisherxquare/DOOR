@@ -6,6 +6,10 @@ import { requireSurfaceAccess } from '../../middleware/require-surface-access.js
 import * as studioService from '../inventory/inventory.studio.service.js';
 import * as assetService from '../inventory/inventory.asset.service.js';
 import * as spatialService from '../inventory/inventory.spatial.service.js';
+import * as sceneJobService from '../inventory/inventory.spatial.scene-job.service.js';
+import * as spatialOsmService from '../inventory/inventory.spatial.osm.service.js';
+import * as spatialTerrainService from '../inventory/inventory.spatial.terrain.service.js';
+import * as generatedSceneService from '../inventory/inventory.spatial.generated-scene.service.js';
 
 const router = express.Router();
 
@@ -395,6 +399,99 @@ router.post('/terrain-work-zones/:zoneId/export-package', async (req, res, next)
 router.post('/terrain-work-zones/:zoneId/execute-export', async (req, res, next) => {
     try {
         const data = await spatialService.executeTerrainWorkZoneExport(buildProjectScope(req), req.authContext.userId, req.params.zoneId);
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/terrain-work-zones/:zoneId/osm-buildings/sync', async (req, res, next) => {
+    try {
+        const data = await spatialOsmService.syncTerrainWorkZoneOsmBuildings(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.zoneId,
+            req.body,
+        );
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/terrain-work-zones/:zoneId/terrain-patch/sync', async (req, res, next) => {
+    try {
+        const data = await spatialTerrainService.syncTerrainWorkZoneTerrainPatch(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.zoneId,
+            req.body,
+        );
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/projects/:projectId/terrain-work-zones/:zoneId/scene-export-jobs', async (req, res, next) => {
+    try {
+        const data = await sceneJobService.createTerrainWorkZoneSceneExportJob(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.projectId,
+            req.params.zoneId,
+            req.body,
+        );
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/scene-export-jobs/:jobId', async (req, res, next) => {
+    try {
+        const data = await sceneJobService.getSceneExportJob(buildProjectScope(req), req.params.jobId);
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/generated-scenes/:sceneId', async (req, res, next) => {
+    try {
+        const data = await generatedSceneService.getGeneratedScene(buildProjectScope(req), req.params.sceneId);
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/generated-scenes/:sceneId/download', async (req, res, next) => {
+    try {
+        const resolved = await generatedSceneService.resolveGeneratedSceneDownload(
+            buildProjectScope(req),
+            req.params.sceneId,
+            req.query.asset,
+        );
+        res.type(resolved.contentType);
+        res.download(resolved.absolutePath, resolved.filename);
+    } catch (error) {
+        if (error?.code === 'ENOENT') {
+            res.status(404).json({ success: false, message: 'generated scene 下载文件不存在' });
+            return;
+        }
+        next(error);
+    }
+});
+
+router.post('/generated-scenes/:sceneId/import-to-studio', async (req, res, next) => {
+    try {
+        const data = await generatedSceneService.importGeneratedSceneToStudio(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.sceneId,
+            req.body,
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);

@@ -3,6 +3,10 @@
 # 用于本地测试环境，不需要 SSL 证书
 
 services:
+  app:
+    volumes:
+      - ../src:/src:ro
+
   nginx:
     volumes:
       - ./nginx.local.conf:/etc/nginx/conf.d/default.conf:ro

@@ -9,6 +9,8 @@ import './modules/import-sessions/commit-import-session.handler.js';
 import './modules/audit/audit.job-handler.js';
 // Phase 6: 抽签 finalize handler
 import './modules/lottery/lottery-finalize.job-handler.js';
+// Lottery V2 Beta handlers
+import './modules/lottery-v2/lottery-v2.job-handler.js';
 
 const WORKER_ID = `worker-${randomUUID().slice(0, 8)}`;
 let running = true;

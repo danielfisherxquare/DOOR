@@ -43,7 +43,7 @@ router.get('/workbench/overview', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await workbenchService.getOverview(orgId);
+        const data = await workbenchService.getOverview(orgId, { surface: req.surface });
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -54,7 +54,7 @@ router.get('/workbench/space', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await workbenchService.getSpace(orgId, req.query);
+        const data = await workbenchService.getSpace(orgId, req.query, { surface: req.surface });
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -65,7 +65,7 @@ router.get('/workbench/control', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await workbenchService.getControl(orgId);
+        const data = await workbenchService.getControl(orgId, { surface: req.surface });
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -76,7 +76,7 @@ router.get('/workbench/analytics', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await workbenchService.getAnalytics(orgId);
+        const data = await workbenchService.getAnalytics(orgId, { surface: req.surface });
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -369,6 +369,7 @@ router.post('/units/scan', async (req, res, next) => {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
         const userId = req.orgAccess.userId;
+        const normalizedRunnerId = String(runnerId || '').trim();
 
         const unit = await repo.getUnitByQR(orgId, qrCode);
         if (!unit) {
@@ -381,10 +382,13 @@ router.post('/units/scan', async (req, res, next) => {
             if (unit.status !== 'allocated') {
                 return res.status(400).json({ success: false, message: '物资状态异常，无法领取' });
             }
+            if (!normalizedRunnerId || normalizedRunnerId === 'current_runner_id') {
+                return res.status(400).json({ success: false, message: '请提供真实领取人 ID' });
+            }
 
             await repo.updateUnitStatus(orgId, unit.id, 'picked', {
                 current_holder_type: 'runner',
-                current_holder_id: runnerId,
+                current_holder_id: normalizedRunnerId,
                 picked_at: knex.fn.now(),
                 picked_by: userId,
             });
@@ -395,7 +399,7 @@ router.post('/units/scan', async (req, res, next) => {
                 fromHolderType: 'race',
                 fromHolderId: raceId,
                 toHolderType: 'runner',
-                toHolderId: runnerId,
+                toHolderId: normalizedRunnerId,
                 operatorId: userId,
                 remarks: '扫码领取',
             });

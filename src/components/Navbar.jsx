@@ -18,7 +18,7 @@ function Navbar() {
     <nav className="surface-public navbar">
       <Link to={isAuthenticated ? getDefaultLandingPath() : '/'} className="navbar__brand">
         <div className="navbar__logo">TP</div>
-        <span className="navbar__brand-text">DOOR Workspace</span>
+        <span className="navbar__brand-text">Powered by Xquare</span>
       </Link>
 
       <div className="navbar__menu hidden-mobile">

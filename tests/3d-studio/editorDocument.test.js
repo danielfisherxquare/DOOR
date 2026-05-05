@@ -18,6 +18,7 @@ import {
   insertBezierSegment,
   insertCircleProfile,
   insertSketchSegment3D,
+  normalizeEditorDocument,
   resizeOpeningInDocument,
   resolveOpeningDraft,
   resolveSketchPlaneForSelection,
@@ -30,9 +31,188 @@ import {
   updateOpeningInDocument,
   updateCurveControlsInDocument,
 } from '../../src/3d-studio/model/editorDocument.js'
+import { normalizeStudioSnapshot } from '../../src/utils/studioProjectUtils.js'
 import { cutWallOpenings } from '../../src/utils/csgUtils.js'
 import { projectPointerToVerticalAxis } from '../../src/3d-studio/utils/workbenchPlane.js'
 import * as THREE from 'three'
+
+test('null warehouse scene migrates to an empty editor document', () => {
+  const document = createEditorDocumentFromWarehouseScene(null)
+
+  assert.equal(document.version, 2)
+  assert.equal(document.vertices.length, 0)
+  assert.equal(document.segments.length, 0)
+  assert.equal(document.profiles.length, 0)
+  assert.equal(document.solids.length, 0)
+})
+
+test('legacy GIS footprint solids normalize into renderable editor geometry', () => {
+  const document = normalizeEditorDocument({
+    version: 2,
+    solids: [{
+      id: 'osm-building-1',
+      kind: 'extruded-solid',
+      color: '#e8e8e8',
+      osmId: 'osm-1',
+      levels: 4,
+      heightMeters: 13.2,
+      footprintWgs84: {
+        type: 'Polygon',
+        coordinates: [[
+          [116.3900, 39.9080],
+          [116.3902, 39.9080],
+          [116.3902, 39.9082],
+          [116.3900, 39.9082],
+          [116.3900, 39.9080],
+        ]],
+      },
+    }],
+  })
+
+  assert.equal(document.solids.length, 1)
+  assert.equal(document.profiles.length, 1)
+  assert.equal(document.vertices.length, 4)
+  assert.equal(document.segments.length, 4)
+  assert.equal(document.solids[0].profileId, document.profiles[0].id)
+  assert.equal(document.solids[0].height, 13.2)
+  assert.equal(document.solids[0].metadata.osmId, 'osm-1')
+  assert.equal(document.metadata.repairedFromLegacyFootprints, true)
+})
+
+test('legacy GIS footprint migration skips abnormal OSM building outlines', () => {
+  const document = normalizeEditorDocument({
+    version: 2,
+    solids: [{
+      id: 'osm-bad-campus',
+      kind: 'extruded-solid',
+      osmId: 'osm-bad-campus',
+      heightMeters: 12,
+      footprintLocal: [
+        [0, 0],
+        [340, 0],
+        [340, 180],
+        [0, 180],
+        [0, 0],
+      ],
+    }, {
+      id: 'osm-good-building',
+      kind: 'extruded-solid',
+      osmId: 'osm-good-building',
+      heightMeters: 12,
+      footprintLocal: [
+        [0, 0],
+        [32, 0],
+        [32, 18],
+        [0, 18],
+        [0, 0],
+      ],
+    }],
+  })
+
+  assert.equal(document.solids.length, 1)
+  assert.equal(document.profiles.length, 1)
+  assert.equal(document.solids[0].metadata.osmId, 'osm-good-building')
+  assert.equal(document.metadata.skippedLegacyOsmFootprintCount, 1)
+})
+
+test('direct GIS editor document snapshots open as a single studio workspace', () => {
+  const snapshot = normalizeStudioSnapshot({
+    sceneType: 'outdoor-event',
+    projectType: 'site',
+    site: { id: 'site-root', name: 'GIS Test Site', projectType: 'site', geoAnchor: null },
+    buildings: [{ id: 'bad-top-level-osm-solid', kind: 'extruded-solid', height: 9.6 }],
+    editorDocument: {
+      version: 2,
+      solids: [{
+        id: 'osm-building-1',
+        heightMeters: 9.6,
+        footprintLocal: [[0, 0], [8, 0], [8, 5], [0, 5], [0, 0]],
+      }],
+      terrainMeshes: [{
+        id: 'terrain-1',
+        vertices: [0, 0, 0, 1, 0, 0, 0, 0, 1],
+        indices: [0, 1, 2],
+      }],
+    },
+  }, {
+    sceneType: 'outdoor-event',
+    projectType: 'site',
+    name: 'GIS Test Site',
+  })
+  const warehouse = snapshot.buildings[0]?.levels?.[0]?.warehouses?.[0]
+
+  assert.equal(snapshot.buildings.length, 1)
+  assert.equal(snapshot.editorState.activeWorkspaceMode, 'warehouse')
+  assert.equal(snapshot.editorState.activeWarehouseId, warehouse?.id)
+  assert.equal(warehouse.sceneSnapshot.editorDocument.solids.length, 1)
+  assert.equal(warehouse.sceneSnapshot.editorDocument.profiles.length, 1)
+  assert.equal(warehouse.sceneSnapshot.editorDocument.terrainMeshes.length, 1)
+})
+
+test('direct GIS editor document wins over placeholder hierarchy warehouses', () => {
+  const snapshot = normalizeStudioSnapshot({
+    sceneType: 'outdoor-event',
+    projectType: 'site',
+    focusZoneName: 'GIS Test Site',
+    buildings: [{
+      id: 'placeholder-building',
+      levels: [{
+        id: 'placeholder-level',
+        warehouses: [{
+          id: 'placeholder-warehouse',
+          name: '一层白模',
+          sceneSnapshot: createEditorDocumentFromWarehouseScene({
+            walls: [{ id: 'wall-1', start: { x: 0, z: 0 }, end: { x: 2, z: 0 }, height: 3, thickness: 0.2 }],
+          }),
+        }],
+      }],
+    }],
+    editorDocument: {
+      version: 2,
+      solids: [Array.from({ length: 4 }, (_, index) => ({
+        id: `osm-building-${index + 1}`,
+        heightMeters: 9.6,
+        footprintLocal: [[index * 4, 0], [index * 4 + 2, 0], [index * 4 + 2, 2], [index * 4, 2]],
+      }))].flat(),
+    },
+  }, {
+    sceneType: 'outdoor-event',
+    projectType: 'site',
+    name: 'GIS Test Site',
+  })
+  const warehouse = snapshot.buildings[0]?.levels?.[0]?.warehouses?.[0]
+
+  assert.equal(snapshot.buildings.length, 1)
+  assert.equal(warehouse.sceneSnapshot.editorDocument.solids.length, 4)
+  assert.ok(warehouse.sceneSnapshot.editorDocument.solids.every((solid) => solid.id.startsWith('osm-building-')))
+})
+
+test('terrain meshes with tuple vertices and triangle tuples normalize into flat renderable buffers', () => {
+  const document = normalizeEditorDocument({
+    version: 2,
+    terrainMeshes: [{
+      id: 'terrain-grid',
+      kind: 'terrain-mesh',
+      source: 'arcgis-terrain',
+      boundsMeters: { minX: -5, maxX: 5, minZ: -10, maxZ: 10, width: 10, depth: 20 },
+      vertices: [
+        [null, 1, null],
+        [null, 2, null],
+        [null, 3, null],
+        [null, 4, null],
+      ],
+      indices: [[0, 1, 2], [1, 3, 2]],
+    }],
+  })
+  const mesh = document.terrainMeshes[0]
+
+  assert.equal(document.terrainMeshes.length, 1)
+  assert.deepEqual(mesh.vertices, [-5, 1, -10, 5, 2, -10, -5, 3, 10, 5, 4, 10])
+  assert.deepEqual(mesh.indices, [0, 1, 2, 1, 3, 2])
+  assert.equal(mesh.metadata.source, 'arcgis-terrain')
+  assert.equal(mesh.metadata.rows, 2)
+  assert.equal(mesh.metadata.cols, 2)
+})
 
 test('closed sketch path creates a profile and closing segment', () => {
   const result = insertSketchPath(createEmptyEditorDocument(), [

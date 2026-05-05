@@ -9,7 +9,7 @@ export default defineConfig({
     'process.env.NEXT_PUBLIC_ASSETS_CDN_URL': JSON.stringify('https://editor.pascal.app')
   },
   server: {
-    port: 3000,
+    port: 5173,
     strictPort: false,
     open: false,
     host: '127.0.0.1',

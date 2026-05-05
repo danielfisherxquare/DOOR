@@ -4,7 +4,24 @@ import * as alertService from './inventory.alert.js';
 import * as stocktakingService from './inventory.stocktaking.js';
 import * as reportService from './inventory.report.js';
 
-function buildHref(path, query = {}) {
+function normalizeSurfacePath(surface, path) {
+    if (surface !== 'ops') {
+        return path;
+    }
+
+    const opsRouteMap = {
+        '/inventory': '/warehouse',
+        '/inventory/inbound': '/warehouse/inbound',
+        '/inventory/outbound': '/warehouse/outbound',
+        '/inventory/space': '/warehouse/binding',
+        '/inventory/control': '/warehouse/count',
+        '/inventory/analytics': '/warehouse/count',
+    };
+
+    return opsRouteMap[path] || path;
+}
+
+function buildHref(surface = 'admin', path, query = {}) {
     const params = new URLSearchParams();
     Object.entries(query).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
@@ -12,7 +29,8 @@ function buildHref(path, query = {}) {
         }
     });
     const search = params.toString();
-    return `/admin${path}${search ? `?${search}` : ''}`;
+    const normalizedPath = normalizeSurfacePath(surface, path);
+    return `/${surface}${normalizedPath}${search ? `?${search}` : ''}`;
 }
 
 function toCountMap(rows = [], keyName) {
@@ -92,7 +110,8 @@ async function getWarehouseLookup(orgId) {
     };
 }
 
-export async function getOverview(orgId) {
+export async function getOverview(orgId, options = {}) {
+    const surface = options.surface || 'admin';
     const { warehouses, warehouseById } = await getWarehouseLookup(orgId);
     const [
         statistics,
@@ -141,7 +160,7 @@ export async function getOverview(orgId) {
         status: item.current_stage,
         warehouseId: null,
         warehouseName: '入库前流程',
-        nextActionHref: buildHref('/inventory/inbound', { orgId, tab: 'pre', itemId: item.id }),
+        nextActionHref: buildHref(surface, '/inventory/inbound', { orgId, tab: 'pre', itemId: item.id }),
         updatedAt: item.updated_at,
         meta: `${item.reference_no} · ${item.confirmed_quantity || item.planned_quantity || 0} 件`,
     }));
@@ -155,7 +174,7 @@ export async function getOverview(orgId) {
             status: 'pending_putaway',
             warehouseId: item.current_warehouse_id,
             warehouseName: warehouse?.name,
-            nextActionHref: buildHref('/inventory/space', {
+            nextActionHref: buildHref(surface, '/inventory/space', {
                 orgId,
                 warehouseId: item.current_warehouse_id,
                 tab: 'bind',
@@ -176,7 +195,7 @@ export async function getOverview(orgId) {
             warehouseId: unit.warehouse_id,
             warehouseName: warehouse?.name,
             locationCode: unit.location_id ? `#${unit.location_id}` : '',
-            nextActionHref: buildHref('/inventory/outbound', { orgId, tab: 'pickup', qrCode: unit.qr_code }),
+            nextActionHref: buildHref(surface, '/inventory/outbound', { orgId, tab: 'pickup', qrCode: unit.qr_code }),
             updatedAt: unit.updated_at,
             meta: unit.item_type,
         });
@@ -195,7 +214,7 @@ export async function getOverview(orgId) {
         status: alert.is_resolved ? 'resolved' : 'open',
         severity: alert.severity,
         warehouseName: '异常中心',
-        nextActionHref: buildHref('/inventory/control', { orgId, tab: 'alerts', alertId: alert.id }),
+        nextActionHref: buildHref(surface, '/inventory/control', { orgId, tab: 'alerts', alertId: alert.id }),
         updatedAt: alert.created_at,
         meta: alert.content,
     }));
@@ -219,7 +238,7 @@ export async function getOverview(orgId) {
             warehouseId: null,
             warehouseName: '流转记录',
             locationCode: '',
-            nextActionHref: buildHref('/inventory/analytics', { orgId }),
+            nextActionHref: buildHref(surface, '/inventory/analytics', { orgId }),
             updatedAt: item.created_at,
             meta: item.operator_name || item.remarks || '-',
         })),
@@ -233,7 +252,8 @@ export async function getOverview(orgId) {
     };
 }
 
-export async function getSpace(orgId, filters = {}) {
+export async function getSpace(orgId, filters = {}, options = {}) {
+    const surface = options.surface || 'admin';
     const { warehouses, warehouseById } = await getWarehouseLookup(orgId);
     const selectedWarehouseId = Number(filters.warehouseId || warehouses[0]?.id || 0) || null;
 
@@ -285,7 +305,7 @@ export async function getSpace(orgId, filters = {}) {
             warehouseId: item.current_warehouse_id,
             warehouseName: warehouseById.get(Number(item.current_warehouse_id))?.name || '待分配仓库',
             locationCode: '',
-            nextActionHref: buildHref('/inventory/space', {
+            nextActionHref: buildHref(surface, '/inventory/space', {
                 orgId,
                 warehouseId: item.current_warehouse_id,
                 tab: 'bind',
@@ -301,7 +321,8 @@ export async function getSpace(orgId, filters = {}) {
     };
 }
 
-export async function getControl(orgId) {
+export async function getControl(orgId, options = {}) {
+    const surface = options.surface || 'admin';
     const { warehouseById } = await getWarehouseLookup(orgId);
     const [plans, alerts, rules] = await Promise.all([
         stocktakingService.getPlans(orgId, { limit: 20 }),
@@ -331,7 +352,7 @@ export async function getControl(orgId) {
             warehouseId: plan?.warehouse_id,
             warehouseName: warehouse?.name,
             locationCode: row.actual_location || row.expected_location || '',
-            nextActionHref: buildHref('/inventory/control', { orgId, tab: 'count', planId: row.plan_id }),
+            nextActionHref: buildHref(surface, '/inventory/control', { orgId, tab: 'count', planId: row.plan_id }),
             updatedAt: row.counted_at || row.created_at,
             meta: `盘点计划 ${plan?.plan_name || row.plan_id}`,
         });
@@ -361,7 +382,7 @@ export async function getControl(orgId) {
                 severity: alert.severity,
                 warehouseName: '异常中心',
                 locationCode: '',
-                nextActionHref: buildHref('/inventory/control', { orgId, tab: 'alerts', alertId: alert.id }),
+                nextActionHref: buildHref(surface, '/inventory/control', { orgId, tab: 'alerts', alertId: alert.id }),
                 updatedAt: alert.created_at,
                 meta: alert.content,
             })),
@@ -370,7 +391,7 @@ export async function getControl(orgId) {
     };
 }
 
-export async function getAnalytics(orgId) {
+export async function getAnalytics(orgId, _options = {}) {
     const [statistics, trend, transactions, typeDistribution, warehouseDistribution] = await Promise.all([
         reportService.getStatistics(orgId),
         reportService.getTrend(orgId, 7),
@@ -401,4 +422,3 @@ export async function getAnalytics(orgId) {
         })),
     };
 }
-

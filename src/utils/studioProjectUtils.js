@@ -1,7 +1,7 @@
 import {
   createEditorDocumentFromWarehouseScene,
   normalizeEditorDocument,
-} from '../3d-studio/model/editorDocument'
+} from '../3d-studio/model/editorDocument.js'
 
 const DEFAULT_WAREHOUSE_DIMENSIONS_MM = {
   width_mm: 24000,
@@ -849,6 +849,106 @@ function isLegacyStudioSnapshot(snapshot) {
   return Boolean(snapshot.warehouse || snapshot.racks || snapshot.locations || snapshot.prefabs || snapshot.walls)
 }
 
+function hasUsableHierarchyBuildings(snapshot) {
+  return ensureArray(snapshot?.buildings).some((building) =>
+    ensureArray(building?.levels).some((level) => ensureArray(level?.warehouses).length > 0),
+  )
+}
+
+function editorDocumentEntityCount(document) {
+  if (!isPlainObject(document)) return 0
+  return ensureArray(document.vertices).length
+    + ensureArray(document.segments).length
+    + ensureArray(document.profiles).length
+    + ensureArray(document.solids).length
+    + ensureArray(document.surfaces).length
+    + ensureArray(document.instances).length
+    + ensureArray(document.terrainMeshes).length
+}
+
+function hierarchyEditorDocumentEntityCount(snapshot) {
+  let count = 0
+  ensureArray(snapshot?.buildings).forEach((building) => {
+    ensureArray(building?.levels).forEach((level) => {
+      ensureArray(level?.warehouses).forEach((warehouse) => {
+        count = Math.max(count, editorDocumentEntityCount(warehouse?.sceneSnapshot?.editorDocument))
+      })
+    })
+  })
+  return count
+}
+
+function isDirectEditorSnapshot(snapshot) {
+  if (!isPlainObject(snapshot)) return false
+  if (hasUsableHierarchyBuildings(snapshot)) {
+    return editorDocumentEntityCount(snapshot.editorDocument) > hierarchyEditorDocumentEntityCount(snapshot)
+  }
+  return isPlainObject(snapshot.editorDocument)
+}
+
+function wrapDirectEditorSnapshotAsHierarchy(snapshot, sceneType, projectType, projectName, geoAnchor = null) {
+  const normalizedScene = normalizeWarehouseSceneSnapshot(snapshot, sceneType, {
+    id: snapshot?.editorState?.activeWarehouseId || snapshot?.warehouse?.id,
+    name: snapshot?.warehouse?.name || projectName,
+  })
+  const levelId = normalizedScene.activeLevelId || DEFAULT_STUDIO_LEVEL.id
+  const building = createBuildingRecord({
+    name: snapshot?.focusZoneName || snapshot?.warehouse?.name || projectName,
+    address: '',
+    geoAnchor,
+    widthMeters: mmToMeters(normalizedScene.warehouse?.dimensions_mm?.width_mm, sceneType === 'outdoor-event' ? 32000 : 24000),
+    depthMeters: mmToMeters(normalizedScene.warehouse?.dimensions_mm?.depth_mm, sceneType === 'outdoor-event' ? 24000 : 18000),
+    floorCount: 1,
+    floorHeight: mmToMeters(normalizedScene.warehouse?.dimensions_mm?.height_mm, sceneType === 'outdoor-event' ? 12000 : 9000),
+    sceneType,
+    allowNullGeoAnchor: geoAnchor === null,
+    levels: [createLevelRecord({
+      id: levelId,
+      name: '一层',
+      elevation: 0,
+      height: mmToMeters(normalizedScene.warehouse?.dimensions_mm?.height_mm, sceneType === 'outdoor-event' ? 12000 : 9000),
+      warehouses: [createWarehouseRecord({
+        id: normalizedScene.warehouse?.id,
+        name: normalizedScene.warehouse?.name || projectName,
+        sceneType,
+        dimensionsMm: normalizedScene.warehouse?.dimensions_mm,
+        levelId,
+        sceneSnapshot: normalizedScene,
+      })],
+    })],
+  })
+
+  return {
+    ...createBlankStudioScene({ sceneType, projectType, name: projectName }),
+    ...cloneStudioValue(snapshot),
+    sceneType,
+    projectType,
+    site: {
+      id: snapshot?.site?.id || 'site-root',
+      name: projectName,
+      projectType,
+      geoAnchor: snapshot?.site?.geoAnchor || geoAnchor || null,
+      orgId: snapshot?.site?.orgId || snapshot?.orgId || null,
+    },
+    buildings: [building],
+    raceBindings: ensureArray(snapshot?.raceBindings).map((item) => cloneStudioValue(item)),
+    mapLayers: ensureArray(snapshot?.mapLayers).map((item) => cloneStudioValue(item)),
+    operationOverlays: {
+      measurements: cloneStudioValue(snapshot?.operationOverlays?.measurements || normalizedScene.measurements || []),
+      notes: ensureArray(snapshot?.operationOverlays?.notes).map((item) => cloneStudioValue(item)),
+    },
+    cameraState: cloneStudioValue(snapshot?.cameraState || null),
+    editorState: {
+      ...(isPlainObject(snapshot?.editorState) ? cloneStudioValue(snapshot.editorState) : {}),
+      map: normalizeMapState(snapshot?.editorState?.map),
+      activeBuildingId: building.id,
+      activeLevelId: levelId,
+      activeWarehouseId: building.levels?.[0]?.warehouses?.[0]?.id || null,
+      activeWorkspaceMode: 'warehouse',
+    },
+  }
+}
+
 function wrapLegacySceneAsHierarchy(snapshot, sceneType, projectType, projectName) {
   const normalizedScene = normalizeWarehouseSceneSnapshot(snapshot, sceneType, {
     name: snapshot?.warehouse?.name || projectName,
@@ -1132,6 +1232,14 @@ export function normalizeStudioSnapshot(snapshot, options = {}) {
         normalizedOptions.projectType || snapshot?.projectType || 'warehouse',
         normalizedOptions.name || snapshot?.site?.name || snapshot?.warehouse?.name || '未命名项目',
       )
+    : isDirectEditorSnapshot(snapshot)
+      ? wrapDirectEditorSnapshotAsHierarchy(
+          snapshot,
+          normalizedOptions.sceneType || snapshot?.sceneType || 'warehouse',
+          normalizedOptions.projectType || snapshot?.projectType || 'warehouse',
+          normalizedOptions.name || snapshot?.site?.name || snapshot?.warehouse?.name || snapshot?.focusZoneName || '未命名项目',
+          normalizedOptions.geoAnchor || snapshot?.site?.geoAnchor || null,
+        )
     : {
         ...createBlankStudioScene(normalizedOptions),
         ...(isPlainObject(snapshot) ? cloneStudioValue(snapshot) : {}),

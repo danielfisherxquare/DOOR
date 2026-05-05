@@ -77,7 +77,7 @@ function nextViewerPath(surface, searchParams, warehouseId, locationId, objectQr
     return buildInventorySurfaceHref(surface, '/inventory/space', { params: Object.fromEntries(params.entries()) })
 }
 
-export default function TwinScanBindingPanel() {
+export default function TwinScanBindingPanel({ mode = 'space' }) {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const selectedOrgId = searchParams.get('orgId')
@@ -360,8 +360,12 @@ export default function TwinScanBindingPanel() {
                     <p className="page-subtitle">先支持 Web 后台的“登记对象 + 扫码绑定/移位/解绑”闭环，后续再平滑迁到 PDA。</p>
                 </div>
                 <div className="twin-actions">
-                    <button className="btn btn--ghost" onClick={() => navigate(nextPath(surface, 'designer', searchParams, selectedWarehouseId))}>回到 3D 设计</button>
-                    <button className="btn btn--primary" onClick={() => navigate(nextViewerPath(surface, searchParams, selectedWarehouseId))}>查看 3D 场景</button>
+                    {mode !== 'ops' && (
+                        <>
+                            <button className="btn btn--ghost" onClick={() => navigate(nextPath(surface, 'designer', searchParams, selectedWarehouseId))}>回到 3D 设计</button>
+                            <button className="btn btn--primary" onClick={() => navigate(nextViewerPath(surface, searchParams, selectedWarehouseId))}>查看 3D 场景</button>
+                        </>
+                    )}
                 </div>
             </header>
 

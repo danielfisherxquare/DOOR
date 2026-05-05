@@ -127,12 +127,29 @@ async function createWebGpuRenderer(props) {
   return renderer
 }
 
-function StudioLights() {
+function createWebGlRenderer(props) {
+  const renderer = new THREE.WebGLRenderer({
+    ...props,
+    antialias: true,
+    alpha: false,
+  })
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 0.9
+  renderer.setClearColor(LIGHT_BG, 1)
+  renderer.userData = renderer.userData || {}
+  renderer.userData.renderBackend = 'webgl2'
+  if (renderer.domElement) {
+    renderer.domElement.dataset.rendererBackend = renderer.userData.renderBackend
+  }
+  return renderer
+}
+
+function StudioLights({ enableShadows = true }) {
   return (
     <>
       <ambientLight intensity={0.72} />
       <directionalLight
-        castShadow
+        castShadow={enableShadows}
         intensity={1.05}
         position={[18, 28, 16]}
         shadow-mapSize-height={2048}
@@ -377,18 +394,20 @@ function EditorReferenceFrame({ showGroundPlane = true, showWorldAxes = true }) 
   )
 }
 
-function ViewerCameras() {
+function ViewerCameras({ sceneBounds }) {
   const cameraMode = useViewer((state) => state.cameraMode)
+  const span = Math.max(sceneBounds?.width || 24, sceneBounds?.depth || 18, sceneBounds?.height || 9, 16)
+  const far = Math.max(1600, span * 4)
 
   return (
     <>
-      <PerspectiveCamera makeDefault={cameraMode === 'perspective'} far={1600} fov={46} near={0.1} position={[16, 12, 16]} />
-      <OrthographicCamera makeDefault={cameraMode === 'orthographic'} far={1600} near={-1600} position={[16, 12, 16]} zoom={24} />
+      <PerspectiveCamera makeDefault={cameraMode === 'perspective'} far={far} fov={46} near={0.1} position={[16, 12, 16]} />
+      <OrthographicCamera makeDefault={cameraMode === 'orthographic'} far={far} near={-far} position={[16, 12, 16]} zoom={24} />
     </>
   )
 }
 
-function SceneViewportController({ sceneBounds, referenceMode = 'world' }) {
+function SceneViewportController({ lightweight = false, sceneBounds, referenceMode = 'world' }) {
   const camera = useThree((state) => state.camera)
   const controlsRef = useRef(null)
   const viewPreset = useEditor((state) => state.viewportView)
@@ -398,17 +417,20 @@ function SceneViewportController({ sceneBounds, referenceMode = 'world' }) {
   const target = useMemo(() => {
     const width = Math.max(sceneBounds?.width || 24, 8)
     const depth = Math.max(sceneBounds?.depth || 18, 8)
+    const centerX = Number.isFinite(Number(sceneBounds?.centerX)) ? Number(sceneBounds.centerX) : null
+    const centerY = Number.isFinite(Number(sceneBounds?.centerY)) ? Number(sceneBounds.centerY) : null
+    const centerZ = Number.isFinite(Number(sceneBounds?.centerZ)) ? Number(sceneBounds.centerZ) : null
 
     if (referenceMode === 'bounded') {
       return {
-        x: width / 2,
-        y: 0,
-        z: depth / 2,
+        x: centerX ?? width / 2,
+        y: centerY ?? 0,
+        z: centerZ ?? depth / 2,
       }
     }
 
-    return { x: 0, y: 0, z: 0 }
-  }, [referenceMode, sceneBounds?.depth, sceneBounds?.width])
+    return { x: centerX ?? 0, y: centerY ?? 0, z: centerZ ?? 0 }
+  }, [referenceMode, sceneBounds?.centerX, sceneBounds?.centerY, sceneBounds?.centerZ, sceneBounds?.depth, sceneBounds?.width])
 
   const span = Math.max(sceneBounds?.width || 24, sceneBounds?.depth || 18, sceneBounds?.height || 9, 16)
 
@@ -473,8 +495,8 @@ function SceneViewportController({ sceneBounds, referenceMode = 'world' }) {
     <OrbitControls
       ref={controlsRef}
       makeDefault
-      dampingFactor={0.08}
-      enableDamping
+      dampingFactor={lightweight ? 0 : 0.08}
+      enableDamping={!lightweight}
       enabled={viewPreset !== 'top'}
       enablePan
       enableRotate={viewPreset !== 'top'}
@@ -495,15 +517,27 @@ function SceneViewportController({ sceneBounds, referenceMode = 'world' }) {
 export default function PascalViewer({
   children,
   toolOverlays,
+  enableBvh = true,
+  enableShadows = true,
   selectionManager = 'default',
   perf = false,
+  preferWebGpu = true,
   sceneBounds,
   referenceMode = 'world',
   defaultView = 'iso',
+  lightweight = false,
   showAxisGizmo = true,
   showGroundPlane = true,
 }) {
   const theme = useViewer((state) => state.theme)
+  const canvasGl = lightweight
+    ? { alpha: false, antialias: false, powerPreference: 'low-power', preserveDrawingBuffer: false }
+    : ((props) => (
+      preferWebGpu
+        ? createWebGpuRenderer({ ...props, preserveDrawingBuffer: true })
+        : createWebGlRenderer({ ...props, preserveDrawingBuffer: true })
+    ))
+
   useEffect(() => {
     const previousTheme = useViewer.getState().theme
 
@@ -520,14 +554,17 @@ export default function PascalViewer({
   return (
     <Canvas
       className={`transition-colors duration-700 ${theme === 'light' ? 'bg-[#edf1f7]' : 'bg-[#1f2433]'}`}
-      dpr={[1, 1.5]}
-      frameloop="always"
-      gl={async (props) => createWebGpuRenderer({ ...props, preserveDrawingBuffer: true })}
+      dpr={lightweight ? 1 : [1, 1.5]}
+      frameloop={lightweight ? 'demand' : 'always'}
+      gl={canvasGl}
       resize={{ debounce: 100 }}
-      shadows={{ type: THREE.PCFShadowMap, enabled: true }}
+      shadows={enableShadows ? { type: THREE.PCFShadowMap, enabled: true } : false}
       style={{ width: '100%', height: '100%' }}
       onCreated={({ gl }) => {
         gl.setClearColor(LIGHT_BG, 1)
+        gl.userData = gl.userData || {}
+        gl.userData.renderBackend = gl.userData.renderBackend || (gl.isWebGLRenderer ? 'webgl2' : (gl.isWebGPURenderer ? 'webgpu' : 'unknown'))
+        if (gl.domElement) gl.domElement.dataset.rendererBackend = gl.userData.renderBackend
         if (typeof window !== 'undefined') {
           window.__DOOR_RENDERERS__ = {
             PascalViewer: {
@@ -538,20 +575,20 @@ export default function PascalViewer({
       }}
     >
       <color attach="background" args={[LIGHT_BG]} />
-      <ViewerCameras />
-      <SceneViewportController referenceMode={referenceMode} sceneBounds={sceneBounds} />
-      <AnimatedBackground />
-      <StudioLights />
-      <EditorReferenceFrame showGroundPlane={showGroundPlane} showWorldAxes={showAxisGizmo} />
+      <ViewerCameras sceneBounds={sceneBounds} />
+      <SceneViewportController lightweight={lightweight} referenceMode={referenceMode} sceneBounds={sceneBounds} />
+      {lightweight ? null : <AnimatedBackground />}
+      <StudioLights enableShadows={enableShadows} />
+      {lightweight ? null : <EditorReferenceFrame showGroundPlane={showGroundPlane} showWorldAxes={showAxisGizmo} />}
       <DevDebugMarker sceneBounds={sceneBounds} referenceMode={referenceMode} />
-      <Bvh>{children}</Bvh>
+      {enableBvh ? <Bvh>{children}</Bvh> : children}
       {toolOverlays}
-      <StudioLevelSystem />
-      <GuideSystem />
-      <ViewerDiagnostics />
+      {lightweight ? null : <StudioLevelSystem />}
+      {lightweight ? null : <GuideSystem />}
+      {lightweight ? null : <ViewerDiagnostics />}
       {selectionManager === 'default' ? <SelectionManager /> : null}
       {perf ? <PerfMonitor /> : null}
-      <ViewerEffects />
+      {lightweight ? null : <ViewerEffects />}
     </Canvas>
   )
 }

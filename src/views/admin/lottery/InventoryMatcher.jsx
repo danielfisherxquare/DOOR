@@ -15,6 +15,7 @@ import {
   resolveEffectiveMode,
   toNumber,
 } from './lotteryHelpers'
+import LotteryV2BetaPanel from './LotteryV2BetaPanel'
 
 function normalizeResult(raw) {
   if (!raw || typeof raw !== 'object') return null
@@ -54,6 +55,7 @@ function buildEventSummaryList(raceDetail, result) {
 }
 
 export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdated }) {
+  const [algorithmVersion, setAlgorithmVersion] = useState('v1')
   const [inventory, setInventory] = useState([])
   const [result, setResult] = useState(null)
   const [hasSnapshot, setHasSnapshot] = useState(false)
@@ -177,173 +179,200 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
 
   return (
     <div className="lottery-step-stack">
-      {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
+      <div className="lottery-version-switch" role="tablist" aria-label="抽签版本切换">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={algorithmVersion === 'v1'}
+          className={`btn ${algorithmVersion === 'v1' ? 'btn--primary' : 'btn--secondary'}`}
+          onClick={() => setAlgorithmVersion('v1')}
+        >
+          V1 正式版
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={algorithmVersion === 'v2'}
+          className={`btn ${algorithmVersion === 'v2' ? 'btn--primary' : 'btn--secondary'}`}
+          onClick={() => setAlgorithmVersion('v2')}
+        >
+          V2 测试版
+        </button>
+      </div>
 
-      <CommandMetricGrid items={metrics} />
+      {algorithmVersion === 'v2' ? (
+        <LotteryV2BetaPanel raceId={raceId} onUpdated={onUpdated} />
+      ) : (
+        <>
+          {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
 
-      <CommandPanel title="尺码库存" subtitle="库存统计与当前已占用数量会在执行后自动刷新。">
-        <CommandDataTable>
-          <thead>
-            <tr>
-              <th>项目</th>
-              <th>性别</th>
-              <th>尺码</th>
-              <th>总库存</th>
-              <th>已占用</th>
-              <th>剩余</th>
-            </tr>
-          </thead>
-          <tbody>
-            {inventory.map((item) => (
-              <tr key={item.id || `${item.event}-${item.gender}-${item.size}`}>
-                <td>{item.event || 'ALL'}</td>
-                <td>{item.gender || 'U'}</td>
-                <td>{item.size}</td>
-                <td>{formatNumber(item.totalInventory)}</td>
-                <td>{formatNumber(item.usedCount)}</td>
-                <td>{formatNumber(toNumber(item.totalInventory, 0) - toNumber(item.usedCount, 0))}</td>
-              </tr>
-            ))}
-          </tbody>
-        </CommandDataTable>
-      </CommandPanel>
+          <CommandMetricGrid items={metrics} />
 
-      {result ? (
-        <CommandPanel title="最终执行结果" subtitle="结果优先读取最近一次成功的 lottery execution JSON，没有时回退到聚合统计。">
-          <div className="lottery-mini-grid lottery-mini-grid--three">
-            <div className="lottery-mini-stat"><span className="lottery-mini-stat__label">中签</span><strong className="lottery-mini-stat__value">{formatNumber(result.winners)}</strong></div>
-            <div className="lottery-mini-stat"><span className="lottery-mini-stat__label">未中签</span><strong className="lottery-mini-stat__value">{formatNumber(result.losers)}</strong></div>
-            <div className="lottery-mini-stat"><span className="lottery-mini-stat__label">总入选</span><strong className="lottery-mini-stat__value">{formatNumber(result.selectedTotal)}</strong></div>
-          </div>
-
-          {eventSummaryList.length ? (
-            <div className="lottery-card-grid lottery-card-grid--compact">
-              {eventSummaryList.map((item) => (
-                <div key={item.key} className="lottery-mini-card">
-                  <span className="lottery-mini-card__label">{item.label}</span>
-                  <strong className="lottery-mini-card__value">{formatNumber(getCountFromMap(result.winnersByEvent, item.key) + getCountFromMap(result.lockedByEvent, item.key))}</strong>
-                  <span className="lottery-mini-card__meta">
-                    中签 {formatNumber(getCountFromMap(result.winnersByEvent, item.key))} / 直通 {formatNumber(getCountFromMap(result.lockedByEvent, item.key))}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : null}
-
-          {result.warnings?.length ? (
-            <div className="lottery-warning-list">
-              {result.warnings.map((warning, index) => <div key={index}>警告：{warning}</div>)}
-            </div>
-          ) : null}
-
-          {result.inventoryWarnings?.length ? (
-            <div className="lottery-warning-list">
-              {result.inventoryWarnings.map((warning, index) => <div key={index}>库存：{warning}</div>)}
-            </div>
-          ) : null}
-
-          {result.errors?.length ? (
-            <div className="lottery-error-list">
-              {result.errors.map((error, index) => <div key={index}>错误：{error}</div>)}
-            </div>
-          ) : null}
-
-          {result.bucketBreakdown?.length ? (
+          <CommandPanel title="尺码库存" subtitle="库存统计与当前已占用数量会在执行后自动刷新。">
             <CommandDataTable>
               <thead>
                 <tr>
-                  <th>Bucket</th>
-                  <th>候选</th>
-                  <th>优先池</th>
-                  <th>普通池</th>
-                  <th>中签</th>
-                  <th>未中签</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.bucketBreakdown.map((bucket, index) => (
-                  <tr key={`${bucket.bucket}-${index}`}>
-                    <td>{bucket.bucket}</td>
-                    <td>{formatNumber(bucket.candidates)}</td>
-                    <td>{formatNumber(bucket.qualifiedWinners)} / {formatNumber(bucket.qualifiedCount)}</td>
-                    <td>{formatNumber(bucket.generalWinners)} / {formatNumber(bucket.generalCount)}</td>
-                    <td>{formatNumber(bucket.winners)}</td>
-                    <td>{formatNumber(bucket.losers)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </CommandDataTable>
-          ) : null}
-
-          {result.inventoryReport?.length ? (
-            <CommandDataTable>
-              <thead>
-                <tr>
+                  <th>项目</th>
+                  <th>性别</th>
                   <th>尺码</th>
                   <th>总库存</th>
-                  <th>既有占用</th>
-                  <th>直通占用</th>
-                  <th>本次消耗</th>
-                  <th>全马</th>
-                  <th>半马</th>
+                  <th>已占用</th>
                   <th>剩余</th>
                 </tr>
               </thead>
               <tbody>
-                {result.inventoryReport.map((item) => (
-                  <tr key={item.size}>
+                {inventory.map((item) => (
+                  <tr key={item.id || `${item.event}-${item.gender}-${item.size}`}>
+                    <td>{item.event || 'ALL'}</td>
+                    <td>{item.gender || 'U'}</td>
                     <td>{item.size}</td>
                     <td>{formatNumber(item.totalInventory)}</td>
-                    <td>{formatNumber(item.previouslyUsed)}</td>
-                    <td>{formatNumber(item.lockedCount)}</td>
-                    <td>{formatNumber(item.consumed)}</td>
-                    <td>{formatNumber(item.fullConsumed)}</td>
-                    <td>{formatNumber(item.halfConsumed)}</td>
-                    <td>{formatNumber(item.remaining)}</td>
+                    <td>{formatNumber(item.usedCount)}</td>
+                    <td>{formatNumber(toNumber(item.totalInventory, 0) - toNumber(item.usedCount, 0))}</td>
                   </tr>
                 ))}
               </tbody>
             </CommandDataTable>
-          ) : null}
+          </CommandPanel>
 
-          {result.genderStats && Object.keys(result.genderStats).length ? (
-            <div className="lottery-card-grid lottery-card-grid--compact">
-              {Object.entries(result.genderStats).map(([key, stats]) => (
-                <div key={key} className="lottery-mini-card">
-                  <span className="lottery-mini-card__label">{getEventLabel(key)}</span>
-                  <strong className="lottery-mini-card__value">{formatNumber(stats?.total)}</strong>
-                  <span className="lottery-mini-card__meta">
-                    男 {formatNumber(stats?.male?.winners)} / 女 {formatNumber(stats?.female?.winners)}
-                  </span>
-                  <span className="lottery-mini-card__meta">
-                    目标比 男 {Math.round(toNumber(stats?.male?.targetRatio, 0) * 100)}% / 女 {Math.round(toNumber(stats?.female?.targetRatio, 0) * 100)}%
-                  </span>
+          {result ? (
+            <CommandPanel title="最终执行结果" subtitle="结果优先读取最近一次成功的 lottery execution JSON，没有时回退到聚合统计。">
+              <div className="lottery-mini-grid lottery-mini-grid--three">
+                <div className="lottery-mini-stat"><span className="lottery-mini-stat__label">中签</span><strong className="lottery-mini-stat__value">{formatNumber(result.winners)}</strong></div>
+                <div className="lottery-mini-stat"><span className="lottery-mini-stat__label">未中签</span><strong className="lottery-mini-stat__value">{formatNumber(result.losers)}</strong></div>
+                <div className="lottery-mini-stat"><span className="lottery-mini-stat__label">总入选</span><strong className="lottery-mini-stat__value">{formatNumber(result.selectedTotal)}</strong></div>
+              </div>
+
+              {eventSummaryList.length ? (
+                <div className="lottery-card-grid lottery-card-grid--compact">
+                  {eventSummaryList.map((item) => (
+                    <div key={item.key} className="lottery-mini-card">
+                      <span className="lottery-mini-card__label">{item.label}</span>
+                      <strong className="lottery-mini-card__value">{formatNumber(getCountFromMap(result.winnersByEvent, item.key) + getCountFromMap(result.lockedByEvent, item.key))}</strong>
+                      <span className="lottery-mini-card__meta">
+                        中签 {formatNumber(getCountFromMap(result.winnersByEvent, item.key))} / 直通 {formatNumber(getCountFromMap(result.lockedByEvent, item.key))}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              ) : null}
+
+              {result.warnings?.length ? (
+                <div className="lottery-warning-list">
+                  {result.warnings.map((warning, index) => <div key={index}>警告：{warning}</div>)}
+                </div>
+              ) : null}
+
+              {result.inventoryWarnings?.length ? (
+                <div className="lottery-warning-list">
+                  {result.inventoryWarnings.map((warning, index) => <div key={index}>库存：{warning}</div>)}
+                </div>
+              ) : null}
+
+              {result.errors?.length ? (
+                <div className="lottery-error-list">
+                  {result.errors.map((error, index) => <div key={index}>错误：{error}</div>)}
+                </div>
+              ) : null}
+
+              {result.bucketBreakdown?.length ? (
+                <CommandDataTable>
+                  <thead>
+                    <tr>
+                      <th>Bucket</th>
+                      <th>候选</th>
+                      <th>优先池</th>
+                      <th>普通池</th>
+                      <th>中签</th>
+                      <th>未中签</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.bucketBreakdown.map((bucket, index) => (
+                      <tr key={`${bucket.bucket}-${index}`}>
+                        <td>{bucket.bucket}</td>
+                        <td>{formatNumber(bucket.candidates)}</td>
+                        <td>{formatNumber(bucket.qualifiedWinners)} / {formatNumber(bucket.qualifiedCount)}</td>
+                        <td>{formatNumber(bucket.generalWinners)} / {formatNumber(bucket.generalCount)}</td>
+                        <td>{formatNumber(bucket.winners)}</td>
+                        <td>{formatNumber(bucket.losers)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </CommandDataTable>
+              ) : null}
+
+              {result.inventoryReport?.length ? (
+                <CommandDataTable>
+                  <thead>
+                    <tr>
+                      <th>尺码</th>
+                      <th>总库存</th>
+                      <th>既有占用</th>
+                      <th>直通占用</th>
+                      <th>本次消耗</th>
+                      <th>全马</th>
+                      <th>半马</th>
+                      <th>剩余</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.inventoryReport.map((item) => (
+                      <tr key={item.size}>
+                        <td>{item.size}</td>
+                        <td>{formatNumber(item.totalInventory)}</td>
+                        <td>{formatNumber(item.previouslyUsed)}</td>
+                        <td>{formatNumber(item.lockedCount)}</td>
+                        <td>{formatNumber(item.consumed)}</td>
+                        <td>{formatNumber(item.fullConsumed)}</td>
+                        <td>{formatNumber(item.halfConsumed)}</td>
+                        <td>{formatNumber(item.remaining)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </CommandDataTable>
+              ) : null}
+
+              {result.genderStats && Object.keys(result.genderStats).length ? (
+                <div className="lottery-card-grid lottery-card-grid--compact">
+                  {Object.entries(result.genderStats).map(([key, stats]) => (
+                    <div key={key} className="lottery-mini-card">
+                      <span className="lottery-mini-card__label">{getEventLabel(key)}</span>
+                      <strong className="lottery-mini-card__value">{formatNumber(stats?.total)}</strong>
+                      <span className="lottery-mini-card__meta">
+                        男 {formatNumber(stats?.male?.winners)} / 女 {formatNumber(stats?.female?.winners)}
+                      </span>
+                      <span className="lottery-mini-card__meta">
+                        目标比 男 {Math.round(toNumber(stats?.male?.targetRatio, 0) * 100)}% / 女 {Math.round(toNumber(stats?.female?.targetRatio, 0) * 100)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {result.unselectedStats ? (
+                <div className="lottery-help-block">
+                  有成绩未中签 {formatNumber(result.unselectedStats.qualified_lottery)}，无成绩未中签 {formatNumber(result.unselectedStats.general_lottery)}，
+                  有成绩但库存不足 {formatNumber(result.unselectedStats.qualified_inventory)}，无成绩但库存不足 {formatNumber(result.unselectedStats.general_inventory)}。
+                </div>
+              ) : null}
+            </CommandPanel>
           ) : null}
 
-          {result.unselectedStats ? (
-            <div className="lottery-help-block">
-              有成绩未中签 {formatNumber(result.unselectedStats.qualified_lottery)}，无成绩未中签 {formatNumber(result.unselectedStats.general_lottery)}，
-              有成绩但库存不足 {formatNumber(result.unselectedStats.qualified_inventory)}，无成绩但库存不足 {formatNumber(result.unselectedStats.general_inventory)}。
-            </div>
+          {!canExecute ? (
+            <CommandNotice tone="warning">当前还不能执行最终抽签，请先在“容量定义”中保存可执行的项目容量配置。</CommandNotice>
           ) : null}
-        </CommandPanel>
-      ) : null}
 
-      {!canExecute ? (
-        <CommandNotice tone="warning">当前还不能执行最终抽签，请先在“容量定义”中保存可执行的项目容量配置。</CommandNotice>
-      ) : null}
-
-      <div className="lottery-footer-actions">
-        <button className="btn btn--primary" onClick={handleExecute} disabled={!canExecute || executing || rollingBack}>
-          {executing ? '执行中...' : '执行最终抽签'}
-        </button>
-        <button className="btn btn--secondary" onClick={handleRollback} disabled={!hasSnapshot || rollingBack || executing}>
-          {rollingBack ? '回滚中...' : hasSnapshot ? '回滚抽签结果' : '暂无可回滚快照'}
-        </button>
-      </div>
+          <div className="lottery-footer-actions">
+            <button className="btn btn--primary" onClick={handleExecute} disabled={!canExecute || executing || rollingBack}>
+              {executing ? '执行中...' : '执行最终抽签'}
+            </button>
+            <button className="btn btn--secondary" onClick={handleRollback} disabled={!hasSnapshot || rollingBack || executing}>
+              {rollingBack ? '回滚中...' : hasSnapshot ? '回滚抽签结果' : '暂无可回滚快照'}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

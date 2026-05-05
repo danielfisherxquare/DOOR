@@ -233,6 +233,16 @@ const navGroups = [
     icon: 'admin_panel_settings',
     items: [
       {
+        key: 'race-dashboard',
+        path: '/race-dashboard',
+        icon: 'monitoring',
+        shortLabel: 'DS',
+        label: '赛事大屏',
+        description: '赛事数据一览，面向领导/甲方展示',
+        cardDescription: '数字化信息一览，展示一场赛事的全部关键数据，支持脱敏模式和全屏展示。',
+        needsRace: true,
+      },
+      {
         key: 'projects',
         path: '/projects',
         icon: 'assignment',
@@ -344,6 +354,7 @@ const routeMeta = [
   { key: 'assessment', path: '/app/assessment', exact: true, title: '考评管理', summary: '创建考评活动，管理成员评分、邀请码和绩效报表。', groupKey: 'management', sectionLabel: '赛事管理', surfaceCode: 'APP' },
   { key: 'assessment-detail', path: '/app/assessment', title: '考评详情', summary: '管理考评活动详情、成员、邀请码和报表。', groupKey: 'management', sectionLabel: '赛事管理', surfaceCode: 'APP' },
   { key: 'bib-tracking', path: '/app/bib-tracking', title: '号牌布控', summary: '按赛事查看号码布状态、检索命中记录，并在同一页里追踪时间线与撤回动作。', groupKey: 'management', sectionLabel: '赛事管理', surfaceCode: 'APP', needsRace: true },
+  { key: 'race-dashboard', path: '/app/race-dashboard', title: '赛事大屏', summary: '数字化信息一览，展示一场赛事的全部关键数据，支持脱敏模式和全屏展示。', groupKey: 'management', sectionLabel: '赛事管理', surfaceCode: 'APP', needsRace: true },
   { key: 'mechanical-clock', path: '/app/tools/mechanical-clock', title: '机械翻页钟', summary: '使用经典翻页时钟与倒计时工具。', groupKey: 'tools', sectionLabel: '我的工具', surfaceCode: 'APP' },
   { key: 'mechanical-clock-3d', path: '/app/tools/mechanical-clock-3d', title: '立体翻页钟', summary: '使用三维段式机械翻页钟与倒计时工具。', groupKey: 'tools', sectionLabel: '我的工具', surfaceCode: 'APP' },
   { key: 'interview', path: '/app/interview', title: '面试面板', summary: '进行候选人面试评分与即时评估。', groupKey: 'tools', sectionLabel: '我的工具', surfaceCode: 'APP' },

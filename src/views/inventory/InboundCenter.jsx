@@ -17,6 +17,34 @@ const TABS = [
     { key: 'labels', label: '标签打印' },
 ]
 
+/**
+ * 纯内容组件：只负责内层 tab 切换和内容渲染
+ * 供 OPS WarehouseWorkbench 的子模块直接使用，不带任何 Shell
+ */
+export function InboundContent({ activeTab = 'batch', onTabChange }) {
+    const tabs = TABS.map((tab) => (
+        <button
+            key={tab.key}
+            type="button"
+            className={`warehouse-workbench__tab ${activeTab === tab.key ? 'warehouse-workbench__tab--active' : ''}`}
+            onClick={() => onTabChange?.(tab.key)}
+        >
+            {tab.label}
+        </button>
+    ))
+
+    let mainContent = <BatchInbound />
+    if (activeTab === 'pre') mainContent = <PreInboundManager />
+    if (activeTab === 'labels') mainContent = <QRCodePrinter />
+
+    return (
+        <div className="warehouse-inbound-content">
+            <div className="warehouse-workbench__tabs">{tabs}</div>
+            {mainContent}
+        </div>
+    )
+}
+
 export default function InboundCenter() {
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
@@ -60,7 +88,7 @@ export default function InboundCenter() {
 
     return (
         <WarehouseWorkbenchShell
-        eyebrow="入库中心"
+            eyebrow="入库中心"
             title="入库中心"
             summary="把预入库、正式入库和标签打印收回到同一条链路，避免做完一步后回侧栏重新找下一页。"
             actions={(

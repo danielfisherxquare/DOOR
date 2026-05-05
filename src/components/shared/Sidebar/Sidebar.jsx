@@ -20,7 +20,7 @@ export default function Sidebar({
   context,
 }) {
   const layerConfig = {
-    admin: { name: 'DOOR 指挥台', shortName: 'DG' },
+    admin: { name: '管理总后台', shortName: 'DG' },
     app: { name: '应用指挥台', shortName: 'AP' },
     ops: { name: '执行指挥台', shortName: 'OP' },
   }

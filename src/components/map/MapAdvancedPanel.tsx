@@ -199,7 +199,7 @@ export default function MapAdvancedPanel({ nodeId }: MapAdvancedPanelProps) {
   if (!node) {
     return (
       <CommandEmptyState 
-        icon="📍"
+        icon={<span className="material-symbols-outlined">location_on</span>}
         title="未选择图形"
       />
     );
@@ -208,7 +208,7 @@ export default function MapAdvancedPanel({ nodeId }: MapAdvancedPanelProps) {
   if (!info) {
     return (
       <CommandEmptyState 
-        icon="❌"
+        icon={<span className="material-symbols-outlined">error</span>}
         title="无法解析图形数据"
       />
     );
@@ -239,27 +239,24 @@ export default function MapAdvancedPanel({ nodeId }: MapAdvancedPanelProps) {
   if (info.perimeter !== undefined) dimMetrics.push({ label: '周长', value: formatDistance(info.perimeter) as any });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      
-      {/* 基本信息 */}
-      <div>
-        <h4 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase' }}>基本信息</h4>
-        <CommandMetricGrid items={basicMetrics} />
-      </div>
+    <div className="advanced-panel">
+      <section className="advanced-panel__section">
+        <h4 className="advanced-panel__section-title">基本信息</h4>
+        <CommandMetricGrid items={basicMetrics} className="advanced-panel__metrics" />
+      </section>
 
-      {/* 尺寸信息 */}
       {dimMetrics.length > 0 && (
-        <div>
-          <h4 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase' }}>尺寸</h4>
-          <CommandMetricGrid items={dimMetrics} />
-        </div>
+        <section className="advanced-panel__section">
+          <h4 className="advanced-panel__section-title">尺寸</h4>
+          <CommandMetricGrid items={dimMetrics} className="advanced-panel__metrics" />
+        </section>
       )}
 
-      {/* 中心点 */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <h4 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', margin: 0, textTransform: 'uppercase' }}>中心点</h4>
+      <section className="advanced-panel__section">
+        <div className="advanced-panel__section-head">
+          <h4 className="advanced-panel__section-title">中心点</h4>
           <button
+            type="button"
             className="btn btn--sm btn--ghost"
             onClick={handleGetElevation}
             disabled={elevationLoading}
@@ -267,61 +264,64 @@ export default function MapAdvancedPanel({ nodeId }: MapAdvancedPanelProps) {
             {elevationLoading ? '查询中...' : '获取海拔'}
           </button>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', background: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>纬度</span>
-            <span style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>{formatCoord(info.center[1], false)} <span style={{ color: 'var(--text-muted)' }}>({info.center[1].toFixed(6)})</span></span>
+        <div className="advanced-panel__info-card">
+          <div className="advanced-panel__info-row">
+            <span className="advanced-panel__info-label">纬度</span>
+            <span className="advanced-panel__info-value">
+              {formatCoord(info.center[1], false)} <span className="advanced-panel__info-meta">({info.center[1].toFixed(6)})</span>
+            </span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>经度</span>
-            <span style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>{formatCoord(info.center[0], true)} <span style={{ color: 'var(--text-muted)' }}>({info.center[0].toFixed(6)})</span></span>
+          <div className="advanced-panel__info-row">
+            <span className="advanced-panel__info-label">经度</span>
+            <span className="advanced-panel__info-value">
+              {formatCoord(info.center[0], true)} <span className="advanced-panel__info-meta">({info.center[0].toFixed(6)})</span>
+            </span>
           </div>
           {elevation !== null && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', borderTop: '1px solid var(--border)', paddingTop: '8px', mt: '4px' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>海拔</span>
-              <span style={{ color: 'var(--accent)', fontWeight: 600, fontFamily: 'monospace' }}>{elevation.toFixed(1)} m</span>
+            <div className="advanced-panel__info-row advanced-panel__info-row--top">
+              <span className="advanced-panel__info-label">海拔</span>
+              <span className="advanced-panel__info-value advanced-panel__info-value--accent">{elevation.toFixed(1)} m</span>
             </div>
           )}
         </div>
-      </div>
+      </section>
 
-      {/* 边界框 */}
-      <div>
-        <h4 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase' }}>边界框 (BBox)</h4>
-        <div style={{ display: 'grid', gridTemplateColumns: 'min-content 1fr min-content', gap: '8px', alignItems: 'center', padding: '16px', background: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', textAlign: 'center' }}>
-           <div style={{ gridColumn: '1 / -1', fontSize: '12px', color: 'var(--text-secondary)' }}>北: <span style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>{info.bbox[3].toFixed(6)}</span></div>
-           <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>西: <span style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>{info.bbox[0].toFixed(6)}</span></div>
-           <div style={{ fontSize: '16px' }}>📍</div>
-           <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>东: <span style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>{info.bbox[2].toFixed(6)}</span></div>
-           <div style={{ gridColumn: '1 / -1', fontSize: '12px', color: 'var(--text-secondary)' }}>南: <span style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>{info.bbox[1].toFixed(6)}</span></div>
+      <section className="advanced-panel__section">
+        <h4 className="advanced-panel__section-title">边界框 (BBox)</h4>
+        <div className="advanced-panel__bbox-card">
+          <div className="advanced-panel__bbox-item advanced-panel__bbox-item--full">北: <span>{info.bbox[3].toFixed(6)}</span></div>
+          <div className="advanced-panel__bbox-item">西: <span>{info.bbox[0].toFixed(6)}</span></div>
+          <div className="advanced-panel__bbox-pin">
+            <span className="material-symbols-outlined">place</span>
+          </div>
+          <div className="advanced-panel__bbox-item">东: <span>{info.bbox[2].toFixed(6)}</span></div>
+          <div className="advanced-panel__bbox-item advanced-panel__bbox-item--full">南: <span>{info.bbox[1].toFixed(6)}</span></div>
         </div>
-      </div>
+      </section>
 
-      {/* 顶点坐标 */}
       {info.coordinates.length > 0 && (
-        <div>
-          <h4 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase' }}>顶点坐标</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '12px', background: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+        <section className="advanced-panel__section">
+          <h4 className="advanced-panel__section-title">顶点坐标</h4>
+          <div className="advanced-panel__vertex-list">
             {info.coordinates.slice(0, 5).map(([lng, lat], idx) => (
-              <div key={idx} style={{ display: 'flex', gap: '12px', fontSize: '13px', fontFamily: 'monospace' }}>
-                <span style={{ color: 'var(--text-muted)', width: '20px', textAlign: 'right' }}>{idx + 1}</span>
-                <span style={{ color: 'var(--text-primary)' }}>{lat.toFixed(5)}, {lng.toFixed(5)}</span>
+              <div key={idx} className="advanced-panel__vertex-row">
+                <span className="advanced-panel__vertex-index">{idx + 1}</span>
+                <span className="advanced-panel__vertex-value">{lat.toFixed(5)}, {lng.toFixed(5)}</span>
               </div>
             ))}
             {info.coordinates.length > 5 && (
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px' }}>
+              <div className="advanced-panel__vertex-more">
                 还有 {info.coordinates.length - 5} 个顶点...
               </div>
             )}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* 高级操作 */}
-      <div style={{ marginTop: 'auto' }}>
+      <div className="advanced-panel__actions">
         <button
+          type="button"
           className="btn btn--primary"
-          style={{ width: '100%' }}
           onClick={handleExportImage}
           disabled={exporting}
         >

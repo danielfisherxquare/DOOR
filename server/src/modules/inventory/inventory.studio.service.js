@@ -21,7 +21,7 @@ import { getTwinScenePayload } from './inventory.twin.scene.js';
 const SCENE_TYPES = new Set(['warehouse', 'outdoor-event']);
 const PROJECT_TYPES = new Set(['warehouse', 'venue', 'site', 'mixed', 'asset']);
 const PROJECT_STATUSES = new Set(['draft', 'active', 'archived']);
-const SOURCE_TYPES = new Set(['blank', 'warehouse-import']);
+const SOURCE_TYPES = new Set(['blank', 'warehouse-import', 'generated-scene-import']);
 const PLACEMENT_STATUSES = new Set(['in-stock', 'reserved', 'deployed', 'returned']);
 const MAP_LAYER_TYPES = new Set(['basemap', 'geojson', 'floorplan', 'scan', 'route', 'note']);
 const RACE_BINDING_MODES = new Set(['reference']);

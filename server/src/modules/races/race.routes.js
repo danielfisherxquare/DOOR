@@ -8,11 +8,15 @@ import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import knex from '../../db/knex.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
 import bibTrackingRoutes from './bib-tracking/bib-tracking.routes.js';
+import raceDashboardRoutes from './race-dashboard/race-dashboard.routes.js';
 
 const router = Router();
 
 // Mount bib-tracking routes under /bibs
 router.use('/bibs', bibTrackingRoutes);
+
+// Mount race-dashboard routes under /dashboard
+router.use('/dashboard', raceDashboardRoutes);
 
 function normalizeOrgId(value) {
     if (value === undefined || value === null || value === '') return null;
@@ -63,6 +67,15 @@ function validateCreatePayload(body) {
     }
     payload.name = name;
 
+    const date = typeof body.date === 'string' ? body.date.trim() : '';
+    if (!date) {
+        throw Object.assign(new Error('Race date is required'), { status: 400, expose: true });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        throw Object.assign(new Error('Race date must be in YYYY-MM-DD format'), { status: 400, expose: true });
+    }
+    payload.date = date;
+
     if (body.conflictRule !== undefined && !['strict', 'permissive'].includes(body.conflictRule)) {
         throw Object.assign(new Error('conflictRule must be strict or permissive'), { status: 400, expose: true });
     }
@@ -83,6 +96,17 @@ function validateUpdatePayload(body) {
             throw Object.assign(new Error('Race name is required'), { status: 400, expose: true });
         }
         payload.name = name;
+    }
+
+    if (body.date !== undefined) {
+        const date = typeof body.date === 'string' ? body.date.trim() : '';
+        if (!date) {
+            throw Object.assign(new Error('Race date cannot be empty'), { status: 400, expose: true });
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            throw Object.assign(new Error('Race date must be in YYYY-MM-DD format'), { status: 400, expose: true });
+        }
+        payload.date = date;
     }
 
     if (body.conflictRule !== undefined && !['strict', 'permissive'].includes(body.conflictRule)) {

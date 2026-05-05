@@ -83,11 +83,12 @@ function RaceManagementPage() {
 
   const canSubmit = useMemo(() => {
     if (!form.name.trim()) return false
+    if (!form.date) return false
     if (sanitizedEvents.length === 0) return false
     if (!isSuperAdmin) return true
     const targetOrgId = editingRace?.orgId || form.orgId || selectedOrgId
     return !!targetOrgId
-  }, [form.name, form.orgId, isSuperAdmin, editingRace, selectedOrgId, sanitizedEvents.length])
+  }, [form.name, form.date, form.orgId, isSuperAdmin, editingRace, selectedOrgId, sanitizedEvents.length])
 
   const metrics = useMemo(() => {
     const totalEvents = races.reduce((sum, race) => sum + (Array.isArray(race.events) ? race.events.length : 0), 0)

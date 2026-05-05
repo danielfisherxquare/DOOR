@@ -56,6 +56,7 @@ function ScanPickup() {
     const [cameraState, setCameraState] = useState('idle')
     const [scanResult, setScanResult] = useState(null)
     const [pickupLoading, setPickupLoading] = useState(false)
+    const [runnerId, setRunnerId] = useState(searchParams.get('runnerId') || '')
 
     useEffect(() => {
         return () => {
@@ -154,17 +155,29 @@ function ScanPickup() {
     const handlePickup = async () => {
         if (!scanResult || scanResult.error) return
 
+        const normalizedRunnerId = String(runnerId || '').trim()
+        if (!normalizedRunnerId) {
+            showWarning('请先填写真实领取人 ID')
+            return
+        }
+
         setPickupLoading(true)
         try {
             const result = await unitApi.scanUnit({
                 qrCode: scanResult.qr_code,
                 action: 'pickup',
                 raceId: scanResult.current_holder_id,
-                runnerId: 'current_runner_id'
+                runnerId: normalizedRunnerId,
             }, selectedOrgId)
 
             if (result.success) {
-                setScanResult({ ...scanResult, status: 'picked', pickup_success: true })
+                setScanResult({
+                    ...scanResult,
+                    status: 'picked',
+                    pickup_success: true,
+                    current_holder_type: 'runner',
+                    current_holder_id: normalizedRunnerId,
+                })
                 showSuccess('领取成功！')
             }
         } catch (err) {
@@ -281,6 +294,18 @@ function ScanPickup() {
                         </div>
                     ) : (
                         <div className="sp-result-card">
+                            <div className="sp-result-item sp-result-item--stack">
+                                <span className="sp-result-label">领取人 ID</span>
+                                <div className="sp-runner-field">
+                                    <input
+                                        className="input"
+                                        placeholder="请输入真实领取人/选手 ID"
+                                        value={runnerId}
+                                        onChange={(event) => setRunnerId(event.target.value)}
+                                    />
+                                    <span className="sp-runner-hint">领取时会把这个 ID 写入持有人和流转记录</span>
+                                </div>
+                            </div>
                             <div className="sp-result-item">
                                 <span className="sp-result-label">二维码</span>
                                 <span className="sp-result-value sp-result-value--mono">{scanResult.qr_code}</span>
@@ -482,6 +507,10 @@ function ScanPickup() {
                     align-items: center;
                     padding-bottom: var(--spacing-md);
                     border-bottom: 1px solid var(--border);
+                    gap: var(--spacing-md);
+                }
+                .sp-result-item--stack {
+                    align-items: flex-start;
                 }
                 .sp-result-item:last-of-type {
                     border-bottom: none;
@@ -489,6 +518,7 @@ function ScanPickup() {
                 .sp-result-label {
                     font-size: var(--font-size-sm);
                     color: var(--text-secondary);
+                    flex-shrink: 0;
                 }
                 .sp-result-value {
                     font-weight: 500;
@@ -496,6 +526,18 @@ function ScanPickup() {
                 .sp-result-value--mono {
                     font-family: 'SF Mono', Monaco, monospace;
                     font-size: var(--font-size-xs);
+                }
+                .sp-runner-field {
+                    flex: 1;
+                    min-width: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: var(--spacing-xs);
+                }
+                .sp-runner-hint {
+                    font-size: var(--font-size-xs);
+                    color: var(--text-muted);
+                    line-height: 1.5;
                 }
                 .sp-result-action {
                     margin-top: var(--spacing-md);

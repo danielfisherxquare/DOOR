@@ -13,6 +13,7 @@ import recordRoutes from './modules/records/record.routes.js';
 import columnMappingRoutes from './modules/column-mappings/column-mapping.routes.js';
 import importSessionRoutes from './modules/import-sessions/import-session.routes.js';
 import lotteryRoutes from './modules/lottery/lottery.routes.js';
+import lotteryV2Routes from './modules/lottery-v2/lottery-v2.routes.js';
 import auditRoutes from './modules/audit/audit.routes.js';
 import clothingRoutes from './modules/clothing/clothing.routes.js';
 import pipelineRoutes from './modules/pipeline/pipeline-config.routes.js';
@@ -71,7 +72,8 @@ app.use((_req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    // 扫码仅需同源摄像头权限，其余高风险能力保持关闭。
+    res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
     next();
 });
 app.use(cors({
@@ -103,6 +105,7 @@ app.use('/api/admin/records', requireSurfaceAccess('admin'), recordRoutes);
 app.use('/api/admin/column-mappings', requireSurfaceAccess('admin'), columnMappingRoutes);
 app.use('/api/admin/import-sessions', requireSurfaceAccess('admin'), importSessionRoutes);
 app.use('/api/admin/lottery', requireSurfaceAccess('admin'), lotteryRoutes);
+app.use('/api/admin/lottery-v2', requireSurfaceAccess('admin'), lotteryV2Routes);
 app.use('/api/admin/audit', requireSurfaceAccess('admin'), auditRoutes);
 app.use('/api/admin/clothing', requireSurfaceAccess('admin'), clothingRoutes);
 app.use('/api/admin/pipeline', requireSurfaceAccess('admin'), pipelineRoutes);

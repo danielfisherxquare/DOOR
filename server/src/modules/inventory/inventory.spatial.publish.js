@@ -482,6 +482,17 @@ function inferMaterialMode(batch) {
     return batch.color && batch.color !== '#d9d9d9' ? 'branded-color' : 'neutral-color';
 }
 
+function getStudioEditorDocument(zone) {
+    return zone?.snapshotJson?.warehouseScene?.editorDocument
+        || zone?.snapshotJson?.sceneSnapshot?.editorDocument
+        || null;
+}
+
+function hasStudioExportGeometry(zone) {
+    const document = getStudioEditorDocument(zone);
+    return Boolean(document?.version === 2 && ensureArray(document?.solids).length);
+}
+
 export function buildTerrainWorkZoneExportPackage(zone, manifest) {
     const generatedAt = new Date().toISOString();
     const baseDir = `focus-zones/${zone.id}`;
@@ -556,6 +567,34 @@ export function buildTerrainWorkZoneExportPackage(zone, manifest) {
         }
     });
 
+    if (!manifest.batches.length && hasStudioExportGeometry(zone)) {
+        const document = getStudioEditorDocument(zone);
+        const resourceId = 'lod0-selection-white-model-01';
+        resources.push({
+            id: resourceId,
+            category: 'geometry-batch',
+            lodLevel: 'LOD0',
+            format: 'glb',
+            path: `${baseDir}/lod0/${resourceId}.glb`,
+            objectType: 'map-selection',
+            placementMode: 'studio-snapshot',
+            materialMode: 'white-model',
+            count: ensureArray(document?.solids).length,
+            objectIds: [],
+            optimization: {
+                geometryFamily: 'studio-editor-document',
+                appearanceKey: 'white-model',
+                instancingEligible: false,
+                strategy: 'studio-editor-document',
+                instanceCount: ensureArray(document?.solids).length,
+            },
+        });
+        byLod.LOD0 += 1;
+        optimizationSummary.uniqueGeometryFamilies = Math.max(optimizationSummary.uniqueGeometryFamilies, 1);
+    }
+
+    const totalGeometryResources = byLod.LOD0 + byLod.LOD1 + byLod.LOD2;
+
     return {
         generatedAt,
         zone: {
@@ -567,7 +606,7 @@ export function buildTerrainWorkZoneExportPackage(zone, manifest) {
         summary: {
             totalResources: resources.length,
             totalObjects: manifest.summary.totalObjects,
-            totalBatches: manifest.summary.batchCount,
+            totalBatches: Math.max(manifest.summary.batchCount, totalGeometryResources),
             byLod,
             optimization: optimizationSummary,
         },

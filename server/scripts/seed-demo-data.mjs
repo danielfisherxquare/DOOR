@@ -13,6 +13,18 @@ const orgSeeds = [
         slug: 'demo-east-run',
         races: [
             {
+                key: 'shanghai-full',
+                name: '上海国际马拉松',
+                date: '2026-04-12',
+                location: '上海 · 外滩起点',
+                locationLat: 31.2304,
+                locationLng: 121.4737,
+                events: [
+                    { name: '全程马拉松', distance: '42.195km', startTime: '07:00' },
+                    { name: '半程马拉松', distance: '21.0975km', startTime: '07:30' },
+                ],
+            },
+            {
                 key: 'shanghai-half',
                 name: '上海滨江半程马拉松',
                 date: '2026-05-17',
@@ -50,12 +62,25 @@ const orgSeeds = [
         slug: 'demo-mountain-ops',
         races: [
             {
-                key: 'chongqing-trail',
-                name: '重庆两江越野挑战赛',
-                date: '2026-05-30',
-                location: '重庆 · 南山步道',
+                key: 'chongqing-full',
+                name: '重庆长江全程马拉松',
+                date: '2026-03-22',
+                location: '重庆 · 南滨路起点',
                 locationLat: 29.5591,
                 locationLng: 106.5777,
+                events: [
+                    { name: '全程马拉松', distance: '42.195km', startTime: '07:30' },
+                    { name: '半程马拉松', distance: '21.0975km', startTime: '08:00' },
+                    { name: '迷你马拉松', distance: '5km', startTime: '09:00' },
+                ],
+            },
+            {
+                key: 'chongqing-trail',
+                name: '重庆南山越野挑战赛',
+                date: '2026-05-30',
+                location: '重庆 · 南山步道',
+                locationLat: 29.5482,
+                locationLng: 106.5910,
                 events: [
                     { name: '越野30K', distance: '30km', startTime: '06:30' },
                     { name: '山径体验12K', distance: '12km', startTime: '08:00' },
@@ -63,13 +88,13 @@ const orgSeeds = [
             },
             {
                 key: 'chengdu-greenway',
-                name: '成都天府绿道骑跑嘉年华',
+                name: '成都天府绿道半程马拉松',
                 date: '2026-07-12',
                 location: '成都 · 锦城湖公园',
                 locationLat: 30.5594,
                 locationLng: 104.0648,
                 events: [
-                    { name: '骑跑接力', distance: '42km', startTime: '07:10' },
+                    { name: '半程马拉松', distance: '21.0975km', startTime: '07:10' },
                     { name: '欢乐跑', distance: '5km', startTime: '09:00' },
                 ],
             },
@@ -87,6 +112,30 @@ const orgSeeds = [
         slug: 'demo-bay-volunteers',
         races: [
             {
+                key: 'shenzhen-full',
+                name: '深圳全程马拉松',
+                date: '2026-03-15',
+                location: '深圳 · 市民中心广场',
+                locationLat: 22.5456,
+                locationLng: 114.0579,
+                events: [
+                    { name: '全程马拉松', distance: '42.195km', startTime: '07:00' },
+                    { name: '半程马拉松', distance: '21.0975km', startTime: '07:30' },
+                ],
+            },
+            {
+                key: 'shenzhen-bay-half',
+                name: '深圳湾半程马拉松',
+                date: '2026-06-21',
+                location: '深圳 · 深圳湾公园',
+                locationLat: 22.5186,
+                locationLng: 113.9438,
+                events: [
+                    { name: '半程马拉松', distance: '21.0975km', startTime: '07:00' },
+                    { name: '无障碍陪跑', distance: '3km', startTime: '09:00' },
+                ],
+            },
+            {
                 key: 'shenzhen-bay-night',
                 name: '深圳湾夜跑公益赛',
                 date: '2026-08-08',
@@ -95,7 +144,7 @@ const orgSeeds = [
                 locationLng: 113.9438,
                 events: [
                     { name: '公益夜跑', distance: '8km', startTime: '19:30' },
-                    { name: '无障碍陪跑', distance: '3km', startTime: '18:30' },
+                    { name: '欢乐跑', distance: '3km', startTime: '18:30' },
                 ],
             },
         ],

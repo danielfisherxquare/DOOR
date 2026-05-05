@@ -27,9 +27,16 @@ interface MapViewProps {
   controlsVariant?: 'floating' | 'inline' | 'hidden';
   projectId?: string | null;
   orgId?: string | null;
+  raceId?: string | null;
 }
 
-export default function MapView({ disableModelAutoLoad = false, controlsVariant = 'floating', projectId = null, orgId = null }: MapViewProps) {
+export default function MapView({
+  disableModelAutoLoad = false,
+  controlsVariant = 'floating',
+  projectId = null,
+  orgId = null,
+  raceId = null,
+}: MapViewProps) {
   const viewMode = useMapStore((s) => s.viewMode);
   const sidebarOpen = useMapStore((s) => s.sidebarOpen);
   const selectedNodeId = useMapStore((s) => s.selectedNodeId);
@@ -39,7 +46,6 @@ export default function MapView({ disableModelAutoLoad = false, controlsVariant 
   const buildingStyle = useMapStore((s) => s.buildingStyle);
   const hiddenOsmBuildings = useMapStore((s) => s.hiddenOsmBuildings);
   const referencePanelRevealToken = useMapStore((s) => s.referencePanelRevealToken);
-  const toggleSidebar = useMapStore((s) => s.toggleSidebar);
   const setSelectedNodeId = useMapStore((s) => s.setSelectedNodeId);
   const setPropsPanelNodeId = useMapStore((s) => s.setPropsPanelNodeId);
   const { selectedPlacedModelId, placedModels } = useModelStore();
@@ -116,14 +122,6 @@ export default function MapView({ disableModelAutoLoad = false, controlsVariant 
       {sidebarOpen && (
         <div className="map-sidebar">
           <CommandToolbar className="map-sidebar__toolbar">
-            <button
-              type="button"
-              className="map-sidebar__toggle"
-              onClick={toggleSidebar}
-              title="收起侧边栏"
-            >
-              <span className="material-symbols-outlined">menu_open</span>
-            </button>
             <div className="map-sidebar__label">地图侧栏</div>
             <div className="map-sidebar__switcher">
               {sidebarTabs.map((tab) => (
@@ -147,18 +145,6 @@ export default function MapView({ disableModelAutoLoad = false, controlsVariant 
             {sidebarTab === 'reference' && hasReferenceTab && <ReferenceBuildingsPanel />}
           </div>
         </div>
-      )}
-
-      {/* 侧边栏展开按钮（当侧边栏隐藏时显示） */}
-      {!sidebarOpen && (
-        <button
-          type="button"
-          className="map-sidebar__show-btn"
-          onClick={toggleSidebar}
-          title="展开侧边栏"
-        >
-          <span className="material-symbols-outlined">menu</span>
-        </button>
       )}
 
       {/* 地图区域 */}
@@ -206,7 +192,13 @@ export default function MapView({ disableModelAutoLoad = false, controlsVariant 
       {/* 属性面板 - GeoJSON图形 */}
       {propsPanelNodeId && !selectedPlacedModelId && (
         <div className="map-props-panel">
-          <MapFeaturePanel nodeId={propsPanelNodeId} onClose={clearFeatureSelection} />
+          <MapFeaturePanel
+            nodeId={propsPanelNodeId}
+            onClose={clearFeatureSelection}
+            projectId={projectId}
+            orgId={orgId}
+            raceId={raceId}
+          />
         </div>
       )}
 

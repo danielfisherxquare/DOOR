@@ -8,6 +8,7 @@ import {
   convertEditorDocumentToLegacyScene,
   createEditorDocumentFromWarehouseScene,
   getEditorDocumentStats,
+  normalizeEditorDocument,
   resolveSketchPlaneForSelection,
 } from './model/editorDocument'
 import GeometryRenderer from './renderers/GeometryRenderer'
@@ -27,6 +28,18 @@ const VIEW_PRESETS = [
   { id: 'front', label: '前视' },
   { id: 'right', label: '右视' },
 ]
+
+const FOCUS_ZONE_IMPORT_LABELS = {
+  current: 'GIS 源数据一致',
+  stale: 'GIS 源数据已变化',
+  unknown: '来源状态未知',
+  missing: '未生成白模',
+}
+
+const GIS_PREVIEW_MAX_BUILDING_MAJOR_METERS = 240
+const GIS_PREVIEW_MAX_BUILDING_AREA_SQM = 20000
+const GIS_PREVIEW_MAX_RIBBON_MAJOR_METERS = 120
+const GIS_PREVIEW_MAX_RIBBON_ASPECT_RATIO = 12
 
 function ToolButton({ active, label, onClick, secondary = false }) {
   return (
@@ -56,6 +69,360 @@ function StudioTools() {
   )
 }
 
+function projectIsoPoint(point) {
+  const [x, y, z] = point
+  return [
+    (x - z) * 0.58,
+    (x + z) * 0.3 - y * 3.6,
+  ]
+}
+
+function getPlanarBounds(points) {
+  if (!points.length) return { width: 0, depth: 0 }
+  const xs = points.map((point) => point.x)
+  const zs = points.map((point) => point.z)
+  return {
+    width: Math.max(...xs) - Math.min(...xs),
+    depth: Math.max(...zs) - Math.min(...zs),
+  }
+}
+
+function getPlanarArea(points) {
+  let area = 0
+  for (let index = 0; index < points.length; index += 1) {
+    const current = points[index]
+    const next = points[(index + 1) % points.length]
+    area += current.x * next.z - next.x * current.z
+  }
+  return Math.abs(area) / 2
+}
+
+function isGisOsmSolid(solid) {
+  return solid?.metadata?.compatType === 'osm-building'
+    || solid?.metadata?.objectType === 'osm_building'
+    || Boolean(solid?.metadata?.osmId)
+}
+
+function isUsablePreviewSolid(solid, footprint) {
+  if (!isGisOsmSolid(solid)) return true
+  const bounds = getPlanarBounds(footprint)
+  const major = Math.max(bounds.width, bounds.depth)
+  const minor = Math.max(Math.min(bounds.width, bounds.depth), 0.01)
+  const area = getPlanarArea(footprint)
+  if (major > GIS_PREVIEW_MAX_BUILDING_MAJOR_METERS) return false
+  if (area > GIS_PREVIEW_MAX_BUILDING_AREA_SQM) return false
+  if (major > GIS_PREVIEW_MAX_RIBBON_MAJOR_METERS && major / minor > GIS_PREVIEW_MAX_RIBBON_ASPECT_RATIO) return false
+  return true
+}
+
+function terrainGridSize(mesh, vertexCount) {
+  const rows = Number(mesh?.metadata?.rows || mesh?.rows || 0)
+  const cols = Number(mesh?.metadata?.cols || mesh?.cols || 0)
+  if (rows >= 2 && cols >= 2 && rows * cols === vertexCount) return { rows, cols }
+  const square = Math.sqrt(vertexCount)
+  if (Number.isInteger(square) && square >= 2) return { rows: square, cols: square }
+  return { rows: 0, cols: 0 }
+}
+
+function GisWhiteModelPreview({ document, onOpenInteractive }) {
+  const canvasRef = useRef(null)
+  const preview = useMemo(() => {
+    const normalized = normalizeEditorDocument(document)
+    const vertexById = new Map(normalized.vertices.map((vertex) => [vertex.id, vertex]))
+    const profileById = new Map(normalized.profiles.map((profile) => [profile.id, profile]))
+    let hiddenSolids = 0
+    const solids = normalized.solids
+      .map((solid) => {
+        const profile = profileById.get(solid.profileId)
+        const vertexIds = Array.isArray(profile?.vertexIds) ? profile.vertexIds.filter(Boolean) : []
+        const cycle = vertexIds.length > 1 && vertexIds[0] === vertexIds[vertexIds.length - 1]
+          ? vertexIds.slice(0, -1)
+          : vertexIds
+        const footprint = cycle.map((vertexId) => vertexById.get(vertexId)).filter(Boolean)
+        if (footprint.length < 3) return null
+        if (!isUsablePreviewSolid(solid, footprint)) {
+          hiddenSolids += 1
+          return null
+        }
+        const baseY = Number(solid.baseElevation) || 0
+        const height = Math.max(Number(solid.height) || 0.1, 0.1)
+        const base = footprint.map((vertex) => [vertex.x, baseY, vertex.z])
+        const top = footprint.map((vertex) => [vertex.x, baseY + height, vertex.z])
+        const sortKey = footprint.reduce((sum, vertex) => sum + vertex.x + vertex.z, 0) / footprint.length
+        return {
+          id: solid.id,
+          name: solid.name,
+          base,
+          top,
+          sortKey,
+        }
+      })
+      .filter(Boolean)
+      .sort((left, right) => left.sortKey - right.sortKey)
+    const terrains = normalized.terrainMeshes
+      .map((mesh) => {
+        const points = []
+        for (let index = 0; index < (mesh.vertices || []).length; index += 3) {
+          const x = Number(mesh.vertices[index])
+          const y = Number(mesh.vertices[index + 1])
+          const z = Number(mesh.vertices[index + 2])
+          if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) points.push([x, y, z])
+        }
+        const grid = terrainGridSize(mesh, points.length)
+        if (points.length < 3) return null
+        const heights = points.map((point) => point[1])
+        return {
+          id: mesh.id,
+          color: mesh.color || '#d9e4d0',
+          points,
+          rows: grid.rows,
+          cols: grid.cols,
+          minY: Math.min(...heights),
+          maxY: Math.max(...heights),
+        }
+      })
+      .filter(Boolean)
+
+    const projected = []
+    terrains.forEach((terrain) => {
+      terrain.points.forEach((point) => projected.push(projectIsoPoint(point)))
+    })
+    solids.forEach((solid) => {
+      solid.base.forEach((point) => projected.push(projectIsoPoint(point)))
+      solid.top.forEach((point) => projected.push(projectIsoPoint(point)))
+    })
+
+    if (!projected.length) {
+      return { bounds: { height: 200, minX: -100, minY: -100, width: 200 }, hiddenSolids, solids: [], terrains: [] }
+    }
+
+    const minX = Math.min(...projected.map((point) => point[0]))
+    const maxX = Math.max(...projected.map((point) => point[0]))
+    const minY = Math.min(...projected.map((point) => point[1]))
+    const maxY = Math.max(...projected.map((point) => point[1]))
+    const padding = Math.max((maxX - minX) * 0.06, (maxY - minY) * 0.06, 24)
+
+    return {
+      bounds: {
+        height: Math.max(maxY - minY + padding * 2, 1),
+        minX: minX - padding,
+        minY: minY - padding,
+        width: Math.max(maxX - minX + padding * 2, 1),
+      },
+      hiddenSolids,
+      solids,
+      terrains,
+    }
+  }, [document])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const width = Math.max(Math.floor(rect.width), 1)
+    const height = Math.max(Math.floor(rect.height), 1)
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = Math.floor(width * dpr)
+    canvas.height = Math.floor(height * dpr)
+    const context = canvas.getContext('2d')
+    if (!context) return
+
+    context.setTransform(dpr, 0, 0, dpr, 0, 0)
+    context.clearRect(0, 0, width, height)
+
+    const gradient = context.createLinearGradient(0, 0, width, height)
+    gradient.addColorStop(0, '#eef3f8')
+    gradient.addColorStop(1, '#f8fafc')
+    context.fillStyle = gradient
+    context.fillRect(0, 0, width, height)
+
+    context.strokeStyle = '#d9e2ec'
+    context.lineWidth = 1
+    for (let x = 0; x < width; x += 28) {
+      context.beginPath()
+      context.moveTo(x, 0)
+      context.lineTo(x, height)
+      context.stroke()
+    }
+    for (let y = 0; y < height; y += 28) {
+      context.beginPath()
+      context.moveTo(0, y)
+      context.lineTo(width, y)
+      context.stroke()
+    }
+
+    const scale = Math.min(width / preview.bounds.width, height / preview.bounds.height)
+    const offsetX = (width - preview.bounds.width * scale) / 2
+    const offsetY = (height - preview.bounds.height * scale) / 2
+    const toCanvas = (point) => [
+      offsetX + (point[0] - preview.bounds.minX) * scale,
+      offsetY + (point[1] - preview.bounds.minY) * scale,
+    ]
+    const drawPolygon = (points, fill, stroke = '#6b7280', alpha = 1) => {
+      if (points.length < 3) return
+      context.save()
+      context.globalAlpha = alpha
+      context.beginPath()
+      const first = toCanvas(points[0])
+      context.moveTo(first[0], first[1])
+      for (let index = 1; index < points.length; index += 1) {
+        const point = toCanvas(points[index])
+        context.lineTo(point[0], point[1])
+      }
+      context.closePath()
+      context.fillStyle = fill
+      context.fill()
+      context.strokeStyle = stroke
+      context.lineWidth = 0.8
+      context.stroke()
+      context.restore()
+    }
+    const drawPolyline = (points, stroke = '#8ea08b', alpha = 0.24) => {
+      if (points.length < 2) return
+      context.save()
+      context.globalAlpha = alpha
+      context.beginPath()
+      const first = toCanvas(points[0])
+      context.moveTo(first[0], first[1])
+      for (let index = 1; index < points.length; index += 1) {
+        const point = toCanvas(points[index])
+        context.lineTo(point[0], point[1])
+      }
+      context.strokeStyle = stroke
+      context.lineWidth = 0.8
+      context.stroke()
+      context.restore()
+    }
+
+    preview.terrains.forEach((terrain) => {
+      const { rows, cols, points } = terrain
+      if (rows < 2 || cols < 2 || points.length < rows * cols) {
+        drawPolygon(points.map(projectIsoPoint), '#d9e4d0', '#8ea08b', 0.42)
+        return
+      }
+
+      const stride = Math.max(1, Math.ceil(Math.max(rows, cols) / 28))
+      const heightRange = Math.max(terrain.maxY - terrain.minY, 0.001)
+      for (let row = 0; row < rows - 1; row += stride) {
+        for (let col = 0; col < cols - 1; col += stride) {
+          const nextRow = Math.min(row + stride, rows - 1)
+          const nextCol = Math.min(col + stride, cols - 1)
+          const cell = [
+            points[row * cols + col],
+            points[row * cols + nextCol],
+            points[nextRow * cols + nextCol],
+            points[nextRow * cols + col],
+          ].filter(Boolean)
+          if (cell.length < 4) continue
+          const heightWeight = cell.reduce((sum, point) => sum + (point[1] - terrain.minY) / heightRange, 0) / cell.length
+          const green = Math.round(188 + heightWeight * 22)
+          const blue = Math.round(176 - heightWeight * 18)
+          drawPolygon(cell.map(projectIsoPoint), `rgb(206,${green},${blue})`, '#9aae92', 0.48)
+        }
+      }
+
+      for (let row = 0; row < rows; row += stride * 2) {
+        drawPolyline(Array.from({ length: cols }, (_, col) => projectIsoPoint(points[row * cols + col])).filter(Boolean))
+      }
+      for (let col = 0; col < cols; col += stride * 2) {
+        drawPolyline(Array.from({ length: rows }, (_, row) => projectIsoPoint(points[row * cols + col])).filter(Boolean))
+      }
+    })
+
+    preview.solids.forEach((solid) => {
+      const base = solid.base.map(projectIsoPoint)
+      const top = solid.top.map(projectIsoPoint)
+      for (let index = 0; index < base.length; index += 1) {
+        const next = (index + 1) % base.length
+        drawPolygon([base[index], base[next], top[next], top[index]], index % 2 === 0 ? '#b8c2cf' : '#aab6c4', '#7b8794', 0.92)
+      }
+      drawPolygon(top, '#dce5ef', '#475569', 1)
+    })
+  }, [preview])
+
+  return (
+    <div style={{ background: 'linear-gradient(135deg, #eef3f8 0%, #f8fafc 100%)', height: '100%', overflow: 'hidden', position: 'relative', width: '100%' }}>
+      <canvas aria-label="GIS 白模轻量预览" ref={canvasRef} style={{ display: 'block', height: '100%', width: '100%' }} />
+      <div style={{ background: 'rgba(255,255,255,0.88)', border: '1px solid #d8dee8', boxShadow: '0 12px 36px rgba(15,23,42,0.12)', left: 18, padding: '14px 16px', position: 'absolute', top: 18 }}>
+        <div style={{ color: '#b7791f', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 6 }}>GIS 白模预览</div>
+        <div style={{ color: '#0f172a', fontSize: 18, fontWeight: 800, marginBottom: 6 }}>{preview.solids.length} 个建筑实体</div>
+        <div style={{ color: '#475569', fontSize: 13, lineHeight: 1.55, maxWidth: 310 }}>
+          已加载 {preview.terrains.length} 个地形网格{preview.hiddenSolids > 0 ? `，隐藏 ${preview.hiddenSolids} 个异常 OSM 轮廓` : ''}。大范围 GIS 场景默认使用轻量预览，避免 WebGL 首帧卡死。
+        </div>
+        <button onClick={onOpenInteractive} style={{ background: '#111827', border: 0, color: '#fff', cursor: 'pointer', fontWeight: 700, marginTop: 12, padding: '9px 12px' }} type="button">
+          进入完整 3D 编辑
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function computeDocumentSceneBounds(document, initialScene = null) {
+  const fallback = {
+    width: Math.max((initialScene?.warehouse?.dimensions_mm?.width_mm || 24000) / 1000, 8),
+    depth: Math.max((initialScene?.warehouse?.dimensions_mm?.depth_mm || 18000) / 1000, 8),
+    height: Math.max((initialScene?.warehouse?.dimensions_mm?.height_mm || 9000) / 1000, 4),
+  }
+  const bounds = {
+    minX: Number.POSITIVE_INFINITY,
+    maxX: Number.NEGATIVE_INFINITY,
+    minY: Number.POSITIVE_INFINITY,
+    maxY: Number.NEGATIVE_INFINITY,
+    minZ: Number.POSITIVE_INFINITY,
+    maxZ: Number.NEGATIVE_INFINITY,
+  }
+  const includePoint = (x, y, z) => {
+    const nextX = Number(x)
+    const nextY = Number(y)
+    const nextZ = Number(z)
+    if (!Number.isFinite(nextX) || !Number.isFinite(nextY) || !Number.isFinite(nextZ)) return
+    bounds.minX = Math.min(bounds.minX, nextX)
+    bounds.maxX = Math.max(bounds.maxX, nextX)
+    bounds.minY = Math.min(bounds.minY, nextY)
+    bounds.maxY = Math.max(bounds.maxY, nextY)
+    bounds.minZ = Math.min(bounds.minZ, nextZ)
+    bounds.maxZ = Math.max(bounds.maxZ, nextZ)
+  }
+
+  document?.vertices?.forEach((vertex) => includePoint(vertex.x, vertex.y, vertex.z))
+  document?.solids?.forEach((solid) => {
+    includePoint(0, Number(solid.baseElevation) || 0, 0)
+    includePoint(0, (Number(solid.baseElevation) || 0) + Math.max(Number(solid.height) || 0, 0), 0)
+  })
+  document?.terrainMeshes?.forEach((mesh) => {
+    for (let index = 0; index < (mesh.vertices || []).length; index += 3) {
+      includePoint(mesh.vertices[index], mesh.vertices[index + 1], mesh.vertices[index + 2])
+    }
+  })
+  document?.instances?.forEach((instance) => {
+    const [x = 0, y = 0, z = 0] = instance.position || []
+    const [width = 1, height = 1, depth = 1] = instance.size || []
+    includePoint(x - width / 2, y - height / 2, z - depth / 2)
+    includePoint(x + width / 2, y + height / 2, z + depth / 2)
+  })
+
+  if (!Number.isFinite(bounds.minX) || !Number.isFinite(bounds.maxX)) {
+    return {
+      ...fallback,
+      centerX: fallback.width / 2,
+      centerY: 0,
+      centerZ: fallback.depth / 2,
+    }
+  }
+
+  const width = Math.max(bounds.maxX - bounds.minX, fallback.width, 8)
+  const depth = Math.max(bounds.maxZ - bounds.minZ, fallback.depth, 8)
+  const height = Math.max(bounds.maxY - bounds.minY, fallback.height, 4)
+  return {
+    width,
+    depth,
+    height,
+    centerX: (bounds.minX + bounds.maxX) / 2,
+    centerY: (bounds.minY + bounds.maxY) / 2,
+    centerZ: (bounds.minZ + bounds.maxZ) / 2,
+  }
+}
+
 export default function Studio3DApp({
   sceneKey,
   initialScene,
@@ -63,6 +430,9 @@ export default function Studio3DApp({
   warehouseMeta = {},
   sourceContext,
   focusZoneContext = null,
+  focusZoneObjectsContext = [],
+  focusZoneObjectSummary = null,
+  focusZoneSceneImportState = null,
   compactChrome = false,
   embedded = false,
   onSceneChange,
@@ -75,6 +445,7 @@ export default function Studio3DApp({
   const [saving, setSaving] = useState(false)
   const sceneLoadedRef = useRef(false)
   const previousSceneKeyRef = useRef(null)
+  const lastSceneChangeDocumentRef = useRef(null)
   const setScene = useScene((state) => state.setScene)
   const clearScene = useScene((state) => state.clearScene)
 
@@ -114,6 +485,16 @@ export default function Studio3DApp({
   const setShowGrid = useViewer((state) => state.setShowGrid)
 
   const geometryStats = useMemo(() => getEditorDocumentStats(document), [document])
+  const sceneViewportBounds = useMemo(() => computeDocumentSceneBounds(document, initialScene), [document, initialScene])
+  const useLightweightViewer = geometryStats.solidCount > 120 || geometryStats.vertexCount > 1500
+  const [forceInteractiveViewer, setForceInteractiveViewer] = useState(false)
+  const showStaticGisPreview = useLightweightViewer && !forceInteractiveViewer
+  const enableViewerBvh = !useLightweightViewer
+  const focusZoneObjectCount = focusZoneObjectSummary?.total ?? focusZoneObjectsContext.length
+  const focusZoneSceneSource = initialScene?.editorDocument?.metadata?.source || initialScene?.metadata?.source || null
+  const focusZoneImportLabel = focusZoneSceneImportState
+    ? FOCUS_ZONE_IMPORT_LABELS[focusZoneSceneImportState] || focusZoneSceneImportState
+    : null
   const activeSketchPlane = useMemo(
     () => resolveSketchPlaneForSelection(document, selectedGeometry),
     [document, selectedGeometry],
@@ -128,6 +509,7 @@ export default function Studio3DApp({
     if (sceneLoadedRef.current && previousSceneKeyRef.current === sceneKey) return
     previousSceneKeyRef.current = sceneKey
     sceneLoadedRef.current = true
+    lastSceneChangeDocumentRef.current = null
     clearScene()
     clearSceneHistory()
     setScene({}, [])
@@ -157,12 +539,14 @@ export default function Studio3DApp({
   }, [document, initialScene?.activeLevelId, initialScene?.warehouse, projectName, sceneType, warehouseMeta])
 
   useEffect(() => {
-    if (!sceneLoadedRef.current || !onSceneChange) return
+    if (!sceneLoadedRef.current || !onSceneChange || !dirty) return
+    if (lastSceneChangeDocumentRef.current === document) return
+    lastSceneChangeDocumentRef.current = document
     const timer = setTimeout(() => {
       onSceneChange(buildSnapshot())
     }, 250)
     return () => clearTimeout(timer)
-  }, [buildSnapshot, onSceneChange])
+  }, [buildSnapshot, dirty, document, onSceneChange])
 
   const handleSave = useCallback(async () => {
     if (!onSave) return
@@ -296,8 +680,13 @@ export default function Studio3DApp({
 
         <div className="studio-canvas-shell">
           {focusZoneContext ? (
-            <div className="studio-focus-chip">
-              Focus Zone · {focusZoneContext.name || '未命名'} · {Math.round(focusZoneContext.boundsMeters?.width || 0)}m × {Math.round(focusZoneContext.boundsMeters?.depth || 0)}m
+            <div className={`studio-focus-chip ${focusZoneSceneImportState === 'stale' ? 'is-stale' : ''}`.trim()}>
+              <strong>GIS 固定区域 · {focusZoneContext.name || '未命名'}</strong>
+              <span>{Math.round(focusZoneContext.boundsMeters?.width || 0)}m × {Math.round(focusZoneContext.boundsMeters?.depth || 0)}m</span>
+              <span>{Math.round(focusZoneContext.approximateAreaSqm || 0)}㎡</span>
+              <span>已导入 {focusZoneObjectCount} 个对象</span>
+              {focusZoneSceneSource ? <span>{focusZoneSceneSource === 'gis-focus-zone' ? 'GIS 初始白模' : focusZoneSceneSource}</span> : null}
+              {focusZoneImportLabel ? <span>{focusZoneImportLabel}</span> : null}
             </div>
           ) : null}
 
@@ -308,21 +697,25 @@ export default function Studio3DApp({
           ) : null}
 
           <div className="studio-canvas">
-            <PascalViewer
-              defaultView="iso"
-              referenceMode="bounded"
-              sceneBounds={{
-                width: Math.max((initialScene?.warehouse?.dimensions_mm?.width_mm || 24000) / 1000, 8),
-                depth: Math.max((initialScene?.warehouse?.dimensions_mm?.depth_mm || 18000) / 1000, 8),
-                height: Math.max((initialScene?.warehouse?.dimensions_mm?.height_mm || 9000) / 1000, 4),
-              }}
-              selectionManager="none"
-              showAxisGizmo
-              showGroundPlane
-              toolOverlays={<StudioTools />}
-            >
-              <GeometryRenderer document={document} />
-            </PascalViewer>
+            {showStaticGisPreview ? (
+              <GisWhiteModelPreview document={document} onOpenInteractive={() => setForceInteractiveViewer(true)} />
+            ) : (
+              <PascalViewer
+                defaultView="iso"
+                enableBvh={enableViewerBvh}
+                enableShadows={!useLightweightViewer}
+                lightweight={useLightweightViewer}
+                preferWebGpu={!useLightweightViewer}
+                referenceMode="bounded"
+                sceneBounds={sceneViewportBounds}
+                selectionManager="none"
+                showAxisGizmo
+                showGroundPlane
+                toolOverlays={<StudioTools />}
+              >
+                <GeometryRenderer document={document} lightweight={useLightweightViewer} />
+              </PascalViewer>
+            )}
           </div>
 
           <div className="studio-status-bar">
@@ -359,7 +752,9 @@ export default function Studio3DApp({
         .studio-main { display: flex; flex: 1; min-height: 0; }
         .studio-canvas-shell { position: relative; flex: 1; min-width: 0; }
         .studio-canvas { height: 100%; background: linear-gradient(180deg, #f1f4f8, #e7ebf0); }
-        .studio-focus-chip { position: absolute; top: 12px; left: 12px; z-index: 20; padding: 6px 10px; background: rgba(249, 250, 252, 0.96); border-left: 3px solid #c59633; border: 1px solid #d8d1c0; font-size: 11px; font-weight: 700; }
+        .studio-focus-chip { position: absolute; top: 12px; left: 12px; z-index: 20; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 24px); padding: 8px 10px; background: rgba(245, 249, 241, 0.94); border: 1px solid rgba(82, 108, 92, 0.24); color: #263b2e; box-shadow: 0 8px 24px rgba(27, 42, 32, 0.12); backdrop-filter: blur(8px); font-size: 11px; font-weight: 700; }
+        .studio-focus-chip span { color: #4d6355; font-weight: 700; }
+        .studio-focus-chip.is-stale { border-color: rgba(168, 105, 39, 0.38); background: rgba(255, 247, 232, 0.96); color: #6b4218; }
         .studio-hint { position: absolute; z-index: 21; transform: translate(12px, -28px); padding: 4px 8px; background: rgba(255,255,255,0.96); border: 1px solid #d1d7e0; font-size: 11px; font-weight: 700; pointer-events: none; }
         .studio-status-bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; gap: 10px; flex-wrap: wrap; padding: 5px 8px; background: rgba(248,250,252,0.96); border-top: 1px solid #d1d8e0; font-size: 11px; }
         .scene-tree-panel { width: 220px; border-right: 1px solid #d4dae2; background: linear-gradient(180deg, #f8f9fb, #f2f4f7); display: flex; flex-direction: column; }

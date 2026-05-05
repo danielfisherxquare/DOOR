@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
+import { buildGeometryBatchFromStudioScene, hasStudioEditorDocument } from './inventory.spatial.studio-export.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -109,7 +110,7 @@ function buildYRotationQuaternion(rotationDeg = 0) {
     ];
 }
 
-function buildGlbFromBatchFile(batchFile) {
+export function buildGlbFromBatchFile(batchFile) {
     const document = {
         asset: {
             version: '2.0',
@@ -1412,6 +1413,9 @@ export async function executeTerrainWorkZoneExportArtifacts({ zone, manifest, ex
     const generatedBrandedGlbFiles = [];
     const generatedTilesetFiles = [];
     const terrainOffset = pickNumber(zone?.snapshotJson?.terrainPatch?.elevationOffsetMeters, 0);
+    const studioScene = zone?.snapshotJson?.warehouseScene || null;
+    const useStudioGeometry = hasStudioEditorDocument(zone);
+    const geometrySource = useStudioGeometry ? 'studio-editor-document' : 'gis-spatial-objects';
     for (const resource of ensureArray(exportPackage?.resources)) {
         let stagedOutput = null;
         let descriptorStatus = resource.category === 'geometry-batch' ? 'pending_asset_generation' : 'materialized_metadata';
@@ -1419,12 +1423,18 @@ export async function executeTerrainWorkZoneExportArtifacts({ zone, manifest, ex
         let auxiliaryOutputs = [];
 
         if (resource.category === 'geometry-batch') {
-            const batchFile = buildGeometryBatchFile({
-                resource,
-                manifest,
-                terrainOffset,
-                zoneId: zone?.id || null,
-            });
+            const batchFile = useStudioGeometry
+                ? buildGeometryBatchFromStudioScene({
+                    zone,
+                    warehouseScene: studioScene,
+                    resource,
+                })
+                : buildGeometryBatchFile({
+                    resource,
+                    manifest,
+                    terrainOffset,
+                    zoneId: zone?.id || null,
+                });
             stagedOutput = path.join('staged-geometry', `${sanitizeSegment(resource.id, 'resource')}.json`);
             await writeJsonFile(path.join(exportRoot, stagedOutput), batchFile);
             descriptorStatus = 'materialized_white_model_json';
@@ -1526,6 +1536,7 @@ export async function executeTerrainWorkZoneExportArtifacts({ zone, manifest, ex
             status: descriptorStatus,
             objectIds: resource.objectIds || [],
             detail: resource,
+            geometrySource,
         };
         const descriptorRelativePath = path.join('descriptors', `${sanitizeSegment(resource.id, 'resource')}.json`);
         const descriptorAbsolutePath = path.join(exportRoot, descriptorRelativePath);
@@ -1575,12 +1586,24 @@ export async function executeTerrainWorkZoneExportArtifacts({ zone, manifest, ex
             glbArtifacts: generatedGlbFiles,
             tilesetArtifacts: generatedTilesetFiles,
         },
+        geometrySource,
+        studioSnapshot: useStudioGeometry
+            ? {
+                sceneType: studioScene?.sceneType || null,
+                savedAt: zone?.snapshotJson?.savedAt || null,
+                importedAt: studioScene?.editorDocument?.metadata?.importedAt || studioScene?.metadata?.importedAt || null,
+                sourceHash: studioScene?.editorDocument?.metadata?.focusZoneSourceHash || studioScene?.metadata?.focusZoneSourceHash || null,
+            }
+            : null,
         logicalOutputs: {
             manifest: normalizeRelativePath(exportPackage?.files?.manifest || 'focus-zones/zone/metadata/publish-manifest.json').split(path.sep).join('/'),
             exportPackage: normalizeRelativePath(exportPackage?.files?.packageDescriptor || 'focus-zones/zone/metadata/export-package.json').split(path.sep).join('/'),
         },
         resourceDescriptors,
         notes: [
+            useStudioGeometry
+                ? '已使用 3D Studio 编辑快照生成白模导出。'
+                : '已使用 GIS 空间对象生成白模导出。',
             generatedGlbFiles.length
                 ? (generatedBrandedGlbFiles.length
                     ? '已输出可直接消费的品牌色 GLB，并保留 staged geometry / staged instancing JSON。'

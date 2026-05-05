@@ -49,6 +49,7 @@ const ProjectDetailPage = lazy(() => import('../../views/app/projects/ProjectDet
 const AssessmentCampaignListPage = lazy(() => import('../../views/app/assessment/AssessmentCampaignListPage'))
 const AssessmentCampaignDetailPage = lazy(() => import('../../views/app/assessment/AssessmentCampaignDetailPage'))
 const BibTrackingPage = lazy(() => import('../../views/app/events/bib-tracking/BibTrackingPage'))
+const RaceDashboardPage = lazy(() => import('../../views/app/race-dashboard/RaceDashboardPage'))
 
 function AppRouteLoader() {
   return (
@@ -527,6 +528,7 @@ useEffect(() => {
               <Route path="assessment" element={<AssessmentCampaignListPage />} />
               <Route path="assessment/:id" element={<AssessmentCampaignDetailPage />} />
               <Route path="bib-tracking" element={<BibTrackingPage />} />
+              <Route path="race-dashboard" element={<RaceDashboardPage />} />
               <Route path="settings" element={<ChangePassword />} />
               <Route path="profile" element={<ProfilePage />} />
               <Route path="*" element={<Navigate to={buildAppHref('', currentContext)} replace />} />

@@ -12,6 +12,12 @@
   gap: 16px;
 }
 
+.lottery-version-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .lottery-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -50,6 +56,12 @@
   border: 1px solid rgba(15, 23, 42, 0.12);
   background: color-mix(in srgb, var(--command-surface) 97%, white 3%);
   color: var(--command-text);
+}
+
+.lottery-v2-textarea {
+  min-height: 120px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .lottery-input--table {

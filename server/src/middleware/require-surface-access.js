@@ -18,6 +18,7 @@ export function requireSurfaceAccess(surface) {
             });
         }
 
+        req.surface = surface;
         next();
     };
 }

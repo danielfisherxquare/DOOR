@@ -76,6 +76,7 @@ export function terrainWorkZoneToMapNode(zone: any): MapTreeNode {
     exportTaskId: zone?.publishTarget?.exportTaskId || zone?.metadata?.exportTaskId || null,
     exportTaskStatus: zone?.publishTarget?.exportTaskStatus || zone?.metadata?.exportTaskStatus || null,
     exportOutputRoot: zone?.publishTarget?.exportOutputRoot || zone?.metadata?.exportOutputRoot || null,
+    geometrySource: zone?.publishTarget?.geometrySource || zone?.metadata?.geometrySource || null,
     syncStatus: 'synced',
     sourceProjectId: zone?.projectId || null,
   };
@@ -122,6 +123,7 @@ export function terrainWorkZoneToGeoJSONFeature(zone: any, nodeId?: string): Geo
       exportTaskId: nextNode.exportTaskId,
       exportTaskStatus: nextNode.exportTaskStatus,
       exportOutputRoot: nextNode.exportOutputRoot,
+      geometrySource: nextNode.geometrySource,
       syncStatus: nextNode.syncStatus,
       sourceProjectId: nextNode.sourceProjectId,
       source: 'terrain-work-zone',

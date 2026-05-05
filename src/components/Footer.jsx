@@ -3,7 +3,7 @@ function Footer() {
   
   return (
     <footer className="footer">
-      <p>© {year} DOOR Workspace · All rights reserved</p>
+      <p>© {year} Powered by Xquare · All rights reserved</p>
     </footer>
   )
 }

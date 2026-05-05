@@ -26,6 +26,7 @@ const PLACEMENT_MODES = new Set(['follow-terrain', 'level-platform', 'vertical-k
 const SPATIAL_OBJECT_STATUSES = new Set(['draft', 'active', 'archived']);
 const WORK_ZONE_TYPES = new Set(['focus-zone', 'terrain-clip', 'corridor-zone']);
 const WORK_ZONE_STATUSES = new Set(['draft', 'ready', 'published', 'archived']);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function normalizeString(value, fieldName, { required = false, fallback = undefined } = {}) {
     if (value === undefined) {
@@ -82,7 +83,16 @@ function buildNotFoundError(message) {
     return error;
 }
 
+function buildBadRequestError(message) {
+    const error = new Error(message);
+    error.statusCode = 400;
+    return error;
+}
+
 async function ensureScopedProject(scope, projectId) {
+    if (!UUID_PATTERN.test(String(projectId || ''))) {
+        throw buildBadRequestError('3D 项目 ID 无效');
+    }
     const project = await studioRepo.getProjectById(scope, projectId);
     if (!project) throw buildNotFoundError('3D 项目不存在');
     return project;
@@ -529,12 +539,14 @@ export async function executeTerrainWorkZoneExport(scope, actorUserId, zoneId) {
             exportTaskId: task.id,
             exportTaskStatus: task.status,
             exportOutputRoot: task.relativeOutputRoot,
+            geometrySource: task.geometrySource,
             exportTaskCompletedAt: task.completedAt,
         }),
         metadata: mergePlainObjects(packageResult.zone.metadata, {
             exportTaskId: task.id,
             exportTaskStatus: task.status,
             exportOutputRoot: task.relativeOutputRoot,
+            geometrySource: task.geometrySource,
         }),
         status: packageResult.zone.status === 'draft' ? 'ready' : packageResult.zone.status,
         updatedBy: actorUserId ?? null,

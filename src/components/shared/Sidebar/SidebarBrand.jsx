@@ -10,7 +10,7 @@ export default function SidebarBrand({ name, shortName, collapsed, onToggleColla
   return (
     <div className="sidebar__brand-row">
       <Link to={homePath} className="sidebar__brand">
-        <span className="sidebar__eyebrow">DOOR</span>
+        <span className="sidebar__eyebrow">Powered by Xquare</span>
         <span className="sidebar__title">{collapsed ? shortName : name}</span>
       </Link>
 

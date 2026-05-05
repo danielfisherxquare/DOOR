@@ -14,6 +14,43 @@ const TABS = [
     { key: 'transfer', label: '调拨占位' },
 ]
 
+/**
+ * 纯内容组件：只负责内层 tab 切换和内容渲染
+ * 供 OPS WarehouseWorkbench 的子模块直接使用，不带任何 Shell
+ */
+export function OutboundContent({ activeTab = 'pickup', onTabChange }) {
+    const tabs = TABS.map((tab) => (
+        <button
+            key={tab.key}
+            type="button"
+            className={`warehouse-workbench__tab ${activeTab === tab.key ? 'warehouse-workbench__tab--active' : ''}`}
+            onClick={() => onTabChange?.(tab.key)}
+        >
+            {tab.label}
+        </button>
+    ))
+
+    let mainContent = <ScanPickup />
+    if (activeTab === 'transfer') {
+        mainContent = (
+            <section className="warehouse-panel">
+                <div className="warehouse-panel__header">
+                    <h3>库内调拨</h3>
+                    <span className="warehouse-panel__subtitle">当前版本先保留占位，避免把未完成能力伪装成可用功能。</span>
+                </div>
+                <div className="warehouse-panel__subtitle">调拨后端能力暂未开放，本轮先收敛作业路径，后续在这里补上系统指引与扫描流。</div>
+            </section>
+        )
+    }
+
+    return (
+        <div className="warehouse-outbound-content">
+            <div className="warehouse-workbench__tabs">{tabs}</div>
+            {mainContent}
+        </div>
+    )
+}
+
 export default function OutboundCenter() {
     const [searchParams, setSearchParams] = useSearchParams()
     const selectedOrgId = searchParams.get('orgId')
@@ -51,7 +88,7 @@ export default function OutboundCenter() {
 
     return (
         <WarehouseWorkbenchShell
-        eyebrow="出库中心"
+            eyebrow="出库中心"
             title="出库中心"
             summary="把扫码领取、待领取队列和出库异常放到同一个作业台里，减少扫码员在多个页面之间反复切换。"
             tabs={tabs}

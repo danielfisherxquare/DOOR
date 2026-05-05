@@ -119,6 +119,34 @@ export const lotteryApi = {
 
     rollbackLottery: (raceId) =>
         request.post(`/lottery/rollback/${raceId}`).then(unwrapData),
+
+    // ── Lottery V2 Beta ─────────────────────────────────────
+    getLotteryV2Config: (raceId) =>
+        request.get(`/lottery-v2/config/${raceId}`).then(unwrapData),
+
+    saveLotteryV2Config: (raceId, data) =>
+        request.put(`/lottery-v2/config/${raceId}`, data).then(unwrapData),
+
+    previewLotteryV2: async (raceId, options = {}) => {
+        const response = await request.post(`/lottery-v2/preview/${raceId}`)
+        const { jobId } = unwrapData(response)
+        return pollJobResult(jobId, options)
+    },
+
+    getLotteryV2Preview: (raceId) =>
+        request.get(`/lottery-v2/preview/${raceId}`).then(unwrapData),
+
+    finalizeLotteryV2: async (raceId, options = {}) => {
+        const response = await request.post(`/lottery-v2/finalize/${raceId}`)
+        const { jobId } = unwrapData(response)
+        return pollJobResult(jobId, options)
+    },
+
+    getLotteryV2Results: (raceId) =>
+        request.get(`/lottery-v2/results/${raceId}`).then(unwrapData),
+
+    rollbackLotteryV2: (raceId) =>
+        request.post(`/lottery-v2/rollback/${raceId}`).then(unwrapData),
 }
 
 export default lotteryApi

@@ -46,11 +46,19 @@ function getOsmDetailLabel(value) {
   return '低'
 }
 
+function normalizeStudioProjectId(projectId) {
+  const normalized = String(projectId || '').trim()
+  if (!normalized || normalized === 'new') return null
+  return normalized
+}
+
 export default function AppMapLayout({ context }) {
   const [searchParams] = useSearchParams()
   const renderFps = useMapStore((state) => state.renderFps)
   const viewMode = useMapStore((state) => state.viewMode)
   const renderQuality = useMapStore((state) => state.renderQuality)
+  const sidebarOpen = useMapStore((state) => state.sidebarOpen)
+  const toggleSidebar = useMapStore((state) => state.toggleSidebar)
   const setRenderQualityPreset = useMapStore((state) => state.setRenderQualityPreset)
   const updateRenderQuality = useMapStore((state) => state.updateRenderQuality)
   const [qualityPanelOpen, setQualityPanelOpen] = useState(false)
@@ -75,7 +83,7 @@ export default function AppMapLayout({ context }) {
     OSM_SSE_MIN,
     OSM_SSE_MAX,
   )
-  const projectId = searchParams.get('projectId')
+  const projectId = normalizeStudioProjectId(searchParams.get('projectId'))
   const studioHref = projectId ? buildAppHref(`/3d-studio/${projectId}`, context) : buildAppHref('/3d-studio', context)
   const studioLinkLabel = projectId ? '进入当前项目工作台' : '先打开项目工作台'
   const projectHint = projectId
@@ -116,16 +124,28 @@ export default function AppMapLayout({ context }) {
                 <span className="app-map-layout__back-text">返回工作台</span>
               </Link>
               <div className="app-map-layout__title-block">
-                <div className="app-map-layout__eyebrow">空间工作台</div>
-                <h1 className="app-map-layout__title">GIS 地图</h1>
+                <div className="app-map-layout__title-row">
+                  <span className="app-map-layout__eyebrow">空间工作台</span>
+                  <h1 className="app-map-layout__title">GIS 地图</h1>
+                  <span className="app-map-layout__badge is-accent">地图模式</span>
+                </div>
                 <div className={`app-map-layout__hint ${projectId ? 'is-project' : 'is-draft'}`.trim()}>
                   {projectHint}
                 </div>
               </div>
-              <span className="app-map-layout__badge is-accent">地图模式</span>
               <Link to={studioHref} className="app-map-layout__studio-link">
                 {studioLinkLabel}
               </Link>
+              <button
+                type="button"
+                className="app-map-layout__sidebar-toggle"
+                title={sidebarOpen ? '收起地图侧栏' : '展开地图侧栏'}
+                aria-label={sidebarOpen ? '收起地图侧栏' : '展开地图侧栏'}
+                aria-pressed={sidebarOpen}
+                onClick={toggleSidebar}
+              >
+                <span className="material-symbols-outlined">{sidebarOpen ? 'menu_open' : 'menu'}</span>
+              </button>
             </div>
             <div className="app-map-layout__canvas-meta">
               <MapControls variant="inline" showHint={false} />
@@ -134,6 +154,7 @@ export default function AppMapLayout({ context }) {
                   type="button"
                   className={`app-map-layout__canvas-chip app-map-layout__canvas-chip--action ${qualityPanelOpen ? 'is-active' : ''}`.trim()}
                   title="调节 3D 画质"
+                  aria-expanded={qualityPanelOpen}
                   onClick={() => setQualityPanelOpen((value) => !value)}
                 >
                   <span className="material-symbols-outlined">tune</span>
@@ -265,7 +286,12 @@ export default function AppMapLayout({ context }) {
           <div className="app-map-layout__canvas-frame">
             <MapErrorBoundary>
               <Suspense fallback={<div className="app-map-layout__loader">正在准备地图工作台…</div>}>
-                <MapView controlsVariant="hidden" projectId={projectId} orgId={context?.orgId || null} />
+                <MapView
+                  controlsVariant="hidden"
+                  projectId={projectId}
+                  orgId={context?.orgId || null}
+                  raceId={context?.raceId || null}
+                />
                 <MapOnboarding />
               </Suspense>
             </MapErrorBoundary>

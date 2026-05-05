@@ -4,10 +4,10 @@ import { useMapStore } from '../../stores/mapStore';
 import MapAdvancedPanel from './MapAdvancedPanel';
 import { CommandDetailPane } from '../command/CommandPrimitives';
 import studioProjectApi from '../../services/studioProjectApi';
-import { getSpatialObjectLabel, SPATIAL_OBJECT_PRESETS, mapNodeToSpatialObjectPayload } from '../../utils/map/spatialObjects';
-import { getTerrainWorkZoneLabel, terrainWorkZoneToGeoJSONFeature, terrainWorkZoneToMapNode } from '../../utils/map/terrainWorkZones';
-import { applyAssetTemplateToNode, inferTemplateObjectType, type StudioAssetTemplate } from '../../utils/map/assetTemplates';
+import { getSpatialObjectLabel, mapNodeToSpatialObjectPayload } from '../../utils/map/spatialObjects';
+import { getTerrainWorkZoneLabel, terrainWorkZoneToMapNode } from '../../utils/map/terrainWorkZones';
 import { measureGeometry } from '../../utils/map/measurements';
+import { createBlankStudioScene } from '../../utils/studioProjectUtils';
 import { buildAppHref } from '../app/appConfig';
 import { showError, showSuccess } from '../../utils/toast';
 import './MapFeaturePanel.css';
@@ -15,24 +15,52 @@ import './MapFeaturePanel.css';
 interface MapFeaturePanelProps {
   nodeId: string;
   onClose?: () => void;
+  projectId?: string | null;
+  orgId?: string | null;
+  raceId?: string | null;
 }
 
-type TabType = 'properties' | 'advanced';
+type TabType = 'properties' | 'advanced' | 'export';
+const SCENE_EXPORT_POLL_INTERVAL_MS = 1500;
+const SCENE_EXPORT_MAX_ATTEMPTS = 80;
 
-export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProps) {
-  const { treeNodes, updateFeature, deleteFeature, setTreeNodes, setDrawnFeatures, recordHistory } = useMapStore();
+function normalizeStudioProjectId(projectId?: string | null) {
+  const normalized = String(projectId || '').trim();
+  if (!normalized || normalized === 'new') return null;
+  return normalized;
+}
+
+export default function MapFeaturePanel({
+  nodeId,
+  onClose,
+  projectId: projectIdProp = null,
+  orgId: orgIdProp = null,
+  raceId: raceIdProp = null,
+}: MapFeaturePanelProps) {
+  const { treeNodes, updateFeature, deleteFeature, recordHistory, viewMode } = useMapStore();
   const [activeTab, setActiveTab] = useState<TabType>('properties');
   const [syncing, setSyncing] = useState(false);
-  const [assetTemplates, setAssetTemplates] = useState<StudioAssetTemplate[]>([]);
+  const [localProjectId, setLocalProjectId] = useState<string | null>(null);
+  const [exportDiagnostics, setExportDiagnostics] = useState<any>(null);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const node = treeNodes.find((n) => n.id === nodeId);
+  const routeProjectId = normalizeStudioProjectId(projectIdProp || searchParams.get('projectId'));
+  const projectId = routeProjectId || localProjectId;
+  const orgId = orgIdProp || searchParams.get('orgId');
+  const raceId = raceIdProp || searchParams.get('raceId');
+  const is3DMode = viewMode === '3D' || viewMode === '3DGlobe';
+
+  useEffect(() => {
+    if (activeTab === 'export' && !is3DMode) {
+      setActiveTab('properties');
+    }
+  }, [activeTab, is3DMode]);
+
   if (!node) return null;
+
   const isStudioDerived = node.source === 'studio-derived';
-  const projectId = searchParams.get('projectId');
-  const orgId = searchParams.get('orgId');
-  const raceId = searchParams.get('raceId');
   const isTerrainWorkZone = node.source === 'terrain-work-zone' || Boolean(node.backendWorkZoneId);
   const activeWorkZoneId = node.backendWorkZoneId || node.focusZoneId || null;
   const detailSubtitle = isTerrainWorkZone
@@ -42,57 +70,20 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
   const hasPublishManifest = Boolean(node.publishManifestGeneratedAt || node.publishManifestObjectCount);
   const hasExportPackage = Boolean(node.exportPackageGeneratedAt || node.exportPackageResourceCount);
   const hasExecutedExport = Boolean(node.exportTaskId || node.exportOutputRoot);
-  const activeTemplate = node.templateId
-    ? assetTemplates.find((item) => item.id === node.templateId) || null
-    : null;
   const measurementSummary = node.geometry ? measureGeometry(node.geometry).summary : '无几何';
-
-  useEffect(() => {
-    let active = true;
-
-    if (!orgId) {
-      setAssetTemplates([]);
-      return () => {
-        active = false;
-      };
-    }
-
-    studioProjectApi.listAssetTemplates(orgId || undefined)
-      .then((result) => {
-        if (!active) return;
-        setAssetTemplates(Array.isArray(result?.data) ? result.data : []);
-      })
-      .catch((error: any) => {
-        if (!active) return;
-        console.warn('[MapFeaturePanel] Failed to load asset templates', error);
-        setAssetTemplates([]);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [orgId]);
+  const exportDisabledReason = !is3DMode
+    ? '请先切换到 3D 模式'
+    : !orgId
+      ? '当前地图缺少机构上下文'
+      : isStudioDerived
+        ? 'Studio 派生对象不能从地图侧导出'
+        : node.geometry?.type !== 'Polygon'
+          ? '请选择面域或矩形选区'
+          : null;
 
   const handleChange = (field: keyof typeof node, value: string | number) => {
     recordHistory();
     updateFeature(nodeId, { [field]: value });
-  };
-
-  const handleTemplateChange = (templateId: string) => {
-    if (!templateId) {
-      updateFeature(nodeId, {
-        templateId: null,
-        templateName: null,
-        variantId: null,
-        assetTemplateKind: null,
-        assetTemplateSource: null,
-      });
-      return;
-    }
-
-    const template = assetTemplates.find((item) => item.id === templateId);
-    if (!template) return;
-    updateFeature(nodeId, applyAssetTemplateToNode(template, node as any));
   };
 
   const handleSync = async () => {
@@ -180,246 +171,280 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
     }
   };
 
-  const handleCreateTerrainWorkZone = async () => {
-    if (!projectId || !node.geometry || node.geometry.type !== 'Polygon') return;
-    setSyncing(true);
+  const updateNodeFromWorkZone = (zoneRecord: any, targetProjectId = projectId) => {
+    if (!zoneRecord?.id) return;
+    const nextNode = terrainWorkZoneToMapNode(zoneRecord) as any;
+    updateFeature(nodeId, {
+      source: 'terrain-work-zone',
+      sourceProjectId: targetProjectId || undefined,
+      backendWorkZoneId: zoneRecord.id,
+      focusZoneId: zoneRecord.id,
+      zoneType: nextNode.zoneType,
+      terrainResolution: nextNode.terrainResolution,
+      includedObjectIds: [],
+      geometry: nextNode.geometry || node.geometry,
+      terrainPatchGeneratedAt: nextNode.terrainPatchGeneratedAt,
+      terrainHeightDeltaMeters: nextNode.terrainHeightDeltaMeters,
+      publishManifestGeneratedAt: nextNode.publishManifestGeneratedAt,
+      publishManifestObjectCount: nextNode.publishManifestObjectCount,
+      publishManifestBatchCount: nextNode.publishManifestBatchCount,
+      publishManifestLodSummary: nextNode.publishManifestLodSummary,
+      publishManifestInstancingEligibleCount: nextNode.publishManifestInstancingEligibleCount,
+      publishManifestGeometryFamilyCount: nextNode.publishManifestGeometryFamilyCount,
+      exportPackageGeneratedAt: nextNode.exportPackageGeneratedAt,
+      exportPackageResourceCount: nextNode.exportPackageResourceCount,
+      exportPackageLodResources: nextNode.exportPackageLodResources,
+      exportPackageInstancingReadyResources: nextNode.exportPackageInstancingReadyResources,
+      exportPackageInstancingReadyObjects: nextNode.exportPackageInstancingReadyObjects,
+      exportTaskId: nextNode.exportTaskId,
+      exportTaskStatus: nextNode.exportTaskStatus,
+      exportOutputRoot: nextNode.exportOutputRoot,
+      geometrySource: nextNode.geometrySource,
+      syncStatus: 'synced',
+    });
+  };
+
+  const updateNodeFromGeneratedScene = (jobRecord: any) => {
+    if (!jobRecord) return;
+    const osmDiagnostics = jobRecord?.generatedScene?.manifestJson?.osm?.diagnostics
+      || jobRecord?.generatedScene?.metadata?.osmDiagnostics
+      || null;
+    if (osmDiagnostics) setExportDiagnostics(osmDiagnostics);
+    updateFeature(nodeId, {
+      generatedSceneId: jobRecord.generatedSceneId || null,
+      generatedSceneStatus: jobRecord.generatedScene?.status || jobRecord.status || null,
+      generatedSceneJobId: jobRecord.id || null,
+      generatedSceneQualityPreset: jobRecord.qualityPreset || null,
+      generatedSceneOsmCount: osmDiagnostics?.returnedCount ?? jobRecord.generatedScene?.manifestJson?.stats?.osmBuildingCount ?? undefined,
+      generatedSceneOsmDiagnostics: osmDiagnostics || undefined,
+    });
+  };
+
+  const getExportDiagnosticRows = () => {
+    const diagnostics = exportDiagnostics || (node as any).generatedSceneOsmDiagnostics || null;
+    if (!diagnostics) return null;
+    const filters = diagnostics.filters || {};
+    return [
+      ['OSM 原始元素', diagnostics.rawElementCount ?? 0],
+      ['可渲染建筑元素', diagnostics.renderableElementCount ?? 0],
+      ['识别 footprint', diagnostics.footprintCount ?? 0],
+      ['保留建筑', diagnostics.returnedCount ?? 0],
+      ['超大面积过滤', filters.areaTooLarge ?? 0],
+      ['主轴过长过滤', filters.majorTooLong ?? 0],
+      ['长条异常过滤', filters.ribbonLike ?? 0],
+      ['building:part 压制父轮廓', filters.suppressedByBuildingParts ?? 0],
+      ['超过数量上限截断', filters.truncatedByMaxBuildings ?? 0],
+    ];
+  };
+
+  const ensureExportProject = async () => {
+    if (projectId) return projectId;
+    if (!orgId) throw new Error('当前地图缺少机构上下文');
+
+    const projectName = `GIS 选区白模 - ${node.name || '未命名选区'}`;
+    const result = await studioProjectApi.createProject({
+      name: projectName,
+      sceneType: 'outdoor-event',
+      projectType: 'site',
+      sourceType: 'blank',
+      snapshotJson: createBlankStudioScene({
+        name: projectName,
+        sceneType: 'outdoor-event',
+        projectType: 'site',
+      }),
+    }, orgId || undefined);
+    const createdProject = result?.data;
+    if (!createdProject?.id) throw new Error('自动创建 3D Studio 项目失败');
+
+    setLocalProjectId(createdProject.id);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('projectId', createdProject.id);
+    if (orgId) nextParams.set('orgId', orgId);
+    if (raceId) nextParams.set('raceId', raceId);
+    setSearchParams(nextParams, { replace: true });
+    return createdProject.id;
+  };
+
+  const ensureSelectionWorkZone = async () => {
+    const targetProjectId = await ensureExportProject();
+    if (!node.geometry || node.geometry.type !== 'Polygon') throw new Error('请选择面域或矩形选区');
+
+    const payload = {
+      name: node.name || '地图选区白模',
+      zoneType: 'focus-zone',
+      clipPolygonWgs84: node.geometry,
+      terrainResolution: node.terrainResolution ?? 2,
+      includedObjectIds: [],
+      publishTarget: {
+        mode: 'focus-zone',
+        sourceNodeId: node.id,
+        exportIntent: 'map-selection-white-model',
+      },
+      metadata: {
+        source: 'map-selection-export',
+        sourceNodeId: node.id,
+        semanticObjectMode: 'disabled',
+      },
+      status: 'ready',
+    };
+    const response = activeWorkZoneId
+      ? await studioProjectApi.updateTerrainWorkZone(activeWorkZoneId, payload, orgId || undefined)
+      : await studioProjectApi.createTerrainWorkZone(targetProjectId, payload, orgId || undefined);
+    const zoneRecord = response?.data;
+    if (!zoneRecord?.id) throw new Error('工作区创建结果无效');
+    updateNodeFromWorkZone(zoneRecord, targetProjectId);
+    return zoneRecord;
+  };
+
+  const ensureTerrainPatch = async (zoneRecord: any) => {
+    if (zoneRecord?.snapshotJson?.terrainPatch) return zoneRecord;
+
+    const result = await studioProjectApi.syncTerrainWorkZoneTerrainPatch(zoneRecord.id, {
+      terrainResolution: node.terrainResolution ?? zoneRecord.terrainResolution ?? 2,
+    }, orgId || undefined);
+    const updatedZone = result?.data?.zone || zoneRecord;
+    updateNodeFromWorkZone(updatedZone, updatedZone.projectId || zoneRecord.projectId || projectId);
+    return updatedZone;
+  };
+
+  const waitForSceneExportJob = async (jobId: string) => {
+    let latestJob: any = null;
+    for (let attempt = 0; attempt < SCENE_EXPORT_MAX_ATTEMPTS; attempt += 1) {
+      const response = await studioProjectApi.getSceneExportJob(jobId, orgId || undefined);
+      latestJob = response?.data || null;
+      if (!latestJob) throw new Error('导出任务返回为空');
+      updateNodeFromGeneratedScene(latestJob);
+      if (latestJob.status === 'completed') return latestJob;
+      if (latestJob.status === 'failed') {
+        throw new Error(latestJob.errorMessage || '选区白模导出失败');
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, SCENE_EXPORT_POLL_INTERVAL_MS));
+    }
+    throw new Error(`导出任务超时${latestJob?.stage ? `：${latestJob.stage}` : ''}`);
+  };
+
+  const ensureCompletedSceneExport = async (targetType: 'studio' | 'file') => {
+    const zoneRecord = await ensureSelectionWorkZone();
+    const zoneWithTerrain = await ensureTerrainPatch(zoneRecord);
+    const targetProjectId = zoneWithTerrain?.projectId || projectId || await ensureExportProject();
+    const response = await studioProjectApi.createTerrainWorkZoneSceneExportJob(
+      targetProjectId,
+      zoneWithTerrain.id,
+      {
+        targetType,
+        qualityPreset: 'standard',
+      },
+      orgId || undefined,
+    );
+    const initialJob = response?.data;
+    if (!initialJob?.id) throw new Error('导出任务创建失败');
+    updateNodeFromGeneratedScene(initialJob);
+    if (initialJob.status === 'completed') return { zoneRecord: zoneWithTerrain, jobRecord: initialJob };
+    const completedJob = await waitForSceneExportJob(initialJob.id);
+    return { zoneRecord: zoneWithTerrain, jobRecord: completedJob };
+  };
+
+  const triggerSceneDownload = (blob: Blob, filename: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const getDownloadFilename = (headers: Record<string, string>, fallback: string) => {
+    const contentDisposition = headers['content-disposition'] || headers['Content-Disposition'] || '';
+    const match = contentDisposition.match(/filename\\*?=(?:UTF-8''|\"?)([^\";]+)/i);
+    if (!match?.[1]) return fallback;
     try {
-      const payload = {
-        name: `${node.name || getSpatialObjectLabel(node.objectType)} 工作区`,
-        zoneType: 'focus-zone',
-        clipPolygonWgs84: node.geometry,
-        includedObjectIds: node.backendObjectId ? [node.backendObjectId] : [],
-        publishTarget: {
-          mode: 'focus-zone',
-          sourceNodeId: node.id,
-        },
-        metadata: {
-          source: 'map-feature-panel',
-          sourceNodeId: node.id,
-          objectType: node.objectType || 'generic',
-        },
-      };
-      const response = node.focusZoneId
-        ? await studioProjectApi.updateTerrainWorkZone(node.focusZoneId, payload, orgId || undefined)
-        : await studioProjectApi.createTerrainWorkZone(projectId, payload, orgId || undefined);
-      const zoneRecord = response?.data || null;
-      if (zoneRecord?.id && node.backendObjectId) {
-        await studioProjectApi.updateSpatialObject(node.backendObjectId, {
-          focusZoneId: zoneRecord.id,
-        }, orgId || undefined);
-      }
-      updateFeature(nodeId, {
-        focusZoneId: zoneRecord?.id || null,
-        syncStatus: node.backendObjectId ? 'synced' : (node.syncStatus || 'local'),
-      });
-      if (zoneRecord?.id) {
-        const terrainNode = terrainWorkZoneToMapNode(zoneRecord);
-        const terrainFeature = terrainWorkZoneToGeoJSONFeature(zoneRecord, terrainNode.id);
-        const currentState = useMapStore.getState();
-        if (!currentState.treeNodes.some((item) => item.id === terrainNode.id || item.backendWorkZoneId === zoneRecord.id)) {
-          setTreeNodes([...currentState.treeNodes, terrainNode]);
-        }
-        if (terrainFeature && !currentState.drawnFeatures.some((feature) => {
-          const props = (feature.properties || {}) as any;
-          return feature.id === terrainFeature.id || props.backendWorkZoneId === zoneRecord.id;
-        })) {
-          setDrawnFeatures([...currentState.drawnFeatures, terrainFeature]);
-        }
-      }
-      showSuccess('地形工作区已创建');
-    } catch (error: any) {
-      showError(`创建地形工作区失败：${error.message}`);
-    } finally {
-      setSyncing(false);
+      return decodeURIComponent(match[1].replace(/\"/g, ''));
+    } catch {
+      return match[1].replace(/\"/g, '');
     }
   };
 
-  const handleOpenWorkbench = () => {
-    if (!projectId || !activeWorkZoneId) return;
-    const href = buildAppHref(`/3d-studio/${projectId}`, { orgId, raceId });
-    const nextUrl = new URL(href, window.location.origin);
-    nextUrl.searchParams.set('focusZoneId', activeWorkZoneId);
-    nextUrl.searchParams.set('sourceNodeId', node.id);
-    nextUrl.searchParams.set('openMode', 'terrain-work-zone');
-    navigate(`${nextUrl.pathname}${nextUrl.search}`);
-  };
-
-  const handleOpenBoundWorkbench = () => {
-    if (!projectId || !node.focusZoneId) return;
-    const href = buildAppHref(`/3d-studio/${projectId}`, { orgId, raceId });
-    const nextUrl = new URL(href, window.location.origin);
-    nextUrl.searchParams.set('focusZoneId', node.focusZoneId);
-    nextUrl.searchParams.set('sourceNodeId', node.id);
-    nextUrl.searchParams.set('openMode', 'terrain-work-zone');
-    navigate(`${nextUrl.pathname}${nextUrl.search}`);
-  };
-
-  const handleGenerateTerrainPatch = async () => {
-    if (!activeWorkZoneId) return;
+  const handleExportToStudio = async () => {
+    if (exportDisabledReason) {
+      showError(exportDisabledReason);
+      return;
+    }
     setSyncing(true);
     try {
-      const zoneResult = await studioProjectApi.getTerrainWorkZone(activeWorkZoneId, orgId || undefined);
-      const zoneRecord = zoneResult?.data;
-      if (!zoneRecord) {
-        throw new Error('未找到地形工作区');
-      }
-
-      const { generateTerrainPatchForZone } = await import('../../utils/map/focusZoneTerrainPatch');
-      const terrainPatch = await generateTerrainPatchForZone(zoneRecord, {
-        terrainResolution: node.terrainResolution ?? zoneRecord.terrainResolution ?? 2,
-      });
-
-      const updateResult = await studioProjectApi.updateTerrainWorkZone(activeWorkZoneId, {
-        snapshotJson: {
-          ...(zoneRecord.snapshotJson || {}),
-          terrainPatch,
-        },
-        metadata: {
-          ...(zoneRecord.metadata || {}),
-          terrainPatchGeneratedAt: terrainPatch.sampledAt,
-          terrainHeightDeltaMeters: terrainPatch.heightDeltaMeters,
-        },
-        terrainResolution: terrainPatch.resolutionMeters,
-        status: 'ready',
+      const { jobRecord } = await ensureCompletedSceneExport('studio');
+      const sceneId = jobRecord?.generatedSceneId;
+      if (!sceneId) throw new Error('导出任务缺少 generated scene');
+      const importResult = await studioProjectApi.importGeneratedSceneToStudio(sceneId, {
+        name: `${node.name || '地图选区'} Studio 导入`,
       }, orgId || undefined);
-
-      const updatedZone = updateResult?.data || zoneRecord;
-      updateFeature(nodeId, {
-        terrainResolution: updatedZone.terrainResolution ?? terrainPatch.resolutionMeters,
-        syncStatus: 'synced',
-        terrainPatchGeneratedAt: terrainPatch.sampledAt,
-        terrainHeightDeltaMeters: terrainPatch.heightDeltaMeters,
-      });
-      showSuccess('Terrain patch 已生成');
+      const importedProjectId = importResult?.data?.studioProject?.id;
+      if (!importedProjectId) throw new Error('导入 Studio 项目失败');
+      showSuccess('选区白模已导入 3D Studio');
+      const href = buildAppHref(`/3d-studio/${importedProjectId}`, { orgId, raceId });
+      navigate(new URL(href, window.location.origin).pathname + new URL(href, window.location.origin).search);
     } catch (error: any) {
-      showError(`生成 terrain patch 失败：${error.message}`);
+      showError(`导出到 3D Studio 失败：${error.message}`);
     } finally {
       setSyncing(false);
     }
   };
 
-  const handleGeneratePublishManifest = async () => {
-    if (!activeWorkZoneId) return;
-    setSyncing(true);
-    try {
-      const result = await studioProjectApi.generateTerrainWorkZonePublishManifest(activeWorkZoneId, orgId || undefined);
-      const zoneRecord = result?.data?.zone;
-      const manifest = result?.data?.manifest;
-      if (!zoneRecord || !manifest) {
-        throw new Error('发布清单生成结果无效');
-      }
-
-      const nextNode = terrainWorkZoneToMapNode(zoneRecord);
-      updateFeature(nodeId, {
-        terrainResolution: nextNode.terrainResolution,
-        terrainPatchGeneratedAt: nextNode.terrainPatchGeneratedAt,
-        terrainHeightDeltaMeters: nextNode.terrainHeightDeltaMeters,
-        publishManifestGeneratedAt: nextNode.publishManifestGeneratedAt,
-        publishManifestObjectCount: nextNode.publishManifestObjectCount,
-        publishManifestBatchCount: nextNode.publishManifestBatchCount,
-        publishManifestLodSummary: nextNode.publishManifestLodSummary,
-        publishManifestInstancingEligibleCount: nextNode.publishManifestInstancingEligibleCount,
-        publishManifestGeometryFamilyCount: nextNode.publishManifestGeometryFamilyCount,
-        syncStatus: 'synced',
-      });
-      showSuccess(`发布清单已生成，共 ${manifest.summary?.totalObjects || 0} 个对象 / ${manifest.summary?.batchCount || 0} 个批次`);
-    } catch (error: any) {
-      showError(`生成发布清单失败：${error.message}`);
-    } finally {
-      setSyncing(false);
+  const handleExportWhiteModelFile = async () => {
+    if (exportDisabledReason) {
+      showError(exportDisabledReason);
+      return;
     }
-  };
-
-  const handleGenerateExportPackage = async () => {
-    if (!activeWorkZoneId) return;
     setSyncing(true);
     try {
-      const result = await studioProjectApi.generateTerrainWorkZoneExportPackage(activeWorkZoneId, orgId || undefined);
-      const zoneRecord = result?.data?.zone;
-      const exportPackage = result?.data?.exportPackage;
-      if (!zoneRecord || !exportPackage) {
-        throw new Error('导出包生成结果无效');
-      }
-
-      const nextNode = terrainWorkZoneToMapNode(zoneRecord);
-      updateFeature(nodeId, {
-        terrainResolution: nextNode.terrainResolution,
-        terrainPatchGeneratedAt: nextNode.terrainPatchGeneratedAt,
-        terrainHeightDeltaMeters: nextNode.terrainHeightDeltaMeters,
-        publishManifestGeneratedAt: nextNode.publishManifestGeneratedAt,
-        publishManifestObjectCount: nextNode.publishManifestObjectCount,
-        publishManifestBatchCount: nextNode.publishManifestBatchCount,
-        publishManifestLodSummary: nextNode.publishManifestLodSummary,
-        publishManifestInstancingEligibleCount: nextNode.publishManifestInstancingEligibleCount,
-        publishManifestGeometryFamilyCount: nextNode.publishManifestGeometryFamilyCount,
-        exportPackageGeneratedAt: nextNode.exportPackageGeneratedAt,
-        exportPackageResourceCount: nextNode.exportPackageResourceCount,
-        exportPackageLodResources: nextNode.exportPackageLodResources,
-        exportPackageInstancingReadyResources: nextNode.exportPackageInstancingReadyResources,
-        exportPackageInstancingReadyObjects: nextNode.exportPackageInstancingReadyObjects,
-        syncStatus: 'synced',
+      const { jobRecord } = await ensureCompletedSceneExport('file');
+      const sceneId = jobRecord?.generatedSceneId;
+      if (!sceneId) throw new Error('导出任务缺少 generated scene');
+      const downloadResponse = await studioProjectApi.downloadGeneratedScene(sceneId, {
+        asset: 'glb',
+        orgId: orgId || undefined,
       });
-      showSuccess(`导出包已生成，共 ${exportPackage.summary?.totalResources || 0} 个资源`);
+      const filename = getDownloadFilename(downloadResponse.headers || {}, `${node.name || 'white-model'}.glb`);
+      triggerSceneDownload(downloadResponse.data, filename);
+      showSuccess('白模文件已生成并开始下载');
     } catch (error: any) {
-      showError(`生成导出包失败：${error.message}`);
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const handleExecuteExport = async () => {
-    if (!activeWorkZoneId) return;
-    setSyncing(true);
-    try {
-      const result = await studioProjectApi.executeTerrainWorkZoneExport(activeWorkZoneId, orgId || undefined);
-      const zoneRecord = result?.data?.zone;
-      const task = result?.data?.task;
-      if (!zoneRecord || !task) {
-        throw new Error('导出执行结果无效');
-      }
-
-      const nextNode = terrainWorkZoneToMapNode(zoneRecord);
-      updateFeature(nodeId, {
-        terrainResolution: nextNode.terrainResolution,
-        terrainPatchGeneratedAt: nextNode.terrainPatchGeneratedAt,
-        terrainHeightDeltaMeters: nextNode.terrainHeightDeltaMeters,
-        publishManifestGeneratedAt: nextNode.publishManifestGeneratedAt,
-        publishManifestObjectCount: nextNode.publishManifestObjectCount,
-        publishManifestBatchCount: nextNode.publishManifestBatchCount,
-        publishManifestLodSummary: nextNode.publishManifestLodSummary,
-        publishManifestInstancingEligibleCount: nextNode.publishManifestInstancingEligibleCount,
-        publishManifestGeometryFamilyCount: nextNode.publishManifestGeometryFamilyCount,
-        exportPackageGeneratedAt: nextNode.exportPackageGeneratedAt,
-        exportPackageResourceCount: nextNode.exportPackageResourceCount,
-        exportPackageLodResources: nextNode.exportPackageLodResources,
-        exportPackageInstancingReadyResources: nextNode.exportPackageInstancingReadyResources,
-        exportPackageInstancingReadyObjects: nextNode.exportPackageInstancingReadyObjects,
-        exportTaskId: nextNode.exportTaskId,
-        exportTaskStatus: nextNode.exportTaskStatus,
-        exportOutputRoot: nextNode.exportOutputRoot,
-        syncStatus: 'synced',
-      });
-      showSuccess(`导出执行完成，输出目录 ${task.relativeOutputRoot}`);
-    } catch (error: any) {
-      showError(`执行导出失败：${error.message}`);
+      showError(`导出白模文件失败：${error.message}`);
     } finally {
       setSyncing(false);
     }
   };
 
   const getTabs = () => (
-    <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
+    <div className="feature-panel-tabs" role="tablist" aria-label="图形信息标签">
       <button
-        className={`btn btn--sm ${activeTab === 'properties' ? 'btn--primary' : 'btn--ghost'}`}
+        type="button"
+        className={`feature-panel-tab ${activeTab === 'properties' ? 'is-active' : ''}`}
         onClick={() => setActiveTab('properties')}
+        role="tab"
+        aria-selected={activeTab === 'properties'}
       >
         属性
       </button>
       <button
-        className={`btn btn--sm ${activeTab === 'advanced' ? 'btn--primary' : 'btn--ghost'}`}
+        type="button"
+        className={`feature-panel-tab ${activeTab === 'advanced' ? 'is-active' : ''}`}
         onClick={() => setActiveTab('advanced')}
+        role="tab"
+        aria-selected={activeTab === 'advanced'}
       >
         详情
+      </button>
+      <button
+        type="button"
+        className={`feature-panel-tab ${activeTab === 'export' ? 'is-active' : ''}`}
+        onClick={() => setActiveTab('export')}
+        role="tab"
+        aria-selected={activeTab === 'export'}
+        disabled={!is3DMode}
+        title={is3DMode ? '导出选区白模' : '切换到 3D 模式后可用'}
+      >
+        导出
       </button>
     </div>
   );
@@ -431,12 +456,12 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
       actions={(
         <button
           type="button"
-          className="btn btn--icon btn--ghost"
+          className="feature-panel-close"
           onClick={onClose}
           title="关闭详情"
           aria-label="关闭详情"
         >
-          <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>close</span>
+          <span className="material-symbols-outlined">close</span>
         </button>
       )}
       className="feature-panel-wrap"
@@ -456,7 +481,7 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
                 onChange={(e) => handleChange('name', e.target.value)}
               />
               {isStudioDerived && (
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                <span className="feature-panel-help">
                   楼层名称来自结构数据，请在结构模式中修改。
                 </span>
               )}
@@ -464,110 +489,19 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
 
             <div className="feature-form-group">
               <label>类型</label>
-              <span style={{ fontSize: '14px', color: 'var(--text-primary)', padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+              <span className="feature-panel-static">
                 {isTerrainWorkZone ? getTerrainWorkZoneLabel(node.zoneType) : node.featureType}
               </span>
             </div>
 
             <div className="feature-form-group">
               <label>量算</label>
-              <span style={{ fontSize: '14px', color: 'var(--text-primary)', padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+              <span className="feature-panel-static feature-panel-static--multiline">
                 {measurementSummary}
               </span>
             </div>
 
-            {!isTerrainWorkZone ? (
-              <>
-                <div className="feature-form-group">
-                  <label>标准件模板</label>
-                  <select
-                    value={node.templateId || ''}
-                    disabled={isStudioDerived}
-                    onChange={(e) => handleTemplateChange(e.target.value)}
-                  >
-                    <option value="">不使用模板</option>
-                    {assetTemplates.map((template) => (
-                      <option key={template.id} value={template.id}>
-                        {template.name}{template.source === 'builtin' ? ' · 内置' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  {activeTemplate && (
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      分类: {activeTemplate.category || 'generic'} · 类型: {inferTemplateObjectType(activeTemplate)}
-                    </span>
-                  )}
-                </div>
-
-                <div className="feature-form-group">
-                  <label>语义对象</label>
-                  <select
-                    value={node.objectType || 'generic'}
-                    disabled={isStudioDerived}
-                    onChange={(e) => handleChange('objectType', e.target.value)}
-                  >
-                    {SPATIAL_OBJECT_PRESETS.map((preset) => (
-                      <option key={preset.objectType} value={preset.objectType}>
-                        {preset.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="feature-form-group">
-                  <label>落地方式</label>
-                  <select
-                    value={node.placementMode || 'follow-terrain'}
-                    disabled={isStudioDerived}
-                    onChange={(e) => handleChange('placementMode', e.target.value)}
-                  >
-                    <option value="follow-terrain">贴地</option>
-                    <option value="level-platform">找平平台</option>
-                    <option value="vertical-keep">主体垂直</option>
-                  </select>
-                </div>
-
-                <div className="feature-form-group">
-                  <label>品牌包</label>
-                  <select
-                    value={node.brandingPackId || 'neutral'}
-                    disabled={isStudioDerived}
-                    onChange={(e) => handleChange('brandingPackId', e.target.value)}
-                  >
-                    <option value="neutral">中性白模</option>
-                    <option value="race-red">赛事红</option>
-                    <option value="sponsor-blue">赞助蓝</option>
-                    <option value="energy-green">能量绿</option>
-                    <option value="custom">自定义</option>
-                  </select>
-                </div>
-
-                <div className="feature-form-group">
-                  <label>门楣样式</label>
-                  <select
-                    value={node.fasciaStyle || 'classic'}
-                    disabled={isStudioDerived}
-                    onChange={(e) => handleChange('fasciaStyle', e.target.value)}
-                  >
-                    <option value="classic">经典门楣</option>
-                    <option value="boxed">盒式门楣</option>
-                    <option value="banner">横幅门楣</option>
-                    <option value="towered">塔冠门楣</option>
-                  </select>
-                </div>
-
-                <div className="feature-form-group">
-                  <label>赞助商标识</label>
-                  <input
-                    type="text"
-                    value={node.sponsorName || ''}
-                    disabled={isStudioDerived}
-                    placeholder="例如 Sponsor A"
-                    onChange={(e) => handleChange('sponsorName', e.target.value)}
-                  />
-                </div>
-              </>
-            ) : (
+            {isTerrainWorkZone && (
               <>
                 <div className="feature-form-group">
                   <label>工作区类型</label>
@@ -598,25 +532,25 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
 
                 <div className="feature-form-group">
                   <label>关联对象</label>
-                  <span style={{ fontSize: '14px', color: 'var(--text-primary)', padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                  <span className="feature-panel-static">
                     {(node.includedObjectIds || []).length} 个
                   </span>
                 </div>
 
                 <div className="feature-form-group">
                   <label>发布清单</label>
-                  <span style={{ fontSize: '14px', color: 'var(--text-primary)', padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                  <span className="feature-panel-static">
                     {hasPublishManifest
                       ? `${node.publishManifestObjectCount || 0} 对象 / ${node.publishManifestBatchCount || 0} 批次`
                       : '尚未生成'}
                   </span>
                   {node.publishManifestLodSummary && (
-                    <span style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    <span className="feature-panel-help">
                       LOD0 {node.publishManifestLodSummary.LOD0 || 0} / LOD1 {node.publishManifestLodSummary.LOD1 || 0} / LOD2 {node.publishManifestLodSummary.LOD2 || 0}
                     </span>
                   )}
                   {(node.publishManifestInstancingEligibleCount || node.publishManifestGeometryFamilyCount) && (
-                    <span style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    <span className="feature-panel-help">
                       可实例化 {node.publishManifestInstancingEligibleCount || 0} / 几何家族 {node.publishManifestGeometryFamilyCount || 0}
                     </span>
                   )}
@@ -624,18 +558,18 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
 
                 <div className="feature-form-group">
                   <label>导出包</label>
-                  <span style={{ fontSize: '14px', color: 'var(--text-primary)', padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                  <span className="feature-panel-static">
                     {hasExportPackage
                       ? `${node.exportPackageResourceCount || 0} 个资源`
                       : '尚未生成'}
                   </span>
                   {node.exportPackageLodResources && (
-                    <span style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    <span className="feature-panel-help">
                       LOD0 {node.exportPackageLodResources.LOD0 || 0} / LOD1 {node.exportPackageLodResources.LOD1 || 0} / LOD2 {node.exportPackageLodResources.LOD2 || 0}
                     </span>
                   )}
                   {(node.exportPackageInstancingReadyResources || node.exportPackageInstancingReadyObjects) && (
-                    <span style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    <span className="feature-panel-help">
                       Instancing-ready 资源 {node.exportPackageInstancingReadyResources || 0} / 对象 {node.exportPackageInstancingReadyObjects || 0}
                     </span>
                   )}
@@ -643,11 +577,11 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
 
                 <div className="feature-form-group">
                   <label>导出执行</label>
-                  <span style={{ fontSize: '14px', color: 'var(--text-primary)', padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                  <span className="feature-panel-static">
                     {hasExecutedExport ? (node.exportTaskStatus || 'completed') : '尚未执行'}
                   </span>
                   {node.exportOutputRoot && (
-                    <span style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
+                    <span className="feature-panel-help feature-panel-help--break">
                       输出: {node.exportOutputRoot}
                     </span>
                   )}
@@ -658,41 +592,41 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
             {!isStudioDerived && (
               <div className="feature-form-group">
                 <label>同步状态</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', padding: '6px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '999px' }}>
+                <div className="feature-panel-status-row">
+                  <span className="feature-panel-status-pill">
                     {isTerrainWorkZone
                       ? (activeWorkZoneId ? `已绑定 ${getTerrainWorkZoneLabel(node.zoneType)}` : '仅本地工作区')
                       : (node.backendObjectId ? `已绑定 ${getSpatialObjectLabel(node.objectType)}` : '仅本地')}
                   </span>
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  <span className="feature-panel-help">
                     {node.syncStatus || ((node.backendObjectId || activeWorkZoneId) ? 'synced' : 'local')}
                   </span>
                 </div>
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="feature-panel-grid feature-panel-grid--two">
               <div className="feature-form-group">
                 <label>颜色 (可选)</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="feature-panel-color-row">
                   <input
                     type="color"
                     value={node.color || '#3388ff'}
                     onChange={(e) => handleChange('color', e.target.value)}
                   />
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{node.color || '#3388ff'}</span>
+                  <span className="feature-panel-color-value">{node.color || '#3388ff'}</span>
                 </div>
               </div>
 
               <div className="feature-form-group">
                 <label>{isTerrainWorkZone ? '边框颜色' : '强调色'}</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="feature-panel-color-row">
                   <input
                     type="color"
                     value={(isTerrainWorkZone ? node.strokeColor : node.accentColor) || '#ffffff'}
                     onChange={(e) => handleChange(isTerrainWorkZone ? 'strokeColor' : 'accentColor', e.target.value)}
                   />
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  <span className="feature-panel-color-value">
                     {(isTerrainWorkZone ? node.strokeColor : node.accentColor) || '#ffffff'}
                   </span>
                 </div>
@@ -701,13 +635,13 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
               {!isTerrainWorkZone && (
                 <div className="feature-form-group">
                   <label>边框颜色</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div className="feature-panel-color-row">
                     <input
                       type="color"
                       value={node.strokeColor || '#3388ff'}
                       onChange={(e) => handleChange('strokeColor', e.target.value)}
                     />
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{node.strokeColor || '#3388ff'}</span>
+                    <span className="feature-panel-color-value">{node.strokeColor || '#3388ff'}</span>
                   </div>
                 </div>
               )}
@@ -723,19 +657,19 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
                 value={node.strokeWeight || 3}
                 onChange={(e) => handleChange('strokeWeight', Number(e.target.value))}
               />
-              <span style={{ fontSize: '12px', textAlign: 'right', color: 'var(--text-secondary)' }}>{node.strokeWeight || 3} px</span>
+              <span className="feature-panel-range-value">{node.strokeWeight || 3} px</span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="feature-panel-grid feature-panel-grid--two">
               <div className="feature-form-group">
                 <label>填充颜色</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="feature-panel-color-row">
                   <input
                     type="color"
                     value={node.fillColor || '#3388ff'}
                     onChange={(e) => handleChange('fillColor', e.target.value)}
                   />
-                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{node.fillColor || '#3388ff'}</span>
+                  <span className="feature-panel-color-value">{node.fillColor || '#3388ff'}</span>
                 </div>
               </div>
             </div>
@@ -750,11 +684,11 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
                 value={node.fillOpacity ?? 0.3}
                 onChange={(e) => handleChange('fillOpacity', Number(e.target.value))}
               />
-              <span style={{ fontSize: '12px', textAlign: 'right', color: 'var(--text-secondary)' }}>{node.fillOpacity ?? 0.3}</span>
+              <span className="feature-panel-range-value">{node.fillOpacity ?? 0.3}</span>
             </div>
 
             {!isStudioDerived && projectId && (
-              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+              <div className="feature-panel-actions">
                 <button type="button" className="btn btn--primary" onClick={handleSync} disabled={syncing}>
                   {syncing
                     ? '同步中...'
@@ -767,89 +701,101 @@ export default function MapFeaturePanel({ nodeId, onClose }: MapFeaturePanelProp
                     {isTerrainWorkZone ? '删除工作区' : '删除项目对象'}
                   </button>
                 )}
-                {isTerrainWorkZone && activeWorkZoneId && (
-                  <button type="button" className="btn btn--ghost" onClick={handleOpenWorkbench}>
-                    进入工作台
-                  </button>
-                )}
-              </div>
-            )}
-
-            {isTerrainWorkZone && activeWorkZoneId && (
-              <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                <button type="button" className="btn btn--ghost" onClick={handleGenerateTerrainPatch} disabled={syncing}>
-                  {syncing ? '处理中...' : hasTerrainPatch ? '刷新 Terrain Patch' : '生成 Terrain Patch'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={handleGeneratePublishManifest}
-                  disabled={syncing || !hasTerrainPatch}
-                >
-                  {syncing ? '处理中...' : hasPublishManifest ? '刷新发布清单' : '生成发布清单'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={handleGenerateExportPackage}
-                  disabled={syncing || !hasPublishManifest}
-                >
-                  {syncing ? '处理中...' : hasExportPackage ? '刷新导出包' : '生成导出包'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--ghost"
-                  onClick={handleExecuteExport}
-                  disabled={syncing || !hasExportPackage}
-                >
-                  {syncing ? '处理中...' : hasExecutedExport ? '重新执行导出' : '执行导出'}
-                </button>
-                {hasTerrainPatch && (
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', alignSelf: 'center' }}>
-                    已缓存局部高程
-                  </span>
-                )}
-                {!hasTerrainPatch && (
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', alignSelf: 'center' }}>
-                    需先生成 Terrain Patch
-                  </span>
-                )}
-                {hasPublishManifest && (
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', alignSelf: 'center' }}>
-                    最近一次: {node.publishManifestGeneratedAt}
-                  </span>
-                )}
-                {hasExportPackage && (
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', alignSelf: 'center' }}>
-                    导出包: {node.exportPackageGeneratedAt}
-                  </span>
-                )}
-                {hasExecutedExport && (
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', alignSelf: 'center' }}>
-                    任务: {node.exportTaskStatus}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {!isStudioDerived && projectId && !isTerrainWorkZone && node.geometry?.type === 'Polygon' && (
-              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                <button type="button" className="btn btn--ghost" onClick={handleCreateTerrainWorkZone} disabled={syncing}>
-                  {node.focusZoneId ? '刷新地形工作区' : '生成地形工作区'}
-                </button>
-                {node.focusZoneId && (
-                  <button type="button" className="btn btn--ghost" onClick={handleOpenBoundWorkbench}>
-                    进入工作台
-                  </button>
-                )}
-                {node.focusZoneId && (
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)', alignSelf: 'center' }}>
-                    工作区: {node.focusZoneId}
-                  </span>
-                )}
               </div>
             )}
           </>
+        ) : activeTab === 'export' ? (
+          <div className="feature-export-tab">
+            <div className="feature-export-card">
+              <span className="feature-export-eyebrow">选区白模</span>
+              <strong>导出当前面域</strong>
+              <span>
+                只使用当前选区边界和地形数据生成白模，不依赖旧配置。
+              </span>
+            </div>
+
+            <div className="feature-export-status-grid">
+              <div>
+                <span>地图模式</span>
+                <strong>{is3DMode ? '3D 可用' : '仅 3D 可用'}</strong>
+              </div>
+              <div>
+                <span>选区类型</span>
+                <strong>{node.geometry?.type || '无几何'}</strong>
+              </div>
+              <div>
+                <span>量算</span>
+                <strong>{measurementSummary}</strong>
+              </div>
+              <div>
+                <span>工作区</span>
+                <strong>{activeWorkZoneId || '导出时自动创建'}</strong>
+              </div>
+              <div>
+                <span>项目</span>
+                <strong>{projectId || '导出时自动创建'}</strong>
+              </div>
+              <div>
+                <span>地形缓存</span>
+                <strong>{hasTerrainPatch ? '已生成' : '导出时自动生成'}</strong>
+              </div>
+              <div>
+                <span>白模文件</span>
+                <strong>{hasExecutedExport ? (node.exportTaskStatus || '已导出') : '尚未导出'}</strong>
+              </div>
+            </div>
+
+            {exportDisabledReason && (
+              <span className="feature-panel-static feature-panel-static--multiline">
+                {exportDisabledReason}
+              </span>
+            )}
+
+            {getExportDiagnosticRows() && (
+              <div className="feature-export-diagnostics">
+                <div className="feature-export-diagnostics__header">
+                  <span>OSM 导出诊断</span>
+                  <strong>{(exportDiagnostics || (node as any).generatedSceneOsmDiagnostics)?.truncatedByMaxBuildings ? '已触顶' : '正常'}</strong>
+                </div>
+                <div className="feature-export-diagnostics__grid">
+                  {getExportDiagnosticRows()?.map(([label, value]) => (
+                    <div key={label}>
+                      <span>{label}</span>
+                      <strong>{value}</strong>
+                    </div>
+                  ))}
+                </div>
+                <span className="feature-panel-help">
+                  若“可渲染建筑元素”本身很少，是 OSM 数据不足；若过滤项很高，是 footprint 被判定为大院、街区或异常轮廓。
+                </span>
+              </div>
+            )}
+
+            <div className="feature-panel-actions feature-panel-actions--stacked">
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={handleExportToStudio}
+                disabled={syncing || Boolean(exportDisabledReason)}
+              >
+                {syncing ? '处理中...' : '导出到 3D Studio'}
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={handleExportWhiteModelFile}
+                disabled={syncing || Boolean(exportDisabledReason)}
+              >
+                {syncing ? '处理中...' : '导出白模文件'}
+              </button>
+            </div>
+
+            {node.exportOutputRoot && (
+              <span className="feature-panel-help feature-panel-help--break">
+                最近输出: {node.exportOutputRoot}
+              </span>
+            )}
+          </div>
         ) : (
           <MapAdvancedPanel nodeId={nodeId} />
         )}

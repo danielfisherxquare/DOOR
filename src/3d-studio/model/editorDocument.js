@@ -1,5 +1,9 @@
 const DEFAULT_WAREHOUSE_DIMENSIONS_MM = { width_mm: 24000, depth_mm: 18000, height_mm: 9000 }
 const DEFAULT_CURVE_TOLERANCE = 0.08
+const DEFAULT_MAX_OSM_BUILDING_MAJOR_METERS = 240
+const DEFAULT_MAX_OSM_BUILDING_AREA_SQM = 20000
+const DEFAULT_MAX_OSM_RIBBON_MAJOR_METERS = 120
+const DEFAULT_MAX_OSM_RIBBON_ASPECT_RATIO = 12
 
 const cloneValue = (value) => {
   if (value === null || value === undefined) return value
@@ -12,6 +16,10 @@ const asString = (value, fallback = '') => (typeof value === 'string' && value.t
 const asNumber = (value, fallback = 0) => {
   const nextValue = Number(value)
   return Number.isFinite(nextValue) ? nextValue : fallback
+}
+const asOptionalNumber = (value, fallback = Number.NaN) => {
+  if (value === null || value === undefined || value === '') return fallback
+  return asNumber(value, fallback)
 }
 const roundCoord = (value) => Math.round(asNumber(value, 0) * 1000) / 1000
 const pointKey = (x, z, y = 0) => `${roundCoord(x)}:${roundCoord(y)}:${roundCoord(z)}`
@@ -131,6 +139,40 @@ function polygonArea(points) {
   return Math.abs(area) / 2
 }
 
+function boundsFromFootprint(points) {
+  if (!points.length) return { width: 0, depth: 0 }
+  let minX = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let minZ = Number.POSITIVE_INFINITY
+  let maxZ = Number.NEGATIVE_INFINITY
+  points.forEach((point) => {
+    minX = Math.min(minX, asNumber(point?.[0], 0))
+    maxX = Math.max(maxX, asNumber(point?.[0], 0))
+    minZ = Math.min(minZ, asNumber(point?.[1], 0))
+    maxZ = Math.max(maxZ, asNumber(point?.[1], 0))
+  })
+  return {
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+    width: Math.max(maxX - minX, 0),
+    depth: Math.max(maxZ - minZ, 0),
+  }
+}
+
+function isUsableLegacyOsmFootprint(points) {
+  if (points.length < 3) return false
+  const bounds = boundsFromFootprint(points)
+  const major = Math.max(bounds.width, bounds.depth)
+  const minor = Math.max(Math.min(bounds.width, bounds.depth), 0.01)
+  const area = polygonArea(points)
+  if (major > DEFAULT_MAX_OSM_BUILDING_MAJOR_METERS) return false
+  if (area > DEFAULT_MAX_OSM_BUILDING_AREA_SQM) return false
+  if (major > DEFAULT_MAX_OSM_RIBBON_MAJOR_METERS && major / minor > DEFAULT_MAX_OSM_RIBBON_ASPECT_RATIO) return false
+  return true
+}
+
 function segmentsIntersect(a1, a2, b1, b2) {
   const cross = (p1, p2, p3) => (p2[0] - p1[0]) * (p3[1] - p1[1]) - (p2[1] - p1[1]) * (p3[0] - p1[0])
   const onSegment = (p1, p2, p3) => (
@@ -202,6 +244,7 @@ export function createEmptyEditorDocument() {
     segments: [],
     profiles: [],
     solids: [],
+    terrainMeshes: [],
     surfaces: [],
     instances: [],
     openings: [],
@@ -210,16 +253,290 @@ export function createEmptyEditorDocument() {
   }
 }
 
+function collectLegacyFootprintWgs84Origin(solids) {
+  const points = []
+  asArray(solids).forEach((solid) => {
+    asArray(solid?.footprintWgs84?.coordinates?.[0]).forEach((point) => {
+      const longitude = asNumber(point?.[0], Number.NaN)
+      const latitude = asNumber(point?.[1], Number.NaN)
+      if (Number.isFinite(longitude) && Number.isFinite(latitude)) points.push([longitude, latitude])
+    })
+  })
+  if (!points.length) return null
+  const sum = points.reduce((acc, point) => [acc[0] + point[0], acc[1] + point[1]], [0, 0])
+  return {
+    longitude: sum[0] / points.length,
+    latitude: sum[1] / points.length,
+  }
+}
+
+function legacyFootprintLocalPoints(solid, originWgs84 = null) {
+  const local = asArray(solid?.footprintLocal)
+    .map((point) => {
+      if (Array.isArray(point)) return [asNumber(point[0], Number.NaN), asNumber(point[1], Number.NaN)]
+      return [asNumber(point?.x, Number.NaN), asNumber(point?.z, Number.NaN)]
+    })
+    .filter((point) => Number.isFinite(point[0]) && Number.isFinite(point[1]))
+  const sourcePoints = local.length >= 3
+    ? local
+    : asArray(solid?.footprintWgs84?.coordinates?.[0])
+      .map((point) => {
+        const longitude = asNumber(point?.[0], Number.NaN)
+        const latitude = asNumber(point?.[1], Number.NaN)
+        if (!originWgs84 || !Number.isFinite(longitude) || !Number.isFinite(latitude)) return null
+        const metersPerDegreeLat = 111320
+        const metersPerDegreeLng = metersPerDegreeLat * Math.cos((asNumber(originWgs84.latitude, 0) * Math.PI) / 180) || 1
+        return [
+          (longitude - asNumber(originWgs84.longitude, 0)) * metersPerDegreeLng,
+          (latitude - asNumber(originWgs84.latitude, 0)) * metersPerDegreeLat,
+        ]
+      })
+      .filter(Boolean)
+  const points = []
+  sourcePoints.forEach((point) => {
+    const nextPoint = [roundCoord(point[0]), roundCoord(point[1])]
+    const previous = points[points.length - 1]
+    if (!previous || previous[0] !== nextPoint[0] || previous[1] !== nextPoint[1]) points.push(nextPoint)
+  })
+  while (points.length > 1 && points[0][0] === points[points.length - 1][0] && points[0][1] === points[points.length - 1][1]) {
+    points.pop()
+  }
+  return points
+}
+
+function inferTerrainGrid(rawVertices, mesh) {
+  const vertexCount = rawVertices.length
+  const explicitRows = Math.max(Math.floor(asNumber(mesh?.rows ?? mesh?.metadata?.rows, 0)), 0)
+  const explicitCols = Math.max(Math.floor(asNumber(mesh?.cols ?? mesh?.metadata?.cols, 0)), 0)
+  if (explicitRows >= 2 && explicitCols >= 2 && explicitRows * explicitCols === vertexCount) {
+    return { rows: explicitRows, cols: explicitCols }
+  }
+
+  const squareSize = Math.sqrt(vertexCount)
+  if (Number.isInteger(squareSize) && squareSize >= 2) {
+    return { rows: squareSize, cols: squareSize }
+  }
+
+  return { rows: explicitRows, cols: explicitCols }
+}
+
+function terrainBounds(mesh) {
+  const bounds = mesh?.boundsMeters || mesh?.metadata?.boundsMeters || {}
+  const width = Math.max(asNumber(bounds.width, asNumber(bounds.maxX, 0) - asNumber(bounds.minX, 0)), 1)
+  const depth = Math.max(asNumber(bounds.depth, asNumber(bounds.maxZ, 0) - asNumber(bounds.minZ, 0)), 1)
+  return {
+    minX: asNumber(bounds.minX, -width / 2),
+    maxX: asNumber(bounds.maxX, width / 2),
+    minZ: asNumber(bounds.minZ, -depth / 2),
+    maxZ: asNumber(bounds.maxZ, depth / 2),
+    width,
+    depth,
+  }
+}
+
+function normalizeTerrainMeshVertices(mesh) {
+  const rawVertices = asArray(mesh?.vertices)
+  if (!rawVertices.length) return []
+  if (rawVertices.every((item) => typeof item === 'number' || typeof item === 'string')) {
+    return rawVertices.map((item) => asNumber(item, 0))
+  }
+
+  const { rows, cols } = inferTerrainGrid(rawVertices, mesh)
+  const bounds = terrainBounds(mesh)
+  const stepX = (bounds.maxX - bounds.minX) / Math.max(cols - 1, 1)
+  const stepZ = (bounds.maxZ - bounds.minZ) / Math.max(rows - 1, 1)
+
+  const vertices = []
+  rawVertices.forEach((rawVertex, index) => {
+    const tuple = Array.isArray(rawVertex) ? rawVertex : null
+    const xValue = tuple ? tuple[0] : rawVertex?.x
+    const yValue = tuple ? tuple[1] : rawVertex?.y ?? rawVertex?.height
+    const zValue = tuple ? tuple[2] : rawVertex?.z
+    let x = asOptionalNumber(xValue, Number.NaN)
+    const y = asOptionalNumber(yValue, 0)
+    let z = asOptionalNumber(zValue, Number.NaN)
+
+    if ((!Number.isFinite(x) || !Number.isFinite(z)) && rows >= 2 && cols >= 2) {
+      const row = Math.floor(index / cols)
+      const col = index % cols
+      x = bounds.minX + stepX * col
+      z = bounds.minZ + stepZ * row
+    }
+
+    vertices.push(roundCoord(x), roundCoord(y), roundCoord(z))
+  })
+  return vertices.filter((item) => Number.isFinite(item))
+}
+
+function normalizeTerrainMeshIndices(indices) {
+  const normalized = []
+  asArray(indices).forEach((item) => {
+    if (Array.isArray(item)) {
+      item.forEach((part) => normalized.push(Math.max(0, Math.floor(asNumber(part, 0)))))
+      return
+    }
+    normalized.push(Math.max(0, Math.floor(asNumber(item, 0))))
+  })
+  return normalized
+}
+
+function normalizeTerrainMeshRecord(mesh, index) {
+  const rawVertices = asArray(mesh?.vertices)
+  const grid = inferTerrainGrid(rawVertices, mesh)
+  const metadata = {
+    ...(mesh?.metadata || {}),
+    source: mesh?.metadata?.source || mesh?.source || null,
+    boundsMeters: mesh?.metadata?.boundsMeters || mesh?.boundsMeters || null,
+    rows: mesh?.metadata?.rows || mesh?.rows || grid.rows || null,
+    cols: mesh?.metadata?.cols || mesh?.cols || grid.cols || null,
+    elevationOffsetMeters: mesh?.metadata?.elevationOffsetMeters ?? mesh?.elevationOffsetMeters ?? null,
+  }
+  return {
+    id: asString(mesh?.id, `terrain-mesh:${index + 1}`),
+    kind: asString(mesh?.kind, 'terrain-grid'),
+    name: asString(mesh?.name, `地形网格 ${index + 1}`),
+    color: asString(mesh?.color, '#d9e4d0'),
+    vertices: normalizeTerrainMeshVertices(mesh),
+    indices: normalizeTerrainMeshIndices(mesh?.indices),
+    metadata: cloneValue(metadata),
+  }
+}
+
+function upgradeLegacyFootprintDocument(value) {
+  const solids = asArray(value?.solids)
+  if (!solids.length || solids.some((solid) => asString(solid?.profileId, ''))) return value
+
+  const originWgs84 = value?.metadata?.originWgs84 || collectLegacyFootprintWgs84Origin(solids)
+  const nextDocument = {
+    ...createEmptyEditorDocument(),
+    ...cloneValue(value),
+    sketchPlanes: asArray(value?.sketchPlanes).length ? cloneValue(value.sketchPlanes) : createEmptyEditorDocument().sketchPlanes,
+    vertices: [],
+    segments: [],
+    profiles: [],
+    solids: [],
+  }
+  let skippedLegacyOsmFootprints = 0
+
+  solids.forEach((solid, solidIndex) => {
+    const points = legacyFootprintLocalPoints(solid, originWgs84)
+    if (points.length < 3) return
+    if ((solid?.metadata?.compatType || 'osm-building') === 'osm-building' && !isUsableLegacyOsmFootprint(points)) {
+      skippedLegacyOsmFootprints += 1
+      return
+    }
+
+    const sourceId = asString(solid?.id, `legacy-solid:${solidIndex + 1}`)
+    const safeId = sourceId.replace(/[^a-zA-Z0-9:_-]+/g, '-')
+    const baseElevation = Math.max(asNumber(solid?.baseElevation ?? solid?.minHeightMeters, 0), 0)
+    const height = Math.max(asNumber(solid?.height ?? solid?.heightMeters, 3), 0.1)
+    const planeId = baseElevation > 0 ? `plane-${safeId}` : 'plane-ground'
+    if (baseElevation > 0 && !nextDocument.sketchPlanes.some((plane) => plane.id === planeId)) {
+      nextDocument.sketchPlanes.push({
+        id: planeId,
+        kind: 'custom',
+        name: `${asString(solid?.name, 'Legacy Footprint')} Base`,
+        origin: [0, roundCoord(baseElevation), 0],
+        normal: [0, 1, 0],
+        xAxis: [1, 0, 0],
+        yAxis: [0, 0, 1],
+      })
+    }
+
+    const vertexIds = points.map((point, pointIndex) => {
+      const vertexId = `${safeId}:v${pointIndex + 1}`
+      nextDocument.vertices.push({
+        id: vertexId,
+        x: point[0],
+        y: 0,
+        z: point[1],
+        metadata: {
+          role: 'legacy-footprint-vertex',
+          pointIndex,
+          planeId,
+          planeElevation: baseElevation,
+        },
+      })
+      return vertexId
+    })
+    const segmentIds = vertexIds.map((vertexId, pointIndex) => {
+      const segmentId = `${safeId}:e${pointIndex + 1}`
+      nextDocument.segments.push({
+        id: segmentId,
+        planeId,
+        startVertexId: vertexId,
+        endVertexId: vertexIds[(pointIndex + 1) % vertexIds.length],
+        kind: 'line',
+        metadata: {
+          compatType: 'legacy-footprint',
+          sketchMode: 'line',
+          planeId,
+          planeElevation: baseElevation,
+        },
+      })
+      return segmentId
+    })
+    const profileId = `${safeId}:profile`
+    const metadata = {
+      ...(solid?.metadata || {}),
+      compatType: solid?.metadata?.compatType || 'osm-building',
+      importedFrom: solid?.metadata?.importedFrom || 'legacy-footprint',
+      osmId: solid?.metadata?.osmId || solid?.osmId || null,
+      levels: solid?.metadata?.levels || solid?.levels || null,
+      heightMeters: solid?.metadata?.heightMeters || solid?.heightMeters || height,
+      repairedFromLegacyFootprint: true,
+    }
+    nextDocument.profiles.push({
+      id: profileId,
+      planeId,
+      vertexIds,
+      segmentIds,
+      name: asString(solid?.name, `OSM 建筑 ${solidIndex + 1}`),
+      color: asString(solid?.color, '#d8dee8'),
+      closed: true,
+      solidId: sourceId,
+      metadata: {
+        ...metadata,
+        baseElevation,
+      },
+    })
+    nextDocument.solids.push({
+      id: sourceId,
+      profileId,
+      kind: 'extrude',
+      name: asString(solid?.name, `OSM 建筑 ${solidIndex + 1}`),
+      height,
+      baseElevation,
+      color: asString(solid?.color, '#d8dee8'),
+      rotationY: asNumber(solid?.rotationY, 0),
+      metadata,
+    })
+  })
+
+  if (!nextDocument.solids.length) return value
+  return {
+    ...nextDocument,
+    metadata: {
+      ...(value?.metadata || {}),
+      originWgs84: value?.metadata?.originWgs84 || originWgs84 || null,
+      repairedFromLegacyFootprints: true,
+      repairedLegacyFootprintCount: nextDocument.solids.length,
+      skippedLegacyOsmFootprintCount: skippedLegacyOsmFootprints,
+    },
+  }
+}
+
 export function normalizeEditorDocument(value) {
   const base = createEmptyEditorDocument()
   if (!value || typeof value !== 'object') return base
+  const upgradedValue = upgradeLegacyFootprintDocument(value)
   return {
     ...base,
-    ...cloneValue(value),
+    ...cloneValue(upgradedValue),
     version: 2,
-    units: asString(value.units, 'meters'),
-    coordinateSystem: asString(value.coordinateSystem, 'xz-ground'),
-    sketchPlanes: asArray(value.sketchPlanes).map((plane, index) => ({
+    units: asString(upgradedValue.units, 'meters'),
+    coordinateSystem: asString(upgradedValue.coordinateSystem, 'xz-ground'),
+    sketchPlanes: asArray(upgradedValue.sketchPlanes).map((plane, index) => ({
       id: asString(plane?.id, index === 0 ? 'plane-ground' : `plane:${index + 1}`),
       kind: asString(plane?.kind, index === 0 ? 'ground' : 'custom'),
       name: asString(plane?.name, index === 0 ? 'Ground' : `Plane ${index + 1}`),
@@ -228,14 +545,14 @@ export function normalizeEditorDocument(value) {
       xAxis: normalizeVector3(plane?.xAxis, [1, 0, 0]),
       yAxis: normalizeVector3(plane?.yAxis, [0, 0, 1]),
     })).filter(Boolean),
-    vertices: asArray(value.vertices).map((vertex, index) => ({
+    vertices: asArray(upgradedValue.vertices).map((vertex, index) => ({
       id: asString(vertex?.id, `vertex:${index + 1}`),
       x: roundCoord(vertex?.x),
       y: roundCoord(vertex?.y),
       z: roundCoord(vertex?.z),
       metadata: cloneValue(vertex?.metadata || {}),
     })),
-    segments: asArray(value.segments).map((segment, index) => ({
+    segments: asArray(upgradedValue.segments).map((segment, index) => ({
       id: asString(segment?.id, `segment:${index + 1}`),
       planeId: asString(segment?.planeId, 'plane-ground'),
       startVertexId: asString(segment?.startVertexId),
@@ -243,7 +560,7 @@ export function normalizeEditorDocument(value) {
       kind: asString(segment?.kind, 'line'),
       metadata: cloneValue(segment?.metadata || {}),
     })),
-    profiles: asArray(value.profiles).map((profile, index) => ({
+    profiles: asArray(upgradedValue.profiles).map((profile, index) => ({
       id: asString(profile?.id, `profile:${index + 1}`),
       planeId: asString(profile?.planeId, 'plane-ground'),
       vertexIds: asArray(profile?.vertexIds).map((item) => asString(item)).filter(Boolean),
@@ -254,18 +571,21 @@ export function normalizeEditorDocument(value) {
       solidId: asString(profile?.solidId, ''),
       metadata: cloneValue(profile?.metadata || {}),
     })),
-    solids: asArray(value.solids).map((solid, index) => ({
+    solids: asArray(upgradedValue.solids).map((solid, index) => ({
       id: asString(solid?.id, `solid:${index + 1}`),
       profileId: asString(solid?.profileId),
       kind: asString(solid?.kind, 'extrude'),
       name: asString(solid?.name, `实体 ${index + 1}`),
-      height: Math.max(asNumber(solid?.height, 3), 0.1),
+      height: Math.max(asNumber(solid?.height ?? solid?.heightMeters, 3), 0.1),
       baseElevation: asNumber(solid?.baseElevation, 0),
       color: asString(solid?.color, '#d8dee8'),
       rotationY: asNumber(solid?.rotationY, 0),
       metadata: cloneValue(solid?.metadata || {}),
     })),
-    surfaces: asArray(value.surfaces).map((surface, index) => ({
+    terrainMeshes: asArray(upgradedValue.terrainMeshes)
+      .map((mesh, index) => normalizeTerrainMeshRecord(mesh, index))
+      .filter((mesh) => mesh.vertices.length >= 9 && mesh.indices.length >= 3),
+    surfaces: asArray(upgradedValue.surfaces).map((surface, index) => ({
       id: asString(surface?.id, `surface:${index + 1}`),
       kind: asString(surface?.kind, 'sweep'),
       profileIds: asArray(surface?.profileIds).map((item) => asString(item)).filter(Boolean),
@@ -276,7 +596,7 @@ export function normalizeEditorDocument(value) {
       color: asString(surface?.color, '#8ab6d6'),
       metadata: cloneValue(surface?.metadata || {}),
     })),
-    instances: asArray(value.instances).map((instance, index) => ({
+    instances: asArray(upgradedValue.instances).map((instance, index) => ({
       id: asString(instance?.id, `instance:${index + 1}`),
       type: asString(instance?.type, 'item'),
       name: asString(instance?.name, `实例 ${index + 1}`),
@@ -287,7 +607,7 @@ export function normalizeEditorDocument(value) {
       color: asString(instance?.color, '#8b9bb0'),
       metadata: cloneValue(instance?.metadata || {}),
     })),
-    openings: asArray(value.openings).map((opening, index) => ({
+    openings: asArray(upgradedValue.openings).map((opening, index) => ({
       id: asString(opening?.id, `opening:${index + 1}`),
       solidId: asString(opening?.solidId),
       width: Math.max(asNumber(opening?.width, 0.9), 0.1),
@@ -297,13 +617,13 @@ export function normalizeEditorDocument(value) {
       type: asString(opening?.type, 'door'),
       metadata: cloneValue(opening?.metadata || {}),
     })),
-    history: asArray(value.history).map((entry, index) => ({
+    history: asArray(upgradedValue.history).map((entry, index) => ({
       id: asString(entry?.id, `history:${index + 1}`),
       label: asString(entry?.label, '编辑'),
       timestamp: asString(entry?.timestamp, new Date().toISOString()),
       metadata: cloneValue(entry?.metadata || {}),
     })),
-    metadata: cloneValue(value.metadata || base.metadata),
+    metadata: cloneValue(upgradedValue.metadata || base.metadata),
   }
 }
 
@@ -2119,9 +2439,10 @@ export function rotateSolidInDocument(document, solidId, angleDelta) {
 }
 
 function migrateLegacyScene(scene = {}) {
+  const legacyScene = scene || {}
   let document = createEmptyEditorDocument()
 
-  asArray(scene.lines).forEach((line) => {
+  asArray(legacyScene.lines).forEach((line) => {
     const result = insertSketchPath(document, [
       [asNumber(line?.start?.x, 0), asNumber(line?.start?.z, 0)],
       [asNumber(line?.end?.x, 0), asNumber(line?.end?.z, 0)],
@@ -2129,7 +2450,7 @@ function migrateLegacyScene(scene = {}) {
     document = result.document
   })
 
-  asArray(scene.zones).forEach((zone) => {
+  asArray(legacyScene.zones).forEach((zone) => {
     const polygon = asArray(zone?.polygon).map((point) => toPoint(point)).filter(Boolean)
     if (polygon.length < 3) return
     const result = createProfile(document, polygon, {
@@ -2141,7 +2462,7 @@ function migrateLegacyScene(scene = {}) {
     document = result.document
   })
 
-  asArray(scene.walls).forEach((wall) => {
+  asArray(legacyScene.walls).forEach((wall) => {
     const footprint = buildWallFootprint(
       [asNumber(wall?.start?.x, 0), asNumber(wall?.start?.z, 0)],
       [asNumber(wall?.end?.x, 0), asNumber(wall?.end?.z, 0)],
@@ -2168,7 +2489,7 @@ function migrateLegacyScene(scene = {}) {
   })
 
   const instances = []
-  asArray(scene.prefabs).forEach((prefab) => {
+  asArray(legacyScene.prefabs).forEach((prefab) => {
     instances.push({
       id: prefab?.id || createId('instance'),
       type: 'item',
@@ -2182,7 +2503,7 @@ function migrateLegacyScene(scene = {}) {
     })
   })
 
-  asArray(scene.structures).forEach((structure) => {
+  asArray(legacyScene.structures).forEach((structure) => {
     instances.push({
       id: structure?.id || createId('instance'),
       type: 'structure',
@@ -2196,7 +2517,7 @@ function migrateLegacyScene(scene = {}) {
     })
   })
 
-  asArray(scene.racks).forEach((rack) => {
+  asArray(legacyScene.racks).forEach((rack) => {
     instances.push({
       id: rack?.id || createId('instance'),
       type: 'rack',
@@ -2233,6 +2554,7 @@ export function getEditorDocumentStats(document) {
     edgeCount: normalized.segments.length,
     faceCount: normalized.profiles.length,
     solidCount: normalized.solids.length,
+    terrainMeshCount: normalized.terrainMeshes.length,
     surfaceCount: normalized.surfaces.length,
     instanceCount: normalized.instances.length,
     openingCount: normalized.openings.length,

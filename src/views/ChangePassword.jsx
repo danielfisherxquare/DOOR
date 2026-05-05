@@ -46,7 +46,7 @@ function ChangePasswordPage() {
       <div className="login-card">
         <div className="login-card__header">
           <h1 className="login-card__title">修改密码</h1>
-          <p className="login-card__subtitle">{user?.username} 需要先修改初始密码后才能继续进入 DOOR Workspace。</p>
+          <p className="login-card__subtitle">{user?.username} 需要先修改初始密码后才能继续进入 Powered by Xquare。</p>
         </div>
         <form className="login-card__form" onSubmit={handleSubmit}>
           {message && (

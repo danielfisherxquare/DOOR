@@ -1,5 +1,6 @@
 import request from '../utils/request'
 import { resolveSurfacePrefix } from '../utils/surfaceApi'
+import useAuthStore from '../stores/authStore'
 
 function getInventoryBasePath() {
   return resolveSurfacePrefix({
@@ -13,38 +14,37 @@ function inventoryUrl(path) {
   return `${getInventoryBasePath()}${path}`
 }
 
+function resolveInventoryOrgId(orgId) {
+  if (orgId !== undefined && orgId !== null && String(orgId).trim() !== '') {
+    return String(orgId)
+  }
+
+  const user = useAuthStore.getState().user
+  const fallbackOrgId = user?.org?.id || user?.orgId || user?.preferences?.lastOrgId
+  return fallbackOrgId ? String(fallbackOrgId) : undefined
+}
+
 function withOrgId(orgId, params = {}) {
-  if (orgId) {
-    return { ...params, orgId }
+  const resolvedOrgId = resolveInventoryOrgId(orgId)
+  if (resolvedOrgId) {
+    return { ...params, orgId: resolvedOrgId }
   }
   return params
 }
 
 const batchApi = {
-  getBatches: (params = {}) => request.get(inventoryUrl('/batches'), { params }),
+  getBatches: (params = {}) => request.get(inventoryUrl('/batches'), { params: withOrgId(params?.orgId, params) }),
   getBatch: (id) => request.get(inventoryUrl(`/batches/${id}`)),
-  createBatch: (data, orgId) => {
-    const params = orgId ? { orgId } : {}
-    return request.post(inventoryUrl('/batches'), data, { params })
-  },
+  createBatch: (data, orgId) => request.post(inventoryUrl('/batches'), data, { params: withOrgId(orgId) }),
   updateBatch: (id, data) => request.put(inventoryUrl(`/batches/${id}`), data),
   deleteBatch: (id) => request.delete(inventoryUrl(`/batches/${id}`)),
 }
 
 const unitApi = {
-  getUnits: (params = {}) => request.get(inventoryUrl('/units'), { params }),
-  getUnitByQR: (qrCode, orgId) => {
-    const params = orgId ? { orgId } : {}
-    return request.get(inventoryUrl(`/units/${encodeURIComponent(qrCode)}`), { params })
-  },
-  batchInbound: (data, orgId) => {
-    const params = orgId ? { orgId } : {}
-    return request.post(inventoryUrl('/units/batch'), data, { params })
-  },
-  scanUnit: (data, orgId) => {
-    const params = orgId ? { orgId } : {}
-    return request.post(inventoryUrl('/units/scan'), data, { params })
-  },
+  getUnits: (params = {}) => request.get(inventoryUrl('/units'), { params: withOrgId(params?.orgId, params) }),
+  getUnitByQR: (qrCode, orgId) => request.get(inventoryUrl(`/units/${encodeURIComponent(qrCode)}`), { params: withOrgId(orgId) }),
+  batchInbound: (data, orgId) => request.post(inventoryUrl('/units/batch'), data, { params: withOrgId(orgId) }),
+  scanUnit: (data, orgId) => request.post(inventoryUrl('/units/scan'), data, { params: withOrgId(orgId) }),
   updateStatus: (id, data) => request.put(inventoryUrl(`/units/${id}/status`), data),
 }
 
@@ -69,8 +69,8 @@ const requestApi = {
 }
 
 const alertApi = {
-  getAlerts: (params = {}) => request.get(inventoryUrl('/alerts'), { params }),
-  getUnreadCount: () => request.get(inventoryUrl('/alerts/unread')),
+  getAlerts: (params = {}) => request.get(inventoryUrl('/alerts'), { params: withOrgId(params?.orgId, params) }),
+  getUnreadCount: (orgId) => request.get(inventoryUrl('/alerts/unread'), { params: withOrgId(orgId) }),
   markAsRead: (id) => request.put(inventoryUrl(`/alerts/${id}/read`)),
   markAsResolved: (id) => request.put(inventoryUrl(`/alerts/${id}/resolve`)),
   getRules: (orgId) => request.get(inventoryUrl('/alert-rules'), { params: withOrgId(orgId) }),
@@ -79,7 +79,7 @@ const alertApi = {
 }
 
 const stocktakingApi = {
-  getPlans: (params = {}) => request.get(inventoryUrl('/stocktaking/plans'), { params }),
+  getPlans: (params = {}) => request.get(inventoryUrl('/stocktaking/plans'), { params: withOrgId(params?.orgId, params) }),
   getPlan: (id) => request.get(inventoryUrl(`/stocktaking/plans/${id}`)),
   createPlan: (data, orgId) => request.post(inventoryUrl('/stocktaking/plans'), data, { params: withOrgId(orgId) }),
   startPlan: (id, orgId) => request.post(inventoryUrl(`/stocktaking/plans/${id}/start`), {}, { params: withOrgId(orgId) }),
@@ -89,9 +89,9 @@ const stocktakingApi = {
 }
 
 const reportApi = {
-  getStatistics: (params = {}) => request.get(inventoryUrl('/statistics'), { params }),
-  getTransactions: (params = {}) => request.get(inventoryUrl('/transactions'), { params }),
-  getTurnover: (params = {}) => request.get(inventoryUrl('/reports/turnover'), { params }),
+  getStatistics: (params = {}) => request.get(inventoryUrl('/statistics'), { params: withOrgId(params?.orgId, params) }),
+  getTransactions: (params = {}) => request.get(inventoryUrl('/transactions'), { params: withOrgId(params?.orgId, params) }),
+  getTurnover: (params = {}) => request.get(inventoryUrl('/reports/turnover'), { params: withOrgId(params?.orgId, params) }),
   getSnapshot: (date, orgId) => request.get(inventoryUrl(`/reports/snapshot/${date}`), { params: withOrgId(orgId) }),
   traceUnit: (unitId, orgId) => request.get(inventoryUrl(`/reports/trace/${unitId}`), { params: withOrgId(orgId) }),
   getTrend: (days = 7, orgId) => request.get(inventoryUrl('/reports/trend'), { params: withOrgId(orgId, { days }) }),
@@ -108,7 +108,7 @@ const statisticsApi = reportApi
 
 const preInboundApi = {
   getSummary: (orgId) => request.get(inventoryUrl('/pre-inbound/summary'), { params: withOrgId(orgId) }),
-  getItems: (params = {}) => request.get(inventoryUrl('/pre-inbound/items'), { params }),
+  getItems: (params = {}) => request.get(inventoryUrl('/pre-inbound/items'), { params: withOrgId(params?.orgId, params) }),
   getItem: (id, orgId) => request.get(inventoryUrl(`/pre-inbound/items/${id}`), { params: withOrgId(orgId) }),
   createItem: (data, orgId) => request.post(inventoryUrl('/pre-inbound/items'), data, { params: withOrgId(orgId) }),
   updateItem: (id, data, orgId) => request.put(inventoryUrl(`/pre-inbound/items/${id}`), data, { params: withOrgId(orgId) }),

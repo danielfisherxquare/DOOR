@@ -8,8 +8,26 @@ function detectInventorySurface(pathname) {
   return 'app'
 }
 
+function normalizeInventoryRoutePath(surface, routePath) {
+  if (surface !== 'ops' || typeof routePath !== 'string') {
+    return routePath
+  }
+
+  const opsRouteMap = {
+    '/inventory': '/warehouse',
+    '/inventory/inbound': '/warehouse/inbound',
+    '/inventory/outbound': '/warehouse/outbound',
+    '/inventory/space': '/warehouse/binding',
+    '/inventory/control': '/warehouse/count',
+    '/inventory/analytics': '/warehouse/count',
+  }
+
+  return opsRouteMap[routePath] || routePath
+}
+
 export function buildInventorySurfaceHref(surface, routePath, { orgId, raceId, params } = {}) {
-  const href = buildSurfaceHref(`/${surface}${routePath}`, { orgId, raceId })
+  const normalizedRoutePath = normalizeInventoryRoutePath(surface, routePath)
+  const href = buildSurfaceHref(`/${surface}${normalizedRoutePath}`, { orgId, raceId })
   if (!params || typeof params !== 'object') return href
 
   const [pathname, search = ''] = href.split('?')
