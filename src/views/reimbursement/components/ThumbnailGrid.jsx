@@ -63,6 +63,7 @@ function ThumbnailCard({ file, isSelected, isRecognizing, isFocused, onSelect, o
                 <input
                     type="checkbox"
                     checked={isSelected}
+                    onClick={(e) => e.stopPropagation()}
                     onChange={handleCheckboxClick}
                     disabled={isRecognizing}
                 />

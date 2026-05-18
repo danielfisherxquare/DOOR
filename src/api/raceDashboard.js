@@ -1,4 +1,4 @@
-import request from '../../utils/request';
+import request from '../utils/request';
 
 /**
  * Race Dashboard API - aggregates data for race dashboard display

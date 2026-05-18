@@ -5,12 +5,12 @@
  */
 
 import { Router } from 'express';
-import { requireRoles } from '../../middleware/require-roles.js';
+import { requirePermission } from '../../middleware/require-permission.js';
 import * as colorSchemeService from './color-scheme.service.js';
 
 const router = Router();
 
-router.use(requireRoles('org_admin', 'super_admin'));
+router.use(requirePermission({ roles: ['org_admin', 'super_admin'] }));
 
 async function getOrgId(req) {
   if (req.authContext.role === 'super_admin' && req.query.orgId) {

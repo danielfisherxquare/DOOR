@@ -2,12 +2,13 @@
  * Org Routes - org admin APIs
  */
 import { Router } from 'express';
-import { requireRoles } from '../../middleware/require-roles.js';
+import { requirePermission } from '../../middleware/require-permission.js';
+import { operationLog } from '../../middleware/operation-log.js';
 import * as orgService from './org.service.js';
 
 const router = Router();
 
-router.use(requireRoles('org_admin', 'super_admin'));
+router.use(requirePermission({ roles: ['org_admin', 'super_admin'] }));
 
 async function getOrgId(req) {
     if (req.authContext.role === 'super_admin' && req.query.orgId) {
@@ -37,7 +38,7 @@ router.get('/users', async (req, res, next) => {
     }
 });
 
-router.post('/users', async (req, res, next) => {
+router.post('/users', operationLog({ module: 'org', businessType: 'INSERT', titleFactory: (req) => '创建用户: ' + (req.body?.username || '') }), async (req, res, next) => {
     try {
         const orgId = await getOrgId(req);
         if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId for super_admin' });
@@ -71,7 +72,7 @@ router.get('/users/:userId', async (req, res, next) => {
     }
 });
 
-router.patch('/users/:userId', async (req, res, next) => {
+router.patch('/users/:userId', operationLog({ module: 'org', businessType: 'UPDATE', titleFactory: (req) => '更新用户: ' + (req.params?.userId || '') }), async (req, res, next) => {
     try {
         const orgId = await getOrgId(req);
         if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId for super_admin' });
@@ -83,7 +84,7 @@ router.patch('/users/:userId', async (req, res, next) => {
     }
 });
 
-router.delete('/users/:userId', async (req, res, next) => {
+router.delete('/users/:userId', operationLog({ module: 'org', businessType: 'DELETE', titleFactory: (req) => '删除用户: ' + (req.params?.userId || '') }), async (req, res, next) => {
     try {
         const orgId = await getOrgId(req);
         if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId for super_admin' });
@@ -95,7 +96,7 @@ router.delete('/users/:userId', async (req, res, next) => {
     }
 });
 
-router.post('/users/:userId/reset-password', async (req, res, next) => {
+router.post('/users/:userId/reset-password', operationLog({ module: 'org', businessType: 'UPDATE', titleFactory: (req) => '重置密码: ' + (req.params?.userId || '') }), async (req, res, next) => {
     try {
         const orgId = await getOrgId(req);
         if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId for super_admin' });

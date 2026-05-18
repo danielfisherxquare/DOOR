@@ -57,7 +57,7 @@ export function errorHandler(err, req, res, _next) {
         ? err.message
         : (normalizedDbError?.expose ? normalizedDbError.message : '服务器内部错误');
 
-    console.error(`[${req.id || '-'}] Error ${status}:`, err.message);
+    console.error(`[${req.id || '-'}] Error ${status}:`, err.message, `| ${req.method} ${req.originalUrl}`, req.params ? `params=${JSON.stringify(req.params)}` : '');
     if (status === 500) {
         console.error(err.stack);
     }

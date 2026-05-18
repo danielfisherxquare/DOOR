@@ -177,9 +177,9 @@ export async function reorderProjectRecordIndexes(projectId) {
 
       await trx.raw(`
         UPDATE reimbursement_records AS r
-        SET index = v.new_index, updated_at = NOW()
+        SET index = v.new_index::integer, updated_at = NOW()
         FROM (VALUES ${values}) AS v(id, new_index)
-        WHERE r.id = v.id::integer
+        WHERE r.id = v.id::uuid
       `, params);
     }
 

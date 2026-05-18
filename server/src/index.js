@@ -3,6 +3,9 @@ import { env } from './config/env.js';
 import knex from './db/knex.js';
 import { verifyEncryptionKeys } from './utils/key-guard.js';
 import { ensureSuperAdmin } from './bootstrap/ensure-super-admin.js';
+import { seedDictionaries } from './bootstrap/seed-dictionaries.js';
+import { scheduler } from './services/scheduler.js';
+import { registerBuiltinJobs } from './modules/sys-job/job-registry.js';
 
 // ── 启动前验证加密密钥一致性 ──────────────────────────────────
 try {
@@ -11,6 +14,13 @@ try {
   if (superAdminBootstrap.created) {
     console.log(`[auth-bootstrap] seeded super admin: ${superAdminBootstrap.username}`);
   }
+  try { await seedDictionaries(); } catch (err) { console.warn("[bootstrap] dict seed skipped:", err.message); }
+
+  // Register built-in job executors
+  registerBuiltinJobs();
+
+  // Load and start scheduled jobs from database
+  try { await scheduler.loadFromDatabase(); } catch (err) { console.warn("[bootstrap] scheduler load skipped:", err.message); }
 } catch (err) {
   console.error(err.message);
   process.exit(1);
@@ -51,6 +61,7 @@ async function shutdown(signal) {
 
     server.close(async () => {
         try {
+            scheduler.shutdown();
             await knex.destroy();
             console.log('Database connection closed');
         } catch (err) {

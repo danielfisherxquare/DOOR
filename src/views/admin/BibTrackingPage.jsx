@@ -449,7 +449,7 @@ function BibTrackingPage() {
                             </div>
                         </div>
 
-                        <CommandDataTable className="bib-tracking-table">
+                        <CommandDataTable className="bib-tracking-table" asTable={false}>
                             <table className="bib-tracking-table__table">
                                 <thead>
                                     <tr>

@@ -149,11 +149,15 @@ export function ContextRequirementState({ title, description, action = null }) {
   )
 }
 
-export function CommandDataTable({ children, className = '' }) {
+export function CommandDataTable({ children, className = '', asTable = true }) {
   return (
     <div className={`command-table-wrap ${className}`.trim()}>
       <div className="command-table-scroll">
-        <table className="command-table">{children}</table>
+        {asTable ? (
+          <table className="command-table">{children}</table>
+        ) : (
+          children
+        )}
       </div>
     </div>
   )

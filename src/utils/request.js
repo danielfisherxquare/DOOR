@@ -38,10 +38,10 @@ const request = axios.create({
   timeout: 30000
 })
 
-// 用于 OCR 识别等长时间请求的 axios 实例（2 分钟超时）
+// 用于 OCR 识别等长时间请求的 axios 实例（10 分钟超时）
 export const requestWithLongTimeout = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 120000 // 2 分钟超时
+  timeout: 600000
 })
 
 /**

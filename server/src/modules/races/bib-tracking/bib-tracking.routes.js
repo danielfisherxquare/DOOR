@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireRaceAccess } from '../../../middleware/require-race-access.js';
-import { requireRoles } from '../../../middleware/require-roles.js';
+import { requirePermission } from '../../../middleware/require-permission.js';
 import { scanPickupLimiter, scanResolveLimiter } from '../../../middleware/rate-limiter.js';
 import * as service from './bib-tracking.service.js';
 
@@ -36,7 +36,7 @@ router.post('/scan/pickup', scanPickupLimiter, async (req, res, next) => {
 
 router.get(
     '/items/:raceId/:itemId',
-    requireRoles('org_admin', 'super_admin'),
+    requirePermission({ roles: ['org_admin', 'super_admin'] }),
     requireRaceAccess('raceId'),
     async (req, res, next) => {
         try {
@@ -50,7 +50,7 @@ router.get(
 
 router.post(
     '/items/:raceId/:itemId/rollback',
-    requireRoles('org_admin', 'super_admin'),
+    requirePermission({ roles: ['org_admin', 'super_admin'] }),
     requireRaceAccess('raceId'),
     async (req, res, next) => {
         try {
@@ -62,7 +62,7 @@ router.post(
     },
 );
 
-router.get('/items/:raceId', requireRoles('org_admin', 'super_admin'), requireRaceAccess('raceId'), async (req, res, next) => {
+router.get('/items/:raceId', requirePermission({ roles: ['org_admin', 'super_admin'] }), requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await service.listTrackingItems(buildRequestContext(req), req.params.raceId, req.query);
         res.json({ success: true, data });
@@ -71,7 +71,7 @@ router.get('/items/:raceId', requireRoles('org_admin', 'super_admin'), requireRa
     }
 });
 
-router.get('/stats/:raceId', requireRoles('org_admin', 'super_admin'), requireRaceAccess('raceId'), async (req, res, next) => {
+router.get('/stats/:raceId', requirePermission({ roles: ['org_admin', 'super_admin'] }), requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await service.getTrackingStats(buildRequestContext(req), req.params.raceId);
         res.json({ success: true, data });

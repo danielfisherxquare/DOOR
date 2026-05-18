@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { requireRoles } from '../../middleware/require-roles.js';
+import { requirePermission } from '../../middleware/require-permission.js';
+import { operationLog } from '../../middleware/operation-log.js';
 import {
   createBackup,
   downloadBackup,
@@ -18,7 +19,7 @@ import {
 
 const router = Router();
 
-router.use(requireRoles('super_admin'));
+router.use(requirePermission({ roles: ['super_admin'] }));
 
 router.get('/backups', async (_req, res, next) => {
   try {
@@ -29,7 +30,7 @@ router.get('/backups', async (_req, res, next) => {
   }
 });
 
-router.post('/backups', async (_req, res, next) => {
+router.post('/backups', operationLog({ module: 'system', businessType: 'EXPORT', titleFactory: () => '创建系统备份' }), async (_req, res, next) => {
   try {
     const backup = await createBackup();
     res.status(201).json({ success: true, data: backup });
@@ -82,7 +83,7 @@ router.post('/restores/upload', uploadMiddleware.fields([{ name: 'file', maxCoun
   }
 });
 
-router.post('/restores', async (req, res, next) => {
+router.post('/restores', operationLog({ module: 'system', businessType: 'IMPORT', titleFactory: (req) => '启动系统恢复: uploadId=' + (req.body?.uploadId || '') }), async (req, res, next) => {
   try {
     const { uploadId } = req.body || {};
     if (!uploadId) {

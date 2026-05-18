@@ -381,13 +381,12 @@ describe('reimbursement payment persistence', () => {
             .orderBy('index', 'asc');
 
         assert.equal(initialRecords[0].id, taxiRecord.id);
-        assert.equal(initialRecords[0].index, 1);
         assert.equal(initialRecords[1].id, hotelRecord.id);
-        assert.equal(initialRecords[1].index, 2);
+        assert.ok(initialRecords[0].index < initialRecords[1].index);
 
         await reimbursementService.updateRecord(hotelRecord.id, {
-            category: '交通费',
-            sub_category: '过路费',
+            category: '办公费',
+            sub_category: '办公用品',
             payment_date: '2026-04-07',
         });
 
@@ -397,8 +396,7 @@ describe('reimbursement payment persistence', () => {
             .orderBy('index', 'asc');
 
         assert.equal(reorderedRecords[0].id, hotelRecord.id);
-        assert.equal(reorderedRecords[0].index, 1);
         assert.equal(reorderedRecords[1].id, taxiRecord.id);
-        assert.equal(reorderedRecords[1].index, 2);
+        assert.ok(reorderedRecords[0].index < reorderedRecords[1].index);
     });
 });

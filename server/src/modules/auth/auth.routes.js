@@ -4,13 +4,67 @@
 import { Router } from 'express';
 import * as authService from './auth.service.js';
 import { requireAuth } from '../../middleware/require-auth.js';
-import { requireRoles } from '../../middleware/require-roles.js';
+import { requirePermission } from '../../middleware/require-permission.js';
 import { loginLimiter, registerLimiter } from '../../middleware/rate-limiter.js';
+import { operationLog } from '../../middleware/operation-log.js';
 
 const router = Router();
 
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     tags: [Auth]
+ *     summary: 用户注册
+ *     description: 注册新用户账号，需提供用户名、邮箱、密码和组织名称
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *               - email
+ *               - password
+ *               - orgName
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 description: 用户名
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: 邮箱地址
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: 密码
+ *               orgName:
+ *                 type: string
+ *                 description: 组织名称
+ *     responses:
+ *       201:
+ *         description: 注册成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: 缺少必填字段
+ *       403:
+ *         description: 注册功能已关闭
+ *       409:
+ *         description: 用户名或邮箱已存在
+ */
 // POST /api/auth/register
-router.post('/register', registerLimiter, async (req, res, next) => {
+router.post('/register', registerLimiter, operationLog({ module: 'auth', businessType: 'INSERT', titleFactory: (req) => '用户注册: ' + (req.body?.username || '') }), async (req, res, next) => {
     try {
         // 生产环境守卫
         if (process.env.DISABLE_REGISTRATION === 'true') {
@@ -32,8 +86,57 @@ router.post('/register', registerLimiter, async (req, res, next) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     tags: [Auth]
+ *     summary: 用户登录
+ *     description: 使用用户名或邮箱和密码登录，返回 accessToken 和 refreshToken
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - login
+ *               - password
+ *             properties:
+ *               login:
+ *                 type: string
+ *                 description: 用户名或邮箱
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: 密码
+ *     responses:
+ *       200:
+ *         description: 登录成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     token:
+ *                       type: string
+ *                       description: JWT access token
+ *                     refreshToken:
+ *                       type: string
+ *                       description: 刷新令牌
+ *       400:
+ *         description: 缺少登录凭据
+ *       401:
+ *         description: 用户名或密码错误
+ */
 // POST /api/auth/login
-router.post('/login', loginLimiter, async (req, res, next) => {
+router.post('/login', loginLimiter, operationLog({ module: 'auth', businessType: 'LOGIN', titleFactory: (req) => '用户登录: ' + (req.body?.login || '') }), async (req, res, next) => {
     try {
         const { login, password } = req.body;
         if (!login || !password) {
@@ -46,6 +149,50 @@ router.post('/login', loginLimiter, async (req, res, next) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/auth/refresh:
+ *   post:
+ *     tags: [Auth]
+ *     summary: 刷新令牌
+ *     description: 使用 refreshToken 获取新的 accessToken
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 description: 刷新令牌
+ *     responses:
+ *       200:
+ *         description: 刷新成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     token:
+ *                       type: string
+ *                       description: 新的 JWT access token
+ *                     refreshToken:
+ *                       type: string
+ *                       description: 新的刷新令牌
+ *       400:
+ *         description: 缺少 refreshToken
+ *       401:
+ *         description: 令牌无效或已过期
+ */
 // POST /api/auth/refresh
 router.post('/refresh', async (req, res, next) => {
     try {
@@ -60,6 +207,37 @@ router.post('/refresh', async (req, res, next) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/auth/logout:
+ *   post:
+ *     tags: [Auth]
+ *     summary: 退出登录
+ *     description: 使 refreshToken 失效，登出当前会话
+ *     security: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 description: 要失效的刷新令牌
+ *     responses:
+ *       200:
+ *         description: 登出成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ */
 // POST /api/auth/logout
 router.post('/logout', async (req, res, next) => {
     try {
@@ -71,6 +249,41 @@ router.post('/logout', async (req, res, next) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     tags: [Auth]
+ *     summary: 当前用户信息
+ *     description: 获取当前已认证用户的个人信息和组织信息
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 获取成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     username:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *                     orgId:
+ *                       type: string
+ *       401:
+ *         description: 未认证或令牌无效
+ */
 // GET /api/auth/me — 需要认证
 router.get('/me', requireAuth, async (req, res, next) => {
     try {
@@ -99,7 +312,7 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
 });
 
 // POST /api/auth/set-password — 管理员为用户重置密码（需要 org_admin/super_admin）
-router.post('/set-password', requireAuth, requireRoles('org_admin', 'super_admin'), async (req, res, next) => {
+router.post('/set-password', requireAuth, requirePermission({ roles: ['org_admin', 'super_admin'] }), async (req, res, next) => {
     try {
         const { targetUserId, newPassword } = req.body;
         if (!targetUserId || !newPassword) {
@@ -116,7 +329,7 @@ router.post('/set-password', requireAuth, requireRoles('org_admin', 'super_admin
 });
 
 // POST /api/auth/race-permissions — 获取或设置特定用户的赛事权限
-router.post('/race-permissions', requireAuth, requireRoles('org_admin', 'super_admin'), async (req, res, next) => {
+router.post('/race-permissions', requireAuth, requirePermission({ roles: ['org_admin', 'super_admin'] }), async (req, res, next) => {
     try {
         const { targetUserId, raceId, role } = req.body;
         if (!targetUserId || !raceId) {

@@ -20,7 +20,7 @@ function getServerLlmConfig() {
         provider: env.REIMBURSEMENT_OCR_PROVIDER || DEFAULT_LLM_CONFIG.provider,
         baseUrl: env.REIMBURSEMENT_OCR_BASE_URL || DEFAULT_LLM_CONFIG.baseUrl,
         apiKey: env.REIMBURSEMENT_OCR_API_KEY || '',
-        modelName: env.REIMBURSEMENT_OCR_MODEL || DEFAULT_LLM_CONFIG.modelName,
+        modelName: env.REIMBURSEMENT_OCR_MODEL_NAME || env.REIMBURSEMENT_OCR_MODEL || DEFAULT_LLM_CONFIG.modelName,
     };
 }
 

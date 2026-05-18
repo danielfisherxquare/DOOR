@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import raceDashboardApi from '../../api/raceDashboard';
+import raceDashboardApi from '../../../../api/raceDashboard';
 
 /**
  * Hook to fetch and refresh dashboard data
@@ -83,7 +83,7 @@ export function useMaskedMode() {
 }
 
 // Import auth store for useMaskedMode
-import useAuthStore from '../../../stores/authStore';
+import useAuthStore from '../../../../stores/authStore';
 
 export default {
     useDashboardData,

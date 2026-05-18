@@ -10,6 +10,7 @@ import { requireAuth } from '../../middleware/require-auth.js';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import { resolveRaceAccess } from '../races/race-access.service.js';
 import knex from '../../db/knex.js';
+import { operationLog } from '../../middleware/operation-log.js';
 
 const router = Router();
 
@@ -141,7 +142,7 @@ router.get('/quick-stats/:raceId', requireRaceAccess('raceId'), async (req, res,
 // ── 写路径 ────────────────────────────────────────────
 
 // PUT /api/records/:recordId — 单条记录更新
-router.put('/:recordId', requireRaceAccess(resolveRaceIdByRecordId), async (req, res, next) => {
+router.put('/:recordId', operationLog({ module: 'records', businessType: 'UPDATE', titleFactory: (req) => '更新记录: ' + (req.params?.recordId || '') }), requireRaceAccess(resolveRaceIdByRecordId), async (req, res, next) => {
     try {
         const updated = await recordRepo.updateById(
             req.raceAccess.operatorOrgId,
@@ -158,7 +159,7 @@ router.put('/:recordId', requireRaceAccess(resolveRaceIdByRecordId), async (req,
 });
 
 // POST /api/records/bulk-update — 批量更新记录
-router.post('/bulk-update', requireRaceAccess(resolveRaceIdByBulkUpdates), async (req, res, next) => {
+router.post('/bulk-update', operationLog({ module: 'records', businessType: 'UPDATE', titleFactory: () => '批量更新记录' }), requireRaceAccess(resolveRaceIdByBulkUpdates), async (req, res, next) => {
     try {
         const { updates } = req.body;
         if (!Array.isArray(updates)) {
@@ -176,7 +177,7 @@ router.post('/bulk-update', requireRaceAccess(resolveRaceIdByBulkUpdates), async
 });
 
 // DELETE /api/records/race/:raceId — 清空赛事数据
-router.delete('/race/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
+router.delete('/race/:raceId', operationLog({ module: 'records', businessType: 'DELETE', titleFactory: (req) => '清空赛事数据: ' + (req.params?.raceId || '') }), requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const deleted = await recordRepo.deleteByRaceId(
             req.raceAccess.operatorOrgId,
@@ -223,7 +224,7 @@ router.get('/export/:raceId', requireRaceAccess('raceId'), async (req, res, next
 });
 
 // POST /api/records/import-verification/:raceId — 校验成绩导入
-router.post('/import-verification/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
+router.post('/import-verification/:raceId', operationLog({ module: 'records', businessType: 'IMPORT', titleFactory: (req) => '导入验证: ' + (req.params?.raceId || '') }), requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const raceId = Number(req.params.raceId);
         if (!raceId || !Number.isFinite(raceId)) {

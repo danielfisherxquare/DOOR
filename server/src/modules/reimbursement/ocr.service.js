@@ -515,7 +515,7 @@ const callVisionLLM = async (config, prompt, imageBase64Urls) => {
                 Authorization: `Bearer ${config.apiKey}`,
                 'Content-Type': 'application/json',
             },
-            timeout: 120000, // 2 minutes timeout for VLM
+            timeout: 600000,
         });
 
         const text = response.data?.choices?.[0]?.message?.content || '';

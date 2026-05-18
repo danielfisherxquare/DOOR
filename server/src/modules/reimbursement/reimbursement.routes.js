@@ -48,7 +48,7 @@ import {
   discardPreviewFile,
   exportWithImages,
 } from './preview.controller.js';
-import { requireReimbursementAccess, requireSuperAdmin, requireOrgAdminOrFinance } from '../../middleware/require-reimbursement-access.js';
+import { requireReimbursementAccess } from '../../middleware/require-reimbursement-access.js';
 
 const router = express.Router();
 
@@ -116,10 +116,10 @@ router.post('/export', exportExcel);
 // ==================== 管理员功能 ====================
 
 // GET /api/reimbursement/admin/org/:orgId - 获取机构所有报销项目
-router.get('/admin/org/:orgId', requireOrgAdminOrFinance, getOrgProjects);
+router.get('/admin/org/:orgId', requireReimbursementAccess({ accessLevel: 'org_admin' }), getOrgProjects);
 
 // GET /api/reimbursement/admin/all - 获取全部报销项目（超管）
-router.get('/admin/all', requireSuperAdmin, getAllProjects);
+router.get('/admin/all', requireReimbursementAccess({ accessLevel: 'super_admin' }), getAllProjects);
 
 // ==================== 处理状态统计 ====================
 

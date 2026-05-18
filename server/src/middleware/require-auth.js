@@ -5,6 +5,8 @@
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 
+// TODO: Remove this map after 2026-07-01 (3-month migration window from 2026-04-01).
+// Legacy tokens issued before the permission consolidation migration will have expired by then.
 // 兼容旧版 token，过渡期平滑支持
 const ROLE_MIGRATION_MAP = {
     owner: 'org_admin',
@@ -33,6 +35,10 @@ export async function requireAuth(req, res, next) {
         const decoded = jwt.verify(token, env.JWT_SECRET);
 
         // 映射纠正旧 token 带来的旧版角色名称
+        if (ROLE_MIGRATION_MAP[decoded.role]) {
+            console.warn(`[DEPRECATED] Legacy role "${decoded.role}" detected for user ${decoded.userId}. ` +
+                         `Mapped to "${ROLE_MIGRATION_MAP[decoded.role]}". User should re-login to get updated token.`);
+        }
         const normalizedRole = ROLE_MIGRATION_MAP[decoded.role] || decoded.role;
 
         req.authContext = {

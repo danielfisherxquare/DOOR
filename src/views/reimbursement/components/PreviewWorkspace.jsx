@@ -40,17 +40,6 @@ const BatchIcon = () => (
     </svg>
 );
 
-const MAX_RECOGNIZE_CONCURRENCY = 4;
-
-// 并发控制：将数组分成指定大小的批次
-function chunk(array, size) {
-    const chunks = [];
-    for (let i = 0; i < array.length; i += size) {
-        chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
-}
-
 function PreviewWorkspace({ projectId, onOpenRecord }) {
     const {
         previewFiles,
@@ -73,8 +62,10 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
     const [stats, setStats] = useState({ total: 0, preview: 0, duplicates: 0 });
     const [uploadType, setUploadType] = useState('invoice');
     const [importNotice, setImportNotice] = useState({ type: '', summary: '', duplicates: [] });
+    const [batchProgress, setBatchProgress] = useState(null);
     const [highlightedPendingId, setHighlightedPendingId] = useState(null);
     const fileInputRef = useRef(null);
+    const uploadTypeRef = useRef('invoice');
 
     useEffect(() => {
         if (projectId) {
@@ -114,13 +105,19 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
 
         setImporting(true);
         try {
-            const result = await importToPreview(projectId, Array.from(files), uploadType);
+            const documentType = uploadTypeRef.current;
+            const result = await importToPreview(projectId, Array.from(files), documentType);
             const importedCount = result?.imported?.length || 0;
             const duplicateCount = result?.duplicates?.length || 0;
+            const importedIds = (result?.imported || []).map(item => item.id).filter(Boolean);
             const duplicateNames = (result?.duplicates || [])
                 .slice(0, 2)
                 .map(item => item.fileName)
                 .join('、');
+
+            if (importedIds.length > 0) {
+                setSelectedIds(prev => new Set([...prev, ...importedIds]));
+            }
 
             if (duplicateCount > 0) {
                 const duplicateSummary = duplicateNames
@@ -135,7 +132,7 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
             } else {
                 setImportNotice({
                     type: 'success',
-                    summary: `已导入 ${importedCount} 个新文件，可以继续拖拽到右侧识别区，或直接批量识别。`,
+                    summary: `已导入 ${importedCount} 个新文件，已自动选中，可以直接逐张批量识别。`,
                     duplicates: [],
                 });
             }
@@ -153,7 +150,11 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
     };
 
     const openFilePicker = (type) => {
+        uploadTypeRef.current = type;
         setUploadType(type);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
         fileInputRef.current?.click();
     };
 
@@ -175,15 +176,20 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
     const recognizeFile = async (fileId, forceRecognize = false, options = {}) => {
         addRecognizingFile(fileId);
         try {
-            await recognizeFromFile(projectId, fileId, forceRecognize, options);
+            const result = await recognizeFromFile(projectId, fileId, forceRecognize, options);
+            if (result?.needConfirm) {
+                return { status: 'needConfirm', fileId, result };
+            }
             // 识别成功后从选中列表移除
             setSelectedIds(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(fileId);
                 return newSet;
             });
+            return { status: 'success', fileId, result };
         } catch (err) {
             console.error('识别失败:', err);
+            return { status: 'failed', fileId, error: err };
         } finally {
             removeRecognizingFile(fileId);
         }
@@ -200,22 +206,53 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
         await recognizeFile(file.id, true);
     };
 
-    // 批量识别（最多4个并发）
+    // 批量识别：逐张排队，避免多个 OCR 请求同时打到模型服务。
     const handleBatchRecognize = async () => {
         const toRecognize = Array.from(selectedIds).filter(id => !recognizingFileIds.has(id));
         if (toRecognize.length === 0) return;
 
-        const batches = chunk(toRecognize, MAX_RECOGNIZE_CONCURRENCY);
-        for (const batch of batches) {
-            await Promise.all(batch.map(id => recognizeFile(id, false, { refresh: false })));
+        const failures = [];
+        const needConfirm = [];
+        let successCount = 0;
+
+        for (let index = 0; index < toRecognize.length; index += 1) {
+            const fileId = toRecognize[index];
+            setBatchProgress({ current: index + 1, total: toRecognize.length });
+
+            const result = await recognizeFile(fileId, false, { refresh: false });
+            if (result?.status === 'success') {
+                successCount += 1;
+            } else if (result?.status === 'needConfirm') {
+                needConfirm.push(fileId);
+            } else if (result?.status === 'failed') {
+                failures.push({
+                    fileId,
+                    message: result.error?.message || '识别失败',
+                });
+            }
         }
 
+        setBatchProgress(null);
         await Promise.all([
             fetchPreviewFiles(projectId),
             fetchRecords(projectId),
             fetchPendingMatches(),
             fetchProjects(),
         ]);
+
+        if (failures.length > 0 || needConfirm.length > 0) {
+            const parts = [`已识别 ${successCount} 个`];
+            if (failures.length > 0) {
+                parts.push(`失败 ${failures.length} 个：${failures[0].message}`);
+            }
+            if (needConfirm.length > 0) {
+                parts.push(`${needConfirm.length} 个重复文件需要单独确认`);
+            }
+            setImportNotice({ type: 'warning', summary: parts.join('，'), duplicates: [] });
+            return;
+        }
+
+        setImportNotice({ type: 'success', summary: `已逐张识别完成 ${successCount} 个文件。`, duplicates: [] });
     };
 
     // 全选/取消全选
@@ -328,7 +365,7 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
                             disabled={recognizingFileIds.size > 0}
                         >
                             <BatchIcon />
-                            批量识别 ({selectedIds.size})
+                            逐张识别 ({selectedIds.size})
                         </button>
                         <button className="btn--discard" onClick={handleBatchDiscard}>
                             <TrashIcon />
@@ -344,6 +381,11 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
                     {recognizingFileIds.size > 0 && (
                         <span className="preview-workspace__stat-value--info">
                             识别中: {recognizingFileIds.size}
+                        </span>
+                    )}
+                    {batchProgress && (
+                        <span className="preview-workspace__stat-value--info">
+                            进度: {batchProgress.current}/{batchProgress.total}
                         </span>
                     )}
                 </div>
@@ -398,7 +440,7 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
                             selectedIds={selectedIds}
                             recognizingIds={recognizingFileIds}
                             focusedFileId={highlightedPendingId}
-                            onSelect={() => {}}
+                            onSelect={(file) => handleCheckboxChange(file.id)}
                             onDragStart={handleDragStart}
                             onCheckboxChange={handleCheckboxChange}
                             onSelectAll={handleSelectAll}

@@ -2,8 +2,20 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import bcrypt from 'bcryptjs';
 
-const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
-process.env.DATABASE_URL = DATABASE_URL;
+function resolveSafeTestDatabaseUrl() {
+    const databaseUrl = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
+    const parsed = new URL(databaseUrl);
+    const dbName = parsed.pathname.replace(/^\//, '');
+
+    if (!/(^test$|_test$|test_)/i.test(dbName)) {
+        throw new Error(`Refusing to run destructive tests against non-test database "${dbName}"`);
+    }
+
+    process.env.DATABASE_URL = databaseUrl;
+    return databaseUrl;
+}
+
+const DATABASE_URL = resolveSafeTestDatabaseUrl();
 process.env.NODE_ENV = 'test';
 
 const { default: knex } = await import('../src/db/knex.js');

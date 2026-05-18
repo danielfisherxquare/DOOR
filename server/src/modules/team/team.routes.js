@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import path from 'path';
-import { requireRoles } from '../../middleware/require-roles.js';
+import { requirePermission } from '../../middleware/require-permission.js';
+import { operationLog } from '../../middleware/operation-log.js';
 import * as teamService from './team.service.js';
 import { uploadTeamMemberPhotoMiddleware } from './team-photo.js';
 
 const router = Router();
 
-router.use(requireRoles('org_admin', 'super_admin'));
+router.use(requirePermission({ roles: ['org_admin', 'super_admin'] }));
 
 function getOrgId(req) {
     if (req.authContext.role === 'super_admin' && req.query.orgId) {
@@ -54,7 +55,7 @@ router.post('/team-members/import-preview', async (req, res, next) => {
     }
 });
 
-router.post('/team-members/import-commit', async (req, res, next) => {
+router.post('/team-members/import-commit', operationLog({ module: 'team', businessType: 'IMPORT', titleFactory: () => '批量导入团队成员' }), async (req, res, next) => {
     try {
         const orgId = getOrgId(req);
         if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId' });
@@ -86,7 +87,7 @@ router.get('/team-members/:teamMemberId/photo', async (req, res, next) => {
     }
 });
 
-router.post('/team-members', async (req, res, next) => {
+router.post('/team-members', operationLog({ module: 'team', businessType: 'INSERT', titleFactory: (req) => '创建团队成员: ' + (req.body?.name || '') }), async (req, res, next) => {
     try {
         const orgId = getOrgId(req);
         if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId' });
@@ -96,7 +97,7 @@ router.post('/team-members', async (req, res, next) => {
     }
 });
 
-router.patch('/team-members/:teamMemberId', async (req, res, next) => {
+router.patch('/team-members/:teamMemberId', operationLog({ module: 'team', businessType: 'UPDATE', titleFactory: (req) => '更新团队成员: ' + (req.params?.teamMemberId || '') }), async (req, res, next) => {
     try {
         const orgId = getOrgId(req);
         if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId' });
@@ -127,7 +128,7 @@ router.delete('/team-members/:teamMemberId/photo', async (req, res, next) => {
     }
 });
 
-router.post('/team-members/:teamMemberId/archive', async (req, res, next) => {
+router.post('/team-members/:teamMemberId/archive', operationLog({ module: 'team', businessType: 'UPDATE', titleFactory: (req) => '归档团队成员: ' + (req.params?.teamMemberId || '') }), async (req, res, next) => {
     try {
         const orgId = getOrgId(req);
         if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId' });
@@ -137,7 +138,7 @@ router.post('/team-members/:teamMemberId/archive', async (req, res, next) => {
     }
 });
 
-router.post('/team-members/:teamMemberId/restore', async (req, res, next) => {
+router.post('/team-members/:teamMemberId/restore', operationLog({ module: 'team', businessType: 'UPDATE', titleFactory: (req) => '恢复团队成员: ' + (req.params?.teamMemberId || '') }), async (req, res, next) => {
     try {
         const orgId = getOrgId(req);
         if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId' });
@@ -147,7 +148,7 @@ router.post('/team-members/:teamMemberId/restore', async (req, res, next) => {
     }
 });
 
-router.post('/team-members/:teamMemberId/enable-account', async (req, res, next) => {
+router.post('/team-members/:teamMemberId/enable-account', operationLog({ module: 'team', businessType: 'UPDATE', titleFactory: (req) => '启用团队成员账号: ' + (req.params?.teamMemberId || '') }), async (req, res, next) => {
     try {
         const orgId = getOrgId(req);
         if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId' });
@@ -157,7 +158,7 @@ router.post('/team-members/:teamMemberId/enable-account', async (req, res, next)
     }
 });
 
-router.post('/team-members/:teamMemberId/reset-password', async (req, res, next) => {
+router.post('/team-members/:teamMemberId/reset-password', operationLog({ module: 'team', businessType: 'UPDATE', titleFactory: (req) => '重置团队成员密码: ' + (req.params?.teamMemberId || '') }), async (req, res, next) => {
     try {
         const orgId = getOrgId(req);
         if (!orgId) return res.status(400).json({ success: false, message: 'Missing orgId' });

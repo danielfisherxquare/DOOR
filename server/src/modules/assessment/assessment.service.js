@@ -952,15 +952,39 @@ export async function getGrowthReport(employeeCode) {
 }
 
 export async function getPublicCampaignMeta(campaignId) {
-    const campaign = await repo.findCampaignById(campaignId);
-    if (!campaign) throw notFound('未找到考评活动');
+    // 参数验证：检查 campaignId 是否有效
+    if (!campaignId || typeof campaignId !== 'string' || campaignId.trim() === '') {
+        throw badRequest('考评活动 ID 不能为空');
+    }
 
-    const members = await repo.listMembers(campaignId);
-    return {
-        campaign: serializeCampaign(campaign),
-        memberCount: members.length,
-        membersPreview: members.map(serializeMemberPreview),
-    };
+    // 检查 campaignId 格式（UUID 格式或数字字符串）
+    const trimmedCampaignId = campaignId.trim();
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(trimmedCampaignId)) {
+        throw notFound('考评活动不存在');
+    }
+
+    try {
+        const campaign = await repo.findCampaignById(trimmedCampaignId);
+        if (!campaign) {
+            throw notFound('未找到考评活动');
+        }
+
+        const members = await repo.listMembers(trimmedCampaignId);
+        return {
+            campaign: serializeCampaign(campaign),
+            memberCount: members.length,
+            membersPreview: members.map(serializeMemberPreview),
+        };
+    } catch (error) {
+        // 如果已经是已知的 HTTP 错误，直接抛出
+        if (error.status && error.expose) {
+            throw error;
+        }
+        // 记录详细错误日志
+        console.error('[getPublicCampaignMeta] Unexpected error:', error.message, '| campaignId:', campaignId);
+        throw error;
+    }
 }
 
 export async function loginWithInviteCode(campaignId, { inviteCode, deviceFingerprint, ip, userAgent }) {

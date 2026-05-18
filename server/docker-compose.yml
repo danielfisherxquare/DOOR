@@ -48,6 +48,12 @@ services:
       BACKUP_DIR: ${BACKUP_DIR:-/backups}
       BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-10}
       RESTORE_UPLOAD_DIR: ${RESTORE_UPLOAD_DIR:-/backups/uploads}
+      REIMBURSEMENT_OCR_PROVIDER: ${REIMBURSEMENT_OCR_PROVIDER:-qwen}
+      REIMBURSEMENT_OCR_BASE_URL: ${REIMBURSEMENT_OCR_BASE_URL:-}
+      REIMBURSEMENT_OCR_API_KEY: ${REIMBURSEMENT_OCR_API_KEY:-}
+      REIMBURSEMENT_OCR_MODEL_NAME: ${REIMBURSEMENT_OCR_MODEL_NAME:-qwen3.5-plus}
+      DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,6 +61,7 @@ services:
         condition: service_healthy
     volumes:
       - ${HOST_BACKUP_DIR:-./backups}:${BACKUP_DIR:-/backups}
+      - ./storage:/app/storage
       # Required for .env backup to function correctly inside the container
       - ./.env:/app/.env:ro
 
@@ -69,6 +76,14 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-false}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://www.xquareliu.com}
+      REIMBURSEMENT_OCR_PROVIDER: ${REIMBURSEMENT_OCR_PROVIDER:-qwen}
+      REIMBURSEMENT_OCR_BASE_URL: ${REIMBURSEMENT_OCR_BASE_URL:-}
+      REIMBURSEMENT_OCR_API_KEY: ${REIMBURSEMENT_OCR_API_KEY:-}
+      REIMBURSEMENT_OCR_MODEL_NAME: ${REIMBURSEMENT_OCR_MODEL_NAME:-qwen3.5-plus}
+      DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+    volumes:
+      - ./storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy
