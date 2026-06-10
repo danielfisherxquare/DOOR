@@ -50,6 +50,7 @@ const AssessmentCampaignListPage = lazy(() => import('../../views/app/assessment
 const AssessmentCampaignDetailPage = lazy(() => import('../../views/app/assessment/AssessmentCampaignDetailPage'))
 const BibTrackingPage = lazy(() => import('../../views/app/events/bib-tracking/BibTrackingPage'))
 const RaceDashboardPage = lazy(() => import('../../views/app/race-dashboard/RaceDashboardPage'))
+const DesignRequestWorkspace = lazy(() => import('../../views/design-requests/DesignRequestWorkspace'))
 
 function AppRouteLoader() {
   return (
@@ -401,6 +402,11 @@ useEffect(() => {
               <Route path="events/lottery" element={<LotteryPage />} />
               <Route path="events/bib" element={<BibPage />} />
               <Route path="events/clothing" element={<ClothingPage />} />
+              <Route path="design-requests" element={
+                <ModuleProtectedRoute surface="app" moduleId="design-requests">
+                  <DesignRequestWorkspace surface="app" mode="designer" />
+                </ModuleProtectedRoute>
+              } />
               <Route path="credential-center" element={
                 <ModuleProtectedRoute surface="app" moduleId="credentials">
                   <CredentialCenterPage />

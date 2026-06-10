@@ -34,10 +34,12 @@ import publicDownloadRoutes from './modules/public/public-download.routes.js';
 import appReimbursementRoutes from './modules/app/app-reimbursement.routes.js';
 import appCredentialRoutes from './modules/app/app-credential.routes.js';
 import appThreeStudioRoutes from './modules/app/app-3d-studio.routes.js';
+import { createDesignRequestRoutes } from './modules/design-requests/design-request.routes.js';
 import adminReimbursementRoutes from './modules/admin/admin-reimbursement.routes.js';
 import ocrRoutes from './modules/ocr/ocr.routes.js';
 import credentialRoutes from './modules/credential/credential.routes.js';
 import identityCenterRoutes from './modules/identity-center/identity-center.routes.js';
+import approvalRoutes from './modules/approvals/approval.routes.js';
 import profileRoutes from './modules/profile/profile.routes.js';
 import colorSchemeRoutes from './modules/color-scheme/color-scheme.routes.js';
 import operationLogRoutes from './modules/operation-log/operation-log.routes.js';
@@ -110,12 +112,17 @@ app.use('/api/app/credentials', requirePermission({ surface: 'app', module: { su
 app.use('/api/app/3d-studio', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: '3d-studio' } }), appThreeStudioRoutes);
 app.use('/api/app/interviews', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'interview' } }), interviewRoutes);
 app.use('/api/app/warehouse', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'inventory' } }), inventoryRoutes);
+app.use('/api/app/design-requests', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'design-requests' } }), createDesignRequestRoutes('app'));
+app.use('/api/app/approvals', requirePermission({ surface: 'app' }), approvalRoutes);
 
 app.use('/api/ops/warehouse', requirePermission({ surface: 'ops', module: { surface: 'ops', moduleId: 'warehouse' } }), inventoryRoutes);
 app.use('/api/ops/credentials', requirePermission({ surface: 'ops', module: { surface: 'ops', moduleId: 'credentials' } }), credentialRoutes);
 app.use('/api/ops/bibs', requirePermission({ surface: 'ops' }), bibTrackingRoutes);
+app.use('/api/ops/design-requests', requirePermission({ surface: 'ops', module: { surface: 'ops', moduleId: 'design-requests' } }), createDesignRequestRoutes('ops'));
 
 app.use('/api/admin/jobs', requirePermission({ surface: 'admin' }), jobRoutes);
+app.use('/api/admin/design-requests', requirePermission({ surface: 'admin' }), createDesignRequestRoutes('admin'));
+app.use('/api/admin/approvals', requirePermission({ surface: 'admin' }), approvalRoutes);
 app.use('/api/admin/races', requirePermission({ surface: 'admin' }), raceRoutes);
 app.use('/api/admin/records', requirePermission({ surface: 'admin' }), recordRoutes);
 app.use('/api/admin/column-mappings', requirePermission({ surface: 'admin' }), columnMappingRoutes);

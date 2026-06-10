@@ -33,6 +33,7 @@ import ColorSchemePage from '../../views/admin/branding/ColorSchemePage'
 const InterviewList = lazy(() => import('../../views/interview/InterviewList'))
 const InterviewCompare = lazy(() => import('../../views/interview/InterviewCompare'))
 const InterviewForm = lazy(() => import('../../views/interview/InterviewForm'))
+const DesignRequestWorkspace = lazy(() => import('../../views/design-requests/DesignRequestWorkspace'))
 
 function AdminRouteLoader() {
   return (
@@ -415,6 +416,7 @@ export default function AdminLayout() {
             <Route path="members/new" element={<Navigate to={buildAdminHref('/team', currentContext)} replace />} />
             <Route path="team" element={<TeamListPage />} />
             <Route path="races" element={<RaceManagementPage />} />
+            <Route path="design-requests" element={<Suspense fallback={<AdminRouteLoader />}><DesignRequestWorkspace surface="admin" mode="manager" /></Suspense>} />
             <Route path="import" element={<Navigate to={buildAppHref('/events/import', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
             <Route path="records" element={<Navigate to={buildAppHref('/events/processing', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
             <Route path="processing" element={<Navigate to={buildAppHref('/events/processing', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />

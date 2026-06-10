@@ -9,6 +9,7 @@ import knex from '../../db/knex.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
 import bibTrackingRoutes from './bib-tracking/bib-tracking.routes.js';
 import raceDashboardRoutes from './race-dashboard/race-dashboard.routes.js';
+import raceStaffRoutes from './race-staff.routes.js';
 import { operationLog } from '../../middleware/operation-log.js';
 
 const router = Router();
@@ -18,6 +19,9 @@ router.use('/bibs', bibTrackingRoutes);
 
 // Mount race-dashboard routes under /dashboard
 router.use('/dashboard', raceDashboardRoutes);
+
+// Mount race staff assignment routes before /:raceId catch-all routes.
+router.use('/:raceId/staff-assignments', requireRaceAccess('raceId'), raceStaffRoutes);
 
 function normalizeOrgId(value) {
     if (value === undefined || value === null || value === '') return null;

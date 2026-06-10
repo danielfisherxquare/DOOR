@@ -67,6 +67,22 @@ const navGroups = [
       },
     ],
   },
+  {
+    key: 'design',
+    label: '部门协同',
+    icon: 'design_services',
+    items: [
+      {
+        key: 'design-requests',
+        path: '/design-requests',
+        icon: 'add_photo_alternate',
+        shortLabel: 'DR',
+        label: '设计需求',
+        description: '提交设计 brief 并查看处理进度',
+        cardDescription: '按赛事提交设计需求、参考样例、尺寸、材质和需求时间，并查看岗位审批与设计进度。',
+      },
+    ],
+  },
 ]
 
 const routeMeta = [
@@ -80,6 +96,7 @@ const routeMeta = [
   { key: 'warehouse-outbound', path: '/ops/warehouse/outbound', title: '出库作业', summary: '出库、领取与扫码处理。', groupKey: 'warehouse', sectionLabel: '仓储作业', surfaceCode: 'OPS' },
   { key: 'warehouse-binding', path: '/ops/warehouse/binding', title: '库位绑定', summary: '数字孪生库位绑定、移位与解绑。', groupKey: 'warehouse', sectionLabel: '仓储作业', surfaceCode: 'OPS' },
   { key: 'warehouse-count', path: '/ops/warehouse/count', title: '盘点作业', summary: '盘点与异常处置。', groupKey: 'warehouse', sectionLabel: '仓储作业', surfaceCode: 'OPS' },
+  { key: 'design-requests', path: '/ops/design-requests', title: '设计需求', summary: '各部门提交设计 brief，查看岗位审批和设计进度。', groupKey: 'design', sectionLabel: '部门协同', surfaceCode: 'OPS' },
 ]
 
 export function getOpsNavGroups() {

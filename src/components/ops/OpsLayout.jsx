@@ -17,6 +17,7 @@ const ScanResult = lazy(() => import('../../views/scan/ScanResult'))
 const BibPickupPage = lazy(() => import('../../views/ops/BibPickupPage'))
 const CredentialIssuePage = lazy(() => import('../../views/admin/credential/CredentialIssuePage'))
 const WarehouseWorkbench = lazy(() => import('../../views/ops/WarehouseWorkbench'))
+const DesignRequestWorkspace = lazy(() => import('../../views/design-requests/DesignRequestWorkspace'))
 
 function OpsRouteLoader() {
   return (
@@ -288,6 +289,7 @@ export default function OpsLayout() {
               <Route path="bibs/pickup" element={<BibPickupPage />} />
               <Route path="credentials/issue" element={<CredentialIssuePage />} />
               <Route path="warehouse/*" element={<WarehouseWorkbench />} />
+              <Route path="design-requests" element={<DesignRequestWorkspace surface="ops" mode="requester" />} />
               <Route path="*" element={<Navigate to={buildOpsHref('', currentContext)} replace />} />
             </Routes>
           </Suspense>
