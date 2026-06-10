@@ -19,9 +19,9 @@
   display: block;
   font-size: var(--font-size-xs);
   font-weight: 700;
-  color: var(--command-muted, #64748b);
+  color: var(--layer-text-muted, #78716c);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
 }
 
 .bib-tracking-filters__keyword {
@@ -46,10 +46,10 @@
 .bib-tracking-list-meta,
 .bib-tracking-muted {
   font-size: var(--font-size-sm);
-  color: var(--command-muted, #64748b);
+  color: var(--layer-text-muted, #78716c);
 }
 
-.bib-tracking-table .command-table-scroll {
+.bib-tracking-table .app-h5-table-scroll {
   overflow-x: auto;
 }
 
@@ -73,7 +73,7 @@
 .bib-tracking-pagination__status {
   font-size: var(--font-size-md);
   font-weight: 600;
-  color: var(--command-text, #0f172a);
+  color: var(--layer-text-primary, #1c1917);
 }
 
 .bib-tracking-drawer-overlay {
@@ -113,16 +113,16 @@
   margin-bottom: 6px;
   font-size: var(--font-size-caption);
   font-weight: 700;
-  color: var(--command-muted, #64748b);
+  color: var(--layer-text-muted, #78716c);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
 }
 
 .bib-tracking-detail-field__value {
   font-size: var(--font-size-md);
   font-weight: 600;
   word-break: break-all;
-  color: var(--command-text, #0f172a);
+  color: var(--layer-text-primary, #1c1917);
 }
 
 .bib-tracking-section {
@@ -142,20 +142,20 @@
 .bib-tracking-section-title {
   font-size: var(--font-size-lg);
   font-weight: 700;
-  color: var(--command-text, #0f172a);
+  color: var(--layer-text-primary, #1c1917);
 }
 
 .bib-tracking-section-summary,
 .bib-tracking-timeline-card__meta {
   font-size: var(--font-size-sm);
   line-height: 1.6;
-  color: var(--command-muted, #64748b);
+  color: var(--layer-text-muted, #78716c);
 }
 
 .bib-tracking-rollback-copy {
   font-size: var(--font-size-md);
   font-weight: 600;
-  color: var(--command-text, #0f172a);
+  color: var(--layer-text-primary, #1c1917);
 }
 
 .bib-tracking-textarea {
@@ -204,7 +204,7 @@
 .bib-tracking-timeline-card__title {
   font-size: var(--font-size-md);
   font-weight: 700;
-  color: var(--command-text, #0f172a);
+  color: var(--layer-text-primary, #1c1917);
 }
 
 .bib-tracking-focusable:focus-visible,
@@ -212,7 +212,7 @@
 .bib-tracking-filters .input:focus-visible,
 .bib-tracking-filters .btn:focus-visible,
 .bib-tracking-textarea:focus-visible {
-  outline: 2px solid var(--command-accent, #b91c1c);
+  outline: 2px solid var(--layer-accent, #D4A017);
   outline-offset: 2px;
 }
 

@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import racesApi from '../../../../api/races'
 import lotteryApi from '../../../../api/lottery'
 import {
-  CommandEmptyState,
-  CommandMetricGrid,
-  CommandNotice,
-  CommandPanel,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5EmptyState,
+  AppH5MetricStrip,
+  AppH5Notice,
+  AppH5Panel,
+} from '../../../../components/app/AppH5Surface'
 import GenderRatioConfig from './GenderRatioConfig'
 import {
   buildEventRows,
@@ -143,23 +143,23 @@ export default function CapacityPlanner({ raceId, raceDetail, preview, onUpdated
 
   if (!rows.length) {
     return (
-      <CommandPanel title="容量定义" subtitle="当前赛事还没有可编辑的项目容量。">
-        <CommandEmptyState
+      <AppH5Panel title="容量定义" subtitle="当前赛事还没有可编辑的项目容量。">
+        <AppH5EmptyState
           icon="CAP"
           title="暂无容量配置"
           description="先在赛事设置里定义项目，或直接保存一次默认容量。"
         />
-      </CommandPanel>
+      </AppH5Panel>
     )
   }
 
   return (
     <div className="lottery-step-stack">
-      {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
+      {message ? <AppH5Notice tone={messageTone}>{message}</AppH5Notice> : null}
 
-      <CommandMetricGrid items={metrics} />
+      <AppH5MetricStrip items={metrics} />
 
-      <CommandPanel
+      <AppH5Panel
         title="赛事默认模式"
         subtitle="赛事默认模式决定没有覆盖配置的项目走抽签还是直通。"
         actions={(
@@ -178,7 +178,7 @@ export default function CapacityPlanner({ raceId, raceDetail, preview, onUpdated
         <div className="lottery-help-block">
           当前默认模式来自赛事配置。下面每个项目都可以用“项目模式覆盖”单独改成 `inherit / lottery / direct`，保存时会一并写回。
         </div>
-      </CommandPanel>
+      </AppH5Panel>
 
       <div className="lottery-card-grid">
         {rows.map((row, index) => {
@@ -189,7 +189,7 @@ export default function CapacityPlanner({ raceId, raceDetail, preview, onUpdated
           const reservedCount = Math.max(toNumber(row.targetCount, 0) - estimatedDraw, 0)
 
           return (
-            <CommandPanel
+            <AppH5Panel
               key={row.id || row.event}
               title={row.event}
               subtitle={effectiveMode === 'direct' ? '当前生效模式：直通' : '当前生效模式：抽签'}
@@ -247,7 +247,7 @@ export default function CapacityPlanner({ raceId, raceDetail, preview, onUpdated
               </div>
 
               <GenderRatioConfig raceId={raceId} event={row.event} targetCount={row.targetCount} />
-            </CommandPanel>
+            </AppH5Panel>
           )
         })}
       </div>

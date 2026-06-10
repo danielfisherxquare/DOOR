@@ -2,7 +2,7 @@
   gap: 20px;
 }
 
-.lottery-step-shell .command-panel__body {
+.lottery-step-shell .app-h5-panel__body {
   display: none;
 }
 
@@ -28,7 +28,7 @@
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
-.lottery-card .command-panel__body {
+.lottery-card .app-h5-panel__body {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -44,7 +44,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  color: var(--command-muted);
+  color: var(--layer-text-muted);
   font-size: var(--font-size-sm);
 }
 
@@ -54,8 +54,8 @@
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid rgba(15, 23, 42, 0.12);
-  background: color-mix(in srgb, var(--command-surface) 97%, white 3%);
-  color: var(--command-text);
+  background: color-mix(in srgb, var(--layer-surface) 97%, white 3%);
+  color: var(--layer-text-primary);
 }
 
 .lottery-v2-textarea {
@@ -77,8 +77,8 @@
 .lottery-help-block {
   padding: 12px 14px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--command-accent-soft) 70%, white 30%);
-  color: var(--command-muted);
+  background: color-mix(in srgb, var(--layer-accent-soft) 70%, white 30%);
+  color: var(--layer-text-muted);
   line-height: 1.7;
 }
 
@@ -109,24 +109,24 @@
   gap: 6px;
   padding: 12px 14px;
   border-radius: 10px;
-  background: color-mix(in srgb, var(--command-surface-strong) 94%, white 6%);
+  background: color-mix(in srgb, var(--layer-bg-primary) 94%, white 6%);
   border: 1px solid rgba(15, 23, 42, 0.08);
 }
 
 .lottery-mini-stat__label,
 .lottery-mini-card__label {
-  color: var(--command-muted);
+  color: var(--layer-text-muted);
   font-size: var(--font-size-xs);
 }
 
 .lottery-mini-stat__value,
 .lottery-mini-card__value {
   font-size: var(--font-size-xl);
-  color: var(--command-text);
+  color: var(--layer-text-primary);
 }
 
 .lottery-mini-card__meta {
-  color: var(--command-muted);
+  color: var(--layer-text-muted);
   font-size: var(--font-size-xs);
   line-height: 1.6;
 }
@@ -145,7 +145,7 @@
   padding: 16px;
   border-radius: 10px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: color-mix(in srgb, var(--command-surface-strong) 95%, white 5%);
+  background: color-mix(in srgb, var(--layer-bg-primary) 95%, white 5%);
 }
 
 .lottery-zone-visualizer--empty {
@@ -165,12 +165,12 @@
 .lottery-zone-visualizer__title {
   font-size: var(--font-size-md);
   font-weight: 700;
-  color: var(--command-text);
+  color: var(--layer-text-primary);
 }
 
 .lottery-zone-visualizer__sub,
 .lottery-zone-visualizer__empty {
-  color: var(--command-muted);
+  color: var(--layer-text-muted);
   font-size: var(--font-size-sm);
   line-height: 1.7;
 }
@@ -186,7 +186,7 @@
   border-radius: 0;
   background: rgba(255, 255, 255, 0.76);
   border: 1px solid rgba(120, 132, 158, 0.16);
-  color: var(--command-muted);
+  color: var(--layer-text-muted);
   font-size: var(--font-size-xs);
 }
 
@@ -234,7 +234,7 @@
   border-radius: 0;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(120, 132, 158, 0.16);
-  color: var(--command-muted);
+  color: var(--layer-text-muted);
   font-size: var(--font-size-xs);
   font-weight: 700;
 }
@@ -263,7 +263,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--command-text);
+  color: var(--layer-text-primary);
 }
 
 .lottery-zone-visualizer__rail-head strong {
@@ -280,7 +280,7 @@
   padding: 4px 8px;
   border-radius: 0;
   background: rgba(18, 60, 103, 0.06);
-  color: var(--command-muted);
+  color: var(--layer-text-muted);
   font-size: var(--font-size-xs);
 }
 
@@ -289,7 +289,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  color: var(--command-muted);
+  color: var(--layer-text-muted);
   font-size: var(--font-size-xs);
 }
 
@@ -305,11 +305,11 @@
 }
 
 .lottery-zone-visualizer__rail-card.is-drop-target {
-  border-color: color-mix(in srgb, var(--command-accent) 36%, transparent);
+  border-color: color-mix(in srgb, var(--layer-accent) 36%, transparent);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--command-accent-soft) 72%, white 28%), rgba(255, 255, 255, 0.92));
+    linear-gradient(180deg, color-mix(in srgb, var(--layer-accent-soft) 72%, white 28%), rgba(255, 255, 255, 0.92));
   box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--command-accent) 18%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--layer-accent) 18%, transparent),
     0 14px 26px rgba(20, 32, 51, 0.08);
   transform: translateY(-2px);
 }
@@ -335,7 +335,7 @@
 }
 
 .lottery-zone-muted {
-  color: var(--command-muted);
+  color: var(--layer-text-muted);
   font-size: var(--font-size-xs);
 }
 
@@ -387,7 +387,7 @@
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  color: var(--command-text);
+  color: var(--layer-text-primary);
 }
 
 .lottery-gender__panel {
@@ -401,7 +401,7 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  color: var(--command-muted);
+  color: var(--layer-text-muted);
   font-size: var(--font-size-xs);
 }
 

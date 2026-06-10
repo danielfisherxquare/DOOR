@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import pipelineApi from '../../../../api/pipeline'
 import {
-  CommandDataTable,
-  CommandMetricGrid,
-  CommandNotice,
-  CommandPanel,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5DataTable,
+  AppH5MetricStrip,
+  AppH5Notice,
+  AppH5Panel,
+} from '../../../../components/app/AppH5Surface'
 import { getEventLabel, toNumber } from './lotteryHelpers'
 
 const ZONE_NAMES = ['S', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O']
@@ -555,11 +555,11 @@ export default function StartZoneSimulator({ raceId, raceDetail, preview, onUpda
 
   return (
     <div className="lottery-step-stack">
-      {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
+      {message ? <AppH5Notice tone={messageTone}>{message}</AppH5Notice> : null}
 
-      <CommandMetricGrid items={metrics} />
+      <AppH5MetricStrip items={metrics} />
 
-      <CommandPanel title="起点沙盘" subtitle="分区容量直接对照预览中的 step2.gap，便于快速判断容量是否够用。">
+      <AppH5Panel title="起点沙盘" subtitle="分区容量直接对照预览中的 step2.gap，便于快速判断容量是否够用。">
         <div className={`lottery-help-block ${gap > 0 ? 'is-warning' : 'is-success'}`}>
           {gap > 0
             ? `当前总有效容量 ${totalZoneCap.toLocaleString()}，距离目标人数还差 ${gap.toLocaleString()}。`
@@ -573,7 +573,8 @@ export default function StartZoneSimulator({ raceId, raceDetail, preview, onUpda
           onReorderZones={reorderZones}
         />
 
-        <CommandDataTable>
+        <AppH5DataTable>
+          <table>
           <thead>
             <tr>
               <th>区</th>
@@ -635,7 +636,8 @@ export default function StartZoneSimulator({ raceId, raceDetail, preview, onUpda
               </tr>
             )})}
           </tbody>
-        </CommandDataTable>
+          </table>
+        </AppH5DataTable>
 
         <div className="lottery-footer-actions">
           <button className="btn btn--secondary" onClick={addZone}>新增分区</button>
@@ -643,7 +645,7 @@ export default function StartZoneSimulator({ raceId, raceDetail, preview, onUpda
             {saving ? '保存中...' : '保存起点沙盘'}
           </button>
         </div>
-      </CommandPanel>
+      </AppH5Panel>
     </div>
   )
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import assessmentAdminApi from '../../../api/assessmentAdmin'
 import { loadChartJs } from '../../../utils/chartLoader'
-import { CommandStatusTag } from '../../../components/command/CommandPrimitives'
+import { AppH5StatusTag } from '../../../components/app/AppH5Surface'
 
 const CAMPAIGN_STATUS_LABELS = {
   draft: '草稿',
@@ -52,7 +52,7 @@ function checkRedLines(itemAverages) {
   const itemMap = new Map(itemAverages.map(item => [item.itemId, item.averageScore]))
   const warnings = []
   let redLineCount = 0
-  
+
   CORE_ITEM_IDS.forEach(itemId => {
     const score = itemMap.get(itemId)
     if (score !== undefined && score <= RED_LINE_THRESHOLD) {
@@ -61,17 +61,17 @@ function checkRedLines(itemAverages) {
       warnings.push(`${itemTitle} 得分 ${score.toFixed(1)} 分，低于合格线`)
     }
   })
-  
+
   return { redLineCount, warnings, hasRedLine: redLineCount > 0 }
 }
 
 function calculateTier(averageScore, itemAverages) {
   const { redLineCount } = checkRedLines(itemAverages)
-  
+
   if (redLineCount >= 2) return 'D'
   if (redLineCount >= 1 && averageScore < 60) return 'D'
   if (redLineCount >= 1) return 'C'
-  
+
   if (averageScore >= 90) {
     const highScores = itemAverages.filter(item => item.averageScore >= 9).length
     return highScores >= 3 ? 'S' : 'A'
@@ -85,7 +85,7 @@ function calculateTier(averageScore, itemAverages) {
 function buildTierResultFallback(averageScore, itemAverages) {
   const tier = calculateTier(averageScore, itemAverages)
   const { redLineCount, warnings } = checkRedLines(itemAverages)
-  
+
   return {
     tier,
     tierTitle: TIER_CONFIG[tier].title,
@@ -331,18 +331,18 @@ function AssessmentCampaignDetailPage() {
 
   const renderRadarChart = (report) => {
     if (!radarChartRef.current || !chartLoaded || !window.Chart) return
-    
+
     const itemAverages = report.itemAverages || []
     if (itemAverages.length === 0) return
-    
+
     if (radarChartInstance.current) {
       radarChartInstance.current.destroy()
       radarChartInstance.current = null
     }
-    
+
     const tierResult = getTierResult(report)
     const tierColor = tierResult?.tierColor || '#6366F1'
-    
+
     radarChartInstance.current = new window.Chart(radarChartRef.current, {
       type: 'radar',
       data: {
@@ -680,12 +680,12 @@ function AssessmentCampaignDetailPage() {
             <div style={titleStyle}>成员报表详情</div>
             <button className="btn btn--ghost btn--sm" onClick={() => setSelectedMemberReport(null)}>关闭</button>
           </div>
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 24 }}>
             <div style={{ height: 260 }}>
               <canvas ref={radarChartRef} />
             </div>
-            
+
             <div style={{ display: 'grid', gap: 16 }}>
               {(() => {
                 const tierResult = getTierResult(selectedMemberReport.report)
@@ -708,7 +708,7 @@ function AssessmentCampaignDetailPage() {
                         {tierResult.tierTitle}
                       </span>
                       {tierResult.hasRedLine && (
-                        <CommandStatusTag tone="danger">{`红线 ${tierResult.redLineCount} 条`}</CommandStatusTag>
+                        <AppH5StatusTag tone="danger">{`红线 ${tierResult.redLineCount} 条`}</AppH5StatusTag>
                       )}
                     </div>
                     <div style={{ color: 'var(--text-primary)', fontSize: 14, lineHeight: 1.6 }}>
@@ -724,7 +724,7 @@ function AssessmentCampaignDetailPage() {
                   </div>
                 )
               })()}
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, fontSize: 14 }}>
                 <div><strong>姓名：</strong>{selectedMemberReport.member.employeeName}</div>
                 <div><strong>工号：</strong>{selectedMemberReport.member.employeeCode}</div>
@@ -735,7 +735,7 @@ function AssessmentCampaignDetailPage() {
               </div>
             </div>
           </div>
-          
+
           <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
             <thead>
               <tr>
@@ -756,7 +756,7 @@ function AssessmentCampaignDetailPage() {
                     </td>
                     <td style={tdStyle}>{item.averageScore}</td>
                     <td style={tdStyle}>
-                      {isRedLine && <CommandStatusTag tone="danger">红线</CommandStatusTag>}
+                      {isRedLine && <AppH5StatusTag tone="danger">红线</AppH5StatusTag>}
                       {!isRedLine && item.averageScore >= 8 && <span style={{ color: 'var(--success)' }}>优秀</span>}
                       {!isRedLine && item.averageScore < 8 && item.averageScore >= 6 && <span style={{ color: 'var(--text-secondary)' }}>合格</span>}
                       {!isRedLine && item.averageScore < 6 && <span style={{ color: 'var(--warning)' }}>待提升</span>}

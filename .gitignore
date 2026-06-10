@@ -33,6 +33,9 @@ tsc_output.txt
 .tmp-*
 tmp-*
 .runtime/
+result.json
+public/minimal.3mf
+public/test-*.3mf
 
 # One-off debug/fix scripts (root level)
 check_server.js

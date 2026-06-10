@@ -40,6 +40,15 @@ const BatchIcon = () => (
     </svg>
 );
 
+function getRecognitionPageCount(file) {
+    const pageCount = Number(file?.pageCount ?? file?.page_count);
+    return Number.isFinite(pageCount) && pageCount > 0 ? Math.ceil(pageCount) : 1;
+}
+
+function summarizeRecognitionPages(files = []) {
+    return files.reduce((total, file) => total + getRecognitionPageCount(file), 0);
+}
+
 function PreviewWorkspace({ projectId, onOpenRecord }) {
     const {
         previewFiles,
@@ -59,7 +68,7 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [isDragOver, setIsDragOver] = useState(false);
     const [importing, setImporting] = useState(false);
-    const [stats, setStats] = useState({ total: 0, preview: 0, duplicates: 0 });
+    const [stats, setStats] = useState({ total: 0, preview: 0, duplicates: 0, processing: 0 });
     const [uploadType, setUploadType] = useState('invoice');
     const [importNotice, setImportNotice] = useState({ type: '', summary: '', duplicates: [] });
     const [batchProgress, setBatchProgress] = useState(null);
@@ -88,16 +97,18 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
 
     useEffect(() => {
         if (previewFiles) {
-            // 只统计待识别的文件
-            const pending = previewFiles.filter(f => f.status === 'preview');
+            const pending = previewFiles.filter(f => f.status === 'preview' || f.status === 'ocr_processing');
+            const processingIds = new Set(pending.filter(f => f.status === 'ocr_processing').map(f => f.id));
+            recognizingFileIds.forEach(id => processingIds.add(id));
             const newStats = {
                 total: pending.length,
-                preview: pending.filter(f => !f.isDuplicate).length,
-                duplicates: pending.filter(f => f.isDuplicate).length,
+                preview: pending.filter(f => f.status === 'preview' && !f.isDuplicate).length,
+                duplicates: pending.filter(f => f.status === 'preview' && f.isDuplicate).length,
+                processing: processingIds.size,
             };
             setStats(newStats);
         }
-    }, [previewFiles]);
+    }, [previewFiles, recognizingFileIds]);
 
     const handleFileUpload = async (e) => {
         const files = e.target.files;
@@ -197,19 +208,37 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
 
     // 拖拽识别
     const handleDrop = async (file) => {
-        if (!file || file.status === 'recognized') return;
-        await recognizeFile(file.id, false);
+        if (!file || file.status !== 'preview' || recognizingFileIds.has(file.id)) return;
+        const pageCount = getRecognitionPageCount(file);
+        if (pageCount > 1 && !confirm(`该文件预计识别页为 ${pageCount} 页，会发送到付费 OCR 模型，确认继续识别？`)) {
+            return;
+        }
+        return recognizeFile(file.id, false);
     };
 
     // 强制识别重复文件
     const handleForceRecognize = async (file) => {
+        const pageCount = getRecognitionPageCount(file);
+        if (pageCount > 1 && !confirm(`该重复文件预计识别页为 ${pageCount} 页，会重新发送到付费 OCR 模型，确认强制识别？`)) {
+            return;
+        }
         await recognizeFile(file.id, true);
     };
 
     // 批量识别：逐张排队，避免多个 OCR 请求同时打到模型服务。
     const handleBatchRecognize = async () => {
-        const toRecognize = Array.from(selectedIds).filter(id => !recognizingFileIds.has(id));
+        const previewById = new Map((previewFiles || []).map(file => [file.id, file]));
+        const toRecognize = Array.from(selectedIds)
+            .filter(id => previewById.get(id)?.status === 'preview' && !recognizingFileIds.has(id));
         if (toRecognize.length === 0) return;
+
+        const filesToRecognize = toRecognize.map(id => previewById.get(id)).filter(Boolean);
+        const recognitionPageCount = summarizeRecognitionPages(filesToRecognize);
+        if (recognitionPageCount > filesToRecognize.length && !confirm(
+            `本次将识别 ${filesToRecognize.length} 个文件，预计识别页为 ${recognitionPageCount} 页，会发送到付费 OCR 模型，确认继续识别？`
+        )) {
+            return;
+        }
 
         const failures = [];
         const needConfirm = [];
@@ -280,11 +309,11 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
 
     // 批量移除
     const handleBatchDiscard = async () => {
-        if (selectedIds.size === 0) return;
-        if (!confirm(`确定要移除选中的 ${selectedIds.size} 个文件吗？`)) return;
+        if (selectedPreviewFileIds.length === 0) return;
+        if (!confirm(`确定要移除选中的 ${selectedPreviewFileIds.length} 个文件吗？`)) return;
 
         try {
-            for (const fileId of selectedIds) {
+            for (const fileId of selectedPreviewFileIds) {
                 await discardFile(projectId, fileId);
             }
             setSelectedIds(new Set());
@@ -313,8 +342,20 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
         }
     };
 
-    // 只显示待识别的文件（已识别的自动隐藏）
-    const pendingFiles = previewFiles?.filter(f => f.status === 'preview') || [];
+    // 只显示待识别和识别中的文件（已识别的自动隐藏）
+    const pendingFiles = previewFiles?.filter(f => f.status === 'preview' || f.status === 'ocr_processing') || [];
+    const selectedPreviewFileIds = Array.from(selectedIds)
+        .filter(id => pendingFiles.some(file => file.id === id && file.status === 'preview' && !recognizingFileIds.has(id)));
+    const selectedPreviewFileSet = new Set(selectedPreviewFileIds);
+    const selectedPreviewFiles = pendingFiles.filter(file => selectedPreviewFileSet.has(file.id));
+    const selectedRecognitionPageCount = summarizeRecognitionPages(selectedPreviewFiles);
+    const pendingRecognitionPageCount = summarizeRecognitionPages(
+        pendingFiles.filter(file => file.status === 'preview' && !recognizingFileIds.has(file.id))
+    );
+    const visibleRecognitionPageCount = selectedPreviewFileIds.length > 0
+        ? selectedRecognitionPageCount
+        : pendingRecognitionPageCount;
+    const hasAnyProcessing = stats.processing > 0;
     const recognizedRecords = records?.filter(r => r.preview_file_id) || [];
 
     return (
@@ -357,17 +398,21 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
                     刷新
                 </button>
 
-                {selectedIds.size > 0 && (
+                {selectedPreviewFileIds.length > 0 && (
                     <>
                         <button
                             className="btn--primary"
                             onClick={handleBatchRecognize}
-                            disabled={recognizingFileIds.size > 0}
+                            disabled={hasAnyProcessing}
                         >
                             <BatchIcon />
-                            逐张识别 ({selectedIds.size})
+                            逐张识别 ({selectedPreviewFileIds.length})
                         </button>
-                        <button className="btn--discard" onClick={handleBatchDiscard}>
+                        <button
+                            className="btn--discard"
+                            onClick={handleBatchDiscard}
+                            disabled={selectedPreviewFileIds.length === 0}
+                        >
                             <TrashIcon />
                             移除选中
                         </button>
@@ -378,9 +423,10 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
                     <span>待处理: <strong className="preview-workspace__stat-value">{stats.total}</strong></span>
                     <span>新文件: <strong className="preview-workspace__stat-value preview-workspace__stat-value--success">{stats.preview}</strong></span>
                     <span>重复: <strong className="preview-workspace__stat-value preview-workspace__stat-value--warning">{stats.duplicates}</strong></span>
-                    {recognizingFileIds.size > 0 && (
+                    <span>预计识别页: <strong className="preview-workspace__stat-value preview-workspace__stat-value--info">{visibleRecognitionPageCount}</strong></span>
+                    {stats.processing > 0 && (
                         <span className="preview-workspace__stat-value--info">
-                            识别中: {recognizingFileIds.size}
+                            识别中: {stats.processing}
                         </span>
                     )}
                     {batchProgress && (

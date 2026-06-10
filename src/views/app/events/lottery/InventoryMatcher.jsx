@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import lotteryApi from '../../../../api/lottery'
 import pipelineApi from '../../../../api/pipeline'
 import {
-  CommandDataTable,
-  CommandMetricGrid,
-  CommandNotice,
-  CommandPanel,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5DataTable,
+  AppH5MetricStrip,
+  AppH5Notice,
+  AppH5Panel,
+} from '../../../../components/app/AppH5Surface'
 import {
   formatNumber,
   getCountFromMap,
@@ -204,12 +204,13 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
         <LotteryV2BetaPanel raceId={raceId} onUpdated={onUpdated} />
       ) : (
         <>
-          {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
+          {message ? <AppH5Notice tone={messageTone}>{message}</AppH5Notice> : null}
 
-          <CommandMetricGrid items={metrics} />
+          <AppH5MetricStrip items={metrics} />
 
-          <CommandPanel title="尺码库存" subtitle="库存统计与当前已占用数量会在执行后自动刷新。">
-            <CommandDataTable>
+          <AppH5Panel title="尺码库存" subtitle="库存统计与当前已占用数量会在执行后自动刷新。">
+            <AppH5DataTable>
+              <table>
               <thead>
                 <tr>
                   <th>项目</th>
@@ -232,11 +233,12 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
                   </tr>
                 ))}
               </tbody>
-            </CommandDataTable>
-          </CommandPanel>
+              </table>
+            </AppH5DataTable>
+          </AppH5Panel>
 
           {result ? (
-            <CommandPanel title="最终执行结果" subtitle="结果优先读取最近一次成功的 lottery execution JSON，没有时回退到聚合统计。">
+            <AppH5Panel title="最终执行结果" subtitle="结果优先读取最近一次成功的 lottery execution JSON，没有时回退到聚合统计。">
               <div className="lottery-mini-grid lottery-mini-grid--three">
                 <div className="lottery-mini-stat"><span className="lottery-mini-stat__label">中签</span><strong className="lottery-mini-stat__value">{formatNumber(result.winners)}</strong></div>
                 <div className="lottery-mini-stat"><span className="lottery-mini-stat__label">未中签</span><strong className="lottery-mini-stat__value">{formatNumber(result.losers)}</strong></div>
@@ -276,7 +278,8 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
               ) : null}
 
               {result.bucketBreakdown?.length ? (
-                <CommandDataTable>
+                <AppH5DataTable>
+                  <table>
                   <thead>
                     <tr>
                       <th>Bucket</th>
@@ -299,11 +302,13 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
                       </tr>
                     ))}
                   </tbody>
-                </CommandDataTable>
+                  </table>
+                </AppH5DataTable>
               ) : null}
 
               {result.inventoryReport?.length ? (
-                <CommandDataTable>
+                <AppH5DataTable>
+                  <table>
                   <thead>
                     <tr>
                       <th>尺码</th>
@@ -330,7 +335,8 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
                       </tr>
                     ))}
                   </tbody>
-                </CommandDataTable>
+                  </table>
+                </AppH5DataTable>
               ) : null}
 
               {result.genderStats && Object.keys(result.genderStats).length ? (
@@ -356,11 +362,11 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
                   有成绩但库存不足 {formatNumber(result.unselectedStats.qualified_inventory)}，无成绩但库存不足 {formatNumber(result.unselectedStats.general_inventory)}。
                 </div>
               ) : null}
-            </CommandPanel>
+            </AppH5Panel>
           ) : null}
 
           {!canExecute ? (
-            <CommandNotice tone="warning">当前还不能执行最终抽签，请先在“容量定义”中保存可执行的项目容量配置。</CommandNotice>
+            <AppH5Notice tone="warning">当前还不能执行最终抽签，请先在“容量定义”中保存可执行的项目容量配置。</AppH5Notice>
           ) : null}
 
           <div className="lottery-footer-actions">

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import lotteryApi from '../../../../api/lottery'
 import {
-  CommandDataTable,
-  CommandMetricGrid,
-  CommandNotice,
-  CommandPanel,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5DataTable,
+  AppH5MetricStrip,
+  AppH5Notice,
+  AppH5Panel,
+} from '../../../../components/app/AppH5Surface'
 import {
   formatNumber,
   toNumber,
@@ -237,9 +237,9 @@ export default function LotteryV2BetaPanel({ raceId, onUpdated }) {
 
   return (
     <div className="lottery-step-stack">
-      {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
+      {message ? <AppH5Notice tone={messageTone}>{message}</AppH5Notice> : null}
 
-      <CommandPanel title="Lottery V2 Beta 配置" subtitle="衣服硬约束 > 成绩比例 > 性别比例 > 地域比例。">
+      <AppH5Panel title="Lottery V2 Beta 配置" subtitle="衣服硬约束 > 成绩比例 > 性别比例 > 地域比例。">
         <div className="lottery-form-grid">
           <label className="lottery-field">
             服装模型
@@ -288,9 +288,9 @@ export default function LotteryV2BetaPanel({ raceId, onUpdated }) {
           <button className="btn btn--secondary" onClick={handleSaveConfig} disabled={loading || previewing || finalizing || rollingBack}>保存 V2 配置</button>
           <button className="btn btn--ghost" onClick={loadAll} disabled={loading || previewing || finalizing || rollingBack}>{loading ? '刷新中...' : '刷新数据'}</button>
         </div>
-      </CommandPanel>
+      </AppH5Panel>
 
-      <CommandMetricGrid items={previewMetrics} />
+      <AppH5MetricStrip items={previewMetrics} />
 
       {preview?.warnings?.length ? (
         <div className="lottery-warning-list">
@@ -304,8 +304,9 @@ export default function LotteryV2BetaPanel({ raceId, onUpdated }) {
       ) : null}
 
       {Array.isArray(previewSummary.quotaBreakdown) && previewSummary.quotaBreakdown.length ? (
-        <CommandPanel title="V2 预演配额分解" subtitle="按项目展示目标、直通占用与实际预演中签。">
-          <CommandDataTable>
+        <AppH5Panel title="V2 预演配额分解" subtitle="按项目展示目标、直通占用与实际预演中签。">
+          <AppH5DataTable>
+            <table>
             <thead>
               <tr>
                 <th>项目</th>
@@ -330,8 +331,9 @@ export default function LotteryV2BetaPanel({ raceId, onUpdated }) {
                 </tr>
               ))}
             </tbody>
-          </CommandDataTable>
-        </CommandPanel>
+            </table>
+          </AppH5DataTable>
+        </AppH5Panel>
       ) : null}
 
       <div className="lottery-footer-actions">
@@ -346,11 +348,12 @@ export default function LotteryV2BetaPanel({ raceId, onUpdated }) {
         </button>
       </div>
 
-      <CommandMetricGrid items={resultMetrics} />
+      <AppH5MetricStrip items={resultMetrics} />
 
       {results?.apparelReservations?.length ? (
-        <CommandPanel title="服装占用汇总" subtitle="来源于 apparel_reservations（直通占用 + V2 抽签占用）。">
-          <CommandDataTable>
+        <AppH5Panel title="服装占用汇总" subtitle="来源于 apparel_reservations（直通占用 + V2 抽签占用）。">
+          <AppH5DataTable>
+            <table>
             <thead>
               <tr>
                 <th>服装 Bucket</th>
@@ -365,13 +368,15 @@ export default function LotteryV2BetaPanel({ raceId, onUpdated }) {
                 </tr>
               ))}
             </tbody>
-          </CommandDataTable>
-        </CommandPanel>
+            </table>
+          </AppH5DataTable>
+        </AppH5Panel>
       ) : null}
 
       {results?.results?.length ? (
-        <CommandPanel title="V2 结果明细（前 200 条）" subtitle="完整数据保留在 lottery_v2_results，可用于审计。">
-          <CommandDataTable>
+        <AppH5Panel title="V2 结果明细（前 200 条）" subtitle="完整数据保留在 lottery_v2_results，可用于审计。">
+          <AppH5DataTable>
+            <table>
             <thead>
               <tr>
                 <th>Record ID</th>
@@ -392,8 +397,9 @@ export default function LotteryV2BetaPanel({ raceId, onUpdated }) {
                 </tr>
               ))}
             </tbody>
-          </CommandDataTable>
-        </CommandPanel>
+            </table>
+          </AppH5DataTable>
+        </AppH5Panel>
       ) : null}
     </div>
   )

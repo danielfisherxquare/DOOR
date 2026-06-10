@@ -12,7 +12,7 @@ export default defineConfig({
     port: 5173,
     strictPort: false,
     open: false,
-    host: '127.0.0.1',
+    host: '0.0.0.0',
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:3001',

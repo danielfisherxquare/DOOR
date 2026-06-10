@@ -67,20 +67,16 @@ export default function InboundCenter() {
         { key: 'openAlerts', label: '未处理异常', value: overview?.metrics?.openAlerts || 0 },
     ]), [overview])
 
-    const tabs = TABS.map((tab) => (
-        <button
-            key={tab.key}
-            type="button"
-            className={`warehouse-workbench__tab ${activeTab === tab.key ? 'warehouse-workbench__tab--active' : ''}`}
-            onClick={() => {
+    const tabs = TABS.map((tab) => ({
+        key: tab.key,
+        label: tab.label,
+        active: activeTab === tab.key,
+        onClick: () => {
                 const nextParams = new URLSearchParams(searchParams)
                 nextParams.set('tab', tab.key)
                 setSearchParams(nextParams)
-            }}
-        >
-            {tab.label}
-        </button>
-    ))
+        },
+    }))
 
     let mainContent = <BatchInbound />
     if (activeTab === 'pre') mainContent = <PreInboundManager />

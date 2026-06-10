@@ -5,14 +5,13 @@ import columnMappingsApi from '../../../../api/column-mappings'
 import { parseFile } from '../../../../utils/excelProcessor'
 import useAuthStore from '../../../../stores/authStore'
 import {
-  CommandEmptyState,
-  CommandMetricGrid,
-  CommandNotice,
-  CommandPanel,
-  CommandShell,
-  CommandStepRail,
-  ContextRequirementState,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5ContextState,
+  AppH5EmptyState,
+  AppH5Notice,
+  AppH5Panel,
+  AppH5Surface,
+  AppH5Tabs,
+} from '../../../../components/app/AppH5Surface'
 import DataCleaner from './DataCleaner'
 import DataPreview from './DataPreview'
 import SurnamePinyinSettings from './SurnamePinyinSettings'
@@ -192,6 +191,15 @@ export default function ImportPage() {
       disabled: !canNavigateToStep(step.key),
     }))
   }, [canNavigateToStep, currentStepIndex])
+
+  const stepTabs = useMemo(() => stepStates.map((step) => ({
+    key: step.key,
+    label: step.label,
+    badge: step.icon,
+    active: step.key === currentStep,
+    disabled: step.disabled,
+    onClick: () => setStep(step.key),
+  })), [currentStep, setStep, stepStates])
 
   const totalRows = useMemo(
     () => uploadedFiles.reduce((sum, file) => sum + Number(file.totalRows || 0), 0),
@@ -424,66 +432,62 @@ export default function ImportPage() {
 
   if (!raceId) {
     return (
-      <div className="command-page surface-app">
-        <CommandShell
-          eyebrow="我的赛事"
-          title="名单导入"
-          summary="上传报名名单、校正字段、执行清洗并提交入库，让选手链路从源头保持一致。"
-        >
-          <CommandMetricGrid items={metrics} />
-        </CommandShell>
-        <ContextRequirementState
+      <AppH5Surface
+        className="import-page"
+        eyebrow="我的赛事"
+        title="名单导入"
+        summary="上传报名名单、校正字段、执行清洗并提交入库，让选手链路从源头保持一致。"
+        metrics={metrics}
+      >
+        <AppH5ContextState
           title="请先选择赛事"
           description="在顶部控制面板中选择目标赛事后，才能导入名单。"
         />
-      </div>
+      </AppH5Surface>
     )
   }
 
   return (
-    <div className="command-page surface-app import-page">
-      <CommandShell
-        eyebrow="我的赛事"
-        title="名单导入"
-        summary="上传本地报名数据，完成字段映射、清洗与预览后，再安全提交。"
-      >
-        <CommandMetricGrid items={metrics} />
-      </CommandShell>
+    <AppH5Surface
+      className="import-page"
+      eyebrow="我的赛事"
+      title="名单导入"
+      summary="上传本地报名数据，完成字段映射、清洗与预览后，再安全提交。"
+      metrics={metrics}
+    >
 
-      {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
+      {message ? <AppH5Notice tone={messageTone}>{message}</AppH5Notice> : null}
 
-      <CommandPanel title="导入阶段" subtitle="保持同一条作业链路，避免在多个旧页面之间来回跳转。">
-        <CommandStepRail
+      <AppH5Panel title="导入阶段" summary="保持同一条作业链路，避免在多个旧页面之间来回跳转。">
+        <AppH5Tabs
           className="import-steps"
-          steps={stepStates}
-          activeKey={currentStep}
-          onChange={setStep}
+          items={stepTabs}
           ariaLabel="名单导入步骤"
         />
-      </CommandPanel>
+      </AppH5Panel>
 
-      <CommandPanel title={currentStepInfo.label} subtitle={currentStepInfo.desc}>
+      <AppH5Panel title={currentStepInfo.label} summary={currentStepInfo.desc}>
         {currentStep === 'upload' ? renderUploadStep() : null}
         {currentStep === 'mapping' ? renderMappingStep() : null}
         {currentStep === 'cleaning' ? (
           uploadedFiles.length > 0
             ? <DataCleaner raceId={raceId} />
-            : <CommandEmptyState icon="CLN" title="请先上传文件" description="完成字段映射后，才能进入数据清洗。" />
+            : <AppH5EmptyState icon="CLN" title="请先上传文件" description="完成字段映射后，才能进入数据清洗。" />
         ) : null}
         {currentStep === 'preview' ? (
           uploadedFiles.length > 0
             ? <DataPreview raceId={raceId} />
-            : <CommandEmptyState icon="PVW" title="请先上传文件" description="请先完成前面的导入步骤。" />
+            : <AppH5EmptyState icon="PVW" title="请先上传文件" description="请先完成前面的导入步骤。" />
         ) : null}
-      </CommandPanel>
+      </AppH5Panel>
 
-      <CommandPanel
+      <AppH5Panel
         title="姓氏拼音补充规则"
-        subtitle="名单清洗和姓名转拼音会共享这里的本地补充映射，行为与 TOOL 端保持一致。"
+        summary="名单清洗和姓名转拼音会共享这里的本地补充映射，行为与 TOOL 端保持一致。"
       >
         <SurnamePinyinSettings />
-      </CommandPanel>
-    </div>
+      </AppH5Panel>
+    </AppH5Surface>
   )
 }
 

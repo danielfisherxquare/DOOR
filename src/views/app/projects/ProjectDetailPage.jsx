@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 
-import TreeGrid from '../../../components/projects/TreeGrid';
 import GanttView from '../../../components/projects/GanttView';
+import TreeGrid from '../../../components/projects/TreeGrid';
+import { AppH5Notice, AppH5Panel, AppH5Surface, AppH5Tabs } from '../../../components/app/AppH5Surface';
 import racesApi from '../../../api/races';
 import projectsApi from '../../../api/projects';
 import useAuthStore from '../../../stores/authStore';
+import './project-detail-page.css';
 
 export default function ProjectDetailPage() {
     const { id } = useParams();
@@ -20,18 +22,23 @@ export default function ProjectDetailPage() {
     useEffect(() => {
         if (id !== 'new') {
             projectsApi.getById(id)
-                .then(data => {
+                .then((data) => {
                     if (data.success) setProject(data.data);
                 });
         } else {
-            setProject({ name: '', description: '', race_id: '', org_id: searchParams.get('orgId') || user?.orgId || user?.org?.id || '' });
+            setProject({
+                name: '',
+                description: '',
+                race_id: '',
+                org_id: searchParams.get('orgId') || user?.orgId || user?.org?.id || '',
+            });
         }
 
-        racesApi.getAll().then(res => {
+        racesApi.getAll().then((res) => {
             if (res.success) {
                 setAvailableRaces(res.data || []);
             }
-        }).catch(err => console.error('Failed to load races', err));
+        }).catch((err) => console.error('Failed to load races', err));
     }, [id]);
 
     const handleSave = async () => {
@@ -43,7 +50,7 @@ export default function ProjectDetailPage() {
             };
             const data = id === 'new'
                 ? await projectsApi.create(payload)
-                : await projectsApi.update(id, project);
+                : await projectsApi.update(id, payload);
 
             if (data.success) {
                 if (id === 'new') {
@@ -60,112 +67,101 @@ export default function ProjectDetailPage() {
         }
     };
 
-    if (!project) return <div>加载中...</div>;
+    if (!project) {
+        return (
+            <AppH5Surface
+                className="project-detail-page"
+                eyebrow="项目计划"
+                title="项目计划"
+                summary="正在加载项目基本信息、赛事上下文和任务排期。"
+            >
+                <AppH5Notice tone="info">加载中...</AppH5Notice>
+            </AppH5Surface>
+        );
+    }
 
-    const pageTitle = id === 'new' ? '新建项目' : '编辑项目: ' + project.name;
-    const shellCardStyle = {
-        padding: 24,
-        background: 'linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), var(--surface)), var(--grid-pattern)',
-        backgroundSize: 'auto, 22px 22px',
-        border: '1px solid var(--border)',
-        borderRadius: 0,
-        boxShadow: 'var(--shadow-sm)',
-    };
-    const fieldStyle = {
-        width: '100%',
-        maxWidth: 400,
-        padding: '10px 12px',
-        border: '1px solid var(--border)',
-        borderRadius: 0,
-        fontSize: 14,
-        background: 'var(--surface)',
-        color: 'var(--text-primary)',
-    };
-    const viewToggleStyle = {
-        display: 'flex',
-        background: 'var(--bg-secondary)',
-        border: '1px solid var(--border)',
-        borderRadius: 0,
-        padding: 4,
-    };
-    const getToggleButtonStyle = (mode) => ({
-        padding: '6px 16px',
-        borderRadius: 0,
-        border: 'none',
-        background: viewMode === mode ? 'var(--surface)' : 'transparent',
-        color: viewMode === mode ? 'var(--text-primary)' : 'var(--text-secondary)',
-        fontSize: 14,
-        fontWeight: viewMode === mode ? 700 : 500,
-        cursor: 'pointer',
-        boxShadow: viewMode === mode ? 'var(--shadow-xs)' : 'none',
-        transition: 'all 0.2s',
-    });
+    const pageTitle = id === 'new' ? '新建项目' : `编辑项目：${project.name}`;
+    const viewTabs = [
+        {
+            key: 'list',
+            label: '列表视图',
+            icon: 'view_list',
+            active: viewMode === 'list',
+            onClick: () => setViewMode('list'),
+        },
+        {
+            key: 'gantt',
+            label: '甘特图',
+            icon: 'timeline',
+            active: viewMode === 'gantt',
+            onClick: () => setViewMode('gantt'),
+        },
+    ];
 
     return (
-        <div className="command-page surface-app">
-            <div className="command-page__header" style={{ marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16 }}>
-                <button onClick={() => navigate('/app/projects')} className="btn btn--ghost" style={{ padding: '8px 12px' }}>&larr; 返回</button>
-                <h2 style={{ fontSize: 24, margin: 0, fontFamily: 'var(--font-headline)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>{pageTitle}</h2>
-            </div>
-
-            <div className="card" style={{ ...shellCardStyle, marginBottom: 24 }}>
-                <div style={{ marginBottom: 16 }}>
-                    <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: 'var(--text-secondary)' }}>项目名称</label>
-                    <input
-                        className="input"
-                        value={project.name}
-                        onChange={e => setProject({ ...project, name: e.target.value })}
-                        style={fieldStyle}
-                        placeholder="例如：2026春季马拉松筹备"
-                    />
-                </div>
-                <div style={{ marginBottom: 24 }}>
-                    <label style={{ display: 'block', marginBottom: 8, fontWeight: 600, color: 'var(--text-secondary)' }}>关联赛事 (选填)</label>
-                    <select
-                        className="input"
-                        value={project.race_id || ''}
-                        onChange={e => setProject({ ...project, race_id: e.target.value })}
-                        style={fieldStyle}
-                    >
-                        <option value="">-- 请选择关联赛事 --</option>
-                        {availableRaces.map(race => (
-                            <option key={race.id} value={race.id}>{race.name}</option>
-                        ))}
-                    </select>
-                </div>
-
-                <button
-                    className="btn btn--primary"
-                    onClick={handleSave}
-                    disabled={saving}
-                    style={{ padding: '10px 20px', fontWeight: 700 }}
-                >
-                    {saving ? '保存中...' : '保存项目信息'}
+        <AppH5Surface
+            className="project-detail-page"
+            eyebrow="项目计划"
+            title={pageTitle}
+            summary="维护项目基本信息、赛事上下文和任务排期。"
+            actions={(
+                <button type="button" onClick={() => navigate('/app/projects')} className="btn btn--ghost">
+                    返回
                 </button>
-            </div>
-
-            {id !== 'new' && (
-                <div className="card" style={shellCardStyle}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 12, marginBottom: 16 }}>
-                        <h3 style={{ fontSize: 18, margin: 0, fontFamily: 'var(--font-headline)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>任务管理</h3>
-                        <div style={viewToggleStyle}>
-                            <button
-                                onClick={() => setViewMode('list')}
-                                style={getToggleButtonStyle('list')}
-                            >
-                                列表视图
-                            </button>
-                            <button
-                                onClick={() => setViewMode('gantt')}
-                                style={getToggleButtonStyle('gantt')}
-                            >
-                                甘特图
-                            </button>
-                        </div>
-                    </div>
-                    {viewMode === 'list' ? <TreeGrid projectId={id} /> : <GanttView projectId={id} />}
-                </div>
             )}
-        </div>
+        >
+            <AppH5Panel
+                title="项目信息"
+                summary="项目名称和赛事归属会影响后续任务、阶段和现场执行入口。"
+                footer={(
+                    <button
+                        type="button"
+                        className="btn btn--primary"
+                        onClick={handleSave}
+                        disabled={saving}
+                    >
+                        {saving ? '保存中...' : '保存项目信息'}
+                    </button>
+                )}
+            >
+                <div className="project-detail-form">
+                    <label className="project-detail-field">
+                        <span className="project-detail-field__label">项目名称</span>
+                        <input
+                            className="input project-detail-field__control"
+                            value={project.name}
+                            onChange={(event) => setProject({ ...project, name: event.target.value })}
+                            placeholder="例如：2026春季马拉松筹备"
+                        />
+                    </label>
+
+                    <label className="project-detail-field">
+                        <span className="project-detail-field__label">关联赛事（选填）</span>
+                        <select
+                            className="input project-detail-field__control"
+                            value={project.race_id || ''}
+                            onChange={(event) => setProject({ ...project, race_id: event.target.value })}
+                        >
+                            <option value="">请选择关联赛事</option>
+                            {availableRaces.map((race) => (
+                                <option key={race.id} value={race.id}>{race.name}</option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+            </AppH5Panel>
+
+            {id !== 'new' ? (
+                <AppH5Panel
+                    title="任务管理"
+                    summary="在列表和甘特视图之间切换，继续维护项目阶段与排期。"
+                    actions={<AppH5Tabs items={viewTabs} ariaLabel="任务视图" />}
+                >
+                    <div className="project-detail-task-frame">
+                        {viewMode === 'list' ? <TreeGrid projectId={id} /> : <GanttView projectId={id} />}
+                    </div>
+                </AppH5Panel>
+            ) : null}
+        </AppH5Surface>
     );
 }

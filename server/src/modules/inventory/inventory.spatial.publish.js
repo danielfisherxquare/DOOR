@@ -1,3 +1,9 @@
+import {
+    EXPORT_COORDINATE_SYSTEMS,
+    buildExportManifest,
+    buildTerrainPatchDiagnostics,
+} from '../../../../src/utils/exportManifest.js';
+
 const OBJECT_LABELS = {
     arch: '赛事拱门',
     stage: '舞台',
@@ -366,6 +372,7 @@ export function buildTerrainWorkZonePublishManifest(zone, spatialObjects = []) {
 
     const generatedAt = new Date().toISOString();
     const objects = ensureArray(spatialObjects).map((object) => buildObjectPlacement(zone, object));
+    const terrainDiagnostics = buildTerrainPatchDiagnostics(terrainPatch);
     const summary = {
         totalObjects: objects.length,
         byObjectType: {},
@@ -442,6 +449,27 @@ export function buildTerrainWorkZonePublishManifest(zone, spatialObjects = []) {
 
     return {
         generatedAt,
+        export: buildExportManifest({
+            kind: 'terrain-work-zone-publish-manifest',
+            name: zone?.name || '重点区工作区',
+            source: 'gis-focus-zone',
+            coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+            input: {
+                sourceWorkZoneId: zone?.id || null,
+                sourceProjectId: zone?.projectId || null,
+                originWgs84: zone?.originWgs84 || null,
+            },
+            stats: {
+                objectCount: objects.length,
+                batchCount: summary.batchCount,
+                terrainRows: terrainDiagnostics.rows,
+                terrainCols: terrainDiagnostics.cols,
+            },
+            diagnostics: {
+                terrainPatch: terrainDiagnostics,
+            },
+            generatedAt,
+        }),
         zone: {
             id: zone?.id || null,
             projectId: zone?.projectId || null,
@@ -594,9 +622,45 @@ export function buildTerrainWorkZoneExportPackage(zone, manifest) {
     }
 
     const totalGeometryResources = byLod.LOD0 + byLod.LOD1 + byLod.LOD2;
+    const packageExport = buildExportManifest({
+        kind: 'terrain-work-zone-export-package',
+        name: manifest?.export?.export?.originalBaseName || zone?.name || '重点区工作区',
+        source: 'gis-focus-zone',
+        coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+        input: {
+            sourceWorkZoneId: zone?.id || null,
+            sourceProjectId: zone?.projectId || null,
+            publishManifestGeneratedAt: manifest?.generatedAt || null,
+        },
+        stats: {
+            totalResources: resources.length,
+            totalObjects: manifest.summary.totalObjects,
+            totalBatches: Math.max(manifest.summary.batchCount, totalGeometryResources),
+            geometryResourceCount: totalGeometryResources,
+        },
+        diagnostics: {
+            terrainPatch: manifest?.export?.diagnostics?.terrainPatch || null,
+            optimization: optimizationSummary,
+        },
+        resources: resources.map((resource) => ({
+            id: resource.id,
+            category: resource.category,
+            format: resource.format,
+            path: resource.path,
+        })),
+        generatedAt,
+    });
+    if (manifest?.export?.export) {
+        packageExport.export = {
+            ...packageExport.export,
+            ...manifest.export.export,
+            coordinateSystem: packageExport.export.coordinateSystem,
+        };
+    }
 
     return {
         generatedAt,
+        export: packageExport,
         zone: {
             id: zone.id,
             name: zone.name,

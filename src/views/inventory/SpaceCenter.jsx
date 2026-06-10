@@ -45,20 +45,16 @@ export default function SpaceCenter() {
         [selectedWarehouseId, spaceData?.warehouses]
     )
 
-    const tabs = TABS.map((tab) => (
-        <button
-            key={tab.key}
-            type="button"
-            className={`warehouse-workbench__tab ${activeTab === tab.key ? 'warehouse-workbench__tab--active' : ''}`}
-            onClick={() => {
+    const tabs = TABS.map((tab) => ({
+        key: tab.key,
+        label: tab.label,
+        active: activeTab === tab.key,
+        onClick: () => {
                 const nextParams = new URLSearchParams(searchParams)
                 nextParams.set('tab', tab.key)
                 setSearchParams(nextParams)
-            }}
-        >
-            {tab.label}
-        </button>
-    ))
+        },
+    }))
 
     const filteredUnboundObjects = useMemo(() => {
         if (!search) return spaceData?.unboundObjects || []

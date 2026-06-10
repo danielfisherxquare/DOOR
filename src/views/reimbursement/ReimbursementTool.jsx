@@ -6,7 +6,12 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import useReimbursementStore from '../../stores/reimbursementStore'
-import { CommandNotice, CommandPanel, CommandShell } from '../../components/command/CommandPrimitives'
+import {
+  AppH5Notice,
+  AppH5Panel,
+  AppH5Surface,
+  AppH5Tabs,
+} from '../../components/app/AppH5Surface'
 import './reimbursement.css'
 
 // 子组件
@@ -62,6 +67,28 @@ function ReimbursementTool() {
 
   // 计算模型配置状态
   const hasLlmConfig = Boolean(hasServerLlmConfig || (llmConfig?.apiKey && llmConfig?.baseUrl))
+  const reimbursementTabs = [
+    {
+      key: 'import',
+      label: '导入与识别',
+      active: !showRecords && !showAttachments,
+      onClick: () => { setShowRecords(false); setShowAttachments(false); },
+    },
+    {
+      key: 'records',
+      label: '报销明细',
+      badge: activeProject?.record_count || 0,
+      active: showRecords,
+      onClick: () => { setShowRecords(true); setShowAttachments(false); },
+    },
+    {
+      key: 'attachments',
+      label: '票据管理',
+      badge: attachmentCount,
+      active: showAttachments,
+      onClick: () => { setShowAttachments(true); setShowRecords(false); },
+    },
+  ]
 
   // 获取项目列表
   useEffect(() => {
@@ -71,7 +98,7 @@ function ReimbursementTool() {
 
   return (
     <div className="reimbursement-page">
-      <CommandShell
+      <AppH5Surface
         eyebrow="报销工具"
         title="发票报销控制面"
         summary="围绕导入凭证、识别校对、汇总明细与导出归档组织单线流程，避免发票与付款凭证分散在多套工作区。"
@@ -114,17 +141,17 @@ function ReimbursementTool() {
         )}
       >
         {error ? (
-          <CommandNotice tone="danger">
+          <AppH5Notice tone="danger">
             {error}
             <button className="btn btn--ghost btn--sm" onClick={clearError}>关闭</button>
-          </CommandNotice>
+          </AppH5Notice>
         ) : null}
 
-        {isLoading ? <CommandNotice tone="info">正在加载报销项目和识别配置...</CommandNotice> : null}
+        {isLoading ? <AppH5Notice tone="info">正在加载报销项目和识别配置...</AppH5Notice> : null}
 
         {/* 未配置模型警告 - 借鉴Admin的admin-state-banner */}
         {activeProjectId && !hasLlmConfig && !isLoading ? (
-          <div className="reimbursement-warning-banner">
+          <AppH5Notice tone="warning" className="reimbursement-warning-banner">
             <span className="reimbursement-warning-banner__icon">⚠️</span>
             <span className="reimbursement-warning-banner__text">
               尚未配置 OCR 模型。请点击"模型配置"按钮完成设置，或确认服务端已配置默认模型。
@@ -135,14 +162,13 @@ function ReimbursementTool() {
             >
               立即配置
             </button>
-          </div>
+          </AppH5Notice>
         ) : null}
-      </CommandShell>
 
       {isProjectManager ? (
         <ProjectManagementPage />
       ) : !activeProjectId ? (
-        <CommandPanel title="先选择项目" subtitle="请先创建或切换到一个报销项目，然后再开始导入发票与付款凭证。">
+        <AppH5Panel title="先选择项目" summary="请先创建或切换到一个报销项目，然后再开始导入发票与付款凭证。">
           <div className="reimbursement-tool__welcome">
             <div className="reimbursement-tool__empty-actions">
               <ProjectSelector showCreate />
@@ -154,12 +180,12 @@ function ReimbursementTool() {
               </button>
             </div>
           </div>
-        </CommandPanel>
+        </AppH5Panel>
       ) : (
         <>
           {/* 待匹配项提示 */}
           {pendingMatches.length > 0 && !showRecords && !showAttachments && (
-            <CommandPanel title="待处理冲突" subtitle="存在无法自动匹配的付款凭证，需要手动确认。">
+            <AppH5Panel title="待处理冲突" summary="存在无法自动匹配的付款凭证，需要手动确认。" tone="warning">
               <div className="reimbursement-alert reimbursement-alert--warning">
                 <span className="reimbursement-alert__icon">⚠️</span>
                 <span className="reimbursement-alert__text">
@@ -172,30 +198,11 @@ function ReimbursementTool() {
                   处理冲突
                 </button>
               </div>
-            </CommandPanel>
+            </AppH5Panel>
           )}
 
           {/* 统一标签栏 */}
-          <div className="reimbursement-tool__tabs">
-            <button
-              className={`tab-btn ${!showRecords && !showAttachments ? 'active' : ''}`}
-              onClick={() => { setShowRecords(false); setShowAttachments(false); }}
-            >
-              导入与识别
-            </button>
-            <button
-              className={`tab-btn ${showRecords ? 'active' : ''}`}
-              onClick={() => { setShowRecords(true); setShowAttachments(false); }}
-            >
-              报销明细 ({activeProject?.record_count || 0})
-            </button>
-            <button
-              className={`tab-btn ${showAttachments ? 'active' : ''}`}
-              onClick={() => { setShowAttachments(true); setShowRecords(false); }}
-            >
-              票据管理 ({attachmentCount})
-            </button>
-          </div>
+          <AppH5Tabs items={reimbursementTabs} ariaLabel="报销视图" />
 
           {/* 内容区域 */}
           {showRecords ? (
@@ -219,6 +226,7 @@ function ReimbursementTool() {
           )}
         </>
       )}
+      </AppH5Surface>
 
       {/* LLM配置弹窗 */}
       <LlmConfigModal

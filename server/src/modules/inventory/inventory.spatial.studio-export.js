@@ -1,3 +1,9 @@
+import {
+    EXPORT_COORDINATE_SYSTEMS,
+    buildExportManifest,
+    buildGeometryPreflight,
+} from '../../../../src/utils/exportManifest.js';
+
 function ensureArray(value) {
     return Array.isArray(value) ? value : [];
 }
@@ -277,6 +283,29 @@ export function buildGeometryBatchFromStudioScene({
     const totalVertices = meshes.reduce((sum, mesh) => sum + (ensureArray(mesh.vertices).length / 3), 0);
     const totalTriangles = meshes.reduce((sum, mesh) => sum + (ensureArray(mesh.indices).length / 3), 0);
     const sourceObjectIds = [...new Set(meshes.map((mesh) => mesh.sourceObjectId).filter(Boolean))];
+    const preflight = buildGeometryPreflight(meshes);
+    const exportManifest = buildExportManifest({
+        kind: 'studio-white-model-batch',
+        name: zone?.name || scene?.name || resource?.id || 'studio-white-model',
+        source: 'studio-editor-document',
+        coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+        input: {
+            sourceWorkZoneId: zone?.id || null,
+            studioSceneType: scene?.sceneType || null,
+            intendedOutput: resource?.path || null,
+        },
+        stats: {
+            objectCount: sourceObjectIds.length || meshes.length,
+            meshCount: meshes.length,
+            totalVertices,
+            totalTriangles,
+        },
+        diagnostics: {
+            warningCount: warnings.length,
+            warnings,
+            geometry: preflight,
+        },
+    });
 
     return {
         version: 'door-white-model-batch-v2',
@@ -312,6 +341,8 @@ export function buildGeometryBatchFromStudioScene({
             studioImportedAt: document?.metadata?.importedAt || scene?.metadata?.importedAt || null,
             studioSnapshotSavedAt: zone?.snapshotJson?.savedAt || null,
             focusZoneSourceHash: document?.metadata?.focusZoneSourceHash || scene?.metadata?.focusZoneSourceHash || null,
+            preflight,
+            export: exportManifest,
         },
     };
 }

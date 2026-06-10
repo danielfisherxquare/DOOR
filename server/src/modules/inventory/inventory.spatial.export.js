@@ -3,6 +3,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { buildGeometryBatchFromStudioScene, hasStudioEditorDocument } from './inventory.spatial.studio-export.js';
+import {
+    EXPORT_COORDINATE_SYSTEMS,
+    buildExportManifest,
+    buildGeometryPreflight,
+} from '../../../../src/utils/exportManifest.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -111,6 +116,13 @@ function buildYRotationQuaternion(rotationDeg = 0) {
 }
 
 export function buildGlbFromBatchFile(batchFile) {
+    const preflight = batchFile?.metadata?.preflight || buildGeometryPreflight(batchFile?.meshes);
+    if (preflight.status === 'error') {
+        const error = new Error('geometry preflight failed: ' + (preflight.warningCodes.join(', ') || 'invalid geometry'));
+        error.preflight = preflight;
+        throw error;
+    }
+
     const document = {
         asset: {
             version: '2.0',
@@ -1232,6 +1244,7 @@ function buildGeometryBatchFile({ resource, manifest, terrainOffset, zoneId }) {
     })));
     const totalVertices = meshes.reduce((sum, mesh) => sum + (mesh.vertices.length / 3), 0);
     const totalTriangles = meshes.reduce((sum, mesh) => sum + (mesh.indices.length / 3), 0);
+    const preflight = buildGeometryPreflight(meshes);
     const instancingTemplates = buildInstancingTemplatePlan(objects, meshes, terrainOffset, resource?.optimization);
     const instancingCandidates = objects
         .filter((object) => object?.optimizationProfile?.instancingEligible)
@@ -1282,6 +1295,31 @@ function buildGeometryBatchFile({ resource, manifest, terrainOffset, zoneId }) {
         },
         instancingTemplates,
         meshes,
+        metadata: {
+            source: 'gis-spatial-objects',
+            sourceWorkZoneId: zoneId || null,
+            preflight,
+            export: buildExportManifest({
+                kind: 'gis-white-model-batch',
+                name: resource?.id || zoneId || 'gis-white-model',
+                source: 'gis-spatial-objects',
+                coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+                input: {
+                    sourceWorkZoneId: zoneId || null,
+                    resourceId: resource?.id || null,
+                    intendedOutput: resource?.path || null,
+                },
+                stats: {
+                    objectCount: objects.length,
+                    meshCount: meshes.length,
+                    totalVertices,
+                    totalTriangles,
+                },
+                diagnostics: {
+                    geometry: preflight,
+                },
+            }),
+        },
     };
 }
 

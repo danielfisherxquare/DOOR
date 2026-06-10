@@ -1,0 +1,24 @@
+.assessment-campaign-list-page__grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.78fr) minmax(0, 1.22fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.assessment-campaign-list-page__form {
+  display: grid;
+  gap: 14px;
+}
+
+.assessment-campaign-list-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 960px) {
+  .assessment-campaign-list-page__grid {
+    grid-template-columns: 1fr;
+  }
+}

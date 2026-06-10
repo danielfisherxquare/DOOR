@@ -182,6 +182,57 @@ describe('reimbursement payment persistence', () => {
         assert.equal(stored[1].file_hash, 'hash-b');
     });
 
+    it('serializes concurrent processing claims for the same file hash', async () => {
+        const fileHash = `concurrent-hash-${Date.now()}`;
+
+        const results = await Promise.all([
+            reimbursementService.startProcessingFile(projectId, userId, {
+                fileName: 'concurrent-a.png',
+                fileType: 'invoice',
+                fileHash,
+            }),
+            reimbursementService.startProcessingFile(projectId, userId, {
+                fileName: 'concurrent-b.png',
+                fileType: 'invoice',
+                fileHash,
+            }),
+        ]);
+
+        const activeClaims = results.filter(result => !result.skipped);
+        const skippedClaims = results.filter(result => result.skipped);
+        const stored = await knex('reimbursement_processed_files')
+            .where({ project_id: projectId, file_hash: fileHash, file_type: 'invoice' })
+            .orderBy('processed_at', 'asc');
+
+        assert.equal(activeClaims.length, 1);
+        assert.equal(skippedClaims.length, 1);
+        assert.equal(skippedClaims[0].existing.id, activeClaims[0].record.id);
+        assert.deepEqual(stored.map(row => row.status).sort(), ['processing', 'skipped']);
+    });
+
+    it('allows retry after a previous OCR processing error', async () => {
+        const fileHash = `retry-error-hash-${Date.now()}`;
+        const first = await reimbursementService.startProcessingFile(projectId, userId, {
+            fileName: 'retry-error.png',
+            fileType: 'payment',
+            fileHash,
+        });
+
+        await reimbursementService.updateProcessingStatus(first.record.id, 'error', {
+            errorMessage: 'upstream timeout',
+        });
+
+        const retry = await reimbursementService.startProcessingFile(projectId, userId, {
+            fileName: 'retry-error-again.png',
+            fileType: 'payment',
+            fileHash,
+        });
+
+        assert.equal(first.skipped, false);
+        assert.equal(retry.skipped, false);
+        assert.notEqual(retry.record.id, first.record.id);
+    });
+
     it('stores error messages when processing status is updated to error', async () => {
         const { record } = await reimbursementService.startProcessingFile(projectId, userId, {
             fileName: `error-${Date.now()}.png`,
@@ -357,6 +408,52 @@ describe('reimbursement payment persistence', () => {
         }
     });
 
+    it('refreshes grouped payment review metadata after merging an invoice', async () => {
+        const paymentRecord = await reimbursementService.createStandalonePaymentRecord(
+            projectId,
+            userId,
+            {
+                amount: '88.00',
+                category: '交通费',
+                subCategory: '打车费',
+                payee: '滴滴出行',
+            },
+            {
+                ocrMeta: {
+                    modelCallCount: 1,
+                    usage: { totalTokens: 420 },
+                },
+            }
+        );
+
+        assert.equal(paymentRecord.ocr_meta.review.status, 'needs_review');
+
+        const merged = await reimbursementService.mergeInvoiceIntoRecord(
+            paymentRecord.id,
+            {
+                date: '2026-04-07',
+                invoiceNumber: 'MERGE-REFRESH-001',
+                category: '交通费',
+                subCategory: '打车费',
+                details: '滴滴出行行程单',
+                amount: 88,
+                buyer: '滴滴出行',
+            },
+            {
+                ocrMeta: {
+                    modelCallCount: 1,
+                    usage: { totalTokens: 510 },
+                },
+            }
+        );
+
+        assert.equal(merged.ocr_meta.payment.modelCallCount, 1);
+        assert.equal(merged.ocr_meta.payment.usage.totalTokens, 420);
+        assert.equal(merged.ocr_meta.payment.review.status, 'ready');
+        assert.equal(merged.ocr_meta.payment.review.issueCount, 0);
+        assert.equal(merged.ocr_meta.invoice.review.status, 'ready');
+    });
+
     it('reorders record indexes after category and sub-category changes', async () => {
         const hotelRecord = await reimbursementService.addRecord(projectId, userId, {
             payment_date: '2026-04-08',
@@ -398,5 +495,154 @@ describe('reimbursement payment persistence', () => {
         assert.equal(reorderedRecords[0].id, hotelRecord.id);
         assert.equal(reorderedRecords[1].id, taxiRecord.id);
         assert.ok(reorderedRecords[0].index < reorderedRecords[1].index);
+    });
+
+    it('updates every business field exposed by the reimbursement table editor', async () => {
+        const record = await reimbursementService.addRecord(projectId, userId, {
+            payment_date: '2026-04-10',
+            category: '办公费',
+            sub_category: '办公用品',
+            description: '原摘要',
+            expense: 42,
+            reporter: '原报销人',
+            has_invoice: false,
+            company: '原公司',
+            unit: '项',
+            quantity: 1,
+        });
+
+        await reimbursementService.updateRecord(record.id, {
+            description: '新摘要',
+            reporter: '新报销人',
+            has_invoice: true,
+            company: '新公司',
+            unit: '张',
+            quantity: 2,
+        });
+
+        const stored = await knex('reimbursement_records')
+            .where({ id: record.id })
+            .first();
+
+        assert.equal(stored.description, '新摘要');
+        assert.equal(stored.reporter, '新报销人');
+        assert.equal(stored.has_invoice, true);
+        assert.equal(stored.company, '新公司');
+        assert.equal(stored.unit, '张');
+        assert.equal(stored.quantity, 2);
+    });
+
+    it('refreshes OCR review metadata when an operator fixes missing invoice fields', async () => {
+        const [record] = await knex('reimbursement_records')
+            .insert({
+                project_id: projectId,
+                user_id: userId,
+                index: 1,
+                payment_date: '2026-04-11',
+                category: '办公费',
+                sub_category: '办公用品',
+                description: '复核测试',
+                expense: 42,
+                company: '测试公司',
+                has_invoice: true,
+                ocr_meta: {
+                    modelCallCount: 1,
+                    durationMs: 1200,
+                    usage: { totalTokens: 960 },
+                    review: {
+                        status: 'needs_review',
+                        issueCount: 1,
+                        issues: [
+                            {
+                                field: 'invoice_number',
+                                code: 'missing_invoice_identifier',
+                                label: '发票号码',
+                                message: '识别结果缺少发票号码或发票代码',
+                            },
+                        ],
+                    },
+                },
+            })
+            .returning('*');
+
+        await reimbursementService.updateRecord(record.id, {
+            invoice_number: 'INV-20260411-001',
+        });
+
+        const stored = await knex('reimbursement_records')
+            .where({ id: record.id })
+            .first();
+
+        assert.equal(stored.ocr_meta.modelCallCount, 1);
+        assert.equal(stored.ocr_meta.usage.totalTokens, 960);
+        assert.equal(stored.ocr_meta.review.status, 'ready');
+        assert.equal(stored.ocr_meta.review.issueCount, 0);
+        assert.deepEqual(stored.ocr_meta.review.issues, []);
+    });
+
+    it('refreshes OCR review metadata after batch field fixes', async () => {
+        const records = await knex('reimbursement_records')
+            .insert([
+                {
+                    project_id: projectId,
+                    user_id: userId,
+                    index: 1,
+                    payment_date: '2026-04-12',
+                    description: '批量复核测试 A',
+                    expense: 64,
+                    company: '测试公司',
+                    has_invoice: true,
+                    invoice_number: 'INV-A',
+                    ocr_meta: {
+                        modelCallCount: 1,
+                        review: {
+                            status: 'needs_review',
+                            issueCount: 2,
+                            issues: [
+                                { field: 'category', code: 'missing_category', label: '大类', message: '识别结果缺少费用大类' },
+                                { field: 'sub_category', code: 'missing_sub_category', label: '子类', message: '识别结果缺少费用子类' },
+                            ],
+                        },
+                    },
+                },
+                {
+                    project_id: projectId,
+                    user_id: userId,
+                    index: 2,
+                    payment_date: '2026-04-12',
+                    description: '批量复核测试 B',
+                    expense: 88,
+                    company: '测试公司',
+                    has_invoice: true,
+                    invoice_number: 'INV-B',
+                    ocr_meta: {
+                        modelCallCount: 1,
+                        review: {
+                            status: 'needs_review',
+                            issueCount: 1,
+                            issues: [
+                                { field: 'category', code: 'missing_category', label: '大类', message: '识别结果缺少费用大类' },
+                            ],
+                        },
+                    },
+                },
+            ])
+            .returning('*');
+
+        await reimbursementService.batchUpdateRecords(
+            records.map((record) => record.id),
+            { category: '办公费', sub_category: '耗材' }
+        );
+
+        const stored = await knex('reimbursement_records')
+            .whereIn('id', records.map((record) => record.id))
+            .orderBy('index', 'asc');
+
+        assert.equal(stored[0].ocr_meta.modelCallCount, 1);
+        assert.equal(stored[0].ocr_meta.review.status, 'ready');
+        assert.equal(stored[0].ocr_meta.review.issueCount, 0);
+        assert.deepEqual(stored[0].ocr_meta.review.issues, []);
+        assert.equal(stored[1].ocr_meta.review.status, 'ready');
+        assert.equal(stored[1].ocr_meta.review.issueCount, 0);
     });
 });

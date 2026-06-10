@@ -58,8 +58,15 @@ import {
     mergeInvoiceIntoRecord,
     reorderProjectRecordIndexes,
 } from './reimbursement.service.js';
+import { attachOcrReview } from './ocr.review.js';
 
 const STORAGE_DIR = path.join(process.cwd(), 'storage', 'preview');
+const PREVIEW_STATUS = {
+    PREVIEW: 'preview',
+    OCR_PROCESSING: 'ocr_processing',
+    RECOGNIZED: 'recognized',
+    DISCARDED: 'discarded',
+};
 
 /**
  * 确保目录存在
@@ -77,12 +84,89 @@ async function getNextRecordIndex(projectId) {
     return (maxIndex?.max || 0) + 1;
 }
 
-async function markPreviewFileRecognized(fileId) {
+function isPlainObject(value) {
+    return value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function mergeRecordOcrMeta(existingMeta, key, nextMeta) {
+    if (!nextMeta) return existingMeta || null;
+    if (!isPlainObject(existingMeta)) return { [key]: nextMeta };
+
+    const hasGroupedMeta = isPlainObject(existingMeta.invoice) || isPlainObject(existingMeta.payment);
+    if (hasGroupedMeta) {
+        return {
+            ...existingMeta,
+            [key]: nextMeta,
+        };
+    }
+
+    const counterpartKey = key === 'invoice' ? 'payment' : 'invoice';
+    return {
+        [counterpartKey]: existingMeta,
+        [key]: nextMeta,
+    };
+}
+
+function buildReviewedOcrMeta(fileType, ocrMeta, ocrData) {
+    if (fileType === 'payment') {
+        return attachOcrReview(ocrMeta, 'payment', buildPaymentRecordData(ocrData));
+    }
+
+    return attachOcrReview(ocrMeta, 'invoice', buildInvoiceRecordData(ocrData));
+}
+
+async function markPreviewFileRecognized(fileId, ocrMeta = null) {
     await knex('reimbursement_preview_files')
         .where({ id: fileId })
         .update({
             status: 'recognized',
             recognized_at: knex.fn.now(),
+            ocr_meta: ocrMeta || undefined,
+            updated_at: knex.fn.now(),
+        });
+}
+
+async function claimPreviewFileForOcr(projectId, fileId) {
+    const updated = await knex('reimbursement_preview_files')
+        .where({
+            id: fileId,
+            project_id: projectId,
+            status: PREVIEW_STATUS.PREVIEW,
+        })
+        .update({
+            status: PREVIEW_STATUS.OCR_PROCESSING,
+            updated_at: knex.fn.now(),
+        });
+
+    if (updated > 0) return true;
+
+    const latest = await knex('reimbursement_preview_files')
+        .where({ id: fileId, project_id: projectId })
+        .first();
+
+    if (!latest) {
+        throw new Error('预览文件不存在');
+    }
+
+    if (latest.status === PREVIEW_STATUS.RECOGNIZED) {
+        throw new Error('该文件已识别');
+    }
+
+    if (latest.status === PREVIEW_STATUS.OCR_PROCESSING) {
+        throw new Error('该文件正在识别，请等待当前任务完成');
+    }
+
+    throw new Error('该文件当前状态不能识别');
+}
+
+async function releasePreviewFileOcrClaim(fileId) {
+    await knex('reimbursement_preview_files')
+        .where({
+            id: fileId,
+            status: PREVIEW_STATUS.OCR_PROCESSING,
+        })
+        .update({
+            status: PREVIEW_STATUS.PREVIEW,
             updated_at: knex.fn.now(),
         });
 }
@@ -116,7 +200,7 @@ async function attachPreviewFileToRecord(recordId, previewFile, fileType) {
     return attachment;
 }
 
-async function createInvoiceRecord(projectId, userId, previewFile, ocrData) {
+async function createInvoiceRecord(projectId, userId, previewFile, ocrData, ocrMeta = null) {
     const invoiceData = buildInvoiceRecordData(ocrData);
     const amount = Number(invoiceData.expense) || 0;
     const [record] = await knex('reimbursement_records')
@@ -128,11 +212,12 @@ async function createInvoiceRecord(projectId, userId, previewFile, ocrData) {
             is_duplicate: previewFile.is_duplicate,
             duplicate_count: previewFile.duplicate_count,
             preview_file_id: previewFile.id,
+            ocr_meta: ocrMeta,
         })
         .returning('*');
 
     await attachPreviewFileToRecord(record.id, previewFile, 'invoice');
-    await markPreviewFileRecognized(previewFile.id);
+    await markPreviewFileRecognized(previewFile.id, ocrMeta);
     await knex('reimbursement_projects')
         .where({ id: projectId })
         .increment('record_count', 1)
@@ -146,7 +231,7 @@ async function createInvoiceRecord(projectId, userId, previewFile, ocrData) {
 }
 
 function buildPaymentRecordData(paymentData) {
-    const amount = Number(paymentData.amount) || 0;
+    const amount = Math.abs(Number(paymentData.amount) || 0);
     const normalizedDate = normalizeChineseDate(paymentData.date);
     return {
         payment_date: normalizedDate || null,
@@ -160,7 +245,7 @@ function buildPaymentRecordData(paymentData) {
     };
 }
 
-async function createPaymentRecord(projectId, userId, previewFile, paymentData) {
+async function createPaymentRecord(projectId, userId, previewFile, paymentData, ocrMeta = null) {
     const recordData = buildPaymentRecordData(paymentData);
     const [record] = await knex('reimbursement_records')
         .insert({
@@ -169,11 +254,12 @@ async function createPaymentRecord(projectId, userId, previewFile, paymentData) 
             index: await getNextRecordIndex(projectId),
             ...recordData,
             preview_file_id: previewFile.id,
+            ocr_meta: ocrMeta,
         })
         .returning('*');
 
     await attachPreviewFileToRecord(record.id, previewFile, 'payment');
-    await markPreviewFileRecognized(previewFile.id);
+    await markPreviewFileRecognized(previewFile.id, ocrMeta);
     await knex('reimbursement_projects')
         .where({ id: projectId })
         .increment('record_count', 1)
@@ -203,21 +289,19 @@ async function findActiveDuplicateFile(projectId, fileHash, documentType = 'invo
         .where('pf.project_id', projectId)
         .where('pf.file_hash', fileHash)
         .where('pf.document_type', normalizedDocumentType)
-        .whereNot('pf.status', 'discarded')
+        .whereNot('pf.status', PREVIEW_STATUS.DISCARDED)
         .where(function () {
-            this.where('pf.status', 'preview')
+            this.whereIn('pf.status', [PREVIEW_STATUS.PREVIEW, PREVIEW_STATUS.OCR_PROCESSING])
                 .orWhereExists(function () {
                     this.select(knex.raw('1'))
                         .from('reimbursement_records as rr')
                         .whereRaw('rr.preview_file_id = pf.id');
                 });
         })
-        .orderByRaw(`
-            CASE
-                WHEN pf.status = 'preview' THEN 0
-                ELSE 1
-            END
-        `)
+        .orderByRaw('CASE WHEN pf.status = ? THEN 0 WHEN pf.status = ? THEN 1 ELSE 2 END', [
+            PREVIEW_STATUS.PREVIEW,
+            PREVIEW_STATUS.OCR_PROCESSING,
+        ])
         .select(
             'pf.id',
             'pf.file_name',
@@ -232,7 +316,7 @@ async function findActiveDuplicateFile(projectId, fileHash, documentType = 'invo
 
     if (previewDuplicate) {
         return {
-            source: previewDuplicate.status === 'preview' ? 'preview' : 'record',
+            source: [PREVIEW_STATUS.PREVIEW, PREVIEW_STATUS.OCR_PROCESSING].includes(previewDuplicate.status) ? 'preview' : 'record',
             id: previewDuplicate.id,
             fileName: previewDuplicate.original_name || previewDuplicate.file_name,
             duplicateCount: Math.max(Number(previewDuplicate.duplicate_count) || 0, 1),
@@ -362,109 +446,131 @@ export async function importToPreview(projectId, userId, files, documentType = '
             duplicateCount: 0,
             documentType,
         });
-    }
-
-    return { imported, duplicates };
-}
-
-/**
- * 处理文件转图片（后台异步）
- * @param {string} projectId - 项目ID
- * @param {string} fileId - 文件ID
- * @param {Buffer} fileBuffer - 文件Buffer
- * @param {string} mimeType - MIME类型
- * @param {string} originalName - 原始文件名
- */
-async function processFileToImages(projectId, fileId, fileBuffer, mimeType, originalName) {
-    const fileDir = path.join(STORAGE_DIR, projectId, fileId);
-    await ensureDir(fileDir);
-
-    const isPdf = mimeType === 'application/pdf' || originalName.toLowerCase().endsWith('.pdf');
-    let thumbnailData = null;
-    let originalPath = null;
-    let pageCount = 1;
-    let pageThumbnailPaths = [];
-
-    if (isPdf) {
-        // PDF: 渲染所有页面
-        const pageBuffers = await renderPdfToImageBuffers(fileBuffer);
-        pageCount = pageBuffers.length;
-
-        // 保存原始PDF
-        originalPath = path.join(fileDir, 'original.pdf');
-        await fs.promises.writeFile(originalPath, fileBuffer);
-
-        // 保存每页图片和缩略图
-        for (let i = 0; i < pageBuffers.length; i++) {
-            const pageNum = i + 1;
-            const imagePath = path.join(fileDir, `page_${pageNum}.jpg`);
-            const thumbPath = path.join(fileDir, `thumb_${pageNum}.jpg`);
-
-            await fs.promises.writeFile(imagePath, pageBuffers[i]);
-            await generateThumbnail(pageBuffers[i], thumbPath, 150);
-
-            pageThumbnailPaths.push(thumbPath);
-
-            // 第一页作为主缩略图
-            if (i === 0) {
-                thumbnailData = await fs.promises.readFile(thumbPath);
-            }
         }
-    } else {
-        // 图片文件
-        originalPath = path.join(fileDir, 'original.jpg');
-        await fs.promises.writeFile(originalPath, fileBuffer);
 
-        // 生成缩略图
-        const thumbPath = path.join(fileDir, 'thumb.jpg');
-        await generateThumbnail(fileBuffer, thumbPath, 150);
-        thumbnailData = await fs.promises.readFile(thumbPath);
-        pageThumbnailPaths = [thumbPath];
+        return { imported, duplicates };
     }
 
-    // 更新数据库记录
-    await knex('reimbursement_preview_files')
-        .where({ id: fileId })
-        .update({
-            thumbnail_data: thumbnailData,
-            original_path: originalPath,
-            page_count: pageCount,
-            page_thumbnail_paths: pageThumbnailPaths,
-            updated_at: knex.fn.now(),
-        });
-}
+    /**
+     * 处理文件转图片（后台异步）
+     * @param {string} projectId - 项目ID
+     * @param {string} fileId - 文件ID
+     * @param {Buffer} fileBuffer - 文件Buffer
+     * @param {string} mimeType - MIME类型
+     * @param {string} originalName - 原始文件名
+     */
+    async function processFileToImages(projectId, fileId, fileBuffer, mimeType, originalName) {
+        const fileDir = path.join(STORAGE_DIR, projectId, fileId);
+        await ensureDir(fileDir);
 
-/**
- * 获取预览文件列表
- * @param {string} projectId - 项目ID
- * @returns {Promise<Object[]>}
- */
-export async function getPreviewList(projectId) {
-    const files = await knex('reimbursement_preview_files')
-        .where({ project_id: projectId })
-        .whereNot({ status: 'discarded' })
-        .orderBy('created_at', 'desc');
+        const isPdf = mimeType === 'application/pdf' || originalName.toLowerCase().endsWith('.pdf');
+        let thumbnailData = null;
+        let originalPath = null;
+        let pageCount = 1;
+        let pageThumbnailPaths = [];
 
-    // 将缩略图转为base64
-    return files.map(file => ({
-        id: file.id,
-        fileName: file.file_name,
-        originalName: file.original_name,
-        fileHash: file.file_hash,
-        mimeType: file.mime_type,
-        fileSize: file.file_size,
-        pageCount: file.page_count,
-        isDuplicate: file.is_duplicate,
-        duplicateCount: file.duplicate_count,
-        documentType: file.document_type || 'invoice',
-        originalFileId: file.original_file_id,
-        status: file.status,
-        thumbnailBase64: file.thumbnail_data
-            ? `data:image/jpeg;base64,${file.thumbnail_data.toString('base64')}`
-            : null,
-        createdAt: file.created_at,
-        recognizedAt: file.recognized_at,
-    }));
+        if (isPdf) {
+            // PDF: 渲染所有页面
+            const pageBuffers = await renderPdfToImageBuffers(fileBuffer);
+            pageCount = pageBuffers.length;
+
+            // 保存原始PDF
+            originalPath = path.join(fileDir, 'original.pdf');
+            await fs.promises.writeFile(originalPath, fileBuffer);
+
+            // 保存每页图片和缩略图
+            for (let i = 0; i < pageBuffers.length; i++) {
+                const pageNum = i + 1;
+                const imagePath = path.join(fileDir, `page_${pageNum}.jpg`);
+                const thumbPath = path.join(fileDir, `thumb_${pageNum}.jpg`);
+
+                await fs.promises.writeFile(imagePath, pageBuffers[i]);
+                await generateThumbnail(pageBuffers[i], thumbPath, 150);
+
+                pageThumbnailPaths.push(thumbPath);
+
+                // 第一页作为主缩略图
+                if (i === 0) {
+                    thumbnailData = await fs.promises.readFile(thumbPath);
+                }
+            }
+        } else {
+            // 图片文件
+            originalPath = path.join(fileDir, 'original.jpg');
+            await fs.promises.writeFile(originalPath, fileBuffer);
+
+            // 生成缩略图
+            const thumbPath = path.join(fileDir, 'thumb.jpg');
+            await generateThumbnail(fileBuffer, thumbPath, 150);
+            thumbnailData = await fs.promises.readFile(thumbPath);
+            pageThumbnailPaths = [thumbPath];
+        }
+
+        // 更新数据库记录
+        await knex('reimbursement_preview_files')
+            .where({ id: fileId })
+            .update({
+                thumbnail_data: thumbnailData,
+                original_path: originalPath,
+                page_count: pageCount,
+                page_thumbnail_paths: pageThumbnailPaths,
+                updated_at: knex.fn.now(),
+            });
+    }
+
+    /**
+     * 获取预览文件列表
+     * @param {string} projectId - 项目ID
+     * @returns {Promise<Object[]>}
+     */
+    export async function getPreviewList(projectId) {
+        const files = await knex('reimbursement_preview_files')
+            .where({ project_id: projectId })
+            .whereNot({ status: 'discarded' })
+            .orderBy('created_at', 'desc');
+
+        // 将缩略图转为base64
+        return files.map(file => ({
+            id: file.id,
+            fileName: file.file_name,
+            originalName: file.original_name,
+            fileHash: file.file_hash,
+            mimeType: file.mime_type,
+            fileSize: file.file_size,
+            pageCount: file.page_count,
+            isDuplicate: file.is_duplicate,
+            duplicateCount: file.duplicate_count,
+            documentType: file.document_type || 'invoice',
+            originalFileId: file.original_file_id,
+            status: file.status,
+            ocrMeta: file.ocr_meta,
+            thumbnailBase64: file.thumbnail_data
+                ? `data:image/jpeg;base64,${file.thumbnail_data.toString('base64')}`
+                : null,
+            createdAt: file.created_at,
+            recognizedAt: file.recognized_at,
+        }));
+    }
+
+async function readPreviewPageImageBuffers(previewFile) {
+    if (!previewFile?.original_path) return [];
+
+    const pageCount = Math.max(0, Number(previewFile.page_count) || 0);
+    if (pageCount === 0) return [];
+
+    const fileDir = path.dirname(previewFile.original_path);
+    const pageBuffers = [];
+
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+        const pagePath = path.join(fileDir, 'page_' + pageNumber + '.jpg');
+        try {
+            pageBuffers.push(await fs.promises.readFile(pagePath));
+        } catch {
+            return [];
+        }
+    }
+
+    return pageBuffers;
 }
 
 /**
@@ -477,7 +583,6 @@ export async function getPreviewList(projectId) {
  * @returns {Promise<Object>}
  */
 export async function recognizeFromPreview(projectId, userId, fileId, config, forceRecognize = false) {
-    // 获取预览文件
     const previewFile = await knex('reimbursement_preview_files')
         .where({ id: fileId, project_id: projectId })
         .first();
@@ -486,8 +591,12 @@ export async function recognizeFromPreview(projectId, userId, fileId, config, fo
         throw new Error('预览文件不存在');
     }
 
-    if (previewFile.status === 'recognized') {
+    if (previewFile.status === PREVIEW_STATUS.RECOGNIZED) {
         throw new Error('该文件已识别');
+    }
+
+    if (previewFile.status === PREVIEW_STATUS.OCR_PROCESSING) {
+        throw new Error('该文件正在识别，请等待当前任务完成');
     }
 
     // 检查是否为重复文件
@@ -499,113 +608,160 @@ export async function recognizeFromPreview(projectId, userId, fileId, config, fo
         };
     }
 
-    // 读取原始文件
     if (!previewFile.original_path) {
         throw new Error('文件尚未处理完成，请稍后再试');
     }
 
-    const fileBuffer = await fs.promises.readFile(previewFile.original_path);
+    await claimPreviewFileForOcr(projectId, fileId);
 
-    // 调用OCR识别
-    const { processInvoice, processPayment } = await import('./ocr.service.js');
-    const fileType = previewFile.document_type || 'invoice';
+    try {
+        const fileBuffer = await fs.promises.readFile(previewFile.original_path);
 
-    const ocrResult = fileType === 'payment'
-        ? await processPayment({ fileBuffer, mimeType: previewFile.mime_type, config })
-        : await processInvoice({ fileBuffer, mimeType: previewFile.mime_type, config });
+        // PDF 在导入预览时已经渲染过页面，优先复用页面图。
+        const {
+            processInvoice,
+            processMultiPageInvoice,
+            processMultiPagePayment,
+            processPayment,
+        } = await import('./ocr.service.js');
+        const fileType = previewFile.document_type || 'invoice';
+        const isPdf = previewFile.mime_type === 'application/pdf' ||
+            String(previewFile.file_name || '').toLowerCase().endsWith('.pdf') ||
+            String(previewFile.original_name || '').toLowerCase().endsWith('.pdf');
+        const pageImageBuffers = isPdf ? await readPreviewPageImageBuffers(previewFile) : [];
 
-    if (!ocrResult.success) {
-        throw new Error('OCR识别失败');
-    }
-
-    if (fileType === 'payment') {
-        const amount = Number(ocrResult.data.amount) || 0;
-        const candidates = amount > 0
-            ? await knex('reimbursement_records')
-                .where({ project_id: projectId })
-                .where('expense', amount)
-                .whereNotExists(function () {
-                    this.select('*')
-                        .from('reimbursement_attachments')
-                        .whereRaw('reimbursement_attachments.record_id = reimbursement_records.id')
-                        .where({ file_type: 'payment' });
+        const ocrResult = fileType === 'payment'
+            ? (pageImageBuffers.length > 0
+                ? await processMultiPagePayment({ imageBuffers: pageImageBuffers, config })
+                : await processPayment({
+                    fileBuffer,
+                    mimeType: previewFile.mime_type,
+                    filename: previewFile.original_name || previewFile.file_name,
+                    config,
+                }))
+            : (pageImageBuffers.length > 0
+                ? await processMultiPageInvoice({
+                    imageBuffers: pageImageBuffers,
+                    config,
+                    filename: previewFile.original_name || previewFile.file_name,
                 })
-            : [];
+                : await processInvoice({
+                    fileBuffer,
+                    mimeType: previewFile.mime_type,
+                    filename: previewFile.original_name || previewFile.file_name,
+                    config,
+                }));
 
-        if (candidates.length === 1) {
-            await attachPreviewFileToRecord(candidates[0].id, previewFile, 'payment');
-            await markPreviewFileRecognized(fileId);
+        if (!ocrResult.success) {
+            throw new Error('OCR识别失败');
+        }
+
+        const reviewedOcrMeta = buildReviewedOcrMeta(fileType, ocrResult.meta, ocrResult.data);
+
+        if (fileType === 'payment') {
+            const amount = Number(ocrResult.data.amount) || 0;
+            const candidates = amount > 0
+                ? await knex('reimbursement_records')
+                    .where({ project_id: projectId })
+                    .where('expense', amount)
+                    .whereNotExists(function () {
+                        this.select('*')
+                            .from('reimbursement_attachments')
+                            .whereRaw('reimbursement_attachments.record_id = reimbursement_records.id')
+                            .where({ file_type: 'payment' });
+                    })
+                : [];
+
+            if (candidates.length === 1) {
+                await attachPreviewFileToRecord(candidates[0].id, previewFile, 'payment');
+                await knex('reimbursement_records')
+                    .where({ id: candidates[0].id })
+                    .update({
+                        ocr_meta: mergeRecordOcrMeta(candidates[0].ocr_meta, 'payment', reviewedOcrMeta),
+                        updated_at: knex.fn.now(),
+                    });
+                await markPreviewFileRecognized(fileId, reviewedOcrMeta);
+                return {
+                    success: true,
+                    ocrResult: ocrResult.data,
+                    ocrMeta: reviewedOcrMeta,
+                    recordId: candidates[0].id,
+                    autoMatched: true,
+                    isDuplicate: previewFile.is_duplicate,
+                };
+            }
+
+            if (candidates.length > 1) {
+                const [pendingMatch] = await knex('reimbursement_pending_matches')
+                    .insert({
+                        project_id: projectId,
+                        user_id: userId,
+                        payment_data: {
+                            ...ocrResult.data,
+                            ocrMeta: reviewedOcrMeta,
+                            previewFileId: previewFile.id,
+                            fileName: previewFile.file_name,
+                        },
+                        candidate_ids: candidates.map((candidate) => candidate.id),
+                        status: 'pending',
+                    })
+                    .returning('*');
+
+                await markPreviewFileRecognized(fileId, reviewedOcrMeta);
+                return {
+                    success: true,
+                    ocrResult: ocrResult.data,
+                    ocrMeta: reviewedOcrMeta,
+                    pendingMatch: true,
+                    matchId: pendingMatch.id,
+                    candidateCount: candidates.length,
+                    isDuplicate: previewFile.is_duplicate,
+                };
+            }
+
+            const paymentRecord = await createPaymentRecord(projectId, userId, previewFile, ocrResult.data, reviewedOcrMeta);
             return {
                 success: true,
                 ocrResult: ocrResult.data,
-                recordId: candidates[0].id,
-                autoMatched: true,
+                ocrMeta: reviewedOcrMeta,
+                recordId: paymentRecord.id,
                 isDuplicate: previewFile.is_duplicate,
             };
         }
 
-        if (candidates.length > 1) {
-            const [pendingMatch] = await knex('reimbursement_pending_matches')
-                .insert({
-                    project_id: projectId,
-                    user_id: userId,
-                    payment_data: {
-                        ...ocrResult.data,
-                        previewFileId: previewFile.id,
-                        fileName: previewFile.file_name,
-                    },
-                    candidate_ids: candidates.map((candidate) => candidate.id),
-                    status: 'pending',
-                })
-                .returning('*');
+        const invoiceCandidates = await findInvoiceMatchCandidates(projectId, ocrResult.data);
+        if (invoiceCandidates.length === 1) {
+            const mergedRecord = await mergeInvoiceIntoRecord(invoiceCandidates[0].id, ocrResult.data, {
+                previewFileId: previewFile.id,
+                ocrMeta: reviewedOcrMeta,
+            });
+            await attachPreviewFileToRecord(mergedRecord.id, previewFile, 'invoice');
+            await markPreviewFileRecognized(previewFile.id, reviewedOcrMeta);
 
-            await markPreviewFileRecognized(fileId);
             return {
                 success: true,
                 ocrResult: ocrResult.data,
-                pendingMatch: true,
-                matchId: pendingMatch.id,
-                candidateCount: candidates.length,
+                ocrMeta: reviewedOcrMeta,
+                recordId: mergedRecord.id,
+                mergedIntoRecord: true,
                 isDuplicate: previewFile.is_duplicate,
             };
         }
 
-        const paymentRecord = await createPaymentRecord(projectId, userId, previewFile, ocrResult.data);
-        return {
-            success: true,
-            ocrResult: ocrResult.data,
-            recordId: paymentRecord.id,
-            isDuplicate: previewFile.is_duplicate,
-        };
-    }
-
-    const invoiceCandidates = await findInvoiceMatchCandidates(projectId, ocrResult.data);
-    if (invoiceCandidates.length === 1) {
-        const mergedRecord = await mergeInvoiceIntoRecord(invoiceCandidates[0].id, ocrResult.data, {
-            previewFileId: previewFile.id,
-        });
-        await attachPreviewFileToRecord(mergedRecord.id, previewFile, 'invoice');
-        await markPreviewFileRecognized(previewFile.id);
+        const record = await createInvoiceRecord(projectId, userId, previewFile, ocrResult.data, reviewedOcrMeta);
 
         return {
             success: true,
             ocrResult: ocrResult.data,
-            recordId: mergedRecord.id,
-            mergedIntoRecord: true,
+            ocrMeta: reviewedOcrMeta,
+            recordId: record.id,
             isDuplicate: previewFile.is_duplicate,
         };
+    } catch (error) {
+        await releasePreviewFileOcrClaim(fileId);
+        throw error;
     }
-
-    const record = await createInvoiceRecord(projectId, userId, previewFile, ocrResult.data);
-
-    return {
-        success: true,
-        ocrResult: ocrResult.data,
-        recordId: record.id,
-        isDuplicate: previewFile.is_duplicate,
-    };
 }
-
 /**
  * 从预览区移除文件
  * @param {string} projectId - 项目ID
@@ -623,6 +779,10 @@ export async function discardPreviewFile(projectId, fileId) {
 
     if (previewFile.status === 'recognized') {
         throw new Error('已识别的文件不能移除');
+    }
+
+    if (previewFile.status === PREVIEW_STATUS.OCR_PROCESSING) {
+        throw new Error('该文件正在识别，完成或失败后再移除');
     }
 
     // 标记为已丢弃
@@ -660,6 +820,7 @@ export async function getPreviewStats(projectId) {
     const result = {
         total: 0,
         preview: 0,
+        processing: 0,
         recognized: 0,
         duplicates: 0,
     };
@@ -668,6 +829,7 @@ export async function getPreviewStats(projectId) {
         const count = Number(stat.count);
         result.total += count;
         if (stat.status === 'preview') result.preview += count;
+        if (stat.status === PREVIEW_STATUS.OCR_PROCESSING) result.processing += count;
         if (stat.status === 'recognized') result.recognized += count;
         if (stat.is_duplicate) result.duplicates += count;
     }
@@ -678,9 +840,12 @@ export async function getPreviewStats(projectId) {
 /**
  * 导出Excel和图片ZIP
  * @param {string} projectId - 项目ID
- * @returns {Promise<{ excelBuffer: Buffer, images: Map<string, Buffer[]> }>}
+ * @param {{ includeBuffers?: boolean }} [options] - 是否读取附件文件内容
+ * @returns {Promise<{ records: Object[], imagesByRecord: Map<string, Object[]> }>}
  */
-export async function exportWithImages(projectId) {
+export async function exportWithImages(projectId, options = {}) {
+    const { includeBuffers = true } = options;
+
     // 获取所有记录
     const records = await knex('reimbursement_records')
         .where({ project_id: projectId })
@@ -688,8 +853,9 @@ export async function exportWithImages(projectId) {
 
     // 获取所有附件
     const recordIds = records.map(r => r.id);
-    const attachments = await knex('reimbursement_attachments')
-        .whereIn('record_id', recordIds);
+    const attachments = recordIds.length > 0
+        ? await knex('reimbursement_attachments').whereIn('record_id', recordIds)
+        : [];
 
     // 按记录ID分组图片
     const imagesByRecord = new Map();
@@ -699,14 +865,23 @@ export async function exportWithImages(projectId) {
             imagesByRecord.set(recordId, []);
         }
 
+        const attachmentInfo = {
+            fileName: attachment.file_name,
+            originalName: attachment.original_name,
+            fileType: attachment.file_type,
+        };
+
+        if (!includeBuffers) {
+            imagesByRecord.get(recordId).push(attachmentInfo);
+            continue;
+        }
+
         // 读取图片文件
         if (attachment.original_path) {
             try {
                 const imageBuffer = await fs.promises.readFile(attachment.original_path);
                 imagesByRecord.get(recordId).push({
-                    fileName: attachment.file_name,
-                    originalName: attachment.original_name,
-                    fileType: attachment.file_type,
+                    ...attachmentInfo,
                     buffer: imageBuffer,
                 });
             } catch (err) {
@@ -721,17 +896,226 @@ export async function exportWithImages(projectId) {
     };
 }
 
-/**
- * 生成导出ZIP（Excel + 图片文件夹）
- * @param {string} projectId - 项目ID
- * @param {string} projectName - 项目名称
- * @returns {Promise<Buffer>} ZIP文件Buffer
- */
-export async function generateExportZip(projectId, projectName) {
-    const archiver = (await import('archiver')).default;
+function hasText(value) {
+    return String(value ?? '').trim().length > 0;
+}
+
+function hasPositiveAmount(value) {
+    const amount = Number(value);
+    return Number.isFinite(amount) && amount > 0;
+}
+
+function getExportRecordLabel(record, fallbackIndex) {
+    return `第${record?.index || fallbackIndex + 1}行`;
+}
+
+function getRecordInvoiceIdentifier(record) {
+    return String(record?.invoice_number || record?.invoice_code || '').trim();
+}
+
+function getMissingExportFields(record) {
+    const missing = [];
+
+    if (!hasText(record?.payment_date)) missing.push('日期');
+    if (!hasText(record?.category)) missing.push('大类');
+    if (!hasText(record?.sub_category)) missing.push('子类');
+    if (!hasText(record?.description)) missing.push('说明');
+    if (!hasPositiveAmount(record?.expense)) missing.push('金额');
+    if (!hasText(record?.reporter)) missing.push('报销人');
+    if (record?.has_invoice && !getRecordInvoiceIdentifier(record)) missing.push('发票号码/代码');
+
+    return missing;
+}
+
+function requiresPaymentAttachment(record) {
+    return !record?.has_invoice && hasPositiveAmount(record?.expense);
+}
+
+function normalizeOcrReviewEntries(meta) {
+    if (!isPlainObject(meta)) return [];
+
+    if (isPlainObject(meta.review)) {
+        return [meta.review];
+    }
+
+    if (meta.status === 'needs_review' || meta.status === 'ready') {
+        return [meta];
+    }
+
+    return Object.values(meta)
+        .filter(isPlainObject)
+        .flatMap((value) => normalizeOcrReviewEntries(value));
+}
+
+function getOcrReviewIssues(record) {
+    return [
+        ...normalizeOcrReviewEntries(record?.ocr_meta),
+        ...normalizeOcrReviewEntries(record?.ocrMeta),
+    ].flatMap((review) => (Array.isArray(review.issues) ? review.issues : []));
+}
+
+function needsOcrReview(record) {
+    const reviews = [
+        ...normalizeOcrReviewEntries(record?.ocr_meta),
+        ...normalizeOcrReviewEntries(record?.ocrMeta),
+    ];
+    const issueCount = reviews.reduce((sum, review) => sum + (Number(review.issueCount) || 0), 0);
+    return issueCount > 0 || reviews.some((review) => review.status === 'needs_review');
+}
+
+function hasExportAttachment(record, imagesByRecord, fileType) {
+    return (imagesByRecord.get(record.id) || []).some((attachment) => attachment.fileType === fileType);
+}
+
+function countInvoiceIdentifiers(records) {
+    const counts = new Map();
+
+    records.forEach((record) => {
+        const identifier = getRecordInvoiceIdentifier(record);
+        if (!identifier) return;
+        counts.set(identifier, [...(counts.get(identifier) || []), record]);
+    });
+
+    return counts;
+}
+
+function buildExportCheckRows(records, imagesByRecord) {
+    const rows = [];
+    const invoiceIdentifiers = countInvoiceIdentifiers(records);
+
+    records.forEach((record, index) => {
+        const label = getExportRecordLabel(record, index);
+        const reviewIssues = getOcrReviewIssues(record);
+
+        if (needsOcrReview(record)) {
+            const details = reviewIssues.length > 0
+                ? reviewIssues.map((issue) => `${issue.label || issue.field || '字段'}：${issue.message || '需要人工复核'}`).join('；')
+                : 'OCR 识别结果需要人工复核';
+            rows.push({
+                label,
+                type: 'OCR复核',
+                message: details,
+                action: '补齐或确认识别字段后再归档',
+            });
+        }
+
+        const missingFields = getMissingExportFields(record);
+        if (missingFields.length > 0) {
+            rows.push({
+                label,
+                type: '关键字段',
+                message: '缺少' + missingFields.join('、'),
+                action: '在报销明细表补齐字段',
+            });
+        }
+
+        if (record?.has_invoice && !hasExportAttachment(record, imagesByRecord, 'invoice')) {
+            rows.push({
+                label,
+                type: '发票附件',
+                message: '缺少发票附件',
+                action: '上传或重新关联发票原件',
+            });
+        }
+
+        if (requiresPaymentAttachment(record) && !hasExportAttachment(record, imagesByRecord, 'payment')) {
+            rows.push({
+                label,
+                type: '付款凭证',
+                message: '缺少付款凭证附件',
+                action: '上传或重新关联付款凭证',
+            });
+        }
+
+        const invoiceIdentifier = getRecordInvoiceIdentifier(record);
+        const duplicateRecords = invoiceIdentifier ? invoiceIdentifiers.get(invoiceIdentifier) || [] : [];
+        if (duplicateRecords.length > 1) {
+            const duplicateLabels = duplicateRecords
+                .map((duplicateRecord, duplicateIndex) => getExportRecordLabel(duplicateRecord, records.indexOf(duplicateRecord)))
+                .join('、');
+            rows.push({
+                label,
+                type: '发票重复',
+                message: `${invoiceIdentifier} 与 ${duplicateLabels} 重复`,
+                action: '核对是否重复报销',
+            });
+        }
+    });
+
+    return rows;
+}
+
+function styleExportCheckRow(row, fillColor = 'FFFFFFFF') {
+    row.eachCell({ includeEmpty: true }, (cell) => {
+        cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' },
+        };
+        cell.font = { name: 'Microsoft YaHei', size: 10 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
+        cell.alignment = { vertical: 'middle', wrapText: true };
+    });
+}
+
+function addExportCheckWorksheet(workbook, records, imagesByRecord) {
+    const checkRows = buildExportCheckRows(records, imagesByRecord);
+    const sheet = workbook.addWorksheet('导出检查', {
+        views: [{ showGridLines: false }],
+    });
+
+    sheet.columns = [
+        { key: 'Row', width: 12 },
+        { key: 'Type', width: 16 },
+        { key: 'Message', width: 54 },
+        { key: 'Action', width: 28 },
+    ];
+
+    sheet.mergeCells('A1:D1');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = '导出检查';
+    titleCell.font = { name: 'Microsoft YaHei', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC00000' } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getRow(1).height = 28;
+
+    const headerRow = sheet.addRow({
+        Row: '明细行',
+        Type: '风险类型',
+        Message: '检查结果',
+        Action: '处理建议',
+    });
+    headerRow.font = { name: 'Microsoft YaHei', size: 10, bold: true };
+    styleExportCheckRow(headerRow, 'FFEDEDED');
+
+    if (checkRows.length === 0) {
+        styleExportCheckRow(sheet.addRow({
+            Row: '全部',
+            Type: '已通过',
+            Message: '当前导出未发现 OCR 复核、关键字段、发票附件或重复发票风险',
+            Action: '可归档流转',
+        }));
+        return;
+    }
+
+    checkRows.forEach((checkRow) => {
+        styleExportCheckRow(sheet.addRow({
+            Row: checkRow.label,
+            Type: checkRow.type,
+            Message: checkRow.message,
+            Action: checkRow.action,
+        }), 'FFFFF7ED');
+    });
+}
+
+async function buildExportWorkbookArtifacts(projectId, options = {}) {
+    const { includeAttachmentBuffers = true } = options;
     const ExcelJS = (await import('exceljs')).default;
 
-    const { records, imagesByRecord } = await exportWithImages(projectId);
+    const { records, imagesByRecord } = await exportWithImages(projectId, {
+        includeBuffers: includeAttachmentBuffers,
+    });
 
     // 获取项目简称
     const project = await knex('reimbursement_projects').where({ id: projectId }).first();
@@ -858,17 +1242,61 @@ export async function generateExportZip(projectId, projectName) {
         return `${fileName || `附件-${index + 1}`}${ext}`;
     };
 
+    const buildExportAttachment = (record, img) => ({
+        file_type: img.fileType || (record.has_invoice ? 'invoice' : 'payment'),
+        original_name: img.originalName || img.fileName,
+        file_name: img.fileName,
+    });
+
+    const getExportAttachmentFileName = (record, img, index) => (
+        generateExportFileName(record, buildExportAttachment(record, img), index)
+    );
+
+    const usedExportAttachmentNames = new Set();
+    const reserveUniqueExportAttachmentName = (fileName) => {
+        const fallbackName = fileName || '附件.jpg';
+        if (!usedExportAttachmentNames.has(fallbackName)) {
+            usedExportAttachmentNames.add(fallbackName);
+            return fallbackName;
+        }
+
+        const ext = path.extname(fallbackName);
+        const baseName = ext ? fallbackName.slice(0, -ext.length) : fallbackName;
+        let suffix = 2;
+        let candidate = `${baseName}-${suffix}${ext}`;
+
+        while (usedExportAttachmentNames.has(candidate)) {
+            suffix += 1;
+            candidate = `${baseName}-${suffix}${ext}`;
+        }
+
+        usedExportAttachmentNames.add(candidate);
+        return candidate;
+    };
+
     // 插入数据行
     let balance = 0;
+    let totalIncome = 0;
+    let totalExpense = 0;
     const attachmentInfo = []; // 用于记录附件信息
 
     records.forEach((record, i) => {
         const income = Number(record.income) || 0;
         const expense = Number(record.expense) || 0;
+        totalIncome += income;
+        totalExpense += expense;
         balance += income - expense;
 
         const images = imagesByRecord.get(record.id) || [];
-        const attachmentNames = images.map((img, idx) => `${idx + 1}. ${img.fileName}`).join('\n');
+        const exportImages = images.map((img, idx) => ({
+            ...img,
+            exportFileName: reserveUniqueExportAttachmentName(
+                getExportAttachmentFileName(record, img, idx)
+            ),
+        }));
+        const attachmentNames = exportImages
+            .map((img, idx) => `${idx + 1}. ${img.exportFileName}`)
+            .join('\n');
 
         const dataRow = sheet.addRow({
             No: i + 1,
@@ -897,7 +1325,7 @@ export async function generateExportZip(projectId, projectName) {
                 row: i + 3, // 数据行号（从第3行开始）
                 recordId: record.id,
                 record,
-                images,
+                images: exportImages,
             });
         }
 
@@ -914,8 +1342,61 @@ export async function generateExportZip(projectId, projectName) {
         });
     });
 
+    if (records.length > 0) {
+        const totalRow = sheet.addRow({
+            No: '费用总计',
+            Income: totalIncome > 0 ? totalIncome : null,
+            Total: totalExpense > 0 ? totalExpense : 0,
+            Balance: balance,
+        });
+
+        totalRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' },
+            };
+            cell.font = { name: 'Microsoft YaHei', size: 10, bold: true };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDEDED' } };
+            cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 ? 'center' : 'right', wrapText: true };
+        });
+    }
+
+    addExportCheckWorksheet(workbook, records, imagesByRecord);
+
     // 生成Excel Buffer
-    const excelBuffer = await workbook.xlsx.writeBuffer();
+    const rawExcelBuffer = await workbook.xlsx.writeBuffer();
+    const excelBuffer = Buffer.isBuffer(rawExcelBuffer)
+        ? rawExcelBuffer
+        : Buffer.from(rawExcelBuffer);
+
+    return { excelBuffer, attachmentInfo };
+}
+
+/**
+ * 生成导出Excel工作簿
+ * @param {string} projectId - 项目ID
+ * @returns {Promise<Buffer>} Excel文件Buffer
+ */
+export async function generateExportWorkbook(projectId) {
+    const { excelBuffer } = await buildExportWorkbookArtifacts(projectId, {
+        includeAttachmentBuffers: false,
+    });
+    return excelBuffer;
+}
+
+/**
+ * 生成导出ZIP（Excel + 图片文件夹）
+ * @param {string} projectId - 项目ID
+ * @param {string} projectName - 项目名称
+ * @returns {Promise<Buffer>} ZIP文件Buffer
+ */
+export async function generateExportZip(projectId, projectName) {
+    const archiver = (await import('archiver')).default;
+    const { excelBuffer, attachmentInfo } = await buildExportWorkbookArtifacts(projectId, {
+        includeAttachmentBuffers: true,
+    });
 
     // 创建ZIP
     const zipBuffer = await new Promise((resolve, reject) => {
@@ -935,14 +1416,7 @@ export async function generateExportZip(projectId, projectName) {
             const images = info.images;
             for (let j = 0; j < images.length; j++) {
                 const img = images[j];
-                // 构建附件对象用于命名
-                const attachment = {
-                    file_type: img.fileType || (info.record.has_invoice ? 'invoice' : 'payment'),
-                    original_name: img.originalName || img.fileName,
-                    file_name: img.fileName,
-                };
-                const fileName = generateExportFileName(info.record, attachment, j);
-                archive.append(img.buffer, { name: `${imagesFolder}/${fileName}` });
+                archive.append(img.buffer, { name: `${imagesFolder}/${img.exportFileName}` });
             }
         }
 

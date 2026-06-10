@@ -5,14 +5,14 @@ import bibTrackingApi from '../../../../api/bibTracking'
 import pipelineApi from '../../../../api/pipeline'
 import useRaceContextStore from '../../../../stores/raceContextStore'
 import {
-  CommandDataTable,
-  CommandEmptyState,
-  CommandNotice,
-  CommandPanel,
-  CommandShell,
-  CommandStepRail,
-  ContextRequirementState,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5ContextState,
+  AppH5DataTable,
+  AppH5EmptyState,
+  AppH5Notice,
+  AppH5Panel,
+  AppH5Surface,
+  AppH5Tabs,
+} from '../../../../components/app/AppH5Surface'
 import BibStats from './ported/BibStats'
 import BibRuleManager from './ported/BibRuleManager'
 import BibExecution from './ported/BibExecution'
@@ -427,54 +427,61 @@ export default function BibPage() {
     return '请先选择赛事'
   }, [currentRace?.name, raceId])
 
+  const tabItems = useMemo(() => BIB_TABS.map((tab) => ({
+    key: tab.key,
+    label: tab.label,
+    badge: tab.icon,
+    active: tab.key === activeTab,
+    onClick: () => setActiveTab(tab.key),
+  })), [activeTab])
+
   if (!raceId) {
     return (
-      <div className="command-page surface-app bib-page">
-        <CommandShell
-          eyebrow="我的赛事"
-          title="选手排号"
-          summary="基于分区、成绩和窗口规则完成号码布编号、存衣窗口号和博览会窗口号分配。"
-        />
-        <ContextRequirementState
+      <AppH5Surface
+        className="bib-page"
+        eyebrow="我的赛事"
+        title="选手排号"
+        summary="基于分区、成绩和窗口规则完成号码布编号、存衣窗口号和博览会窗口号分配。"
+      >
+        <AppH5ContextState
           title="请先选择赛事"
           description="在顶部控制面板中选择目标赛事后，才能进入完整的选手排号工作台。"
         />
-      </div>
+      </AppH5Surface>
     )
   }
 
   return (
-    <div className="command-page surface-app bib-page">
-      <CommandShell
-        eyebrow="我的赛事"
-        title="选手排号"
-        summary={headerSummary}
-      >
+    <AppH5Surface
+      className="bib-page"
+      eyebrow="我的赛事"
+      title="选手排号"
+      summary={headerSummary}
+      actions={(
         <div className="bib-toolbar">
           <div className="bib-toolbar__meta">
             已排号 {stats.assigned.toLocaleString()} / 可排号 {stats.eligible.toLocaleString()}
           </div>
           {loading && hasLoadedOnce ? <div className="bib-toolbar__chip">同步中...</div> : null}
         </div>
-      </CommandShell>
+      )}
+    >
 
       {message ? (
-        <CommandNotice tone={message.type === 'error' ? 'danger' : message.type === 'success' ? 'success' : 'info'}>
+        <AppH5Notice tone={message.type === 'error' ? 'danger' : message.type === 'success' ? 'success' : 'info'}>
           {message.text}
-        </CommandNotice>
+        </AppH5Notice>
       ) : null}
 
       {isInitialLoading ? (
-        <CommandPanel title="排号工作台" subtitle="正在加载规则、起点分区和执行数据。">
+        <AppH5Panel title="排号工作台" summary="正在加载规则、起点分区和执行数据。">
           <div className="bib-loading">正在加载排号数据...</div>
-        </CommandPanel>
+        </AppH5Panel>
       ) : (
         <div className="bib-workbench">
-          <CommandStepRail
+          <AppH5Tabs
             className="bib-tab-strip"
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            steps={BIB_TABS}
+            items={tabItems}
             ariaLabel="排号工作台标签"
           />
 
@@ -507,7 +514,7 @@ export default function BibPage() {
               />
 
               <div className="bib-side-grid">
-                <CommandPanel title="最近号码布记录" subtitle="最近写入的号码布编号会显示在这里。">
+                <AppH5Panel title="最近号码布记录" summary="最近写入的号码布编号会显示在这里。">
                   {previewRecords.length > 0 ? (
                     <div className="bib-preview-list">
                       {previewRecords.map((record, index) => (
@@ -519,46 +526,48 @@ export default function BibPage() {
                       ))}
                     </div>
                   ) : (
-                    <CommandEmptyState
+                    <AppH5EmptyState
                       title="暂无排号记录"
                       description="执行排号后，这里会显示最近生成的号码布编号。"
                       icon="BIB"
                     />
                   )}
-                </CommandPanel>
+                </AppH5Panel>
 
-                <CommandPanel title="号码区间模板" subtitle="保留后端已存在的项目号段配置，便于核对历史模板。">
+                <AppH5Panel title="号码区间模板" summary="保留后端已存在的项目号段配置，便于核对历史模板。">
                   {templates.length > 0 ? (
-                    <CommandDataTable>
-                      <thead>
-                        <tr>
-                          <th>项目</th>
-                          <th>前缀</th>
-                          <th>起始号</th>
-                          <th>结束号</th>
-                          <th>位数</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {templates.map((template, index) => (
-                          <tr key={template.id || `${template.event}-${index}`}>
-                            <td>{template.event || '-'}</td>
-                            <td>{template.prefix || '-'}</td>
-                            <td>{template.startNumber ?? '-'}</td>
-                            <td>{template.endNumber ?? '-'}</td>
-                            <td>{template.padding ?? '-'}</td>
+                    <AppH5DataTable>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>项目</th>
+                            <th>前缀</th>
+                            <th>起始号</th>
+                            <th>结束号</th>
+                            <th>位数</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </CommandDataTable>
+                        </thead>
+                        <tbody>
+                          {templates.map((template, index) => (
+                            <tr key={template.id || `${template.event}-${index}`}>
+                              <td>{template.event || '-'}</td>
+                              <td>{template.prefix || '-'}</td>
+                              <td>{template.startNumber ?? '-'}</td>
+                              <td>{template.endNumber ?? '-'}</td>
+                              <td>{template.padding ?? '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </AppH5DataTable>
                   ) : (
-                    <CommandEmptyState
+                    <AppH5EmptyState
                       title="暂无号码区间模板"
                       description="当前赛事还没有写入项目号段模板，但排号流程已经可以按分区规则执行。"
                       icon="TPL"
                     />
                   )}
-                </CommandPanel>
+                </AppH5Panel>
               </div>
             </>
           ) : (
@@ -566,6 +575,6 @@ export default function BibPage() {
           )}
         </div>
       )}
-    </div>
+    </AppH5Surface>
   )
 }

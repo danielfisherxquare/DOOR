@@ -10,6 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as processor from './invoice.processor.js';
 import * as storage from './invoice.storage.js';
+import * as reimbursementService from './reimbursement.service.js';
 import { resolveOcrConfig, normalizeOcrError } from './reimbursement.controller.js';
 import { processPayment } from './ocr.service.js';
 import knex from '../../db/knex.js';
@@ -261,17 +262,25 @@ async function uploadAndProcessInvoice(req, res, next) {
         // 计算文件哈希
         const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
 
-        // 创建处理记录
-        const [record] = await knex('reimbursement_processed_files')
-            .insert({
-                project_id: projectId,
-                file_name: req.file.originalname,
-                file_type: 'invoice',
-                file_hash: fileHash,
-                status: 'processing',
-                started_at: knex.fn.now(),
-            })
-            .returning('*');
+        const { skipped, record, existing } = await reimbursementService.startProcessingFile(
+            projectId,
+            userId,
+            {
+                fileName: req.file.originalname,
+                fileType: 'invoice',
+                fileHash,
+            }
+        );
+
+        if (skipped) {
+            return res.json({
+                success: true,
+                skipped: true,
+                existingInvoiceId: existing.id,
+                status: existing.status,
+                message: '文件已处理过，跳过重复处理',
+            });
+        }
 
         processingRecord = record;
 
@@ -339,17 +348,25 @@ async function uploadAndProcessPayment(req, res, next) {
         // 计算文件哈希
         const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
 
-        // 创建处理记录
-        const [record] = await knex('reimbursement_processed_files')
-            .insert({
-                project_id: projectId,
-                file_name: req.file.originalname,
-                file_type: 'payment',
-                file_hash: fileHash,
-                status: 'processing',
-                started_at: knex.fn.now(),
-            })
-            .returning('*');
+        const { skipped, record, existing } = await reimbursementService.startProcessingFile(
+            projectId,
+            userId,
+            {
+                fileName: req.file.originalname,
+                fileType: 'payment',
+                fileHash,
+            }
+        );
+
+        if (skipped) {
+            return res.json({
+                success: true,
+                skipped: true,
+                existingPaymentId: existing.id,
+                status: existing.status,
+                message: '文件已处理过，跳过重复处理',
+            });
+        }
 
         processingRecord = record;
 

@@ -5,7 +5,7 @@
 .clothing-loading {
   padding: 48px;
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--layer-text-secondary, #57534e);
 }
 
 .clothing-section {
@@ -19,6 +19,7 @@
 .clothing-section h3 {
   margin: 0 0 16px;
   font-size: var(--font-size-lg);
+  color: var(--layer-text-primary, #1c1917);
 }
 
 .clothing-subsection {
@@ -28,7 +29,7 @@
 .clothing-subsection h4 {
   margin: 0 0 12px;
   font-size: var(--font-size-md);
-  color: var(--text-secondary);
+  color: var(--layer-text-secondary, #57534e);
 }
 
 .clothing-grid {
@@ -42,10 +43,10 @@
   flex-direction: column;
   align-items: center;
   padding: 16px 24px;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
+  background: var(--layer-bg-primary, #faf9f7);
+  border-radius: 8px;
   min-width: 100px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--layer-border, #e7e5e4);
 }
 
 .clothing-card-size {
@@ -63,17 +64,17 @@
 .clothing-card-used {
   font-size: var(--font-size-xl);
   font-weight: 700;
-  color: var(--accent);
+  color: var(--layer-accent, #D4A017);
 }
 
 .clothing-card-divider {
   font-size: var(--font-size-md);
-  color: var(--text-secondary);
+  color: var(--layer-text-secondary, #57534e);
 }
 
 .clothing-card-total {
   font-size: var(--font-size-lg);
-  color: var(--text-secondary);
+  color: var(--layer-text-secondary, #57534e);
 }
 
 .clothing-card-warning {
@@ -82,7 +83,7 @@
   margin-top: 8px;
   background: var(--danger-soft);
   padding: 2px 8px;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
 }
 
 .clothing-table {

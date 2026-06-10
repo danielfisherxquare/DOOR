@@ -26,14 +26,26 @@ function getServerLlmConfig() {
 
 /**
  * 获取合并后的LLM配置
+ * 服务端付费 OCR 配置优先，避免旧浏览器 key 继续消耗或失效。
  */
-function resolveLlmConfig(userConfig) {
-    const serverConfig = getServerLlmConfig();
+export function resolveLlmConfig(userConfig, serverConfig = getServerLlmConfig()) {
+    const hasServerApiKey = Boolean(serverConfig?.apiKey?.trim());
+
+    if (hasServerApiKey) {
+        return {
+            ...DEFAULT_LLM_CONFIG,
+            provider: serverConfig.provider || DEFAULT_LLM_CONFIG.provider,
+            baseUrl: serverConfig.baseUrl || DEFAULT_LLM_CONFIG.baseUrl,
+            apiKey: serverConfig.apiKey,
+            modelName: serverConfig.modelName || DEFAULT_LLM_CONFIG.modelName,
+        };
+    }
+
     return {
         ...DEFAULT_LLM_CONFIG,
         provider: userConfig?.provider || serverConfig?.provider || DEFAULT_LLM_CONFIG.provider,
         baseUrl: userConfig?.baseUrl || serverConfig?.baseUrl || DEFAULT_LLM_CONFIG.baseUrl,
-        apiKey: userConfig?.apiKey || serverConfig?.apiKey || '',
+        apiKey: userConfig?.apiKey || '',
         modelName: userConfig?.modelName || serverConfig?.modelName || DEFAULT_LLM_CONFIG.modelName,
     };
 }

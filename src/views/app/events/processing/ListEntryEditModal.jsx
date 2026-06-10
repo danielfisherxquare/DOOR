@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CommandNotice, CommandPanel } from '../../../../components/command/CommandPrimitives'
+import { AppH5Notice, AppH5Panel } from '../../../../components/app/AppH5Surface'
 
 /**
  * 名单条目编辑 Modal
  *
  * 替代 window.prompt 的三连弹窗，提供统一的字段校验和交互体验。
- * 使用系统已有的 .command-panel 样式 + overlay 覆盖层。
+ * 使用系统已有的 H5 面板样式 + overlay 覆盖层。
  */
 export default function ListEntryEditModal({ entry, onSave, onCancel }) {
   const [form, setForm] = useState({
@@ -66,12 +66,12 @@ export default function ListEntryEditModal({ entry, onSave, onCancel }) {
       aria-label="编辑名单条目"
     >
       <div className="processing-modal-content">
-        <CommandPanel
+        <AppH5Panel
           title="编辑名单条目"
           subtitle={'修改后需手动点击"重新应用匹配"以更新关联状态。'}
         >
           <form onSubmit={handleSubmit} className="processing-modal-form">
-            {error ? <CommandNotice tone="danger">{error}</CommandNotice> : null}
+            {error ? <AppH5Notice tone="danger">{error}</AppH5Notice> : null}
 
             <div className="processing-modal-field">
               <label htmlFor="edit-entry-name">姓名</label>
@@ -119,7 +119,7 @@ export default function ListEntryEditModal({ entry, onSave, onCancel }) {
               </button>
             </div>
           </form>
-        </CommandPanel>
+        </AppH5Panel>
       </div>
     </div>
   )

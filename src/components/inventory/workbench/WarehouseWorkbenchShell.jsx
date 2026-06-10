@@ -1,4 +1,4 @@
-import { CommandShell } from '../../command/CommandPrimitives'
+import { AppH5Surface, AppH5Tabs } from '../../app/AppH5Surface'
 import './workbench.css'
 
 export default function WarehouseWorkbenchShell({
@@ -12,15 +12,19 @@ export default function WarehouseWorkbenchShell({
     main,
     side,
 }) {
+    const tabsNode = Array.isArray(tabs)
+        ? <AppH5Tabs items={tabs} ariaLabel={(title || '仓储') + '视图'} />
+        : tabs
+
     return (
-        <CommandShell
-            className="warehouse-workbench warehouse-workbench__shell surface-admin"
+        <AppH5Surface
+            className="warehouse-workbench warehouse-workbench__shell"
             eyebrow={eyebrow}
             title={title}
             summary={summary}
             actions={actions}
         >
-            {tabs ? <div className="warehouse-workbench__tabs">{tabs}</div> : null}
+            {tabsNode}
             {contextBar}
             {metrics}
 
@@ -28,6 +32,6 @@ export default function WarehouseWorkbenchShell({
                 <div className="warehouse-workbench__main">{main}</div>
                 <aside className="warehouse-workbench__side">{side}</aside>
             </div>
-        </CommandShell>
+        </AppH5Surface>
     )
 }

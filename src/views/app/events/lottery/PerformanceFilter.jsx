@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import pipelineApi from '../../../../api/pipeline'
 import {
-  CommandMetricGrid,
-  CommandNotice,
-  CommandPanel,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5MetricStrip,
+  AppH5Notice,
+  AppH5Panel,
+} from '../../../../components/app/AppH5Surface'
 import { getEventLabel, toNumber } from './lotteryHelpers'
 
 function buildDefaultRules(raceDetail, raceId) {
@@ -113,13 +113,13 @@ export default function PerformanceFilter({ raceId, raceDetail, preview, onUpdat
 
   return (
     <div className="lottery-step-stack">
-      {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
+      {message ? <AppH5Notice tone={messageTone}>{message}</AppH5Notice> : null}
 
-      <CommandMetricGrid items={metrics} />
+      <AppH5MetricStrip items={metrics} />
 
       <div className="lottery-card-grid">
         {rules.map((rule, index) => (
-          <CommandPanel key={rule.id || rule.event} title={rule.event} subtitle="设定达标门槛和优先录取比例。">
+          <AppH5Panel key={rule.id || rule.event} title={rule.event} subtitle="设定达标门槛和优先录取比例。">
             <div className="lottery-form-grid">
               <label className="lottery-field">
                 <span>成绩上限</span>
@@ -154,18 +154,18 @@ export default function PerformanceFilter({ raceId, raceDetail, preview, onUpdat
                 onChange={(event) => updateRule(index, 'priorityRatio', event.target.value)}
               />
             </label>
-          </CommandPanel>
+          </AppH5Panel>
         ))}
       </div>
 
       {result ? (
-        <CommandPanel title="筛选结果" subtitle="执行后会更新 qualified_time 标记，抽签阶段将以这个结果作为优先池输入。">
+        <AppH5Panel title="筛选结果" subtitle="执行后会更新 qualified_time 标记，抽签阶段将以这个结果作为优先池输入。">
           <div className="lottery-mini-grid lottery-mini-grid--three">
             <div className="lottery-mini-stat"><span className="lottery-mini-stat__label">达标</span><strong className="lottery-mini-stat__value">{(result.qualifiedCount || 0).toLocaleString()}</strong></div>
             <div className="lottery-mini-stat"><span className="lottery-mini-stat__label">未达标</span><strong className="lottery-mini-stat__value">{(result.unqualifiedCount || 0).toLocaleString()}</strong></div>
             <div className="lottery-mini-stat"><span className="lottery-mini-stat__label">无成绩</span><strong className="lottery-mini-stat__value">{(result.noTimeCount || 0).toLocaleString()}</strong></div>
           </div>
-        </CommandPanel>
+        </AppH5Panel>
       ) : null}
 
       <div className="lottery-footer-actions">

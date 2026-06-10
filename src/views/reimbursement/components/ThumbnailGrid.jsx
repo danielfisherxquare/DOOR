@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react';
 
 const STATUS_LABELS = {
     preview: '待识别',
+    ocr_processing: '识别中',
     recognized: '已识别',
     error: '失败',
     recognizing: '识别中',
@@ -19,6 +20,7 @@ const DOCUMENT_TYPE_LABELS = {
 
 function getBorderClass(file, isRecognizing) {
     if (isRecognizing) return 'thumbnail-card--recognizing';
+    if (file.status === 'ocr_processing') return 'thumbnail-card--recognizing';
     if (file.status === 'recognized') return 'thumbnail-card--recognized';
     if (file.status === 'error') return 'thumbnail-card--error';
     if (file.isDuplicate) return 'thumbnail-card--duplicate';
@@ -45,6 +47,7 @@ function PageCountBadge({ count }) {
 
 function ThumbnailCard({ file, isSelected, isRecognizing, isFocused, onSelect, onDragStart, onCheckboxChange, onRegister }) {
     const borderClass = getBorderClass(file, isRecognizing);
+    const isLocked = isRecognizing || file.status === 'ocr_processing';
 
     const handleCheckboxClick = (e) => {
         e.stopPropagation();
@@ -55,9 +58,9 @@ function ThumbnailCard({ file, isSelected, isRecognizing, isFocused, onSelect, o
         <div
             ref={(node) => onRegister(file.id, node)}
             className={`thumbnail-card ${borderClass} ${isSelected ? 'thumbnail-card--selected' : ''} ${isFocused ? 'thumbnail-card--focused' : ''}`}
-            draggable={!isRecognizing}
-            onDragStart={(e) => !isRecognizing && onDragStart(e, file)}
-            onClick={() => !isRecognizing && onSelect(file)}
+            draggable={!isLocked}
+            onDragStart={(e) => !isLocked && onDragStart(e, file)}
+            onClick={() => !isLocked && onSelect(file)}
         >
             <div className="thumbnail-card__checkbox">
                 <input
@@ -65,7 +68,7 @@ function ThumbnailCard({ file, isSelected, isRecognizing, isFocused, onSelect, o
                     checked={isSelected}
                     onClick={(e) => e.stopPropagation()}
                     onChange={handleCheckboxClick}
-                    disabled={isRecognizing}
+                    disabled={isLocked}
                 />
             </div>
 
@@ -90,7 +93,7 @@ function ThumbnailCard({ file, isSelected, isRecognizing, isFocused, onSelect, o
                 {DOCUMENT_TYPE_LABELS[file.documentType] || '凭证'}
             </div>
 
-            {isRecognizing ? (
+            {isLocked ? (
                 <div className="thumbnail-card__status thumbnail-card__status--recognizing">
                     识别中...
                 </div>

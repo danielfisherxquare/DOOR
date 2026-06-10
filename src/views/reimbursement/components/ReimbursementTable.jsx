@@ -3,8 +3,18 @@
  * 报销明细表格组件 - 支持批量编辑和删除
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import useReimbursementStore from '../../../stores/reimbursementStore';
+import {
+  formatOcrDuration,
+  formatOcrImageSavings,
+  formatOcrTokens,
+  getRecordExportIssueLabels,
+  getOcrReviewStatus,
+  summarizeOcrMetrics,
+  summarizeExportReadiness,
+  summarizeOcrReview,
+} from '../utils/ocrMetrics';
 
 const TABLE_COLUMN_COUNT = 14;
 
@@ -81,23 +91,28 @@ function buildGroupedRows(records) {
   };
 }
 
-const ThumbnailList = ({ items, borderColor }) => {
-  const { getAttachmentUrl } = useReimbursementStore();
+const ThumbnailList = ({ items, borderColor, onPreview }) => {
+  const { getAttachmentThumbnail } = useReimbursementStore();
   const [urls, setUrls] = useState({});
 
   useEffect(() => {
     let mounted = true;
-    items.forEach((item) => {
-      getAttachmentUrl(item.storage_path).then((url) => {
-        if (mounted) {
+    const loadUrls = async () => {
+      for (const item of items) {
+        const url = await getAttachmentThumbnail(item.id);
+        if (mounted && url) {
           setUrls((prev) => ({ ...prev, [item.id]: url }));
         }
-      });
-    });
+      }
+    };
+    loadUrls();
     return () => {
       mounted = false;
+      Object.values(urls).forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
     };
-  }, [items, getAttachmentUrl]);
+  }, [items, getAttachmentThumbnail]);
 
   const borderClass = borderColor === '#3b82f6' ? 'thumbnail-item--invoice' : 'thumbnail-item--payment';
 
@@ -108,17 +123,12 @@ const ThumbnailList = ({ items, borderColor }) => {
           key={item.id}
           className={`thumbnail-item ${borderClass}`}
           title={item.original_name || item.file_name}
-          onClick={() => {
-            const url = urls[item.id];
-            if (url) {
-              window.open(url, '_blank');
-            }
-          }}
+          onClick={() => onPreview && onPreview(item)}
         >
           {urls[item.id] ? (
             <img
               src={urls[item.id]}
-              alt={item.original_name}
+              alt={item.original_name || item.file_name}
               className="thumbnail-item__image"
             />
           ) : (
@@ -130,7 +140,62 @@ const ThumbnailList = ({ items, borderColor }) => {
   );
 };
 
+const AttachmentPreviewModal = ({ attachment, onClose }) => {
+  const { getAttachmentImage } = useReimbursementStore();
+  const [imageUrl, setImageUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadImage = async () => {
+      try {
+        const url = await getAttachmentImage(attachment.id);
+        if (mounted) {
+          setImageUrl(url);
+          setLoading(false);
+        }
+      } catch {
+        if (mounted) setLoading(false);
+      }
+    };
+    loadImage();
+    return () => {
+      mounted = false;
+      if (imageUrl) URL.revokeObjectURL(imageUrl);
+    };
+  }, [attachment.id, getAttachmentImage]);
+
+  if (!attachment) return null;
+
+  return (
+    <div className="attachment-preview-modal__overlay" onClick={onClose}>
+      <div className="attachment-preview-modal__content" onClick={(e) => e.stopPropagation()}>
+        <div className="attachment-preview-modal__header">
+          <span className="attachment-preview-modal__title">
+            {attachment.original_name || attachment.file_name}
+          </span>
+          <span className={`attachment-preview-modal__type-badge ${attachment.file_type === 'invoice' ? 'badge--info' : 'badge--success'}`}>
+            {attachment.file_type === 'invoice' ? '发票' : '付款凭证'}
+          </span>
+          <button className="attachment-preview-modal__close" onClick={onClose}>×</button>
+        </div>
+        <div className="attachment-preview-modal__body">
+          {loading ? (
+            <div className="attachment-preview-modal__loading">加载中...</div>
+          ) : imageUrl ? (
+            <img src={imageUrl} alt={attachment.original_name} className="attachment-preview-modal__image" />
+          ) : (
+            <div className="attachment-preview-modal__error">图片加载失败</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AttachmentPreview = ({ attachments }) => {
+  const [previewAttachment, setPreviewAttachment] = useState(null);
+
   if (!attachments || attachments.length === 0) {
     return <span className="attachment-empty">-</span>;
   }
@@ -139,14 +204,19 @@ const AttachmentPreview = ({ attachments }) => {
   const paymentAttachments = attachments.filter((a) => a.file_type === 'payment');
 
   return (
-    <div className="attachment-preview">
-      {invoiceAttachments.length > 0 && (
-        <ThumbnailList items={invoiceAttachments} borderColor="#3b82f6" />
+    <>
+      <div className="attachment-preview">
+        {invoiceAttachments.length > 0 && (
+          <ThumbnailList items={invoiceAttachments} borderColor="#3b82f6" onPreview={setPreviewAttachment} />
+        )}
+        {paymentAttachments.length > 0 && (
+          <ThumbnailList items={paymentAttachments} borderColor="#22c55e" onPreview={setPreviewAttachment} />
+        )}
+      </div>
+      {previewAttachment && (
+        <AttachmentPreviewModal attachment={previewAttachment} onClose={() => setPreviewAttachment(null)} />
       )}
-      {paymentAttachments.length > 0 && (
-        <ThumbnailList items={paymentAttachments} borderColor="#22c55e" />
-      )}
-    </div>
+    </>
   );
 };
 
@@ -326,7 +396,52 @@ function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null 
   const [showBatchEdit, setShowBatchEdit] = useState(false);
   const [highlightedId, setHighlightedId] = useState(null);
   const [reporterDraft, setReporterDraft] = useState(defaultReporter || '');
+  const [exportFeedback, setExportFeedback] = useState(null);
+  const [qualityFilter, setQualityFilter] = useState('all');
+  const [sortMode, setSortMode] = useState('category');
   const rowRefs = useRef({});
+  const isExporting = Boolean(exportFeedback?.mode);
+
+  const ocrSummary = useMemo(() => summarizeOcrMetrics(records), [records]);
+  const ocrReviewSummary = useMemo(() => summarizeOcrReview(records), [records]);
+  const exportReadiness = useMemo(() => summarizeExportReadiness(records), [records]);
+  const recordQualityMap = useMemo(() => {
+    const map = new Map();
+    records.forEach((record, index) => {
+      map.set(record.id, {
+        reviewStatus: getOcrReviewStatus(record),
+        exportIssues: getRecordExportIssueLabels(record, index, records),
+      });
+    });
+    return map;
+  }, [records]);
+  const riskRecordCount = Array.from(recordQualityMap.values())
+    .filter((quality) => quality.exportIssues.length > 0).length;
+  const reviewRecordCount = Array.from(recordQualityMap.values())
+    .filter((quality) => quality.reviewStatus.needsReview).length;
+  const visibleRecords = useMemo(() => records.filter((record) => {
+    const quality = recordQualityMap.get(record.id);
+    if (qualityFilter === 'risk') return (quality?.exportIssues.length || 0) > 0;
+    if (qualityFilter === 'review') return Boolean(quality?.reviewStatus.needsReview);
+    return true;
+  }), [records, recordQualityMap, qualityFilter]);
+
+  const { sortedRecords, rows: groupedRows } = useMemo(() => {
+    if (sortMode === 'date-asc' || sortMode === 'date-desc') {
+      const sorted = [...visibleRecords].sort((a, b) => {
+        const dateA = a.payment_date || '';
+        const dateB = b.payment_date || '';
+        const dateDiff = dateA.localeCompare(dateB);
+        if (dateDiff !== 0) return sortMode === 'date-asc' ? dateDiff : -dateDiff;
+        return Number(a.index || 0) - Number(b.index || 0);
+      });
+      return { sortedRecords: sorted, rows: sorted.map((r) => ({ type: 'record', key: r.id, record: r })) };
+    }
+    return buildGroupedRows(visibleRecords);
+  }, [visibleRecords, sortMode]);
+  const visibleRecordIds = useMemo(() => sortedRecords.map((record) => record.id), [sortedRecords]);
+  const selectedVisibleCount = visibleRecordIds.filter((id) => selectedIds.has(id)).length;
+  const allVisibleSelected = visibleRecordIds.length > 0 && selectedVisibleCount === visibleRecordIds.length;
 
   const startEdit = (record) => {
     setEditingId(record.id);
@@ -354,11 +469,15 @@ function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null 
 
   // 全选/取消全选
   const toggleSelectAll = () => {
-    if (selectedIds.size === records.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(records.map((r) => r.id)));
-    }
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      if (allVisibleSelected) {
+        visibleRecordIds.forEach((id) => next.delete(id));
+        return next;
+      }
+      visibleRecordIds.forEach((id) => next.add(id));
+      return next;
+    });
   };
 
   // 切换单条选择
@@ -395,9 +514,44 @@ function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null 
     await saveDefaultReporter(reporterDraft);
   };
 
+  const runExport = async (mode, action) => {
+    const isZip = mode === 'zip';
+    if (!exportReadiness.ready && !confirm(exportReadiness.confirmMessage)) {
+      setExportFeedback({
+        mode: null,
+        type: 'info',
+        message: '已取消导出',
+      });
+      return;
+    }
+
+    setExportFeedback({
+      mode,
+      type: 'info',
+      message: isZip ? '正在生成 Excel + 附件...' : '正在生成 Excel...',
+    });
+
+    try {
+      await action();
+      setExportFeedback({
+        mode: null,
+        type: 'success',
+        message: isZip ? 'Excel + 附件已开始下载' : 'Excel 已开始下载',
+      });
+    } catch (error) {
+      setExportFeedback({
+        mode: null,
+        type: 'error',
+        message: error?.message || '导出失败',
+      });
+    }
+  };
+
+  const handleExportToExcel = () => runExport('excel', exportToExcel);
+  const handleExportWithImages = () => runExport('zip', exportWithImages);
+
   const totalExpense = records.reduce((sum, r) => sum + (Number(r.expense) || 0), 0);
   const totalIncome = records.reduce((sum, r) => sum + (Number(r.income) || 0), 0);
-  const { sortedRecords, rows: groupedRows } = buildGroupedRows(records);
 
   useEffect(() => {
     if (!focusRecordId) return;
@@ -450,11 +604,95 @@ function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null 
             <span className="stat">
               收入: <strong className="text-income">¥{totalIncome.toLocaleString()}</strong>
             </span>
+            {ocrSummary.coveredRecordCount > 0 && (
+              <>
+                <span className="stat stat--ocr">
+                  识别成本: <strong>{ocrSummary.coveredRecordCount}</strong> 条
+                </span>
+                <span className="stat stat--ocr">
+                  Token: <strong>{formatOcrTokens(ocrSummary.totalTokens)}</strong>
+                </span>
+                <span className="stat stat--ocr">
+                  调用: <strong>{ocrSummary.modelCallCount}</strong> 次
+                </span>
+                <span className="stat stat--ocr">
+                  平均耗时: <strong>{formatOcrDuration(ocrSummary.averageDurationMs)}</strong>
+                </span>
+                {ocrSummary.imageOptimization.savedBytes > 0 && (
+                  <span className="stat stat--ocr">
+                    图片压缩: <strong>{formatOcrImageSavings(ocrSummary.imageOptimization)}</strong>
+                  </span>
+                )}
+              </>
+            )}
+            {ocrReviewSummary.needsReviewCount > 0 && (
+              <span className="stat stat--review">
+                需复核: <strong>{ocrReviewSummary.needsReviewCount}</strong> 条
+              </span>
+            )}
+            <span className={exportReadiness.ready ? 'stat stat--export-ready' : 'stat stat--review'}>
+              导出检查: <strong>{exportReadiness.ready ? '已通过' : exportReadiness.warningCount + ' 项风险'}</strong>
+            </span>
             {selectedIds.size > 0 && (
               <span className="stat stat--selected">
                 已选 <strong>{selectedIds.size}</strong> 条
               </span>
             )}
+            {qualityFilter !== 'all' && (
+              <span className="stat stat--filter">
+                显示 <strong>{sortedRecords.length}</strong> / {records.length} 条
+              </span>
+            )}
+          </div>
+          <div className="reimbursement-table__quality-filters" role="group" aria-label="记录筛选">
+            <button
+              type="button"
+              className={qualityFilter === 'all' ? 'active' : ''}
+              onClick={() => setQualityFilter('all')}
+            >
+              全部
+            </button>
+            <button
+              type="button"
+              className={qualityFilter === 'risk' ? 'active' : ''}
+              onClick={() => setQualityFilter('risk')}
+            >
+              只看风险 {riskRecordCount}
+            </button>
+            <button
+              type="button"
+              className={qualityFilter === 'review' ? 'active' : ''}
+              onClick={() => setQualityFilter('review')}
+            >
+              只看复核 {reviewRecordCount}
+            </button>
+          </div>
+          <div className="reimbursement-table__sort-controls" role="group" aria-label="排序方式">
+            <span className="reimbursement-table__sort-label">排序</span>
+            <button
+              type="button"
+              className={sortMode === 'category' ? 'active' : ''}
+              onClick={() => setSortMode('category')}
+              title="按大类/子类分组展示"
+            >
+              分类
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'date-asc' ? 'active' : ''}
+              onClick={() => setSortMode('date-asc')}
+              title="按日期从早到晚排列"
+            >
+              日期 ↑
+            </button>
+            <button
+              type="button"
+              className={sortMode === 'date-desc' ? 'active' : ''}
+              onClick={() => setSortMode('date-desc')}
+              title="按日期从晚到早排列"
+            >
+              日期 ↓
+            </button>
           </div>
         </div>
 
@@ -495,13 +733,27 @@ function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null 
               </button>
             </>
           )}
-          <button className="btn btn--primary" onClick={exportToExcel} disabled={isLoading}>
-            导出 Excel
+          <button className="btn btn--primary" onClick={handleExportToExcel} disabled={isLoading || isExporting}>
+            {exportFeedback?.mode === 'excel' ? '生成中...' : '导出 Excel'}
           </button>
-          <button className="btn btn--ghost" onClick={exportWithImages} disabled={isLoading}>
-            导出 Excel + 附件
+          <button className="btn btn--ghost" onClick={handleExportWithImages} disabled={isLoading || isExporting}>
+            {exportFeedback?.mode === 'zip' ? '打包中...' : '导出 Excel + 附件'}
           </button>
         </div>
+
+        {exportFeedback?.message && (
+          <div className={'reimbursement-table__export-feedback reimbursement-table__export-feedback--' + exportFeedback.type}>
+            {exportFeedback.message}
+          </div>
+        )}
+
+        {!exportReadiness.ready && (
+          <div className="reimbursement-table__export-readiness">
+            {exportReadiness.warnings.slice(0, 3).map((warning) => (
+              <span key={warning.code}>{warning.message}</span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="reimbursement-table__container">
@@ -509,11 +761,11 @@ function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null 
           <thead>
             <tr>
               <th className="th-checkbox">
-                <input
-                  type="checkbox"
-                    checked={selectedIds.size === records.length && records.length > 0}
-                    onChange={toggleSelectAll}
-                  />
+	                <input
+	                  type="checkbox"
+	                  checked={allVisibleSelected}
+	                  onChange={toggleSelectAll}
+	                />
                 </th>
               <th>序号</th>
               <th>日期</th>
@@ -548,6 +800,11 @@ function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null 
               }
 
               const record = row.record;
+              const quality = recordQualityMap.get(record.id) || {
+                reviewStatus: getOcrReviewStatus(record),
+                exportIssues: getRecordExportIssueLabels(record, 0, records),
+              };
+              const reviewStatus = quality.reviewStatus;
               return (
                 <tr
                   key={record.id}
@@ -640,9 +897,26 @@ function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null 
                     )}
                   </td>
                   <td>
-                    <span className={`badge ${record.has_invoice ? 'badge--success' : 'badge--default'}`}>
-                      {record.has_invoice ? '有' : '无'}
-                    </span>
+                    <div className="invoice-review-cell">
+                      <span className={`badge ${record.has_invoice ? 'badge--success' : 'badge--default'}`}>
+                        {record.has_invoice ? '有' : '无'}
+                      </span>
+                      {reviewStatus.needsReview && (
+                        <span
+                          className="badge badge--review"
+                          title={reviewStatus.title || '识别字段需要人工复核'}
+                        >
+                          复核 {reviewStatus.issueCount}
+                        </span>
+                      )}
+                      {quality.exportIssues.length > 0 && (
+                        <div className="reimbursement-table__risk-list" title={quality.exportIssues.join('；')}>
+                          {quality.exportIssues.slice(0, 2).map((label) => (
+                            <span key={label}>{label}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="cell-company">
                     {editingId === record.id ? (

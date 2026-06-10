@@ -3,9 +3,19 @@
  * 识别区拖放区域 - 接收拖拽的文件并触发识别
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import {
+    formatOcrDuration,
+    formatOcrImageSavings,
+    formatOcrTokens,
+    getOcrReviewStatus,
+    summarizeOcrMetrics,
+    summarizeOcrReview,
+} from '../utils/ocrMetrics';
 
 function RecognizedRecordCard({ record }) {
+    const reviewStatus = getOcrReviewStatus(record);
+
     return (
         <div className="recognized-record-card">
             <div className="recognized-record-card__title">
@@ -18,6 +28,14 @@ function RecognizedRecordCard({ record }) {
             {record.is_duplicate && (
                 <span className="recognized-record-card__duplicate-badge">
                     重复上传
+                </span>
+            )}
+            {reviewStatus.needsReview && (
+                <span
+                    className="recognized-record-card__review-badge"
+                    title={reviewStatus.title || '识别字段需要人工复核'}
+                >
+                    需复核 {reviewStatus.issueCount}
                 </span>
             )}
         </div>
@@ -34,19 +52,34 @@ function RecognizeDropZone({
 }) {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [pendingFile, setPendingFile] = useState(null);
+    const ocrSummary = useMemo(
+        () => summarizeOcrMetrics(recognizedRecords || []),
+        [recognizedRecords],
+    );
+    const ocrReviewSummary = useMemo(
+        () => summarizeOcrReview(recognizedRecords || []),
+        [recognizedRecords],
+    );
 
-    const handleDrop = (e) => {
+    const handleDrop = async (e) => {
         const file = e.dataTransfer.getData('application/json');
+        onDragLeave();
         if (file) {
             const parsedFile = JSON.parse(file);
             if (parsedFile.isDuplicate) {
                 setPendingFile(parsedFile);
                 setShowConfirmModal(true);
             } else {
-                onDrop(parsedFile);
+                const result = await onDrop(parsedFile);
+                if (result?.status === 'needConfirm') {
+                    setPendingFile({
+                        ...parsedFile,
+                        duplicateCount: result.result?.duplicateCount ?? parsedFile.duplicateCount,
+                    });
+                    setShowConfirmModal(true);
+                }
             }
         }
-        onDragLeave();
     };
 
     const confirmForceRecognize = () => {
@@ -114,7 +147,21 @@ function RecognizeDropZone({
             <div className="recognized-records">
                 <div className="recognized-records__header">
                     <span>已识别记录</span>
-                    <span>{recognizedRecords?.length || 0} 条</span>
+                    <div className="recognized-records__summary">
+                        <span>{recognizedRecords?.length || 0} 条</span>
+                        {ocrSummary.coveredRecordCount > 0 && (
+                            <>
+                                <span>Token {formatOcrTokens(ocrSummary.totalTokens)}</span>
+                                <span>平均耗时 {formatOcrDuration(ocrSummary.averageDurationMs)}</span>
+                                {ocrSummary.imageOptimization.savedBytes > 0 && (
+                                    <span>图片压缩 {formatOcrImageSavings(ocrSummary.imageOptimization)}</span>
+                                )}
+                            </>
+                        )}
+                        {ocrReviewSummary.needsReviewCount > 0 && (
+                            <span>需复核 {ocrReviewSummary.needsReviewCount}</span>
+                        )}
+                    </div>
                 </div>
                 {recognizedRecords && recognizedRecords.length > 0 ? (
                     <div className="recognized-records__list">

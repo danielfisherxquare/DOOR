@@ -5,13 +5,12 @@ import racesApi from '../../../../api/races'
 import useRaceContextStore from '../../../../stores/raceContextStore'
 import { unwrapData } from '../../../../utils/apiResponse'
 import {
-  CommandMetricGrid,
-  CommandNotice,
-  CommandPanel,
-  CommandShell,
-  CommandStepRail,
-  ContextRequirementState,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5ContextState,
+  AppH5Notice,
+  AppH5Panel,
+  AppH5Surface,
+  AppH5Tabs,
+} from '../../../../components/app/AppH5Surface'
 import CapacityPlanner from './CapacityPlanner'
 import StartZoneSimulator from './StartZoneSimulator'
 import PerformanceFilter from './PerformanceFilter'
@@ -99,47 +98,51 @@ export default function LotteryPage() {
     ]
   }, [activeMeta, currentRace?.name, preview?.records?.locked, preview?.records?.total, preview?.records?.won, preview?.step1?.totalTarget, raceDetail?.name, raceId])
 
+  const stepTabs = useMemo(() => STEPS.map((step) => ({
+    key: step.key,
+    label: step.label,
+    badge: step.icon,
+    active: step.key === activeStep,
+    onClick: () => setActiveStep(step.key),
+  })), [activeStep])
+
   if (!raceId) {
     return (
-      <div className="command-page surface-app lottery-page">
-        <CommandShell
-          eyebrow="我的赛事"
-          title="抽签管理"
-          summary="把容量定义、起点沙盘、成绩筛选和最终执行收回到一条完整的抽签链路。"
-        >
-          <CommandMetricGrid items={[{ key: 'race', label: '目标赛事', value: '未选择', meta: '抽签工作流必须先锁定赛事上下文。', pill: 'RACE' }]} />
-        </CommandShell>
-        <ContextRequirementState
+      <AppH5Surface
+        className="lottery-page"
+        eyebrow="我的赛事"
+        title="抽签管理"
+        summary="把容量定义、起点沙盘、成绩筛选和最终执行收回到一条完整的抽签链路。"
+        metrics={[{ key: 'race', label: '目标赛事', value: '未选择', meta: '抽签工作流必须先锁定赛事上下文。', pill: 'RACE' }]}
+      >
+        <AppH5ContextState
           title="请先选择赛事"
           description="在顶部控制面板中选择赛事后，才能进入抽签管理工作流。"
         />
-      </div>
+      </AppH5Surface>
     )
   }
 
   return (
-    <div className="command-page surface-app lottery-page">
-      <CommandShell
-        eyebrow="我的赛事"
-        title="抽签管理"
-        summary="对齐 TOOL 的四步链路：容量定义、起点沙盘、成绩筛选、物资匹配与最终执行。"
-        actions={<button className="btn btn--secondary" onClick={() => refreshPreview(true)} disabled={loading}>{loading ? '刷新中...' : '刷新预览'}</button>}
-      >
-        <CommandMetricGrid items={metrics} />
-      </CommandShell>
+    <AppH5Surface
+      className="lottery-page"
+      eyebrow="我的赛事"
+      title="抽签管理"
+      summary="对齐 TOOL 的四步链路：容量定义、起点沙盘、成绩筛选、物资匹配与最终执行。"
+      metrics={metrics}
+      actions={<button className="btn btn--secondary" onClick={() => refreshPreview(true)} disabled={loading}>{loading ? '刷新中...' : '刷新预览'}</button>}
+    >
 
-      {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
+      {message ? <AppH5Notice tone={messageTone}>{message}</AppH5Notice> : null}
 
-      <CommandStepRail
-        steps={STEPS}
-        activeKey={activeStep}
-        onChange={setActiveStep}
+      <AppH5Tabs
+        items={stepTabs}
         ariaLabel="抽签步骤"
       />
 
-      <CommandPanel
+      <AppH5Panel
         title={activeMeta.label}
-        subtitle={`Step ${STEPS.findIndex((step) => step.key === activeStep) + 1} · ${activeMeta.desc}`}
+        summary={`Step ${STEPS.findIndex((step) => step.key === activeStep) + 1} · ${activeMeta.desc}`}
         className="lottery-step-shell"
       />
 
@@ -175,6 +178,6 @@ export default function LotteryPage() {
           下一步
         </button>
       </div>
-    </div>
+    </AppH5Surface>
   )
 }

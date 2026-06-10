@@ -38,6 +38,36 @@ const request = axios.create({
   timeout: 30000
 })
 
+function isInvalidAuthResponse(error) {
+  const status = error.response?.status
+  const message = error.response?.data?.message || error.response?.data?.error || ''
+  return status === 401 || (
+    status === 404 &&
+    typeof message === 'string' &&
+    (message.includes('用户不存在') || message.includes('令牌'))
+  )
+}
+
+function forceLocalLogout() {
+  useAuthStore.setState({
+    user: null,
+    token: null,
+    refreshToken: null,
+    isAuthenticated: false,
+    error: null,
+  })
+
+  try {
+    window.localStorage.removeItem('auth-storage')
+  } catch {
+    // ignore storage cleanup failures
+  }
+
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login'
+  }
+}
+
 // 用于 OCR 识别等长时间请求的 axios 实例（10 分钟超时）
 export const requestWithLongTimeout = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -84,9 +114,8 @@ requestWithLongTimeout.interceptors.request.use(
 requestWithLongTimeout.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
-      useAuthStore.getState().logout()
-      window.location.href = '/login'
+    if (isInvalidAuthResponse(error)) {
+      forceLocalLogout()
     }
 
     const responseData = error.response?.data
@@ -120,9 +149,8 @@ request.interceptors.request.use(
 request.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
-      useAuthStore.getState().logout()
-      window.location.href = '/login'
+    if (isInvalidAuthResponse(error)) {
+      forceLocalLogout()
     }
 
     const responseData = error.response?.data

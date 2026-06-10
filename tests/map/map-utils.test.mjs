@@ -74,9 +74,26 @@ test('GeoJSON exchange preserves Door map metadata and imports as local drafts',
       syncStatus: 'synced',
     };
 
-    const collection = geojsonExchange.buildMapFeatureCollection([node], [feature]);
+    const collection = geojsonExchange.buildMapFeatureCollection([node], [feature], {
+      exportName: '50km组 GIS 重点区',
+      source: 'gis-map',
+    });
     assert.equal(collection.features[0].properties.backendObjectId, 'remote-1');
     assert.equal(collection.features[0].properties.featureType, 'marker');
+    assert.equal(collection.properties.doorExport.kind, 'gis-map-feature-collection');
+    assert.equal(collection.properties.doorExport.export.originalBaseName, '50km组 GIS 重点区');
+    assert.equal(collection.properties.doorExport.export.filenamePolicy, 'ascii-safe');
+    assert.ok(collection.properties.doorExport.export.baseName.startsWith('50km-GIS-'));
+    assert.deepEqual(collection.properties.doorExport.export.coordinateSystem, {
+      type: 'wgs84',
+      xAxis: 'longitude',
+      yAxis: 'latitude',
+      zAxis: 'height',
+    });
+    assert.deepEqual(collection.properties.doorExport.stats, {
+      featureCount: 1,
+      nodeCount: 1,
+    });
 
     const imported = geojsonExchange.parseMapFeatureCollection(collection);
     assert.equal(imported.length, 1);

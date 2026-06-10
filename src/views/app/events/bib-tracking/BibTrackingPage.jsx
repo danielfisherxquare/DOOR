@@ -4,18 +4,17 @@ import bibTrackingApi from '../../../../api/app/bibTracking'
 import racesApi from '../../../../api/races'
 import useAuthStore from '../../../../stores/authStore'
 import {
-    CommandDataTable,
-    CommandDetailPane,
-    CommandEmptyState,
-    CommandFilterBar,
-    CommandMetricGrid,
-    CommandNotice,
-    CommandPanel,
-    CommandShell,
-    CommandStatusTag,
-    CommandToolbar,
-    ContextRequirementState,
-} from '../../../../components/command/CommandPrimitives'
+    AppH5ContextState,
+    AppH5DataTable,
+    AppH5DetailPane,
+    AppH5EmptyState,
+    AppH5FilterBar,
+    AppH5Notice,
+    AppH5Panel,
+    AppH5StatusTag,
+    AppH5Surface,
+    AppH5Toolbar,
+} from '../../../../components/app/AppH5Surface'
 import './bib-tracking-page.css'
 
 
@@ -354,34 +353,33 @@ function BibTrackingPage() {
     ]
 
     return (
-        <div className="command-page surface-admin">
-            <CommandShell
-                eyebrow="选手管理"
-                title="号码布状态"
-                summary="按赛事查看号码布状态、检索命中记录，并在同一页里追踪时间线与撤回动作。"
-                actions={(
-                    <button type="button" className="btn btn--secondary" onClick={handleRefresh} disabled={!hasValidRace || loadingData}>
-                        刷新
-                    </button>
-                )}
-            >
-                <CommandMetricGrid items={metrics} />
-            </CommandShell>
+        <AppH5Surface
+            className="bib-tracking-page"
+            eyebrow="选手管理"
+            title="号码布状态"
+            summary="按赛事查看号码布状态、检索命中记录，并在同一页里追踪时间线与撤回动作。"
+            metrics={metrics}
+            actions={(
+                <button type="button" className="btn btn--secondary" onClick={handleRefresh} disabled={!hasValidRace || loadingData}>
+                    刷新
+                </button>
+            )}
+        >
 
             {isSuperAdmin && !selectedOrgId && (
-                <CommandNotice tone="warning">
+                <AppH5Notice tone="warning">
                     未选择机构：当前可从全部可见赛事中选择目标赛事。
-                </CommandNotice>
+                </AppH5Notice>
             )}
 
             {message && (
-                <CommandNotice tone="danger">{message}</CommandNotice>
+                <AppH5Notice tone="danger">{message}</AppH5Notice>
             )}
 
-            <CommandPanel title="筛选条件" subtitle="先锁定赛事，再按状态或关键词查看号码布流转。">
-                <CommandToolbar>
+            <AppH5Panel title="筛选条件" summary="先锁定赛事，再按状态或关键词查看号码布流转。">
+                <AppH5Toolbar>
                     <form onSubmit={handleSearch} className="bib-tracking-filters">
-                        <CommandFilterBar>
+                        <AppH5FilterBar>
                             <div className="bib-tracking-field">
                                 <label className="bib-tracking-label" htmlFor="bib-race">赛事</label>
                                 <select
@@ -431,26 +429,26 @@ function BibTrackingPage() {
                                     <button type="button" className="btn btn--ghost" onClick={handleReset}>重置</button>
                                 </div>
                             </div>
-                        </CommandFilterBar>
+                        </AppH5FilterBar>
                     </form>
-                </CommandToolbar>
-            </CommandPanel>
+                </AppH5Toolbar>
+            </AppH5Panel>
 
             {!hasValidRace ? (
-                <ContextRequirementState
+                <AppH5ContextState
                     title={loadingRaces ? '正在加载赛事列表...' : '请先选择赛事'}
                     description={loadingRaces ? '控制台正在同步可查看赛事。' : (races.length === 0 ? '当前机构下没有可查看的赛事。' : '请选择一个赛事后查看号码布状态。')}
                 />
             ) : (
                 <>
-                    <CommandPanel title="号码布列表" subtitle="按状态节点、身份信息和时间线快速定位记录。">
+                    <AppH5Panel title="号码布列表" summary="按状态节点、身份信息和时间线快速定位记录。">
                         <div className="bib-tracking-list-head">
                             <div className="bib-tracking-list-meta">
                                 共 {total.toLocaleString()} 条
                             </div>
                         </div>
 
-                        <CommandDataTable className="bib-tracking-table">
+                        <AppH5DataTable className="bib-tracking-table">
                             <table className="bib-tracking-table__table">
                                 <thead>
                                     <tr>
@@ -477,7 +475,7 @@ function BibTrackingPage() {
                                     ) : items.length === 0 ? (
                                         <tr>
                                             <td colSpan={11} className="bib-tracking-table__empty">
-                                                <CommandEmptyState
+                                                <AppH5EmptyState
                                                     title="暂无符合条件的号码布记录"
                                                     description="调整赛事、状态或关键词后再试一次。"
                                                     icon="BIB"
@@ -492,7 +490,7 @@ function BibTrackingPage() {
                                                 <td>{item.phoneMasked || '-'}</td>
                                                 <td>{item.idNumberMasked || '-'}</td>
                                                 <td>
-                                                    <CommandStatusTag tone={statusTone(item.status)}>{statusLabel(item.status)}</CommandStatusTag>
+                                                    <AppH5StatusTag tone={statusTone(item.status)}>{statusLabel(item.status)}</AppH5StatusTag>
                                                 </td>
                                                 <td>{formatDateTime(item.receiptPrintedAt)}</td>
                                                 <td>{formatDateTime(item.pickedUpAt)}</td>
@@ -509,7 +507,7 @@ function BibTrackingPage() {
                                     )}
                                 </tbody>
                             </table>
-                        </CommandDataTable>
+                        </AppH5DataTable>
 
                         {total > PAGE_LIMIT && (
                             <div className="bib-tracking-pagination">
@@ -534,13 +532,13 @@ function BibTrackingPage() {
                                 </button>
                             </div>
                         )}
-                    </CommandPanel>
+                    </AppH5Panel>
                 </>
             )}
 
             {detailOpen && (
                 <div className="bib-tracking-drawer-overlay" onClick={closeDetail}>
-                    <CommandDetailPane
+                    <AppH5DetailPane
                         className="bib-tracking-drawer"
                         title={detail?.item?.bibNumber || '-'}
                         subtitle="号码布详情"
@@ -553,20 +551,20 @@ function BibTrackingPage() {
                         {loadingDetail ? <div className="bib-tracking-muted">正在加载详情...</div> : null}
 
                         {!loadingDetail && detail?.error ? (
-                            <CommandNotice tone="danger">{detail.error}</CommandNotice>
+                            <AppH5Notice tone="danger">{detail.error}</AppH5Notice>
                         ) : null}
 
                         {!loadingDetail && detail?.item ? (
                             <>
                                 {detailNotice ? (
-                                    <CommandNotice tone={detailNotice.type === 'error' ? 'danger' : 'success'}>
+                                    <AppH5Notice tone={detailNotice.type === 'error' ? 'danger' : 'success'}>
                                         {detailNotice.text}
-                                    </CommandNotice>
+                                    </AppH5Notice>
                                 ) : null}
 
                                 <div className="bib-tracking-detail-grid">
                                     <DetailField label="姓名" value={detail.item.name || '-'} />
-                                    <DetailField label="状态" value={<CommandStatusTag tone={statusTone(detail.item.status)}>{statusLabel(detail.item.status)}</CommandStatusTag>} />
+                                    <DetailField label="状态" value={<AppH5StatusTag tone={statusTone(detail.item.status)}>{statusLabel(detail.item.status)}</AppH5StatusTag>} />
                                     <DetailField label="手机号" value={detail.item.phone || '-'} />
                                     <DetailField label="证件号" value={detail.item.idNumber || '-'} />
                                     <DetailField label="出回执" value={formatDateTime(detail.item.receiptPrintedAt)} />
@@ -615,9 +613,9 @@ function BibTrackingPage() {
                                                 </div>
                                             </>
                                         ) : (
-                                            <CommandNotice tone="info">
+                                            <AppH5Notice tone="info">
                                                 当前状态不能继续撤回。
-                                            </CommandNotice>
+                                            </AppH5Notice>
                                         )}
                                     </div>
                                 </section>
@@ -653,7 +651,7 @@ function BibTrackingPage() {
                                         {(detail.timeline || []).map((entry) => (
                                             <article key={entry.status} className="bib-tracking-timeline-card">
                                                 <div className="bib-tracking-timeline-card__head">
-                                                    <CommandStatusTag tone={statusTone(entry.status)}>{entry.label}</CommandStatusTag>
+                                                    <AppH5StatusTag tone={statusTone(entry.status)}>{entry.label}</AppH5StatusTag>
                                                     <span className="bib-tracking-muted">{formatDateTime(entry.occurredAt)}</span>
                                                 </div>
                                                 <div className="bib-tracking-timeline-card__meta">
@@ -668,10 +666,10 @@ function BibTrackingPage() {
                                 </section>
                             </>
                         ) : null}
-                    </CommandDetailPane>
+                    </AppH5DetailPane>
                 </div>
             )}
-        </div>
+        </AppH5Surface>
     )
 }
 

@@ -9,6 +9,11 @@ import { normalizeStudioSnapshot } from './inventory.studio.snapshot.js';
 import { buildGlbFromBatchFile } from './inventory.spatial.export.js';
 import { buildGeometryBatchFromStudioScene } from './inventory.spatial.studio-export.js';
 import { createEmptyEditorDocument, normalizeEditorDocument } from '../../../../src/3d-studio/model/editorDocument.js';
+import {
+    EXPORT_COORDINATE_SYSTEMS,
+    buildExportManifest,
+    buildTerrainPatchDiagnostics,
+} from '../../../../src/utils/exportManifest.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -124,6 +129,7 @@ function buildFastFocusZoneStudioScene({ generatedScene, zone, project, objects 
     const terrainMesh = zone?.snapshotJson?.terrainMesh || null;
     const warnings = [];
     const bounds = inferBoundsFromZone(zone);
+    const importedAt = new Date().toISOString();
 
     const legacySolids = osmBuildings.map((building, index) => ({
         id: building?.id || building?.osmId || `osm-building-${index + 1}`,
@@ -147,6 +153,27 @@ function buildFastFocusZoneStudioScene({ generatedScene, zone, project, objects 
             compatType: 'osm-building',
         },
     }));
+    const exportManifest = buildExportManifest({
+        kind: 'focus-zone-studio-scene',
+        name: zone?.name || 'GIS 固定区域白模',
+        source: 'gis-focus-zone',
+        coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+        input: {
+            sourceWorkZoneId: zone?.id || null,
+            sourceProjectId: zone?.projectId || project?.id || null,
+            sourceObjectCount: ensureArray(objects).length,
+            originWgs84: zone?.originWgs84 || null,
+        },
+        stats: {
+            objectCount: ensureArray(objects).length,
+            osmBuildingCount: legacySolids.length,
+            terrainMeshCount: terrainMesh ? 1 : 0,
+        },
+        diagnostics: {
+            terrainPatch: buildTerrainPatchDiagnostics(zone?.snapshotJson?.terrainPatch || null),
+        },
+        generatedAt: importedAt,
+    });
 
     const editorDocument = normalizeEditorDocument({
         ...createEmptyEditorDocument(),
@@ -163,8 +190,9 @@ function buildFastFocusZoneStudioScene({ generatedScene, zone, project, objects 
             focusZoneSourceHash: generatedScene?.sourceHash || null,
             spatialObjectHash: generatedScene?.sourceHash || null,
             terrainPatchHash: zone?.snapshotJson?.terrainPatch?.sampledAt || null,
-            importedAt: new Date().toISOString(),
+            importedAt,
             originWgs84: zone?.originWgs84 || null,
+            export: exportManifest,
             warnings,
         },
     });
@@ -192,7 +220,8 @@ function buildFastFocusZoneStudioScene({ generatedScene, zone, project, objects 
             osmBuildingCount: legacySolids.length,
             osmSkippedBuildingCount: 0,
             focusZoneSourceHash: generatedScene?.sourceHash || null,
-            importedAt: new Date().toISOString(),
+            importedAt,
+            export: exportManifest,
             warnings,
         },
     };
@@ -226,6 +255,12 @@ function normalizeOutputPaths(packageRoot, absolutePath) {
 
 function buildPackageManifest({ generatedScene, project, zone, studioScene, geometryBatch, packageFiles }) {
     const osmBuildings = zone?.snapshotJson?.osmBuildings || null;
+    const createdAt = new Date().toISOString();
+    const assets = {
+        sceneJson: packageFiles.sceneJson.relativePath,
+        geometryBatchJson: packageFiles.geometryBatch.relativePath,
+        whiteModelGlb: packageFiles.whiteModelGlb.relativePath,
+    };
     return {
         sceneId: generatedScene.id,
         projectId: project.id,
@@ -233,12 +268,36 @@ function buildPackageManifest({ generatedScene, project, zone, studioScene, geom
         status: generatedScene.status,
         sourceHash: generatedScene.sourceHash,
         qualityPreset: generatedScene.qualityPreset,
-        createdAt: new Date().toISOString(),
-        assets: {
-            sceneJson: packageFiles.sceneJson.relativePath,
-            geometryBatchJson: packageFiles.geometryBatch.relativePath,
-            whiteModelGlb: packageFiles.whiteModelGlb.relativePath,
-        },
+        createdAt,
+        export: buildExportManifest({
+            kind: 'generated-scene-package',
+            name: zone?.name || project?.name || generatedScene.id,
+            source: 'gis-focus-zone',
+            coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+            input: {
+                sceneId: generatedScene.id,
+                sourceWorkZoneId: zone?.id || null,
+                sourceProjectId: project?.id || null,
+                sourceHash: generatedScene.sourceHash || null,
+            },
+            stats: {
+                objectCount: geometryBatch?.stats?.objectCount || 0,
+                meshCount: geometryBatch?.stats?.meshCount || 0,
+                totalVertices: geometryBatch?.stats?.totalVertices || 0,
+                totalTriangles: geometryBatch?.stats?.totalTriangles || 0,
+            },
+            diagnostics: {
+                osm: osmBuildings?.diagnostics || null,
+                studioWarnings: studioScene?.metadata?.warnings || [],
+                geometry: geometryBatch?.metadata?.preflight || null,
+            },
+            resources: Object.entries(assets).map(([id, pathValue]) => ({
+                id,
+                path: pathValue,
+            })),
+            generatedAt: createdAt,
+        }),
+        assets,
         stats: {
             objectCount: geometryBatch?.stats?.objectCount || 0,
             meshCount: geometryBatch?.stats?.meshCount || 0,

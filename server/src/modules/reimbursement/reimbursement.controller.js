@@ -9,9 +9,10 @@ import fs from 'fs';
 import path from 'path';
 import { processInvoice, processPayment } from './ocr.service.js';
 import * as service from './reimbursement.service.js';
+import { generateExportWorkbook } from './preview.service.js';
 import knex from '../../db/knex.js';
-import ExcelJS from 'exceljs';
 import { env } from '../../config/env.js';
+import { attachOcrReview } from './ocr.review.js';
 
 // 配置文件上传
 const upload = multer({
@@ -47,6 +48,17 @@ function getServerLlmConfig() {
   };
 }
 
+function buildPaymentReviewRecordData(paymentData = {}) {
+  const rawExpense = paymentData.amount ?? paymentData.expense ?? null;
+  return {
+    payment_date: paymentData.date || paymentData.payment_date || null,
+    category: paymentData.category || null,
+    sub_category: paymentData.subCategory || paymentData.sub_category || null,
+    expense: rawExpense != null ? Math.abs(Number(rawExpense) || 0) || null : null,
+    company: paymentData.payee || paymentData.targetName || paymentData.company || null,
+  };
+}
+
 function mergeNonEmptyConfig(...configs) {
   const merged = {};
 
@@ -69,6 +81,16 @@ function mergeNonEmptyConfig(...configs) {
   }
 
   return merged;
+}
+
+function getServerOcrOverrideConfig() {
+  const serverConfig = getServerLlmConfig();
+
+  if (!serverConfig.apiKey) {
+    return null;
+  }
+
+  return serverConfig;
 }
 
 function readRequestConfig(req) {
@@ -94,12 +116,13 @@ function readRequestConfig(req) {
 export async function resolveOcrConfig(req) {
   const userId = req.user?.userId || req.authContext?.userId;
   const settings = userId ? await service.getUserSettings(userId) : null;
+  const requestConfig = readRequestConfig(req);
 
   return mergeNonEmptyConfig(
     DEFAULT_LLM_CONFIG,
-    getServerLlmConfig(),
     settings?.llm_config,
-    readRequestConfig(req),
+    requestConfig,
+    getServerOcrOverrideConfig(),
   );
 }
 
@@ -134,19 +157,24 @@ export function normalizeOcrError(error, label) {
 function toSettingsResponse(settings) {
   const userConfig = settings?.llm_config || {};
   const serverConfig = getServerLlmConfig();
+  const hasServerLlmConfig = Boolean(serverConfig.apiKey && serverConfig.baseUrl);
+
+  // 用户在前端配置的 apiKey 优先展示，不再被服务端配置强制覆盖
+  // 这样用户可以自行选择使用服务端默认模型或自定义模型（如硅基流动）
+  const hasUserApiKey = Boolean(userConfig.apiKey?.trim());
   const mergedConfig = {
     ...DEFAULT_LLM_CONFIG,
-    provider: userConfig.provider || serverConfig.provider || DEFAULT_LLM_CONFIG.provider,
-    baseUrl: userConfig.baseUrl || serverConfig.baseUrl || DEFAULT_LLM_CONFIG.baseUrl,
-    apiKey: userConfig.apiKey || '',
-    modelName: userConfig.modelName || serverConfig.modelName || DEFAULT_LLM_CONFIG.modelName,
+    provider: hasUserApiKey ? (userConfig.provider || DEFAULT_LLM_CONFIG.provider) : (hasServerLlmConfig ? serverConfig.provider : (userConfig.provider || DEFAULT_LLM_CONFIG.provider)),
+    baseUrl: hasUserApiKey ? (userConfig.baseUrl || DEFAULT_LLM_CONFIG.baseUrl) : (hasServerLlmConfig ? serverConfig.baseUrl : (userConfig.baseUrl || serverConfig.baseUrl || DEFAULT_LLM_CONFIG.baseUrl)),
+    apiKey: hasUserApiKey ? userConfig.apiKey : (hasServerLlmConfig ? '' : (userConfig.apiKey || '')),
+    modelName: hasUserApiKey ? (userConfig.modelName || DEFAULT_LLM_CONFIG.modelName) : (hasServerLlmConfig ? serverConfig.modelName : (userConfig.modelName || serverConfig.modelName || DEFAULT_LLM_CONFIG.modelName)),
   };
 
   return {
     defaultReporter: settings?.default_reporter || '',
     watchDirectoryPath: settings?.watch_directory_path || '',
     llmConfig: mergedConfig,
-    hasServerLlmConfig: Boolean(serverConfig.apiKey && serverConfig.baseUrl),
+    hasServerLlmConfig,
   };
 }
 
@@ -205,13 +233,18 @@ export async function ocrInvoice(req, res, next) {
       filename: req.file.originalname,
       config,
     });
+    const reviewedOcrMeta = attachOcrReview(result.meta, 'invoice', service.buildInvoiceRecordData(result.data));
+    const reviewedResult = { ...result, meta: reviewedOcrMeta };
 
     // 更新处理状态为完成
     if (processingRecord) {
-      await service.updateProcessingStatus(processingRecord.id, 'completed');
+      await service.updateProcessingStatus(processingRecord.id, 'completed', {
+        ocrResult: result.data,
+        ocrMeta: reviewedOcrMeta,
+      });
     }
 
-    res.json(result);
+    res.json(reviewedResult);
   } catch (error) {
     console.error('OCR Invoice Error:', error);
 
@@ -279,10 +312,15 @@ export async function ocrPayment(req, res, next) {
       filename: req.file.originalname,
       config,
     });
+    const reviewedOcrMeta = attachOcrReview(result.meta, 'payment', buildPaymentReviewRecordData(result.data));
+    const reviewedResult = { ...result, meta: reviewedOcrMeta };
 
     // 更新处理状态为完成
     if (processingRecord) {
-      await service.updateProcessingStatus(processingRecord.id, 'completed');
+      await service.updateProcessingStatus(processingRecord.id, 'completed', {
+        ocrResult: result.data,
+        ocrMeta: reviewedOcrMeta,
+      });
     }
 
     if (processingRecord && result.success && result.data) {
@@ -307,6 +345,7 @@ export async function ocrPayment(req, res, next) {
           mimeType: req.file.mimetype || 'application/octet-stream',
           fileSize: req.file.size,
         });
+        await service.mergePaymentOcrMetaIntoRecord(candidates[0].id, reviewedOcrMeta);
         // 自动匹配成功
         matchResult = {
           autoMatched: true,
@@ -318,6 +357,7 @@ export async function ocrPayment(req, res, next) {
         const pendingMatch = await service.createPendingMatch(projectId, userId, {
           paymentData: {
             ...result.data,
+            ocrMeta: reviewedOcrMeta,
             processedFileId: processingRecord?.id,
             fileName: req.file.originalname,
             originalName: req.file.originalname,
@@ -332,7 +372,9 @@ export async function ocrPayment(req, res, next) {
           candidateCount: candidates.length,
         };
       } else {
-        const record = await service.createStandalonePaymentRecord(projectId, userId, result.data);
+        const record = await service.createStandalonePaymentRecord(projectId, userId, result.data, {
+          ocrMeta: reviewedOcrMeta,
+        });
         await service.attachProcessedPayment(record.id, {
           processedFileId: processingRecord?.id,
           fileName: req.file.originalname,
@@ -349,7 +391,7 @@ export async function ocrPayment(req, res, next) {
     }
 
     res.json({
-      ...result,
+      ...reviewedResult,
       matchResult,
       recordId: matchResult?.recordId || null,
     });
@@ -659,84 +701,7 @@ export async function exportExcel(req, res, next) {
   try {
     const { projectId } = req.body;
     const project = await service.getProjectById(projectId);
-    const rawRecords = await service.getProjectRecords(projectId);
-
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('报销明细');
-
-    // 设置列
-    worksheet.columns = [
-      { header: '序号', key: 'index', width: 8 },
-      { header: '日期', key: 'payment_date', width: 12 },
-      { header: '大类', key: 'category', width: 12 },
-      { header: '子类', key: 'sub_category', width: 12 },
-      { header: '摘要', key: 'description', width: 30 },
-      { header: '收入', key: 'income', width: 12 },
-      { header: '支出', key: 'expense', width: 12 },
-      { header: '报销人', key: 'reporter', width: 10 },
-      { header: '发票', key: 'has_invoice', width: 8 },
-      { header: '开票公司', key: 'company', width: 20 },
-      { header: '备注', key: 'remarks', width: 20 },
-    ];
-
-    // 添加数据行并计算合计
-    let totalIncome = 0;
-    let totalExpense = 0;
-
-    for (const record of rawRecords) {
-      // 确保数值类型正确
-      const income = Number(record.income) || 0;
-      const expense = Number(record.expense) || 0;
-      totalIncome += income;
-      totalExpense += expense;
-
-      worksheet.addRow({
-        index: record.index,
-        payment_date: record.payment_date || '',
-        category: record.category || '',
-        sub_category: record.sub_category || '',
-        description: record.description || '',
-        income: income > 0 ? income : '',
-        expense: expense > 0 ? expense : '',
-        reporter: record.reporter || '',
-        has_invoice: record.has_invoice ? '是' : '否',
-        company: record.company || '',
-        remarks: record.remarks || '',
-      });
-    }
-
-    // 添加空行和合计行
-    worksheet.addRow({});
-    const summaryRow = worksheet.addRow({
-      index: '合计',
-      payment_date: '',
-      category: '',
-      sub_category: '',
-      description: '',
-      income: totalIncome,
-      expense: totalExpense,
-      reporter: '',
-      has_invoice: '',
-      company: '',
-      remarks: '',
-    });
-    // 为合计行添加样式
-    summaryRow.eachCell((cell, colNumber) => {
-      if (colNumber === 1) {
-        cell.font = { bold: true };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDEDED' } };
-      } else if (colNumber === 6 || colNumber === 7) {
-        cell.numFmt = '¥#,##0.00';
-        cell.font = { bold: true };
-        cell.alignment = { horizontal: 'right' };
-      }
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' },
-      };
-    });
+    const excelBuffer = await generateExportWorkbook(projectId);
 
     // 设置响应头
     const fileName = `${project?.name || '报销单'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
@@ -749,8 +714,7 @@ export async function exportExcel(req, res, next) {
       `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`
     );
 
-    await workbook.xlsx.write(res);
-    res.end();
+    res.end(excelBuffer);
   } catch (error) {
     next(error);
   }
@@ -816,52 +780,7 @@ export async function exportProjectExcel(req, res, next) {
       return res.status(404).json({ error: '项目不存在' });
     }
 
-    const records = await service.getProjectRecords(projectId);
-
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('报销明细');
-
-    // 设置列
-    worksheet.columns = [
-      { header: '序号', key: 'index', width: 8 },
-      { header: '日期', key: 'payment_date', width: 12 },
-      { header: '大类', key: 'category', width: 12 },
-      { header: '子类', key: 'sub_category', width: 12 },
-      { header: '摘要', key: 'description', width: 30 },
-      { header: '收入', key: 'income', width: 12 },
-      { header: '支出', key: 'expense', width: 12 },
-      { header: '报销人', key: 'reporter', width: 10 },
-      { header: '发票', key: 'has_invoice', width: 8 },
-      { header: '开票公司', key: 'company', width: 20 },
-      { header: '备注', key: 'remarks', width: 20 },
-    ];
-
-    // 添加数据行
-    for (const record of records) {
-      worksheet.addRow({
-        index: record.index,
-        payment_date: record.payment_date || '',
-        category: record.category || '',
-        sub_category: record.sub_category || '',
-        description: record.description || '',
-        income: record.income || '',
-        expense: record.expense || '',
-        reporter: record.reporter || '',
-        has_invoice: record.has_invoice ? '是' : '否',
-        company: record.company || '',
-        remarks: record.remarks || '',
-      });
-    }
-
-    // 添加合计行
-    const totalIncome = records.reduce((sum, r) => sum + (r.income || 0), 0);
-    const totalExpense = records.reduce((sum, r) => sum + (r.expense || 0), 0);
-    worksheet.addRow({});
-    worksheet.addRow({
-      index: '合计',
-      income: totalIncome,
-      expense: totalExpense,
-    });
+    const excelBuffer = await generateExportWorkbook(projectId);
 
     // 设置响应头
     const fileName = `${project?.name || '报销单'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
@@ -874,8 +793,7 @@ export async function exportProjectExcel(req, res, next) {
       `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`
     );
 
-    await workbook.xlsx.write(res);
-    res.end();
+    res.end(excelBuffer);
   } catch (error) {
     next(error);
   }

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import auditApi from '../../../../api/audit'
 import {
-  CommandEmptyState,
-  CommandNotice,
-  CommandPanel,
-  CommandStatusTag,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5EmptyState,
+  AppH5Notice,
+  AppH5Panel,
+  AppH5StatusTag,
+} from '../../../../components/app/AppH5Surface'
 
 const PIPELINE_STEPS = [
   {
@@ -142,12 +142,12 @@ export default function AuditPipelinePanel({ raceId, raceDate, onDataChanged }) 
 
   return (
     <div className="processing-stack">
-      <CommandNotice tone="info">
+      <AppH5Notice tone="info">
         建议先在"黑/白名单处理"Tab 完成名单导入和匹配后，再启动清洗流水线，以避免第 2 步黑名单碰撞覆盖之前的手动标记。
-      </CommandNotice>
-      {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
+      </AppH5Notice>
+      {message ? <AppH5Notice tone={messageTone}>{message}</AppH5Notice> : null}
 
-      <CommandPanel
+      <AppH5Panel
         title="按项目统计"
         subtitle="统计直接基于后端返回的 byEvent + total 结构渲染，不再使用旧抽签页的伪字段。"
         actions={(
@@ -160,7 +160,7 @@ export default function AuditPipelinePanel({ raceId, raceDate, onDataChanged }) 
         footer={<div className="processing-footnote">当前赛事总报名人数：{stats?.total || 0}</div>}
       >
         {eventEntries.length === 0 ? (
-          <CommandEmptyState
+          <AppH5EmptyState
             icon="STAT"
             title="暂无项目统计"
             description="当前赛事还没有可用于清洗流水线的记录数据。"
@@ -171,7 +171,7 @@ export default function AuditPipelinePanel({ raceId, raceDate, onDataChanged }) 
               <article key={eventName} className="pipeline-event-card">
                 <div className="pipeline-event-title-row">
                   <strong>{eventName}</strong>
-                  <CommandStatusTag tone="neutral">{eventStats.subtotal || 0} 人</CommandStatusTag>
+                  <AppH5StatusTag tone="neutral">{eventStats.subtotal || 0} 人</AppH5StatusTag>
                 </div>
                 <div className="pipeline-event-stats">
                   <span>参与抽签 {eventStats.participate || 0}</span>
@@ -183,9 +183,9 @@ export default function AuditPipelinePanel({ raceId, raceDate, onDataChanged }) 
             ))}
           </div>
         )}
-      </CommandPanel>
+      </AppH5Panel>
 
-      <CommandPanel
+      <AppH5Panel
         title="清洗流水线"
         subtitle="开始流水线会先重置审核状态；每一步执行后都需要显式确认，才能进入下一步。"
         actions={(
@@ -208,19 +208,19 @@ export default function AuditPipelinePanel({ raceId, raceDate, onDataChanged }) 
             const isRunning = runningStepKey === step.key
 
             return (
-              <section
+              <AppH5Panel
                 key={step.key}
-                className={`command-panel pipeline-step-panel ${isCurrent ? 'pipeline-step-panel--current' : ''}`}
+                className={`pipeline-step-panel ${isCurrent ? 'pipeline-step-panel--current' : ''}`}
               >
-                <div className="command-panel__body">
+                <>
                   <div className="pipeline-step-meta">
                     <div>
                       <strong>{`${index + 1}. ${step.label}`}</strong>
                       <p>{step.description}</p>
                     </div>
-                    <CommandStatusTag tone={isDone ? 'success' : isCurrent ? 'warning' : 'neutral'}>
+                    <AppH5StatusTag tone={isDone ? 'success' : isCurrent ? 'warning' : 'neutral'}>
                       {isDone ? '已完成' : isCurrent ? '进行中' : currentStepIndex === -1 ? '未开始' : isLocked ? '等待前一步确认' : '待执行'}
-                    </CommandStatusTag>
+                    </AppH5StatusTag>
                   </div>
 
                   <div className="processing-help">{step.hint}</div>
@@ -248,8 +248,8 @@ export default function AuditPipelinePanel({ raceId, raceDate, onDataChanged }) 
                       {index === PIPELINE_STEPS.length - 1 ? '确认完成' : '确认进入下一步'}
                     </button>
                   </div>
-                </div>
-              </section>
+                </>
+              </AppH5Panel>
             )
           })}
         </div>
@@ -259,7 +259,7 @@ export default function AuditPipelinePanel({ raceId, raceDate, onDataChanged }) 
             五步二次清洗已全部完成。你可以返回“数据总览”核对结果，或再次点击“重置全部”重新开始。
           </div>
         ) : null}
-      </CommandPanel>
+      </AppH5Panel>
     </div>
   )
 }

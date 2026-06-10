@@ -11,12 +11,18 @@ import { execFile } from 'child_process';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import sharp from 'sharp';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 
 const MAX_PDF_RENDER_PAGES = 5;
 const PDF_RENDER_SCALE = 200 / 72;
 const JPEG_MIME_TYPE = 'image/jpeg';
+const VISION_MAX_IMAGE_EDGE = 1800;
+const VISION_JPEG_QUALITY = 82;
+const OCR_MAX_COMPLETION_TOKENS = 700;
+const PAYMENT_OCR_MAX_COMPLETION_TOKENS = 260;
+const RAILWAY_OCR_MAX_COMPLETION_TOKENS = 420;
 const execFileAsync = promisify(execFile);
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const PYTHON_PDF_RENDER_SCRIPT = path.resolve(currentDir, '../../..', 'scripts', 'render_pdf_pages.py');
@@ -58,6 +64,11 @@ export const pickFirstAmount = (...values) => {
 
 const isPdfUpload = ({ mimeType, filename }) =>
     mimeType === 'application/pdf' || String(filename || '').toLowerCase().endsWith('.pdf');
+
+const looksRailwayUpload = (filename) => {
+    const text = String(filename || '').toLowerCase();
+    return /铁路|高铁|火车|客票|动车|train|railway|ticket/.test(text);
+};
 
 const getPdfRenderPageNumbers = (numPages, maxPages = MAX_PDF_RENDER_PAGES) => {
     if (!Number.isInteger(numPages) || numPages <= 0) {
@@ -229,12 +240,13 @@ export function resolveInvoiceAmounts(raw) {
     const amount = taxInclusiveAmount
         ?? (lineAmount != null && taxAmount != null ? roundCurrency(lineAmount + taxAmount) : lineAmount);
 
+    // 所有金额取绝对值，确保存储为正数
     return {
-        amount,
-        unitPrice,
+        amount: amount != null ? Math.abs(amount) : null,
+        unitPrice: unitPrice != null ? Math.abs(unitPrice) : null,
         quantity,
-        taxAmount,
-        lineAmount,
+        taxAmount: taxAmount != null ? Math.abs(taxAmount) : null,
+        lineAmount: lineAmount != null ? Math.abs(lineAmount) : null,
     };
 }
 
@@ -247,6 +259,7 @@ Important rules:
 - For standard Chinese mainland VAT/electronic invoices, "amount" must be the tax-inclusive total from "价税合计(小写)". Never use the line-item "单价" or "金额" column as the reimbursement amount when a tax-inclusive total is present.
 - If both line amount and tax amount are visible, prefer their tax-inclusive total. If "价税合计(小写)" is visible, it has the highest priority.
 - Prefer the true reimbursement amount field. For railway e-ticket invoices, amount should come from "票价", "票价合计", or the fare area, not from invoice code numbers.
+- ALL numeric amounts (amount, unitPrice, lineAmount, taxAmount) MUST be positive numbers. Never return negative values. If the invoice shows a credit note or negative amount, still return the absolute value as a positive number.
 - For railway e-ticket invoices, the useful reimbursement date is usually the travel date shown in the ticket body. Do not prefer the top-right issue date when the travel date is available.
 - If the invoice title or body indicates "电子发票（铁路电子客票）", "铁路电子客票", "火车票", or similar railway ticket wording, set "subCategory" to "高铁费".
 - For railway e-ticket invoices, focus on these key fields:
@@ -260,7 +273,7 @@ Important rules:
 
 Return JSON only:
 {
-  "amount": "number, for common mainland invoices this must be 价税合计(小写)",
+  "amount": "number (always positive), for common mainland invoices this must be 价税合计(小写)",
   "date": "string",
   "invoiceNumber": "string, 发票号码，通常在发票右上角，纸质发票8位数字，数电发票20位数字",
   "invoiceCode": "string or null, 发票代码，通常在发票号码上方，10-12位数字。数电发票可能没有此字段",
@@ -268,9 +281,9 @@ Return JSON only:
   "details": "string",
   "subCategory": "must choose the best fit from: 备用金收入、打车费、高速费、高铁费、机票费、停车费、加油费、租车费、托运费、餐费、住宿费、保险费、物资采购费、快递费、劳务费、印刷费、租赁费、运输费、备用金支出、其他费用",
   "category": "string",
-  "unitPrice": "number or null, only from the line-item 单价 column, never copied from 价税合计",
-  "lineAmount": "number or null, optional line-item amount before tax",
-  "taxAmount": "number or null, optional tax amount",
+  "unitPrice": "number or null (always positive), only from the line-item 单价 column, never copied from 价税合计",
+  "lineAmount": "number or null (always positive), optional line-item amount before tax",
+  "taxAmount": "number or null (always positive), optional tax amount",
   "unit": "string or null",
   "quantity": "number or null",
   "targetName": "same as buyer when useful for matching"
@@ -280,7 +293,7 @@ const RAILWAY_INVOICE_PROMPT = `You are reading one railway e-ticket invoice ses
 Extract the reimbursement-critical fields and return ONE JSON object only.
 
 Focus on these fields:
-- "amount": extract the fare from "票价" or the fare amount area. Return number only.
+- "amount": extract the fare from "票价" or the fare amount area. Return a positive number only. Never return negative values.
 - "date": extract the travel date in the ticket body, such as "2026年03月01日". Use this instead of the issue date when both exist.
 - "buyer": extract the purchaser company or buyer name, including "购买方名称" if present.
 - "details": combine route + train number + seat class, such as "江油-成都东 C6315 一等座".
@@ -305,6 +318,8 @@ Return pure JSON only:
 
 const PAYMENT_PROMPT_V2 = `You are reading one payment proof session. The request may contain 1 to 5 images.
 All images belong to the same payment proof. Combine information across all images and return ONE JSON object only.
+
+Important: "amount" MUST be a positive number. Never return negative values.
 
 Return JSON only:
 {
@@ -430,6 +445,9 @@ const shouldRetryInvoiceExtraction = (data) => {
     return amount == null || !date || !buyer || !details;
 };
 
+const shouldRetryWithRailwayPrompt = (data, filename) =>
+    shouldRetryInvoiceExtraction(data) && (isRailwayLike(data) || looksRailwayUpload(filename));
+
 const normalizePaymentData = (raw) => ({
     ...raw,
     amount: pickFirstAmount(raw.amount, raw.totalAmount, raw.paymentAmount) ?? raw.amount ?? null,
@@ -439,10 +457,128 @@ const normalizePaymentData = (raw) => ({
     targetName: pickFirstString(raw.targetName, raw.payee, raw.receiver, raw.merchant),
 });
 
-const toImageBase64Urls = (imageBuffers) =>
-    imageBuffers.map((buffer) => `data:${JPEG_MIME_TYPE};base64,${buffer.toString('base64')}`);
+const summarizeImageOptimization = (items = []) => {
+    const normalizedItems = items.filter(Boolean);
+    const summary = normalizedItems.reduce((acc, item) => {
+        acc.imageCount += 1;
+        acc.originalBytes += Number(item.originalBytes) || 0;
+        acc.optimizedBytes += Number(item.optimizedBytes) || 0;
+        return acc;
+    }, {
+        imageCount: 0,
+        originalBytes: 0,
+        optimizedBytes: 0,
+    });
+
+    summary.savedBytes = Math.max(0, summary.originalBytes - summary.optimizedBytes);
+    summary.savedRatio = summary.originalBytes > 0
+        ? Math.round((summary.savedBytes / summary.originalBytes) * 10000) / 10000
+        : 0;
+
+    return summary;
+};
+
+const normalizeImageForVision = async (buffer, mimeType = JPEG_MIME_TYPE) => {
+    try {
+        const optimized = await sharp(buffer, { failOn: 'none' })
+            .rotate()
+            .resize({
+                width: VISION_MAX_IMAGE_EDGE,
+                height: VISION_MAX_IMAGE_EDGE,
+                fit: 'inside',
+                withoutEnlargement: true,
+            })
+            .jpeg({
+                quality: VISION_JPEG_QUALITY,
+                mozjpeg: true,
+            })
+            .toBuffer();
+
+        return {
+            buffer: optimized,
+            mimeType: JPEG_MIME_TYPE,
+            optimization: {
+                originalBytes: buffer.length,
+                optimizedBytes: optimized.length,
+                savedBytes: Math.max(0, buffer.length - optimized.length),
+                originalMimeType: mimeType || JPEG_MIME_TYPE,
+                optimizedMimeType: JPEG_MIME_TYPE,
+            },
+        };
+    } catch (error) {
+        console.warn('[reimbursement] image optimization failed, using original upload:', error instanceof Error ? error.message : error);
+        return {
+            buffer,
+            mimeType: mimeType || JPEG_MIME_TYPE,
+            optimization: {
+                originalBytes: buffer.length,
+                optimizedBytes: buffer.length,
+                savedBytes: 0,
+                originalMimeType: mimeType || JPEG_MIME_TYPE,
+                optimizedMimeType: mimeType || JPEG_MIME_TYPE,
+            },
+        };
+    }
+};
+
+const toVisionImageInput = async (buffer, mimeType = JPEG_MIME_TYPE) => {
+    const image = await normalizeImageForVision(buffer, mimeType);
+    return {
+        url: `data:${image.mimeType};base64,${image.buffer.toString('base64')}`,
+        optimization: image.optimization,
+    };
+};
+
+const toVisionImageInputs = async (imageBuffers) =>
+    Promise.all(imageBuffers.map((buffer) => toVisionImageInput(buffer, JPEG_MIME_TYPE)));
 
 // ==================== LLM调用 ====================
+
+const toNonNegativeInteger = (value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric >= 0 ? Math.round(numeric) : undefined;
+};
+
+const normalizeUsage = (usage = {}) => {
+    const promptTokens = toNonNegativeInteger(
+        usage.prompt_tokens ?? usage.promptTokens ?? usage.input_tokens ?? usage.inputTokens
+    );
+    const completionTokens = toNonNegativeInteger(
+        usage.completion_tokens ?? usage.completionTokens ?? usage.output_tokens ?? usage.outputTokens
+    );
+    const totalTokens = toNonNegativeInteger(
+        usage.total_tokens ?? usage.totalTokens ?? usage.total
+    ) ?? (promptTokens != null && completionTokens != null ? promptTokens + completionTokens : undefined);
+
+    return {
+        ...(promptTokens != null ? { promptTokens } : {}),
+        ...(completionTokens != null ? { completionTokens } : {}),
+        ...(totalTokens != null ? { totalTokens } : {}),
+    };
+};
+
+const sumUsage = (calls) => calls.reduce((acc, call) => {
+    const usage = call?.usage || {};
+    for (const key of ['promptTokens', 'completionTokens', 'totalTokens']) {
+        if (usage[key] == null) continue;
+        acc[key] = (acc[key] || 0) + Number(usage[key]);
+    }
+    return acc;
+}, {});
+
+const buildOcrMeta = (calls) => {
+    const normalizedCalls = calls.filter(Boolean);
+    const imageOptimization = summarizeImageOptimization(
+        normalizedCalls.map((call) => call.imageOptimization).filter(Boolean)
+    );
+    return {
+        modelCallCount: normalizedCalls.length,
+        durationMs: normalizedCalls.reduce((sum, call) => sum + (Number(call.durationMs) || 0), 0),
+        usage: sumUsage(normalizedCalls),
+        ...(imageOptimization.imageCount > 0 ? { imageOptimization } : {}),
+        calls: normalizedCalls,
+    };
+};
 
 const createOcrError = (message, status = 502, extra = {}) => {
     const error = new Error(message);
@@ -488,14 +624,27 @@ const parseJsonOutput = (text) => {
     }
 };
 
-const callVisionLLM = async (config, prompt, imageBase64Urls) => {
+const callVisionLLM = async (
+    config,
+    prompt,
+    imageInputs,
+    callType = 'vision',
+    maxCompletionTokens = OCR_MAX_COMPLETION_TOKENS
+) => {
+    const startedAt = Date.now();
+    const normalizedImageInputs = imageInputs.map((input) => (
+        typeof input === 'string' ? { url: input, optimization: null } : input
+    ));
     const contentPayload = [
-        { type: 'text', text: `${prompt}\nPage count: ${imageBase64Urls.length}. Images are ordered from page 1 to page ${imageBase64Urls.length}.` }
+        { type: 'text', text: `${prompt}\nPage count: ${normalizedImageInputs.length}. Images are ordered from page 1 to page ${normalizedImageInputs.length}.` }
     ];
-    imageBase64Urls.forEach((url, index) => {
+    normalizedImageInputs.forEach((image, index) => {
         contentPayload.push({ type: 'text', text: `Page ${index + 1}` });
-        contentPayload.push({ type: 'image_url', image_url: { url } });
+        contentPayload.push({ type: 'image_url', image_url: { url: image.url } });
     });
+    const imageOptimization = summarizeImageOptimization(
+        normalizedImageInputs.map((image) => image.optimization).filter(Boolean)
+    );
 
     const payload = {
         model: config.modelName || 'qwen3.5-plus',
@@ -506,6 +655,7 @@ const callVisionLLM = async (config, prompt, imageBase64Urls) => {
             },
         ],
         temperature: 0.1,
+        max_tokens: maxCompletionTokens,
     };
 
     const apiUrl = `${config.baseUrl.replace(/\/+$/, '')}/chat/completions`;
@@ -518,8 +668,25 @@ const callVisionLLM = async (config, prompt, imageBase64Urls) => {
             timeout: 600000,
         });
 
-        const text = response.data?.choices?.[0]?.message?.content || '';
-        return parseJsonOutput(text);
+        const durationMs = Date.now() - startedAt;
+        const message = response.data?.choices?.[0]?.message;
+        // 推理模型（如 Qwen3.6-27B、DeepSeek-R1）将思考过程放在 reasoning_content，
+        // 而最终回答在 content。当 content 为空时，尝试从 reasoning_content 中提取 JSON。
+        let text = message?.content || '';
+        if (!text.trim() && message?.reasoning_content) {
+            text = message.reasoning_content;
+        }
+        return {
+            data: parseJsonOutput(text),
+            meta: {
+                callType,
+                model: response.data?.model || config.modelName || 'qwen3.5-plus',
+                imageCount: normalizedImageInputs.length,
+                durationMs,
+                usage: normalizeUsage(response.data?.usage),
+                ...(imageOptimization.imageCount > 0 ? { imageOptimization } : {}),
+            },
+        };
     } catch (error) {
         if (error?.status && error?.expose) {
             throw error;
@@ -569,25 +736,34 @@ const callVisionLLM = async (config, prompt, imageBase64Urls) => {
  * @param {Object} params.config - LLM配置 { baseUrl, apiKey, modelName, provider }
  * @returns {Promise<Object>}
  */
-export async function processInvoice({ fileBuffer, mimeType, config }) {
-    if (isPdfUpload({ mimeType })) {
+export async function processInvoice({ fileBuffer, mimeType, filename, config }) {
+    if (isPdfUpload({ mimeType, filename })) {
         const imageBuffers = await renderPdfToImageBuffers(fileBuffer);
-        return processMultiPageInvoice({ imageBuffers, config });
+        return processMultiPageInvoice({ imageBuffers, config, filename });
     }
 
-    const base64 = fileBuffer.toString('base64');
-    const imageUrl = `data:${mimeType};base64,${base64}`;
+    const imageInput = await toVisionImageInput(fileBuffer, mimeType);
 
     // 第一轮：通用发票Prompt
-    const firstPass = normalizeInvoiceData(await callVisionLLM(config, INVOICE_PROMPT_V2, [imageUrl]));
+    const firstCall = await callVisionLLM(config, INVOICE_PROMPT_V2, [imageInput], 'invoice_general');
+    const firstPass = normalizeInvoiceData(firstCall.data);
+    const calls = [firstCall.meta];
 
     // 如果数据不完整，使用铁路专用Prompt重试
-    if (shouldRetryInvoiceExtraction(firstPass)) {
-        const secondPass = normalizeInvoiceData(await callVisionLLM(config, RAILWAY_INVOICE_PROMPT, [imageUrl]));
-        return { success: true, data: mergeInvoiceData(firstPass, secondPass) };
+    if (shouldRetryWithRailwayPrompt(firstPass, filename)) {
+        const secondCall = await callVisionLLM(
+            config,
+            RAILWAY_INVOICE_PROMPT,
+            [imageInput],
+            'invoice_railway_retry',
+            RAILWAY_OCR_MAX_COMPLETION_TOKENS
+        );
+        const secondPass = normalizeInvoiceData(secondCall.data);
+        calls.push(secondCall.meta);
+        return { success: true, data: mergeInvoiceData(firstPass, secondPass), meta: buildOcrMeta(calls) };
     }
 
-    return { success: true, data: firstPass };
+    return { success: true, data: firstPass, meta: buildOcrMeta(calls) };
 }
 
 /**
@@ -598,17 +774,23 @@ export async function processInvoice({ fileBuffer, mimeType, config }) {
  * @param {Object} params.config - LLM配置
  * @returns {Promise<Object>}
  */
-export async function processPayment({ fileBuffer, mimeType, config }) {
-    if (isPdfUpload({ mimeType })) {
+export async function processPayment({ fileBuffer, mimeType, filename, config }) {
+    if (isPdfUpload({ mimeType, filename })) {
         const imageBuffers = await renderPdfToImageBuffers(fileBuffer);
         return processMultiPagePayment({ imageBuffers, config });
     }
 
-    const base64 = fileBuffer.toString('base64');
-    const imageUrl = `data:${mimeType};base64,${base64}`;
+    const imageInput = await toVisionImageInput(fileBuffer, mimeType);
 
-    const data = normalizePaymentData(await callVisionLLM(config, PAYMENT_PROMPT_V2, [imageUrl]));
-    return { success: true, data };
+    const call = await callVisionLLM(
+        config,
+        PAYMENT_PROMPT_V2,
+        [imageInput],
+        'payment',
+        PAYMENT_OCR_MAX_COMPLETION_TOKENS
+    );
+    const data = normalizePaymentData(call.data);
+    return { success: true, data, meta: buildOcrMeta([call.meta]) };
 }
 
 /**
@@ -618,17 +800,27 @@ export async function processPayment({ fileBuffer, mimeType, config }) {
  * @param {Object} params.config - LLM配置
  * @returns {Promise<Object>}
  */
-export async function processMultiPageInvoice({ imageBuffers, config }) {
-    const imageBase64Urls = toImageBase64Urls(imageBuffers);
+export async function processMultiPageInvoice({ imageBuffers, config, filename }) {
+    const imageInputs = await toVisionImageInputs(imageBuffers);
 
-    const firstPass = normalizeInvoiceData(await callVisionLLM(config, INVOICE_PROMPT_V2, imageBase64Urls));
+    const firstCall = await callVisionLLM(config, INVOICE_PROMPT_V2, imageInputs, 'invoice_general');
+    const firstPass = normalizeInvoiceData(firstCall.data);
+    const calls = [firstCall.meta];
 
-    if (shouldRetryInvoiceExtraction(firstPass)) {
-        const secondPass = normalizeInvoiceData(await callVisionLLM(config, RAILWAY_INVOICE_PROMPT, imageBase64Urls));
-        return { success: true, data: mergeInvoiceData(firstPass, secondPass) };
+    if (shouldRetryWithRailwayPrompt(firstPass, filename)) {
+        const secondCall = await callVisionLLM(
+            config,
+            RAILWAY_INVOICE_PROMPT,
+            imageInputs,
+            'invoice_railway_retry',
+            RAILWAY_OCR_MAX_COMPLETION_TOKENS
+        );
+        const secondPass = normalizeInvoiceData(secondCall.data);
+        calls.push(secondCall.meta);
+        return { success: true, data: mergeInvoiceData(firstPass, secondPass), meta: buildOcrMeta(calls) };
     }
 
-    return { success: true, data: firstPass };
+    return { success: true, data: firstPass, meta: buildOcrMeta(calls) };
 }
 
 /**
@@ -639,9 +831,16 @@ export async function processMultiPageInvoice({ imageBuffers, config }) {
  * @returns {Promise<Object>}
  */
 export async function processMultiPagePayment({ imageBuffers, config }) {
-    const imageBase64Urls = toImageBase64Urls(imageBuffers);
-    const data = normalizePaymentData(await callVisionLLM(config, PAYMENT_PROMPT_V2, imageBase64Urls));
-    return { success: true, data };
+    const imageInputs = await toVisionImageInputs(imageBuffers);
+    const call = await callVisionLLM(
+        config,
+        PAYMENT_PROMPT_V2,
+        imageInputs,
+        'payment',
+        PAYMENT_OCR_MAX_COMPLETION_TOKENS
+    );
+    const data = normalizePaymentData(call.data);
+    return { success: true, data, meta: buildOcrMeta([call.meta]) };
 }
 
 // ==================== 导出供 invoice.processor.js 使用 ====================

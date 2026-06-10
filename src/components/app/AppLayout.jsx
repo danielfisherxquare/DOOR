@@ -19,9 +19,11 @@ const ReimbursementTool = lazy(() => import('../../views/reimbursement/Reimburse
 const ChangePassword = lazy(() => import('../../views/ChangePassword'))
 const StudioProjectsPage = lazy(() => import('../../views/app/StudioProjectsPage'))
 const StudioProjectPage = lazy(() => import('../../views/app/StudioProjectPage'))
+const TerrainModelPage = lazy(() => import('../../views/app/terrain-model/TerrainModelPage'))
 const ProfilePage = lazy(() => import('../../views/profile/ProfilePage'))
 const ImportPage = lazy(() => import('../../views/app/events/import/ImportPage'))
 const ProcessingCenterPage = lazy(() => import('../../views/app/events/processing/ProcessingCenterPage'))
+const RecordsPage = lazy(() => import('../../views/app/events/records/RecordsPage'))
 const LotteryPage = lazy(() => import('../../views/app/events/lottery/LotteryPage'))
 const BibPage = lazy(() => import('../../views/app/events/bib/BibPage'))
 const ClothingPage = lazy(() => import('../../views/app/events/clothing/ClothingPage'))
@@ -69,17 +71,17 @@ export default function AppLayout() {
 useEffect(() => {
   // 确保body有正确的布局类
   document.body.classList.add('layout--app');
-  
+
   // 验证CSS变量是否加载
   const requiredVars = ['--designer-shell', '--designer-panel', '--designer-text'];
-  const missing = requiredVars.filter(v => 
+  const missing = requiredVars.filter(v =>
     !getComputedStyle(document.documentElement).getPropertyValue(v)
   );
-  
+
   if (missing.length > 0) {
     console.warn('[3D Studio] 缺少CSS变量:', missing);
   }
-  
+
   return () => {
     // 清理（如果需要）
     // document.body.classList.remove('layout--app');
@@ -96,6 +98,13 @@ useEffect(() => {
   const { sidebarCollapsed, sidebarMotionClass, toggleSidebar } = useSidebarMotion()
   const [contextOptions, setContextOptions] = useState(null)
   const [contextLoading, setContextLoading] = useState(false)
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
+  const [installPromptState, setInstallPromptState] = useState({
+    canPrompt: false,
+    isInstalled: false,
+    isIos: false,
+    promptEvent: null,
+  })
   const navRef = useRef(null)
   const requestedRaceId = searchParams.get('raceId') || ''
   const selectedOrgId = resolveSurfaceOrgId(searchParams, user)
@@ -171,6 +180,60 @@ useEffect(() => {
     return () => clearTimeout(timer)
   }, [selectedOrgId, selectedRaceId, updatePreferences, user])
 
+  useEffect(() => {
+    setMobileDrawerOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+
+    const displayModeQuery = window.matchMedia?.('(display-mode: standalone)')
+    const detectInstallState = () => {
+      const isStandalone = Boolean(
+        displayModeQuery?.matches
+          || window.navigator.standalone
+          || window.matchMedia?.('(display-mode: fullscreen)')?.matches,
+      )
+      const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent || '')
+      setInstallPromptState((state) => ({
+        ...state,
+        isInstalled: isStandalone,
+        isIos,
+        canPrompt: Boolean(window.__doorInstallPrompt && !isStandalone),
+        promptEvent: window.__doorInstallPrompt || state.promptEvent,
+      }))
+    }
+
+    const handleInstallPrompt = (event) => {
+      const promptEvent = event.detail?.promptEvent || window.__doorInstallPrompt || null
+      setInstallPromptState((state) => ({
+        ...state,
+        canPrompt: Boolean(promptEvent),
+        promptEvent,
+      }))
+    }
+
+    const handleAppInstalled = () => {
+      setInstallPromptState((state) => ({
+        ...state,
+        canPrompt: false,
+        isInstalled: true,
+        promptEvent: null,
+      }))
+    }
+
+    detectInstallState()
+    window.addEventListener('door:installprompt', handleInstallPrompt)
+    window.addEventListener('door:appinstalled', handleAppInstalled)
+    displayModeQuery?.addEventListener?.('change', detectInstallState)
+
+    return () => {
+      window.removeEventListener('door:installprompt', handleInstallPrompt)
+      window.removeEventListener('door:appinstalled', handleAppInstalled)
+      displayModeQuery?.removeEventListener?.('change', detectInstallState)
+    }
+  }, [])
+
   const handleOrgChange = useCallback((nextOrgId) => {
     syncSearchParams(nextOrgId, '')
   }, [syncSearchParams])
@@ -210,6 +273,26 @@ useEffect(() => {
     navigate('/login')
   }
 
+  const handleInstallClick = useCallback(async () => {
+    const promptEvent = installPromptState.promptEvent || window.__doorInstallPrompt
+
+    if (promptEvent?.prompt) {
+      promptEvent.prompt()
+      await promptEvent.userChoice.catch(() => null)
+      window.__doorInstallPrompt = null
+      setInstallPromptState((state) => ({
+        ...state,
+        canPrompt: false,
+        promptEvent: null,
+      }))
+      return
+    }
+
+    showInfo(installPromptState.isIos
+      ? '在 Safari 中点分享按钮，然后选择“添加到主屏幕”。'
+      : '在浏览器菜单中选择“添加到主屏幕”或“安装应用”。')
+  }, [installPromptState])
+
   const roleName = useMemo(() => {
     if (!user) return '用户'
     if (user.role === 'super_admin') return '超级管理员'
@@ -220,6 +303,34 @@ useEffect(() => {
   }, [user])
 
   const groupTitle = currentGroup?.label || '应用层'
+  const isNavItemActive = useCallback((item) => {
+    return item.path === ''
+      ? location.pathname === '/app'
+      : location.pathname === '/app' + item.path || location.pathname.startsWith('/app' + item.path + '/')
+  }, [location.pathname])
+  const flatNavItems = useMemo(
+    () => navGroups.flatMap((group) => group.items.map((item) => ({ ...item, groupLabel: group.label }))),
+    [navGroups],
+  )
+  const mobileDockItems = useMemo(() => {
+    const primaryKeys = ['dashboard', 'reimbursement', 'import', 'inventory-workbench']
+    const primaryItems = primaryKeys
+      .map((key) => flatNavItems.find((item) => item.key === key))
+      .filter(Boolean)
+
+    return (primaryItems.length >= 4 ? primaryItems : flatNavItems).slice(0, 4)
+  }, [flatNavItems])
+  const shouldShowInstallAction = !installPromptState.isInstalled
+  const installCopy = installPromptState.isIos
+    ? '添加到主屏幕'
+    : installPromptState.canPrompt
+      ? '一键安装到桌面'
+      : '添加到桌面'
+  const installHint = installPromptState.isIos
+    ? 'Safari 分享菜单'
+    : installPromptState.canPrompt
+      ? '浏览器安装提示'
+      : '浏览器菜单'
 
   return (
     <>
@@ -295,9 +406,7 @@ useEffect(() => {
               <div className="workspace-nav-list">
                 {group.items.map((item) => {
                   const href = buildAppHref(item.path, currentContext)
-                  const active = item.path === ''
-                    ? location.pathname === '/app'
-                    : location.pathname === `/app${item.path}` || location.pathname.startsWith(`/app${item.path}/`)
+                  const active = isNavItemActive(item)
 
                   return (
                     <Link key={item.key} to={href} className={`workspace-nav-item ${active ? 'workspace-nav-item--active' : ''}`}>
@@ -355,6 +464,15 @@ useEffect(() => {
         {/* ── 顶栏 ── */}
         <header className="workspace-main__topbar">
           <div className="workspace-main__topbar-left">
+            <button
+              type="button"
+              className="workspace-main__mobile-menu-btn"
+              onClick={() => setMobileDrawerOpen(true)}
+              aria-label="打开应用菜单"
+              aria-expanded={mobileDrawerOpen}
+            >
+              <span className="material-symbols-outlined">menu</span>
+            </button>
             <span className="workspace-main__topbar-title">{groupTitle}</span>
           </div>
           <div className="workspace-main__topbar-right">
@@ -362,6 +480,21 @@ useEffect(() => {
               <input type="text" placeholder="搜索..." />
               <span className="material-symbols-outlined">search</span>
             </div>
+            {shouldShowInstallAction && (
+              <button
+                type="button"
+                className="workspace-main__install-btn"
+                onClick={handleInstallClick}
+                title={installPromptState.isIos ? '在 Safari 分享菜单中选择“添加到主屏幕”' : '添加到桌面'}
+                aria-label={installPromptState.isIos ? '在 Safari 分享菜单中选择添加到主屏幕' : installCopy}
+              >
+                <span className="material-symbols-outlined">add_to_home_screen</span>
+                <span className="workspace-main__install-text">
+                  <span className="workspace-main__install-copy">{installCopy}</span>
+                  <span className="workspace-main__install-hint">{installHint}</span>
+                </span>
+              </button>
+            )}
             <button type="button" className="workspace-main__topbar-btn" title="通知">
               <span className="material-symbols-outlined">notifications</span>
             </button>
@@ -389,6 +522,9 @@ useEffect(() => {
               <span className="workspace-kicker">{routeMeta.surfaceCode || 'APP'}</span>
             </div>
             <h1 className="workspace-main__title">{routeMeta.title}</h1>
+            {routeMeta.summary ? (
+              <p className="workspace-main__summary">{routeMeta.summary}</p>
+            ) : null}
           </div>
         </section>
 
@@ -399,6 +535,7 @@ useEffect(() => {
               <Route index element={<Home />} />
               <Route path="events/import" element={<ImportPage />} />
               <Route path="events/processing" element={<ProcessingCenterPage />} />
+              <Route path="events/records" element={<RecordsPage />} />
               <Route path="events/lottery" element={<LotteryPage />} />
               <Route path="events/bib" element={<BibPage />} />
               <Route path="events/clothing" element={<ClothingPage />} />
@@ -513,6 +650,7 @@ useEffect(() => {
                   </CapabilityProtectedRoute>
                 )}
               />
+              <Route path="terrain-model" element={<TerrainModelPage />} />
               <Route
                 path="3d-studio/new"
                 element={(
@@ -542,6 +680,98 @@ useEffect(() => {
           </Suspense>
         </section>
       </main>
+      {mobileDrawerOpen && (
+        <div className="workspace-mobile-menu" role="presentation">
+          <button
+            type="button"
+            className="workspace-mobile-menu__backdrop"
+            onClick={() => setMobileDrawerOpen(false)}
+            aria-label="关闭应用菜单"
+          />
+          <aside className="workspace-mobile-menu__panel" aria-label="应用菜单">
+            <div className="workspace-mobile-menu__header">
+              <div>
+                <span className="workspace-mobile-menu__eyebrow">DOOR APP</span>
+                <h2 className="workspace-mobile-menu__title">应用层</h2>
+              </div>
+              <button
+                type="button"
+                className="workspace-mobile-menu__close"
+                onClick={() => setMobileDrawerOpen(false)}
+                aria-label="关闭应用菜单"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {shouldShowInstallAction && (
+              <button
+                type="button"
+                className="workspace-mobile-menu__install"
+                onClick={handleInstallClick}
+              >
+                <span className="material-symbols-outlined">add_to_home_screen</span>
+                <span>
+                  <strong>{installCopy}</strong>
+                  <small>{installPromptState.isIos ? 'Safari 分享菜单 -> 添加到主屏幕' : `${installHint} · 保存成主屏幕 H5 app`}</small>
+                </span>
+              </button>
+            )}
+
+            <nav className="workspace-mobile-menu__nav">
+              {navGroups.map((group) => (
+                <section key={group.key} className="workspace-mobile-menu__section">
+                  <span className="workspace-mobile-menu__section-title">{group.label}</span>
+                  <div className="workspace-mobile-menu__links">
+                    {group.items.map((item) => {
+                      const active = isNavItemActive(item)
+                      return (
+                        <Link
+                          key={item.key}
+                          to={buildAppHref(item.path, currentContext)}
+                          className={'workspace-mobile-menu__link ' + (active ? 'workspace-mobile-menu__link--active' : '')}
+                        >
+                          <span className="material-symbols-outlined">{item.icon || 'circle'}</span>
+                          <span>{item.label}</span>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))}
+            </nav>
+
+            <div className="workspace-mobile-menu__footer">
+              <span>{user?.username || '用户'} · {roleName}</span>
+              <button type="button" onClick={handleLogout}>退出登录</button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      <nav className="workspace-mobile-dock" aria-label="应用层快捷导航">
+        {mobileDockItems.map((item) => {
+          const active = isNavItemActive(item)
+          return (
+            <Link
+              key={item.key}
+              to={buildAppHref(item.path, currentContext)}
+              className={'workspace-mobile-dock__item ' + (active ? 'workspace-mobile-dock__item--active' : '')}
+            >
+              <span className="material-symbols-outlined">{item.icon || 'circle'}</span>
+              <span>{item.label}</span>
+            </Link>
+          )
+        })}
+        <button
+          type="button"
+          className="workspace-mobile-dock__item workspace-mobile-dock__item--button"
+          onClick={() => setMobileDrawerOpen(true)}
+        >
+          <span className="material-symbols-outlined">apps</span>
+          <span>全部</span>
+        </button>
+      </nav>
     </div>
       )}
     </>

@@ -3,10 +3,11 @@ import recordsApi from '../../../../api/records'
 import { unwrapData } from '../../../../utils/apiResponse'
 import { parseVerificationExcel } from '../../../../utils/excelProcessor'
 import {
-  CommandDataTable,
-  CommandNotice,
-  CommandPanel,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5DataCard,
+  AppH5DataTable,
+  AppH5Notice,
+  AppH5Panel,
+} from '../../../../components/app/AppH5Surface'
 
 export default function VerificationImportPanel({ raceId, onImported }) {
   const fileInputRef = useRef(null)
@@ -71,9 +72,9 @@ export default function VerificationImportPanel({ raceId, onImported }) {
 
   return (
     <div className="processing-stack">
-      {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
+      {message ? <AppH5Notice tone={messageTone}>{message}</AppH5Notice> : null}
 
-      <CommandPanel
+      <AppH5Panel
         title="导入成绩证明"
         subtitle="上传包含全马/半马成绩证明的 Excel，系统会按证件号匹配当前赛事选手。"
         actions={(
@@ -92,10 +93,10 @@ export default function VerificationImportPanel({ raceId, onImported }) {
         <div className="processing-help">
           <strong>识别规则：</strong>工作表名称需包含“全 / full / qmcj”或“半 / half / bmcj”，且表头至少包含证件号与净成绩。
         </div>
-      </CommandPanel>
+      </AppH5Panel>
 
       {parsedPreview ? (
-        <CommandPanel
+        <AppH5Panel
           title="解析预览"
           subtitle={`已识别工作表：${parsedPreview.sheetsMatched.join(' | ')}`}
           actions={(
@@ -109,7 +110,22 @@ export default function VerificationImportPanel({ raceId, onImported }) {
             </div>
           )}
         >
-          <CommandDataTable>
+          <AppH5DataTable
+            mobileCards={parsedPreview.results.slice(0, 100).map((item, index) => (
+              <AppH5DataCard
+                key={`${item.idNumber}-${index}`}
+                eyebrow={`#${index + 1}`}
+                title={item.idNumber}
+                fields={[
+                  { key: 'idNumber', label: '证件号', value: item.idNumber },
+                  { key: 'netTime', label: '净成绩', value: item.netTime },
+                  { key: 'raceName', label: '赛事名称', value: item.raceName },
+                  { key: 'event', label: '项目', value: item.event === 'Full' ? '马拉松' : '半程马拉松' },
+                ]}
+              />
+            ))}
+          >
+            <table>
             <thead>
               <tr>
                 <th>#</th>
@@ -130,11 +146,12 @@ export default function VerificationImportPanel({ raceId, onImported }) {
                 </tr>
               ))}
             </tbody>
-          </CommandDataTable>
+            </table>
+          </AppH5DataTable>
           {parsedPreview.results.length > 100 ? (
             <div className="processing-footnote">仅展示前 100 条，共 {parsedPreview.results.length} 条。</div>
           ) : null}
-        </CommandPanel>
+        </AppH5Panel>
       ) : null}
     </div>
   )

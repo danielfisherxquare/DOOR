@@ -576,6 +576,118 @@
   color: var(--text-secondary);
 }
 
+.reimbursement-table__stats .stat--ocr {
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--info) 18%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--info-light) 58%, transparent);
+}
+
+.reimbursement-table__stats .stat--ocr strong {
+  color: var(--info);
+}
+
+.reimbursement-table__stats .stat--review {
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--warning) 22%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning-light) 70%, transparent);
+}
+
+.reimbursement-table__stats .stat--review strong {
+  color: var(--warning);
+}
+
+.reimbursement-table__stats .stat--export-ready {
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--success) 22%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--success-light) 70%, transparent);
+}
+
+.reimbursement-table__stats .stat--export-ready strong {
+  color: var(--success);
+}
+
+.reimbursement-table__stats .stat--filter {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.reimbursement-table__quality-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+}
+
+.reimbursement-table__quality-filters button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reimbursement-table__quality-filters button:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.reimbursement-table__quality-filters button.active {
+  color: var(--primary);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.reimbursement-table__sort-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.reimbursement-table__sort-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  padding: 0 6px;
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+
+.reimbursement-table__sort-controls button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.reimbursement-table__sort-controls button:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.reimbursement-table__sort-controls button.active {
+  color: var(--primary);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
 .reimbursement-table__reporter-bar {
   display: flex;
   align-items: center;
@@ -744,6 +856,39 @@
 .badge--expense {
   background: var(--danger-light);
   color: var(--danger);
+}
+
+.badge--review {
+  background: var(--warning-light);
+  color: var(--warning);
+}
+
+.invoice-review-cell {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.reimbursement-table__risk-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 180px;
+}
+
+.reimbursement-table__risk-list span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--warning) 22%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning-light) 70%, transparent);
+  color: var(--warning);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 /* 弹窗 */
@@ -2265,8 +2410,17 @@
   color: var(--text-secondary);
   margin-bottom: 8px;
   display: flex;
+  gap: 8px;
   justify-content: space-between;
   align-items: center;
+}
+
+.recognized-records__summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 10px;
+  text-align: right;
 }
 
 .recognized-records__list {
@@ -2302,6 +2456,16 @@
 }
 
 .recognized-record-card__duplicate-badge {
+  font-size: var(--font-size-eyebrow);
+  color: var(--warning);
+  background: var(--warning-light);
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+  display: inline-block;
+}
+
+.recognized-record-card__review-badge {
   font-size: var(--font-size-eyebrow);
   color: var(--warning);
   background: var(--warning-light);
@@ -2375,6 +2539,113 @@
   display: flex;
   gap: 6px;
   flex-direction: column;
+}
+
+/* 附件大图预览弹窗 */
+.attachment-preview-modal__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in 0.15s ease;
+}
+
+.attachment-preview-modal__content {
+  background: var(--bg-primary, #fff);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.attachment-preview-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle, rgba(15, 23, 42, 0.08));
+  min-width: 0;
+}
+
+.attachment-preview-modal__title {
+  flex: 1;
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.attachment-preview-modal__type-badge {
+  font-size: var(--font-size-eyebrow, 11px);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 4px);
+  white-space: nowrap;
+}
+
+.attachment-preview-modal__type-badge.badge--info {
+  background: var(--info-light, #eff6ff);
+  color: var(--info, #3b82f6);
+}
+
+.attachment-preview-modal__type-badge.badge--success {
+  background: var(--success-light, #ecfdf5);
+  color: var(--success, #059669);
+}
+
+.attachment-preview-modal__close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-muted, #94a3b8);
+  padding: 0 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.attachment-preview-modal__close:hover {
+  color: var(--text-primary, #0f172a);
+}
+
+.attachment-preview-modal__body {
+  padding: 16px;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.attachment-preview-modal__image {
+  max-width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.attachment-preview-modal__loading,
+.attachment-preview-modal__error {
+  color: var(--text-muted, #94a3b8);
+  font-size: var(--font-size-sm, 13px);
+  padding: 40px;
+}
+
+.attachment-preview-modal__error {
+  color: var(--danger, #ef4444);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .attachment-empty {
@@ -2927,6 +3198,42 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--spacing-xs);
+}
+
+.reimbursement-table__export-feedback {
+  margin-top: var(--spacing-sm);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  text-align: right;
+}
+
+.reimbursement-table__export-feedback--info {
+  background: color-mix(in srgb, var(--info-light) 65%, transparent);
+  color: var(--info);
+}
+
+.reimbursement-table__export-feedback--success {
+  background: color-mix(in srgb, var(--success-light) 70%, transparent);
+  color: var(--success);
+}
+
+.reimbursement-table__export-feedback--error {
+  background: color-mix(in srgb, var(--danger-light) 70%, transparent);
+  color: var(--danger);
+}
+
+.reimbursement-table__export-readiness {
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  margin-top: var(--spacing-xs);
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--warning) 20%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning-light) 60%, transparent);
+  color: var(--warning);
+  font-size: var(--font-size-sm);
 }
 
 .stat--selected {

@@ -25,7 +25,7 @@ async function ensureDir(dir) {
  * @param {Buffer} fileBuffer - 文件 Buffer
  * @param {string} originalName - 原始文件名
  * @param {string} mimeType - MIME 类型
- * @returns {Promise<{ originalPath: string, savedFiles: string[] }>}
+ * @returns {Promise<{ originalPath: string, thumbnailPath: string|null, savedFiles: string[] }>}
  */
 export async function saveInvoiceFile(projectId, invoiceId, fileBuffer, originalName, mimeType) {
     const invoiceDir = path.join(STORAGE_DIR, projectId, invoiceId);
@@ -40,19 +40,21 @@ export async function saveInvoiceFile(projectId, invoiceId, fileBuffer, original
 
     // 如果是 PDF，生成每页的图片
     const savedFiles = [originalPath];
+    let thumbnailPath = null;
 
     if (isPdf) {
         // PDF 转图片逻辑在 ocr.service.js 中已实现，这里只保存图片引用
         // 实际图片生成由 ocr.service.js 处理后回调保存
     } else {
         // 图片文件直接生成缩略图
-        const thumbnailPath = path.join(invoiceDir, `thumbnail${ext}`);
+        thumbnailPath = path.join(invoiceDir, 'thumbnail.jpg');
         await generateThumbnail(fileBuffer, thumbnailPath);
         savedFiles.push(thumbnailPath);
     }
 
     return {
         originalPath,
+        thumbnailPath,
         savedFiles,
         invoiceDir,
     };

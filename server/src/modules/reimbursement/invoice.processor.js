@@ -4,7 +4,12 @@
  */
 
 import knex from '../../db/knex.js';
-import { processInvoice as ocrProcessInvoice, processPayment as ocrProcessPayment } from './ocr.service.js';
+import {
+    processInvoice as ocrProcessInvoice,
+    processMultiPageInvoice as ocrProcessMultiPageInvoice,
+    processMultiPagePayment as ocrProcessMultiPagePayment,
+    processPayment as ocrProcessPayment,
+} from './ocr.service.js';
 import {
     saveInvoiceFile,
     savePdfPages,
@@ -12,10 +17,13 @@ import {
 } from './invoice.storage.js';
 import {
     attachProcessedPayment,
+    buildInvoiceRecordData,
     createPendingMatch,
     createStandalonePaymentRecord,
     findMatchingRecords,
+    mergePaymentOcrMetaIntoRecord,
 } from './reimbursement.service.js';
+import { attachOcrReview } from './ocr.review.js';
 
 /**
  * 处理步骤枚举
@@ -61,7 +69,7 @@ async function logProcessingStep(invoiceId, step, message, metadata = {}) {
     await knex('reimbursement_processed_files')
         .where({ id: invoiceId })
         .update({
-            processing_log: logs,
+            processing_log: JSON.stringify(logs),
             updated_at: knex.fn.now(),
         });
 
@@ -85,6 +93,17 @@ async function updateProcessingStatus(invoiceId, status, extra = {}) {
     await knex('reimbursement_processed_files')
         .where({ id: invoiceId })
         .update(updateData);
+}
+
+function buildPaymentReviewRecordData(paymentData = {}) {
+    const rawExpense = paymentData.amount ?? paymentData.expense ?? null;
+    return {
+        payment_date: paymentData.date || paymentData.payment_date || null,
+        category: paymentData.category || null,
+        sub_category: paymentData.subCategory || paymentData.sub_category || null,
+        expense: rawExpense != null ? Math.abs(Number(rawExpense) || 0) || null : null,
+        company: paymentData.payee || paymentData.targetName || paymentData.company || null,
+    };
 }
 
 /**
@@ -113,7 +132,7 @@ export async function processInvoiceWithProgress({
         const isPdf = mimeType === 'application/pdf' || originalName.toLowerCase().endsWith('.pdf');
 
         // Step 2: 保存原始文件
-        const { invoiceDir } = await saveInvoiceFile(projectId, invoiceId, fileBuffer, originalName, mimeType);
+        const { invoiceDir, originalPath, thumbnailPath } = await saveInvoiceFile(projectId, invoiceId, fileBuffer, originalName, mimeType);
 
         let pageBuffers = [];
         let savedPaths = [];
@@ -137,20 +156,32 @@ export async function processInvoiceWithProgress({
         // Step 4: OCR 识别
         await logProcessingStep(invoiceId, ProcessingStep.OCR_PROCESSING, '正在进行 OCR 识别...');
 
-        const ocrResult = await ocrProcessInvoice({
-            fileBuffer,
-            mimeType,
-            config,
-        });
+        const ocrResult = isPdf
+            ? await ocrProcessMultiPageInvoice({
+                imageBuffers: pageBuffers,
+                config,
+                filename: originalName,
+            })
+            : await ocrProcessInvoice({
+                fileBuffer,
+                mimeType,
+                filename: originalName,
+                config,
+            });
 
         if (!ocrResult.success) {
             throw new Error('OCR 识别失败：' + JSON.stringify(ocrResult));
         }
+        const reviewedOcrMeta = attachOcrReview(ocrResult.meta, 'invoice', buildInvoiceRecordData(ocrResult.data));
+        const reviewedOcrResult = { ...ocrResult, meta: reviewedOcrMeta };
 
         await logProcessingStep(invoiceId, ProcessingStep.OCR_PROCESSING, 'OCR 识别完成', {
             amount: ocrResult.data?.amount,
             date: ocrResult.data?.date,
             buyer: ocrResult.data?.buyer,
+            usage: ocrResult.meta?.usage || {},
+            modelCallCount: ocrResult.meta?.modelCallCount || 0,
+            durationMs: ocrResult.meta?.durationMs || 0,
         });
 
         // Step 5: 保存结果
@@ -161,15 +192,16 @@ export async function processInvoiceWithProgress({
         // 更新数据库记录
         await updateProcessingStatus(invoiceId, 'completed', {
             ocr_result: ocrResult.data,
+            ocr_meta: reviewedOcrMeta,
             thumbnail_path: isPdf
                 ? `${invoiceDir}/thumbnail_1.jpg`
-                : `${invoiceDir}/thumbnail.jpg`,
-            original_path: `${invoiceDir}/original${isPdf ? '.pdf' : '.jpg'}`,
+                : thumbnailPath,
+            original_path: originalPath,
         });
 
         await logProcessingStep(invoiceId, ProcessingStep.COMPLETED, '处理完成');
 
-        return ocrResult;
+        return reviewedOcrResult;
     } catch (error) {
         console.error('发票处理失败:', error);
 
@@ -213,7 +245,7 @@ export async function processPaymentWithProgress({
         const isPdf = mimeType === 'application/pdf' || originalName.toLowerCase().endsWith('.pdf');
 
         // Step 2: 保存原始文件
-        const { invoiceDir } = await saveInvoiceFile(projectId, paymentId, fileBuffer, originalName, mimeType);
+        const { invoiceDir, originalPath, thumbnailPath } = await saveInvoiceFile(projectId, paymentId, fileBuffer, originalName, mimeType);
 
         let pageBuffers = [];
 
@@ -233,20 +265,31 @@ export async function processPaymentWithProgress({
         // Step 4: OCR 识别
         await logProcessingStep(paymentId, ProcessingStep.OCR_PROCESSING, '正在进行 OCR 识别...');
 
-        const ocrResult = await ocrProcessPayment({
-            fileBuffer,
-            mimeType,
-            config,
-        });
+        const ocrResult = isPdf
+            ? await ocrProcessMultiPagePayment({
+                imageBuffers: pageBuffers,
+                config,
+            })
+            : await ocrProcessPayment({
+                fileBuffer,
+                mimeType,
+                filename: originalName,
+                config,
+            });
 
         if (!ocrResult.success) {
             throw new Error('OCR 识别失败：' + JSON.stringify(ocrResult));
         }
+        const reviewedOcrMeta = attachOcrReview(ocrResult.meta, 'payment', buildPaymentReviewRecordData(ocrResult.data));
+        const reviewedOcrResult = { ...ocrResult, meta: reviewedOcrMeta };
 
         await logProcessingStep(paymentId, ProcessingStep.OCR_PROCESSING, 'OCR 识别完成', {
             amount: ocrResult.data?.amount,
             date: ocrResult.data?.date,
             payee: ocrResult.data?.payee,
+            usage: ocrResult.meta?.usage || {},
+            modelCallCount: ocrResult.meta?.modelCallCount || 0,
+            durationMs: ocrResult.meta?.durationMs || 0,
         });
 
         // Step 5: 保存结果
@@ -257,10 +300,11 @@ export async function processPaymentWithProgress({
         // 更新数据库记录
         await updateProcessingStatus(paymentId, 'completed', {
             ocr_result: ocrResult.data,
+            ocr_meta: reviewedOcrMeta,
             thumbnail_path: isPdf
                 ? `${invoiceDir}/thumbnail_1.jpg`
-                : `${invoiceDir}/thumbnail.jpg`,
-            original_path: `${invoiceDir}/original${isPdf ? '.pdf' : '.jpg'}`,
+                : thumbnailPath,
+            original_path: originalPath,
         });
 
         if (projectId && userId && ocrResult.data) {
@@ -275,6 +319,7 @@ export async function processPaymentWithProgress({
 
             if (candidates.length === 1) {
                 await attachProcessedPayment(candidates[0].id, paymentFile);
+                await mergePaymentOcrMetaIntoRecord(candidates[0].id, reviewedOcrMeta);
                 await logProcessingStep(paymentId, ProcessingStep.SAVING_RESULT, '付款凭证已自动匹配到已有报销记录', {
                     matchedRecordId: candidates[0].id,
                 });
@@ -283,6 +328,7 @@ export async function processPaymentWithProgress({
                     paymentData: {
                         ...ocrResult.data,
                         ...paymentFile,
+                        ocrMeta: reviewedOcrMeta,
                     },
                     candidateIds: candidates.map((candidate) => candidate.id),
                 });
@@ -291,7 +337,9 @@ export async function processPaymentWithProgress({
                     candidateCount: candidates.length,
                 });
             } else {
-                const record = await createStandalonePaymentRecord(projectId, userId, ocrResult.data);
+                const record = await createStandalonePaymentRecord(projectId, userId, ocrResult.data, {
+                    ocrMeta: reviewedOcrMeta,
+                });
                 await attachProcessedPayment(record.id, paymentFile);
                 await logProcessingStep(paymentId, ProcessingStep.SAVING_RESULT, '付款凭证已写入独立报销记录', {
                     createdRecordId: record.id,
@@ -301,7 +349,7 @@ export async function processPaymentWithProgress({
 
         await logProcessingStep(paymentId, ProcessingStep.COMPLETED, '处理完成');
 
-        return ocrResult;
+        return reviewedOcrResult;
     } catch (error) {
         console.error('付款凭证处理失败:', error);
 
@@ -335,6 +383,7 @@ export async function getProcessingQueue(projectId) {
         status: record.status,
         thumbnailPath: record.thumbnail_path,
         ocrResult: record.ocr_result,
+        ocrMeta: record.ocr_meta,
         errorMessage: record.error_message,
         processingLog: record.processing_log || [],
         processedAt: record.processed_at,
@@ -365,6 +414,7 @@ export async function getInvoiceDetail(projectId, invoiceId) {
         thumbnailPath: record.thumbnail_path,
         originalPath: record.original_path,
         ocrResult: record.ocr_result,
+        ocrMeta: record.ocr_meta,
         errorMessage: record.error_message,
         processingLog: record.processing_log || [],
         processedAt: record.processed_at,
@@ -378,13 +428,24 @@ export async function getInvoiceDetail(projectId, invoiceId) {
  * @param {Object} ocrResult - 更新后的 OCR 结果
  */
 export async function updateInvoiceOCR(invoiceId, ocrResult) {
+    const existing = await knex('reimbursement_processed_files')
+        .where({ id: invoiceId })
+        .first();
+
+    const reviewedOcrMeta = attachOcrReview(
+        existing?.ocr_meta || null,
+        'invoice',
+        buildInvoiceRecordData(ocrResult)
+    );
+
     await knex('reimbursement_processed_files')
         .where({ id: invoiceId })
         .update({
             ocr_result: ocrResult,
+            ocr_meta: reviewedOcrMeta,
         });
 
-    return { success: true };
+    return { success: true, ocrMeta: reviewedOcrMeta };
 }
 
 /**

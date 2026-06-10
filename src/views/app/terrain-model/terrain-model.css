@@ -1,0 +1,2713 @@
+.terrain-model-page {
+  display: grid;
+  --terrain-field-height: 40px;
+  --terrain-canvas-height: clamp(460px, 52vh, 620px);
+  --terrain-panel-gap: 16px;
+  --terrain-panel-padding: 14px;
+  gap: var(--terrain-panel-gap);
+  color: var(--tm-text);
+
+  /* —— 接入 DOOR 设计系统：本页局部语义令牌 —— */
+  --tm-surface: var(--layer-surface);
+  --tm-soft: var(--layer-bg-secondary);
+  --tm-border: var(--layer-border);
+  --tm-border-strong: var(--layer-border-strong);
+  --tm-text: var(--layer-text-primary);
+  --tm-text-secondary: var(--layer-text-secondary);
+  --tm-text-muted: var(--layer-text-muted);
+  --tm-text-disabled: var(--layer-text-disabled);
+  --tm-accent: var(--layer-accent);
+  --tm-accent-ink: var(--layer-accent-active);
+  --tm-accent-soft: var(--layer-accent-soft);
+  --tm-accent-border: var(--layer-border-accent);
+  --tm-on-accent: var(--layer-text-on-accent);
+  --tm-success: var(--success);
+  --tm-success-soft: var(--success-soft);
+  --tm-warning: var(--warning);
+  --tm-warning-soft: var(--warning-soft);
+  --tm-danger: var(--danger);
+  --tm-danger-soft: var(--danger-soft);
+  --tm-info: var(--info);
+  --tm-info-soft: var(--info-soft);
+  --tm-shadow: var(--shadow-sm);
+}
+
+.terrain-model-page *,
+.terrain-model-page *::before,
+.terrain-model-page *::after {
+  box-sizing: border-box;
+}
+
+.terrain-model-toolbar,
+.terrain-model-workflow,
+.terrain-model-panel,
+.terrain-model-relief-meter,
+.terrain-model-stats,
+.terrain-model-delivery {
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  box-shadow: var(--tm-shadow);
+}
+
+/* 工具栏：作为右侧 sticky 列顶部的「输入 + 生成」控制面板，竖向紧凑排布 */
+.terrain-model-toolbar {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.terrain-model-toolbar__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  align-items: stretch;
+}
+
+/* 工具栏内控件铺满单元格并收紧高度 */
+.terrain-model-toolbar .terrain-model-file,
+.terrain-model-toolbar .terrain-model-toggle,
+.terrain-model-toolbar .terrain-model-btn {
+  width: 100%;
+  min-height: 34px;
+}
+
+/* 导出 / 导入配置：低频操作，更矮更轻 */
+.terrain-model-toolbar__config .terrain-model-btn {
+  min-height: 30px;
+  font-size: 12px;
+}
+
+.terrain-model-file,
+.terrain-model-toggle,
+.terrain-model-btn,
+.terrain-model-downloads button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--terrain-field-height);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.terrain-model-file {
+  min-width: 0;
+  width: 100%;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.terrain-model-file input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.terrain-model-config-file {
+  cursor: pointer;
+}
+
+.terrain-model-config-file input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.terrain-model-file span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terrain-model-toggle {
+  padding: 0 12px;
+}
+
+.terrain-model-toggle:has(input:disabled) {
+  opacity: 0.56;
+}
+
+.terrain-model-toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--tm-accent);
+}
+
+.terrain-model-workflow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  background: var(--tm-surface);
+}
+
+.terrain-model-workflow__step {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 7px 10px;
+  border-right: 1px solid var(--tm-border);
+}
+
+.terrain-model-workflow__step:last-child {
+  border-right: 0;
+}
+
+.terrain-model-workflow__index {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.terrain-model-workflow__icon {
+  color: var(--tm-text-muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.terrain-model-workflow__copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* 紧凑工作流：隐去次要提示行，仅保留「标题 + 状态」 */
+.terrain-model-workflow__copy p {
+  display: none;
+}
+
+.terrain-model-workflow__copy strong,
+.terrain-model-workflow__copy span,
+.terrain-model-workflow__copy p {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terrain-model-workflow__copy strong {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.terrain-model-workflow__copy span {
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.terrain-model-workflow__copy p {
+  margin: 0;
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.terrain-model-workflow__step--done .terrain-model-workflow__index,
+.terrain-model-workflow__step--ready .terrain-model-workflow__index {
+  border-color: var(--tm-success);
+  background: var(--tm-success-soft);
+  color: var(--tm-success);
+}
+
+.terrain-model-workflow__step--active .terrain-model-workflow__index {
+  border-color: var(--tm-accent-border);
+  background: var(--tm-accent-soft);
+  color: var(--tm-accent-ink);
+}
+
+.terrain-model-workflow__step--done .terrain-model-workflow__icon,
+.terrain-model-workflow__step--ready .terrain-model-workflow__icon {
+  color: var(--tm-success);
+}
+
+.terrain-model-workflow__step--active .terrain-model-workflow__icon {
+  color: var(--tm-warning);
+}
+
+
+.terrain-model-btn,
+.terrain-model-downloads button {
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.terrain-model-btn--primary {
+  border-color: transparent;
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+}
+
+.terrain-model-btn--primary:hover:not(:disabled) {
+  background: var(--layer-accent-hover, var(--tm-accent));
+}
+
+/* 主操作：生成模型——视觉权重最高，置于右侧列顶部常驻 */
+.terrain-model-toolbar .terrain-model-btn--generate {
+  min-height: 40px;
+  padding: 0 20px;
+  font-size: 14px;
+  box-shadow: var(--tm-shadow);
+}
+
+/* 次级 ghost：导出 / 导入配置 */
+.terrain-model-btn--ghost {
+  border-color: var(--tm-border);
+  background: transparent;
+  color: var(--tm-text-secondary);
+  font-weight: 600;
+}
+
+.terrain-model-btn--ghost:hover:not(:disabled) {
+  border-color: var(--tm-accent-border);
+  background: var(--tm-accent-soft);
+  color: var(--tm-text);
+}
+
+/* GPX 入口：作为流程起点做轻强调 */
+.terrain-model-file--gpx {
+  border-color: var(--tm-accent-border);
+  background: var(--tm-accent-soft);
+}
+
+.terrain-model-file--gpx .material-symbols-outlined {
+  color: var(--tm-accent-ink);
+}
+
+.terrain-model-btn:disabled,
+.terrain-model-downloads button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.terrain-model-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 0.96fr) minmax(0, 1.04fr);
+  gap: var(--terrain-panel-gap);
+  align-items: start;
+  min-width: 0;
+}
+
+.terrain-model-left,
+.terrain-model-right {
+  display: grid;
+  gap: var(--terrain-panel-gap);
+  min-width: 0;
+}
+
+/* 右栏卡片间距更紧凑（输入/工作流/预览/统计/交付） */
+.terrain-model-right {
+  gap: 12px;
+}
+
+@media (min-width: 1181px) {
+  .terrain-model-right {
+    position: sticky;
+    top: 0;
+    max-height: calc(100vh - 96px);
+    overflow: auto;
+    scrollbar-width: thin;
+    padding-right: 2px;
+  }
+}
+
+/* 工作流条移入右侧窄列后改为 2×2 */
+.terrain-model-right .terrain-model-workflow {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.terrain-model-right .terrain-model-workflow__step:nth-child(2n) {
+  border-right: 0;
+}
+
+.terrain-model-right .terrain-model-workflow__step:nth-child(-n + 2) {
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.terrain-model-panel {
+  min-width: 0;
+}
+
+.terrain-model-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px var(--terrain-panel-padding);
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.terrain-model-panel__head h2 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.terrain-model-panel__head span {
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.terrain-model-map-frame {
+  position: relative;
+}
+
+.terrain-model-map {
+  width: 100%;
+  height: var(--terrain-canvas-height);
+  background: var(--tm-soft);
+}
+
+.terrain-model-map--drawing {
+  cursor: crosshair;
+}
+
+.terrain-model-map-tools {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 460;
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--tm-border);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--tm-shadow);
+}
+
+.terrain-model-map-tools button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 78px;
+  min-height: 36px;
+  border: 0;
+  border-right: 1px solid var(--tm-border);
+  background: transparent;
+  color: var(--tm-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.terrain-model-map-tools .material-symbols-outlined {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.terrain-model-map-tools button:last-child {
+  border-right: 0;
+}
+
+.terrain-model-map-tools button.is-active {
+  background: var(--tm-success);
+  color: var(--tm-surface);
+}
+
+.terrain-model-map-tools button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.terrain-model-map-frame--drawing .terrain-model-map-tools {
+  pointer-events: none;
+  opacity: 0.52;
+}
+
+.terrain-model-map-status {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 455;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--tm-info);
+  background: rgba(255, 255, 255, 0.94);
+  padding: 7px 9px;
+  color: var(--tm-info);
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.terrain-model-map-status .material-symbols-outlined {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.terrain-model-map-legend {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 450;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--tm-success);
+  background: rgba(255, 255, 255, 0.92);
+  padding: 6px 8px;
+  color: var(--tm-success);
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.terrain-model-map-legend__bounds {
+  width: 20px;
+  height: 12px;
+  border: 2px dashed var(--tm-success);
+  background: var(--tm-success-soft);
+}
+
+.terrain-model-bounds-panel {
+  display: grid;
+  gap: 12px;
+  border-top: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  padding: var(--terrain-panel-padding);
+}
+
+.terrain-model-bounds-panel__lead,
+.terrain-model-bounds-panel__settings,
+.terrain-model-bounds-panel__shape-row,
+.terrain-model-bounds-panel__shape,
+.terrain-model-bounds-panel__metrics,
+.terrain-model-bounds-panel__coords {
+  display: grid;
+  min-width: 0;
+}
+
+.terrain-model-bounds-panel__lead {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.terrain-model-bounds-panel__lead > div:first-child,
+.terrain-model-bounds-panel__metrics div,
+.terrain-model-bounds-panel__coords div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.terrain-model-bounds-panel span,
+.terrain-model-bounds-panel p,
+.terrain-model-bounds-advanced summary span,
+.terrain-model-bounds-advanced__grid label > span {
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.terrain-model-bounds-panel p {
+  margin: 0;
+  line-height: 1.35;
+}
+
+.terrain-model-bounds-panel strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.terrain-model-bounds-panel__mode,
+.terrain-model-bounds-panel__manual-actions,
+.terrain-model-bounds-panel__shape {
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+}
+
+.terrain-model-bounds-panel__mode button,
+.terrain-model-bounds-panel__manual-actions button,
+.terrain-model-bounds-panel__shape button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--terrain-field-height);
+  border: 0;
+  border-right: 1px solid var(--tm-border);
+  background: transparent;
+  padding: 0 10px;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.terrain-model-bounds-panel__mode button:last-child,
+.terrain-model-bounds-panel__manual-actions button:last-child,
+.terrain-model-bounds-panel__shape button:last-child {
+  border-right: 0;
+}
+
+.terrain-model-bounds-panel__mode button.is-active,
+.terrain-model-bounds-panel__shape button.is-active {
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+}
+
+.terrain-model-bounds-panel button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.terrain-model-bounds-panel .material-symbols-outlined {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.terrain-model-bounds-panel__settings {
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  align-items: end;
+  gap: 10px;
+}
+
+.terrain-model-bounds-panel__padding {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "label label"
+    "input unit";
+  align-items: center;
+  gap: 6px 7px;
+  min-width: 0;
+}
+
+.terrain-model-bounds-panel__padding > span {
+  grid-area: label;
+}
+
+.terrain-model-bounds-panel__padding input {
+  grid-area: input;
+  width: 100%;
+  min-height: var(--terrain-field-height);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  padding: 0 8px;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.terrain-model-bounds-panel__padding em {
+  grid-area: unit;
+  color: var(--tm-text-secondary);
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.terrain-model-bounds-panel__manual-actions {
+  justify-self: start;
+}
+
+.terrain-model-bounds-panel__shape {
+  justify-self: start;
+}
+
+.terrain-model-bounds-panel__shape-row {
+  grid-template-columns: auto minmax(220px, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.terrain-model-bounds-panel__rotation {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 72px auto;
+  grid-template-areas:
+    "label label label"
+    "range value unit";
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+}
+
+.terrain-model-bounds-panel__rotation > span {
+  grid-area: label;
+}
+
+.terrain-model-bounds-panel__rotation input[type="range"] {
+  grid-area: range;
+  width: 100%;
+}
+
+.terrain-model-bounds-panel__rotation input[type="number"] {
+  grid-area: value;
+  width: 100%;
+  min-height: var(--terrain-field-height);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  padding: 0 8px;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.terrain-model-bounds-panel__rotation em {
+  grid-area: unit;
+  color: var(--tm-text-secondary);
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.terrain-model-bounds-panel__metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+}
+
+.terrain-model-bounds-panel__metrics div {
+  min-height: 58px;
+  padding: 10px;
+  border-right: 1px solid var(--tm-border);
+}
+
+.terrain-model-bounds-panel__metrics div:last-child {
+  border-right: 0;
+}
+
+.terrain-model-bounds-panel__coords {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+}
+
+.terrain-model-bounds-details {
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+}
+
+.terrain-model-bounds-details summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: var(--terrain-field-height);
+  padding: 8px 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.terrain-model-bounds-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.terrain-model-bounds-details summary strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+}
+
+.terrain-model-bounds-details .terrain-model-bounds-panel__coords {
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+}
+
+.terrain-model-bounds-panel__extra {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--tm-border);
+}
+
+.terrain-model-bounds-panel__extra div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  min-height: 50px;
+  padding: 8px 10px;
+  border-right: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+}
+
+.terrain-model-bounds-panel__extra div:last-child {
+  border-right: 0;
+}
+
+.terrain-model-bounds-panel__coords div {
+  min-height: 50px;
+  padding: 8px 10px;
+  border-right: 1px solid var(--tm-border);
+}
+
+.terrain-model-bounds-panel__coords div:last-child {
+  border-right: 0;
+}
+
+.terrain-model-bounds-panel__coords strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.terrain-model-bounds-advanced {
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+}
+
+.terrain-model-bounds-advanced summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: var(--terrain-field-height);
+  padding: 8px 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.terrain-model-bounds-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.terrain-model-bounds-advanced__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.terrain-model-bounds-advanced__grid label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.terrain-model-bounds-advanced__grid input {
+  width: 100%;
+  min-height: var(--terrain-field-height);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  padding: 0 8px;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+
+.terrain-model-preview {
+  position: relative;
+  width: 100%;
+  height: var(--terrain-canvas-height);
+  min-height: 460px;
+  overflow: hidden;
+  background: var(--tm-soft);
+}
+
+.terrain-model-preview__canvas {
+  position: absolute;
+  inset: 0;
+  cursor: grab;
+  touch-action: none;
+}
+
+.terrain-model-preview__canvas:active {
+  cursor: grabbing;
+}
+
+.terrain-model-preview__canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.terrain-model-preview__camera {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--tm-border-strong);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.terrain-model-preview__camera button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 70px;
+  min-height: var(--terrain-field-height);
+  border: 1px solid var(--tm-border-strong);
+  background: var(--tm-surface);
+  color: var(--tm-text);
+  padding: 0 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.terrain-model-preview__camera button:hover {
+  border-color: var(--tm-accent-border);
+  background: var(--tm-accent-soft);
+}
+
+.terrain-model-preview__camera button:focus-visible {
+  outline: 2px solid var(--tm-accent);
+  outline-offset: 2px;
+}
+
+.terrain-model-preview__camera .material-symbols-outlined {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.terrain-model-preview__orientation {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  width: 58px;
+  height: 58px;
+  border: 1px solid var(--tm-border-strong);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--tm-text);
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.terrain-model-preview__orientation::before,
+.terrain-model-preview__orientation::after {
+  content: '';
+  position: absolute;
+  background: var(--tm-text-secondary);
+}
+
+.terrain-model-preview__orientation::before {
+  left: 50%;
+  top: 10px;
+  bottom: 10px;
+  width: 1px;
+}
+
+.terrain-model-preview__orientation::after {
+  left: 10px;
+  right: 10px;
+  top: 50%;
+  height: 1px;
+}
+
+.terrain-model-preview__orientation-north,
+.terrain-model-preview__orientation-east {
+  position: absolute;
+  line-height: 1;
+}
+
+.terrain-model-preview__orientation-north {
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.terrain-model-preview__orientation-east {
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.terrain-model-preview__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--tm-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.terrain-model-preview__empty--error {
+  align-content: center;
+  gap: 8px;
+  padding: 20px;
+  text-align: center;
+}
+
+.terrain-model-preview__empty--error strong {
+  color: var(--tm-danger);
+  font-size: 14px;
+}
+
+.terrain-model-preview__empty--error span {
+  max-width: 320px;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.terrain-model-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: var(--terrain-panel-padding);
+}
+
+.terrain-model-form-grid label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.terrain-model-form-grid span {
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.terrain-model-form-grid input,
+.terrain-model-form-grid select {
+  width: 100%;
+  min-height: var(--terrain-field-height);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  padding: 0 10px;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.terrain-model-form-grid select {
+  appearance: auto;
+}
+
+.terrain-model-form-grid input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  accent-color: var(--tm-accent);
+}
+
+.terrain-model-panel--controls {
+  overflow: hidden;
+}
+
+.terrain-model-controls {
+  display: grid;
+  gap: 0;
+}
+
+/* 一键「真实地貌」预设横幅 */
+.terrain-model-realistic-preset {
+  display: grid;
+  gap: 10px;
+  padding: 12px var(--terrain-panel-padding);
+  border-bottom: 1px solid var(--tm-border);
+  background: var(--tm-accent-soft);
+}
+
+.terrain-model-realistic-preset__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.terrain-model-realistic-preset__head > .material-symbols-outlined {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--tm-accent-border);
+  background: var(--tm-surface);
+  color: var(--tm-accent-ink);
+  font-size: 19px;
+}
+
+.terrain-model-realistic-preset__head div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.terrain-model-realistic-preset__head strong {
+  font-size: 13px;
+}
+
+.terrain-model-realistic-preset__head p {
+  margin: 0;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.terrain-model-realistic-preset__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.terrain-model-realistic-preset__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.terrain-model-realistic-preset__actions button .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.terrain-model-realistic-preset__actions button:hover:not(:disabled) {
+  border-color: var(--tm-accent-border);
+  background: var(--tm-accent-soft);
+}
+
+.terrain-model-realistic-preset__dramatic {
+  border-color: transparent !important;
+  background: var(--tm-accent) !important;
+  color: var(--tm-on-accent) !important;
+}
+
+.terrain-model-realistic-preset__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.terrain-model-control-section {
+  display: grid;
+  border-bottom: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+}
+
+.terrain-model-control-section:last-child {
+  border-bottom: 0;
+}
+
+.terrain-model-control-section__head,
+.terrain-model-control-section summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  min-height: 64px;
+  min-width: 0;
+  padding: 12px var(--terrain-panel-padding);
+}
+
+.terrain-model-control-section summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.terrain-model-control-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.terrain-model-control-section__head > .material-symbols-outlined,
+.terrain-model-control-section summary > .material-symbols-outlined:first-child {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+  color: var(--tm-accent-ink);
+  font-size: 19px;
+  line-height: 1;
+}
+
+.terrain-model-control-section__head div,
+.terrain-model-control-section summary div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.terrain-model-control-section h3,
+.terrain-model-control-section p {
+  margin: 0;
+}
+
+.terrain-model-control-section h3 {
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.terrain-model-control-section p {
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.terrain-model-control-section__chevron {
+  color: var(--tm-text-muted);
+  font-size: 20px;
+  transition: transform 160ms ease;
+}
+
+.terrain-model-control-section[open] .terrain-model-control-section__chevron {
+  transform: rotate(180deg);
+}
+
+.terrain-model-control-section__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+  padding: 0 var(--terrain-panel-padding) var(--terrain-panel-padding);
+}
+
+.terrain-model-control-section:not([open]).terrain-model-control-section--collapsible .terrain-model-control-section__grid {
+  display: none;
+}
+
+.terrain-model-control-section__grid label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.terrain-model-control-section__grid label > span,
+.terrain-model-control-section__grid .terrain-model-relief-mode > span {
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.terrain-model-control-section__grid input,
+.terrain-model-control-section__grid select {
+  width: 100%;
+  min-height: var(--terrain-field-height);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  padding: 0 10px;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.terrain-model-control-section__grid select {
+  appearance: auto;
+}
+
+.terrain-model-control-section__grid input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  padding: 0;
+  accent-color: var(--tm-accent);
+}
+
+.terrain-model-size-readout {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+  min-height: 74px;
+  padding: 10px;
+}
+
+.terrain-model-size-readout span {
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.terrain-model-size-readout strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.terrain-model-size-readout p {
+  margin: 0;
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.terrain-model-preset-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(82px, 1fr));
+  gap: 8px;
+}
+
+.terrain-model-preset-row button {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 58px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+  padding: 8px 6px;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.terrain-model-preset-row button:hover {
+  border-color: var(--tm-accent-border);
+  background: var(--tm-accent-soft);
+}
+
+.terrain-model-preset-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.terrain-model-preset-row .material-symbols-outlined {
+  color: var(--tm-accent-ink);
+  font-size: 21px;
+}
+
+.terrain-model-preset-row strong {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.terrain-model-preset-row em {
+  display: none;
+}
+
+.terrain-model-feature-switches {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.terrain-model-control-section__grid .terrain-model-check {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--terrain-field-height);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  padding: 0 10px;
+}
+
+.terrain-model-control-section__grid .terrain-model-check--field {
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: 6px;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.terrain-model-check__control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: var(--terrain-field-height);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  padding: 0 10px;
+}
+
+.terrain-model-check__state {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.terrain-model-check__control input[type="checkbox"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.terrain-model-check__indicator {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--tm-text-muted);
+  color: transparent;
+  font-size: 20px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.terrain-model-check__control:has(input:checked) {
+  border-color: var(--tm-accent-border);
+  background: var(--tm-accent-soft);
+}
+
+.terrain-model-check__control:has(input:checked) .terrain-model-check__indicator {
+  border-color: transparent;
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+}
+
+.terrain-model-check__control:has(input:checked) .terrain-model-check__state {
+  color: var(--tm-accent-ink);
+}
+
+.terrain-model-check__control:has(input:focus-visible) {
+  outline: 2px solid var(--tm-accent);
+  outline-offset: 2px;
+}
+
+.terrain-model-check__control:has(input:disabled) {
+  opacity: 0.5;
+}
+
+.terrain-model-control-section__grid .terrain-model-switch-card {
+  min-height: 0;
+  background: transparent;
+}
+
+.terrain-model-control-section__grid .terrain-model-switch-card:has(input:checked) {
+  background: transparent;
+}
+
+.terrain-model-style-summary {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.terrain-model-style-summary div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  min-height: 58px;
+  align-content: center;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+  padding: 9px 10px;
+}
+
+.terrain-model-style-summary span {
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.terrain-model-style-summary strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.terrain-model-style-summary .is-enabled {
+  border-color: var(--tm-success);
+  background: var(--tm-success-soft);
+}
+
+.terrain-model-style-summary .is-enabled strong {
+  color: var(--tm-success);
+}
+
+.terrain-model-relief-mode {
+  display: grid;
+  gap: 6px;
+}
+
+.terrain-model-relief-mode > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-height: var(--terrain-field-height);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+}
+
+.terrain-model-relief-mode button {
+  border: 0;
+  border-right: 1px solid var(--tm-border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.terrain-model-relief-mode button:last-child {
+  border-right: 0;
+}
+
+.terrain-model-relief-mode button.is-active {
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+}
+
+.terrain-model-relief-meter {
+  display: grid;
+  gap: 10px;
+  background: var(--tm-accent-soft);
+  padding: var(--terrain-panel-padding);
+}
+
+.terrain-model-relief-meter__head,
+.terrain-model-relief-meter__values,
+.terrain-model-relief-meter__ticks {
+  display: grid;
+  min-width: 0;
+}
+
+.terrain-model-relief-meter__head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.terrain-model-relief-meter__head div,
+.terrain-model-relief-meter__values div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.terrain-model-relief-meter span {
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.terrain-model-relief-meter strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 16px;
+}
+
+.terrain-model-relief-meter__status {
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  padding: 4px 8px;
+  color: var(--tm-text-secondary);
+}
+
+.terrain-model-relief-meter__status--real {
+  border-color: var(--tm-success);
+  color: var(--tm-success);
+}
+
+.terrain-model-relief-meter__status--soft {
+  border-color: var(--tm-info);
+  color: var(--tm-info);
+}
+
+.terrain-model-relief-meter__status--print {
+  border-color: var(--tm-warning);
+  color: var(--tm-warning);
+}
+
+.terrain-model-relief-meter__status--high {
+  border-color: var(--tm-danger);
+  color: var(--tm-danger);
+}
+
+.terrain-model-relief-meter__values {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.terrain-model-relief-meter__values div {
+  border: 1px solid var(--tm-border);
+  background: rgba(255, 255, 255, 0.72);
+  min-height: 58px;
+  padding: 9px;
+}
+
+.terrain-model-relief-meter__track {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  background: var(--tm-border);
+}
+
+.terrain-model-relief-meter__fill {
+  display: block;
+  width: var(--relief-meter-percent, 0%);
+  height: 100%;
+  background: var(--tm-accent);
+}
+
+.terrain-model-relief-meter__marker {
+  position: absolute;
+  top: 50%;
+  left: var(--relief-meter-percent, 0%);
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--tm-text);
+  background: var(--tm-surface);
+  transform: translate(-50%, -50%);
+}
+
+.terrain-model-relief-meter__ticks {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.terrain-model-relief-meter__ticks span:nth-child(2),
+.terrain-model-relief-meter__ticks span:nth-child(3) {
+  text-align: center;
+}
+
+.terrain-model-relief-meter__ticks span:last-child {
+  text-align: right;
+}
+
+.terrain-model-status-strip,
+.terrain-model-action-row {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+}
+
+.terrain-model-status-strip {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+}
+
+.terrain-model-status-strip--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.terrain-model-status-strip--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.terrain-model-status-strip > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  min-height: 58px;
+  align-content: center;
+  padding: 10px;
+  border-right: 1px solid var(--tm-border);
+}
+
+.terrain-model-status-strip > div:last-child {
+  border-right: 0;
+}
+
+.terrain-model-status-strip span {
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.terrain-model-status-strip strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.terrain-model-action-row {
+  align-items: stretch;
+}
+
+.terrain-model-action-row--single {
+  grid-template-columns: 1fr;
+}
+
+.terrain-model-action-row--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.terrain-model-action-row--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.terrain-model-action-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: var(--terrain-field-height);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  padding: 0 10px;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.terrain-model-action-row button:hover {
+  border-color: var(--tm-accent-border);
+  background: var(--tm-accent-soft);
+}
+
+.terrain-model-action-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.terrain-model-status--success {
+  color: var(--tm-success);
+}
+
+.terrain-model-status--idle {
+  color: var(--tm-text-muted);
+}
+
+.terrain-model-status--loading {
+  color: var(--tm-info);
+}
+
+.terrain-model-status--warning {
+  color: var(--tm-warning);
+}
+
+.terrain-model-status--error {
+  color: var(--tm-danger);
+}
+
+.terrain-model-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
+  gap: 1px;
+  background: var(--tm-border);
+}
+
+.terrain-model-stats div {
+  display: grid;
+  gap: 3px;
+  align-content: center;
+  min-height: 56px;
+  padding: 10px 12px;
+  background: var(--tm-surface);
+}
+
+.terrain-model-stats span {
+  color: var(--tm-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.terrain-model-stats strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.terrain-model-readiness {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--tm-border);
+  border-bottom: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  padding: var(--terrain-panel-padding);
+}
+
+.terrain-model-readiness--ready {
+  background: var(--tm-success-soft);
+}
+
+.terrain-model-readiness--review {
+  background: var(--tm-accent-soft);
+}
+
+.terrain-model-readiness--blocked {
+  background: var(--tm-danger-soft);
+}
+
+.terrain-model-readiness__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.terrain-model-readiness__head div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.terrain-model-readiness__head span,
+.terrain-model-readiness__check p {
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.terrain-model-readiness__head strong {
+  font-size: 16px;
+}
+
+.terrain-model-readiness__badge {
+  border: 1px solid var(--tm-border);
+  background: rgba(255, 255, 255, 0.72);
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.terrain-model-readiness__badge--ready {
+  border-color: var(--tm-success);
+  color: var(--tm-success);
+}
+
+.terrain-model-readiness__badge--review {
+  border-color: var(--tm-warning);
+  color: var(--tm-warning);
+}
+
+.terrain-model-readiness__badge--blocked {
+  border-color: var(--tm-danger);
+  color: var(--tm-danger);
+}
+
+.terrain-model-readiness__checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.terrain-model-readiness__check {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  min-height: 72px;
+  min-width: 0;
+  border: 1px solid var(--tm-border);
+  background: rgba(255, 255, 255, 0.66);
+  padding: 9px;
+}
+
+.terrain-model-readiness__check > span {
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.terrain-model-readiness__check div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.terrain-model-readiness__check strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.terrain-model-readiness__check p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.terrain-model-readiness__check--ok > span {
+  color: var(--tm-success);
+}
+
+.terrain-model-readiness__check--review > span {
+  color: var(--tm-warning);
+}
+
+.terrain-model-readiness__check--blocked > span {
+  color: var(--tm-danger);
+}
+
+.terrain-model-delivery {
+  display: grid;
+  overflow: hidden;
+}
+
+.terrain-model-delivery__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px var(--terrain-panel-padding);
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.terrain-model-delivery__head div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.terrain-model-delivery__head span,
+.terrain-model-delivery__group > span,
+.terrain-model-delivery--empty p {
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.terrain-model-delivery__head strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.terrain-model-delivery__group {
+  display: grid;
+  gap: 8px;
+  padding: 10px var(--terrain-panel-padding) var(--terrain-panel-padding);
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.terrain-model-delivery__group:last-child {
+  border-bottom: 0;
+}
+
+.terrain-model-delivery--empty {
+  padding-bottom: 12px;
+}
+
+.terrain-model-delivery--empty p {
+  margin: 0;
+  padding: 0 14px;
+  line-height: 1.45;
+}
+
+.terrain-model-bambu-card {
+  display: grid;
+  gap: 10px;
+  margin: 10px var(--terrain-panel-padding) 0;
+  padding: 12px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+}
+
+.terrain-model-bambu-card__head {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.terrain-model-bambu-card__head > .material-symbols-outlined {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  background: var(--tm-text);
+  color: var(--tm-soft);
+  font-size: 19px;
+}
+
+.terrain-model-bambu-card__head div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.terrain-model-bambu-card__head span,
+.terrain-model-bambu-slot span {
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.terrain-model-bambu-card__head strong,
+.terrain-model-bambu-slot strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--tm-text);
+}
+
+.terrain-model-bambu-card__head p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.terrain-model-bambu-card__notice {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  min-height: 36px;
+  padding: 8px;
+  border: 1px solid var(--tm-success);
+  background: var(--tm-success-soft);
+}
+
+.terrain-model-bambu-card__notice .material-symbols-outlined {
+  color: var(--tm-success);
+  font-size: 19px;
+}
+
+.terrain-model-bambu-card__notice p {
+  margin: 0;
+  color: var(--tm-success);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.terrain-model-bambu-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.terrain-model-bambu-card__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  color: var(--tm-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.terrain-model-bambu-card__actions button:first-child {
+  border-color: var(--tm-accent-border);
+  background: var(--tm-accent);
+  color: var(--tm-text);
+}
+
+.terrain-model-bambu-card__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.terrain-model-bambu-card__actions .material-symbols-outlined {
+  flex: 0 0 auto;
+  font-size: 18px;
+}
+
+.terrain-model-bambu-card__actions button span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terrain-model-bambu-preflight {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+}
+
+.terrain-model-bambu-preflight__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.terrain-model-bambu-preflight__head div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.terrain-model-bambu-preflight__head span,
+.terrain-model-bambu-preflight__check p {
+  color: var(--tm-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.terrain-model-bambu-preflight__head strong,
+.terrain-model-bambu-preflight__check strong {
+  color: var(--tm-text);
+  font-weight: 700;
+}
+
+.terrain-model-bambu-preflight__head > span {
+  padding: 5px 8px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+  color: var(--tm-text);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.terrain-model-bambu-preflight__checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.terrain-model-bambu-preflight__check {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 7px;
+  align-items: start;
+  min-height: 54px;
+  padding: 8px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+}
+
+.terrain-model-bambu-preflight__check > .material-symbols-outlined {
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.terrain-model-bambu-preflight__check div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.terrain-model-bambu-preflight__check p {
+  margin: 0;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.terrain-model-bambu-preflight__check--ok > .material-symbols-outlined {
+  color: var(--tm-success);
+}
+
+.terrain-model-bambu-preflight__check--review > .material-symbols-outlined {
+  color: var(--tm-accent-ink);
+}
+
+.terrain-model-bambu-preflight__check--blocked > .material-symbols-outlined {
+  color: var(--tm-danger);
+}
+
+.terrain-model-bambu-slots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.terrain-model-bambu-slot {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+}
+
+.terrain-model-bambu-slot__swatch {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--tm-border-strong);
+  background: var(--bambu-slot-color, var(--tm-text-muted));
+}
+
+.terrain-model-bambu-slot div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.terrain-model-bambu-slot__parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.terrain-model-bambu-slot__parts span {
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+  padding: 2px 5px;
+  color: var(--tm-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.terrain-model-downloads {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+.terrain-model-delivery .terrain-model-downloads {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0;
+}
+
+.terrain-model-downloads button {
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.terrain-model-delivery .terrain-model-downloads button {
+  display: grid;
+  grid-template-columns: 18px auto minmax(0, 1fr);
+  align-items: center;
+}
+
+.terrain-model-downloads__badge {
+  min-width: 62px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+  padding: 2px 6px;
+  color: var(--tm-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.terrain-model-downloads button span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .terrain-model-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .terrain-model-right {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    /* 单列堆叠时把「输入 + 生成 + 预览」放到设置面板上方，生成键仍在易达处 */
+    order: -1;
+  }
+
+  /* 单列时工具栏不再 sticky，避免高栏长期占顶 */
+  .terrain-model-toolbar {
+    position: static;
+  }
+
+  .terrain-model-preview {
+    height: 460px;
+  }
+}
+
+@media (max-width: 760px) {
+  .terrain-model-file,
+  .terrain-model-toggle,
+  .terrain-model-btn,
+  .terrain-model-config-file {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .terrain-model-workflow,
+  .terrain-model-form-grid,
+  .terrain-model-control-section__grid,
+  .terrain-model-preset-row,
+  .terrain-model-feature-switches,
+  .terrain-model-style-summary,
+  .terrain-model-status-strip,
+  .terrain-model-action-row,
+  .terrain-model-bounds-panel__lead,
+  .terrain-model-bounds-panel__settings,
+  .terrain-model-bounds-panel__shape,
+  .terrain-model-bounds-panel__metrics,
+  .terrain-model-bounds-panel__extra,
+  .terrain-model-bounds-panel__coords,
+  .terrain-model-bounds-advanced__grid,
+  .terrain-model-stats,
+  .terrain-model-readiness__checks,
+  .terrain-model-bambu-slots,
+  .terrain-model-bambu-preflight__checks,
+  .terrain-model-bambu-card__actions,
+  .terrain-model-downloads {
+    grid-template-columns: 1fr;
+  }
+
+  .terrain-model-bounds-panel__mode,
+  .terrain-model-bounds-panel__manual-actions,
+  .terrain-model-bounds-panel__shape {
+    grid-auto-flow: row;
+    width: 100%;
+  }
+
+  .terrain-model-bounds-panel__mode button,
+  .terrain-model-bounds-panel__manual-actions button,
+  .terrain-model-bounds-panel__shape button {
+    min-height: 40px;
+    border-right: 0;
+    border-bottom: 1px solid var(--tm-border);
+  }
+
+  .terrain-model-bounds-panel__mode button:last-child,
+  .terrain-model-bounds-panel__manual-actions button:last-child,
+  .terrain-model-bounds-panel__shape button:last-child {
+    border-bottom: 0;
+  }
+
+  .terrain-model-bounds-panel__manual-actions,
+  .terrain-model-bounds-panel__shape {
+    justify-self: stretch;
+  }
+
+  .terrain-model-bounds-panel__metrics div {
+    border-right: 0;
+    border-bottom: 1px solid var(--tm-border);
+  }
+
+  .terrain-model-bounds-panel__metrics div:last-child {
+    border-bottom: 0;
+  }
+
+  .terrain-model-bounds-panel__coords div {
+    border-right: 0;
+    border-bottom: 1px solid var(--tm-border);
+  }
+
+  .terrain-model-bounds-panel__coords div:last-child {
+    border-bottom: 0;
+  }
+
+  .terrain-model-status-strip > div {
+    border-right: 0;
+    border-bottom: 1px solid var(--tm-border);
+  }
+
+  .terrain-model-status-strip > div:last-child {
+    border-bottom: 0;
+  }
+
+  .terrain-model-relief-meter__head,
+  .terrain-model-relief-meter__values,
+  .terrain-model-readiness__head {
+    grid-template-columns: 1fr;
+  }
+
+  .terrain-model-stats div {
+    border-right: 0;
+    border-bottom: 1px solid var(--tm-border);
+  }
+
+  .terrain-model-stats div:nth-child(n + 6) {
+    border-top: 0;
+  }
+
+  .terrain-model-stats div:last-child {
+    border-bottom: 0;
+  }
+
+  .terrain-model-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .terrain-model-stats div:nth-child(odd) {
+    border-right: 1px solid var(--tm-border);
+  }
+
+  .terrain-model-stats div:nth-last-child(-n + 2) {
+    border-bottom: 0;
+  }
+
+  .terrain-model-workflow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .terrain-model-workflow__step {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    padding: 10px;
+  }
+
+  .terrain-model-workflow__icon {
+    display: none;
+  }
+
+  .terrain-model-map {
+    height: 300px;
+  }
+
+  .terrain-model-preview {
+    height: 360px;
+    min-height: 320px;
+  }
+
+  .terrain-model-preview__camera {
+    left: 10px;
+    right: 10px;
+    top: 10px;
+  }
+
+  .terrain-model-preview__camera button {
+    flex: 1 1 calc(50% - 6px);
+    min-height: 42px;
+  }
+}
+
+/* ── 分段切换：色彩模式（与起伏模式 / 范围模式统一）── */
+.terrain-model-elevation-bands,
+.terrain-model-satellite-config {
+  grid-column: 1 / -1;
+}
+
+.terrain-model-color-mode-switch {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: var(--terrain-field-height);
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.terrain-model-color-mode-switch button {
+  border: 0;
+  border-right: 1px solid var(--tm-border);
+  background: transparent;
+  color: var(--tm-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+.terrain-model-color-mode-switch button:last-child { border-right: 0; }
+.terrain-model-color-mode-switch button.is-active {
+  background: var(--tm-accent);
+  color: var(--tm-on-accent);
+}
+.terrain-model-color-mode-switch button:hover:not(.is-active) {
+  background: var(--tm-accent-soft);
+  color: var(--tm-text);
+}
+
+/* ── 海拔色带编辑器（表格式：表头只出现一次，行内单行紧凑）── */
+.terrain-model-band-editor {
+  display: grid;
+  margin-bottom: 12px;
+  border: 1px solid var(--tm-border);
+}
+
+.terrain-model-band-head,
+.terrain-model-band-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 64px 30px;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+}
+
+.terrain-model-band-head {
+  background: var(--tm-soft);
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.terrain-model-band-head span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tm-text-muted);
+}
+
+.terrain-model-band-head span:nth-child(3) {
+  text-align: center;
+}
+
+.terrain-model-band-row {
+  border-bottom: 1px solid var(--tm-border);
+}
+
+.terrain-model-band-row:last-child {
+  border-bottom: 0;
+}
+
+.terrain-model-band-row input {
+  width: 100%;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+}
+
+.terrain-model-band-pct {
+  text-align: center;
+}
+
+/* 颜色井：可见色块叠一个透明取色器，整块可点 */
+.terrain-model-band-color {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+}
+
+.terrain-model-band-swatch {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--tm-border-strong);
+}
+
+.terrain-model-band-color input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.terrain-model-band-remove {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  color: var(--tm-text-muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.terrain-model-band-remove .material-symbols-outlined {
+  font-size: 18px;
+}
+
+.terrain-model-band-remove:hover {
+  background: var(--tm-danger-soft);
+  border-color: var(--tm-danger);
+  color: var(--tm-danger);
+}
+
+.terrain-model-band-remove--empty {
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.terrain-model-band-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  background: var(--tm-soft);
+  color: var(--tm-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.terrain-model-band-add:hover {
+  background: var(--tm-accent-soft);
+  color: var(--tm-accent-ink);
+}
+
+/* ── 卫星色彩配置 ── */
+.terrain-model-satellite-config {
+  display: grid;
+  gap: 10px;
+}
+.terrain-model-satellite-hint {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--tm-text-secondary);
+  background: var(--tm-soft);
+  border-left: 2px solid var(--tm-accent);
+}
+.terrain-model-satellite-warning {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--tm-warning);
+  background: var(--tm-warning-soft);
+  border-left: 2px solid var(--tm-warning);
+}
+.terrain-model-satellite-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.terrain-model-satellite-metrics div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+}
+.terrain-model-satellite-metrics span {
+  display: block;
+  color: var(--tm-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.terrain-model-satellite-metrics strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--tm-text);
+  font-size: 13px;
+  line-height: 1.2;
+}
+.terrain-model-cluster-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-soft);
+}
+.terrain-model-cluster-swatch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+.terrain-model-cluster-color {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--tm-border-strong);
+}
+.terrain-model-cluster-swatch code {
+  font-size: 10px;
+  font-family: var(--font-mono, monospace);
+  color: var(--tm-text-secondary);
+}
+
+/* ── ControlSection 内联分隔线 ── */
+.terrain-model-section-divider {
+  height: 1px;
+  background: var(--tm-border);
+  margin: 8px 0 12px;
+}
+
+/* ── ControlSection 内可折叠子区（高级几何 / 底座铭牌）── */
+.terrain-model-subsection {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--tm-border);
+}
+.terrain-model-subsection > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tm-text-secondary);
+  cursor: pointer;
+  padding: 4px 0;
+  list-style: none;
+}
+.terrain-model-subsection > summary::-webkit-details-marker { display: none; }
+.terrain-model-subsection > summary .material-symbols-outlined {
+  font-size: 17px;
+  color: var(--tm-accent-ink);
+}
+.terrain-model-subsection__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.terrain-model-subsection__grid label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--tm-text-muted);
+}
+.terrain-model-subsection__grid label span:first-child {
+  font-weight: 600;
+  color: var(--tm-text-secondary);
+}
+.terrain-model-subsection__grid input,
+.terrain-model-subsection__grid select {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--tm-border);
+  background: var(--tm-surface);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}

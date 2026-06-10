@@ -594,6 +594,22 @@
   gap: 12px;
 }
 
+.workspace-main__mobile-menu-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--layer-border, #e7e5e4);
+  background: var(--layer-surface, #ffffff);
+  color: var(--layer-text-primary, #1c1917);
+  cursor: pointer;
+}
+
+.workspace-main__mobile-menu-btn .material-symbols-outlined {
+  font-size: 20px;
+}
+
 .workspace-main__topbar-title {
   font-family: var(--font-headline, 'Space Grotesk', sans-serif);
   font-size: 14px;
@@ -636,6 +652,54 @@
   font-size: 16px;
   color: var(--layer-text-muted, #78716c);
   pointer-events: none;
+}
+
+.workspace-main__install-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--layer-border-accent, rgba(212, 160, 23, 0.24));
+  background: var(--layer-accent-soft, rgba(212, 160, 23, 0.08));
+  color: var(--layer-accent, #D4A017);
+  font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.workspace-main__install-btn:hover {
+  border-color: var(--layer-accent, #D4A017);
+  background: var(--layer-accent-muted, rgba(212, 160, 23, 0.15));
+}
+
+.workspace-main__install-btn .material-symbols-outlined {
+  font-size: 17px;
+}
+
+.workspace-main__install-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+}
+
+.workspace-main__install-copy,
+.workspace-main__install-hint {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-main__install-hint {
+  color: var(--layer-text-muted, #78716c);
+  font-family: var(--font-body, 'Inter', sans-serif);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .workspace-main__topbar-btn {
@@ -889,11 +953,19 @@
 .workspace-main__title {
   margin: 0;
   font-family: var(--font-headline, 'Space Grotesk', sans-serif);
-  font-size: clamp(1.5rem, 1.2rem + 0.6vw, 2rem);
+  font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.15;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: var(--layer-text-primary, #1c1917);
+}
+
+.workspace-main__summary {
+  max-width: 760px;
+  margin: 8px 0 0;
+  color: var(--layer-text-muted, #78716c);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 /* ── 内容区 ── */
@@ -1074,28 +1146,350 @@
 }
 
 /* ========================================
+   H5 App Shell
+   ======================================== */
+
+.workspace-mobile-menu,
+.workspace-mobile-dock {
+  display: none;
+}
+
+/* ========================================
    响应式
    ======================================== */
 
 @media (max-width: 768px) {
   .workspace-layout {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
   }
 
   .workspace-sidebar {
     display: none;
   }
 
+  .workspace-main {
+    max-height: none;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .workspace-main__topbar {
+    gap: 8px;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  }
+
+  .workspace-main__topbar-left {
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .workspace-main__mobile-menu-btn {
+    display: inline-flex;
+  }
+
+  .workspace-main__topbar-title {
+    max-width: 42vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    text-transform: none;
+  }
+
+  .workspace-main__topbar-right {
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  .workspace-main__topbar-search {
+    display: none;
+  }
+
+  .workspace-main__install-btn {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .workspace-main__install-text {
+    display: none;
+  }
+
+  .workspace-main__mobile-menu-btn,
+  .workspace-main__topbar-btn,
+  .context-square-entry__trigger,
+  .workspace-main__topbar-avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .workspace-main__page-header {
+    padding: 16px 14px 12px;
+  }
+
+  .workspace-main__page-header-inner {
+    border-left-width: 4px;
+    padding-left: 12px;
+  }
+
+  .workspace-main__title {
+    font-size: 1.35rem;
+    letter-spacing: 0;
+  }
+
+  .workspace-main__summary {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
   .workspace-main__content {
-    padding: 16px;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 12px;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
   }
 
   .app-portal-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .app-portal-card {
+    min-height: 132px;
+    padding: 16px;
+  }
+
+  .app-portal-card__description {
+    line-height: 1.5;
   }
 
   .context-square-entry__panel {
     width: min(320px, calc(100vw - 24px));
     right: -6px;
+  }
+
+  .workspace-mobile-dock {
+    position: relative;
+    z-index: var(--z-floating-toolbar, 500);
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 2px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--layer-panel, #1c1917) 96%, transparent);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 -10px 24px rgba(28, 25, 23, 0.16);
+  }
+
+  .workspace-mobile-dock__item {
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    gap: 3px;
+    min-width: 0;
+    min-height: 52px;
+    border: 0;
+    background: transparent;
+    color: rgba(250, 250, 249, 0.62);
+    text-decoration: none;
+    font-family: var(--font-body, 'Inter', sans-serif);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.1;
+    cursor: pointer;
+  }
+
+  .workspace-mobile-dock__item .material-symbols-outlined {
+    font-size: 20px;
+  }
+
+  .workspace-mobile-dock__item span:last-child {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .workspace-mobile-dock__item--active {
+    color: var(--layer-accent-light, #FDE68A);
+    background: rgba(212, 160, 23, 0.12);
+  }
+
+  .workspace-mobile-dock__item--button {
+    font: inherit;
+  }
+
+  .workspace-mobile-menu {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal-overlay, 1000);
+    display: block;
+  }
+
+  .workspace-mobile-menu__backdrop {
+    position: absolute;
+    inset: 0;
+    border: 0;
+    background: rgba(12, 10, 9, 0.5);
+  }
+
+  .workspace-mobile-menu__panel {
+    position: absolute;
+    inset: 0 0 0 auto;
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    width: min(360px, 88vw);
+    max-width: 100%;
+    padding: calc(18px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+    background: var(--layer-bg-primary, #faf9f7);
+    color: var(--layer-text-primary, #1c1917);
+    box-shadow: -20px 0 40px rgba(28, 25, 23, 0.18);
+    overflow: hidden;
+  }
+
+  .workspace-mobile-menu__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--layer-border, #e7e5e4);
+  }
+
+  .workspace-mobile-menu__eyebrow {
+    display: block;
+    font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--layer-accent, #D4A017);
+  }
+
+  .workspace-mobile-menu__title {
+    margin: 2px 0 0;
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .workspace-mobile-menu__close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--layer-border, #e7e5e4);
+    background: var(--layer-surface, #ffffff);
+    color: var(--layer-text-primary, #1c1917);
+  }
+
+  .workspace-mobile-menu__install {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    margin: 14px 0;
+    padding: 12px;
+    border: 1px solid var(--layer-border-accent, rgba(212, 160, 23, 0.24));
+    background: var(--layer-accent-soft, rgba(212, 160, 23, 0.08));
+    color: var(--layer-text-primary, #1c1917);
+    text-align: left;
+  }
+
+  .workspace-mobile-menu__install .material-symbols-outlined {
+    color: var(--layer-accent, #D4A017);
+  }
+
+  .workspace-mobile-menu__install strong,
+  .workspace-mobile-menu__install small {
+    display: block;
+  }
+
+  .workspace-mobile-menu__install strong {
+    font-size: 14px;
+  }
+
+  .workspace-mobile-menu__install small {
+    margin-top: 2px;
+    color: var(--layer-text-muted, #78716c);
+    font-size: 11px;
+  }
+
+  .workspace-mobile-menu__nav {
+    min-height: 0;
+    overflow: auto;
+    display: grid;
+    align-content: start;
+    gap: 16px;
+    padding-right: 2px;
+  }
+
+  .workspace-mobile-menu__section {
+    display: grid;
+    gap: 8px;
+  }
+
+  .workspace-mobile-menu__section-title {
+    font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: var(--layer-text-muted, #78716c);
+  }
+
+  .workspace-mobile-menu__links {
+    display: grid;
+    gap: 6px;
+  }
+
+  .workspace-mobile-menu__link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 0 10px;
+    border: 1px solid var(--layer-border, #e7e5e4);
+    background: var(--layer-surface, #ffffff);
+    color: var(--layer-text-primary, #1c1917);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .workspace-mobile-menu__link .material-symbols-outlined {
+    color: var(--layer-text-muted, #78716c);
+    font-size: 19px;
+  }
+
+  .workspace-mobile-menu__link--active {
+    border-color: var(--layer-accent, #D4A017);
+    background: var(--layer-accent-soft, rgba(212, 160, 23, 0.08));
+    color: var(--layer-accent, #D4A017);
+  }
+
+  .workspace-mobile-menu__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 14px;
+    border-top: 1px solid var(--layer-border, #e7e5e4);
+    color: var(--layer-text-muted, #78716c);
+    font-size: 12px;
+  }
+
+  .workspace-mobile-menu__footer button {
+    min-height: 32px;
+    border: 1px solid var(--layer-border, #e7e5e4);
+    background: var(--layer-surface, #ffffff);
+    color: var(--layer-text-primary, #1c1917);
+    font-size: 12px;
   }
 }

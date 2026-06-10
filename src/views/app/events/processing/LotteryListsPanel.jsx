@@ -6,12 +6,13 @@ import { unwrapData } from '../../../../utils/apiResponse'
 import { isWildcard, buildResolvedEntries, applyStatusesForEntries } from '../../../../utils/listMatching'
 import { parseListExcel } from '../../../../utils/excelProcessor'
 import {
-  CommandDataTable,
-  CommandEmptyState,
-  CommandNotice,
-  CommandPanel,
-  CommandStatusTag,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5DataCard,
+  AppH5DataTable,
+  AppH5EmptyState,
+  AppH5Notice,
+  AppH5Panel,
+  AppH5StatusTag,
+} from '../../../../components/app/AppH5Surface'
 import ListEntryEditModal from './ListEntryEditModal'
 
 const LIST_TABS = [
@@ -280,9 +281,9 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
 
   return (
     <div className="processing-stack">
-      {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
+      {message ? <AppH5Notice tone={messageTone}>{message}</AppH5Notice> : null}
 
-      <CommandPanel
+      <AppH5Panel
         title="黑 / 白名单概览"
         subtitle="导入后不会自动长期保持同步，修改名单后请手动重新应用匹配。"
         actions={(
@@ -300,7 +301,7 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
           <article className="pipeline-event-card">
             <div className="pipeline-event-title-row">
               <strong>白名单</strong>
-              <CommandStatusTag tone="success">{stats.whitelistTotal} 条</CommandStatusTag>
+              <AppH5StatusTag tone="success">{stats.whitelistTotal} 条</AppH5StatusTag>
             </div>
             <div className="pipeline-event-stats">
               <span>已匹配 {stats.whitelistMatched}</span>
@@ -309,7 +310,7 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
           <article className="pipeline-event-card">
             <div className="pipeline-event-title-row">
               <strong>黑名单</strong>
-              <CommandStatusTag tone="danger">{stats.blacklistTotal} 条</CommandStatusTag>
+              <AppH5StatusTag tone="danger">{stats.blacklistTotal} 条</AppH5StatusTag>
             </div>
             <div className="pipeline-event-stats">
               <span>已匹配 {stats.blacklistMatched}</span>
@@ -318,16 +319,16 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
           <article className="pipeline-event-card">
             <div className="pipeline-event-title-row">
               <strong>选手记录</strong>
-              <CommandStatusTag tone="neutral">{stats.recordTotal} 人</CommandStatusTag>
+              <AppH5StatusTag tone="neutral">{stats.recordTotal} 人</AppH5StatusTag>
             </div>
             <div className="pipeline-event-stats">
               <span>当前赛事可用于匹配的完整记录集合</span>
             </div>
           </article>
         </div>
-      </CommandPanel>
+      </AppH5Panel>
 
-      <CommandPanel
+      <AppH5Panel
         title="冲突规则"
         subtitle={conflictRule === 'strict' ? '严格模式：黑名单命中优先，冲突将强制剔除。' : '宽松模式：白名单优先，冲突将强制保签。'}
       >
@@ -345,9 +346,9 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
             宽松模式
           </button>
         </div>
-      </CommandPanel>
+      </AppH5Panel>
 
-      <CommandPanel title="单条维护" subtitle="支持手工补录当前列表中的单条名单。">
+      <AppH5Panel title="单条维护" subtitle="支持手工补录当前列表中的单条名单。">
         <div className="processing-list-toolbar">
           <input
             className="input"
@@ -371,9 +372,9 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
             新增到当前列表
           </button>
         </div>
-      </CommandPanel>
+      </AppH5Panel>
 
-      <CommandPanel
+      <AppH5Panel
         title={`${currentTabMeta.label}处理`}
         subtitle="支持 Excel 导入、搜索、单条编辑删除与整表清空。"
         actions={(
@@ -411,15 +412,51 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
         </div>
 
         {loading ? (
-          <CommandNotice tone="info">正在加载名单数据...</CommandNotice>
+          <AppH5Notice tone="info">正在加载名单数据...</AppH5Notice>
         ) : currentEntries.length === 0 ? (
-          <CommandEmptyState
+          <AppH5EmptyState
             icon={activeListType === 'whitelist' ? 'WL' : 'BL'}
             title={`暂无${currentTabMeta.label}数据`}
             description={currentTabMeta.empty}
           />
         ) : (
-          <CommandDataTable>
+          <AppH5DataTable
+            mobileCards={currentEntries.map((entry, index) => {
+              const matchLabel = entry.matchedRecordId ? `已匹配 #${entry.matchedRecordId}` : '未匹配'
+              const matchType = entry.matchType || (isWildcard(entry.idNumber) ? '待匹配' : '精确')
+
+              return (
+                <AppH5DataCard
+                  key={entry.id || `${entry.listType}-${entry.idNumber}-${index}`}
+                  eyebrow={activeListType === 'whitelist' ? '白名单' : '黑名单'}
+                  title={entry.name || '(未命名)'}
+                  meta={(
+                    <AppH5StatusTag tone={entry.matchedRecordId ? 'success' : 'warning'}>
+                      {matchLabel}
+                    </AppH5StatusTag>
+                  )}
+                  fields={[
+                    { key: 'name', label: '姓名', value: entry.name },
+                    { key: 'idNumber', label: '证件号', value: entry.idNumber },
+                    { key: 'phone', label: '手机号', value: entry.phone || '-' },
+                    { key: 'match', label: '匹配状态', value: matchLabel },
+                    { key: 'matchType', label: '匹配方式', value: matchType },
+                  ]}
+                  actions={(
+                    <div className="processing-inline-actions">
+                      <button className="btn btn--ghost btn--sm" onClick={() => handleEditEntry(entry)}>
+                        编辑
+                      </button>
+                      <button className="btn btn--ghost btn--sm" onClick={() => handleDeleteEntry(entry.id)}>
+                        删除
+                      </button>
+                    </div>
+                  )}
+                />
+              )
+            })}
+          >
+            <table>
             <thead>
               <tr>
                 <th>#</th>
@@ -439,14 +476,14 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
                   <td>{entry.idNumber}</td>
                   <td>{entry.phone || '-'}</td>
                   <td>
-                    <CommandStatusTag tone={entry.matchedRecordId ? 'success' : 'warning'}>
+                    <AppH5StatusTag tone={entry.matchedRecordId ? 'success' : 'warning'}>
                       {entry.matchedRecordId ? `已匹配 #${entry.matchedRecordId}` : '未匹配'}
-                    </CommandStatusTag>
+                    </AppH5StatusTag>
                   </td>
                   <td>
-                    <CommandStatusTag tone={entry.matchType === 'fuzzy' ? 'warning' : 'neutral'}>
+                    <AppH5StatusTag tone={entry.matchType === 'fuzzy' ? 'warning' : 'neutral'}>
                       {entry.matchType || (isWildcard(entry.idNumber) ? '待匹配' : '精确')}
-                    </CommandStatusTag>
+                    </AppH5StatusTag>
                   </td>
                   <td>
                     <div className="processing-inline-actions">
@@ -461,13 +498,14 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
                 </tr>
               ))}
             </tbody>
-          </CommandDataTable>
+            </table>
+          </AppH5DataTable>
         )}
 
         <div className="processing-help">
           Excel 表头至少包含“姓名”和“证件号”列。证件号支持 `*` 与 `?` 通配符，用于模糊匹配黑名单。
         </div>
-      </CommandPanel>
+      </AppH5Panel>
 
       {editingEntry ? (
         <ListEntryEditModal

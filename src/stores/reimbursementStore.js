@@ -448,6 +448,7 @@ const useReimbursementStore = create(
           set({ isLoading: false });
         } catch (error) {
           set({ error: error.message, isLoading: false });
+          throw error;
         }
       },
 
@@ -460,6 +461,7 @@ const useReimbursementStore = create(
           set({ isLoading: false });
         } catch (error) {
           set({ error: error.message, isLoading: false });
+          throw error;
         }
       },
 

@@ -4,11 +4,10 @@ import racesApi from '../../../../api/races'
 import useRaceContextStore from '../../../../stores/raceContextStore'
 import { unwrapData } from '../../../../utils/apiResponse'
 import {
-  CommandMetricGrid,
-  CommandShell,
-  CommandStepRail,
-  ContextRequirementState,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5ContextState,
+  AppH5Surface,
+  AppH5Tabs,
+} from '../../../../components/app/AppH5Surface'
 import ProcessingOverviewPanel from './ProcessingOverviewPanel'
 import VerificationImportPanel from './VerificationImportPanel'
 import LotteryListsPanel from './LotteryListsPanel'
@@ -86,44 +85,48 @@ export default function ProcessingCenterPage() {
     },
   ]), [activeTabMeta, currentRace?.name, raceDetail?.name, raceId])
 
+  const tabItems = useMemo(() => TABS.map((item) => ({
+    key: item.key,
+    label: item.label,
+    badge: item.icon,
+    active: item.key === activeTab,
+    onClick: () => setActiveTab(item.key),
+  })), [activeTab])
+
   const handleDataChanged = () => {
     setRefreshKey((value) => value + 1)
   }
 
   if (!raceId) {
     return (
-      <div className="command-page surface-app processing-center-page">
-        <CommandShell
-          eyebrow="我的赛事"
-          title="名单处理"
-          summary="把成绩校验、黑白名单和五步二次清洗收回到同一条处理链路。"
-        >
-          <CommandMetricGrid items={[
-            { key: 'race', label: '目标赛事', value: '未选择', meta: '处理中心依赖明确的赛事作用域。', pill: 'RACE' },
-          ]} />
-        </CommandShell>
-        <ContextRequirementState
+      <AppH5Surface
+        className="processing-center-page"
+        eyebrow="我的赛事"
+        title="名单处理"
+        summary="把成绩校验、黑白名单和五步二次清洗收回到同一条处理链路。"
+        metrics={[
+          { key: 'race', label: '目标赛事', value: '未选择', meta: '处理中心依赖明确的赛事作用域。', pill: 'RACE' },
+        ]}
+      >
+        <AppH5ContextState
           title="请先选择赛事"
           description="在顶部控制面板中锁定赛事后，才能进入名单处理中心。"
         />
-      </div>
+      </AppH5Surface>
     )
   }
 
   return (
-    <div className="command-page surface-app processing-center-page">
-      <CommandShell
-        eyebrow="我的赛事"
-        title="名单处理"
-        summary="集中查询导出、状态概览、成绩校验、黑白名单与五步二次清洗。"
-      >
-        <CommandMetricGrid items={metrics} />
-      </CommandShell>
+    <AppH5Surface
+      className="processing-center-page"
+      eyebrow="我的赛事"
+      title="名单处理"
+      summary="集中查询导出、状态概览、成绩校验、黑白名单与五步二次清洗。"
+      metrics={metrics}
+    >
 
-      <CommandStepRail
-        steps={TABS}
-        activeKey={activeTab}
-        onChange={setActiveTab}
+      <AppH5Tabs
+        items={tabItems}
         className="processing-tab-strip"
         ariaLabel="名单处理标签"
       />
@@ -164,6 +167,6 @@ export default function ProcessingCenterPage() {
           />
         ) : null}
       </div>
-    </div>
+    </AppH5Surface>
   )
 }

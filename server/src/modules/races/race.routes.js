@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Race Routes - race CRUD API and bib tracking
  */
 import { Router } from 'express';

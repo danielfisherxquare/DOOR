@@ -3,14 +3,14 @@ import { Link } from 'react-router-dom'
 import racesApi from '../../../api/races'
 import assessmentAdminApi from '../../../api/assessmentAdmin'
 import {
-  CommandDataTable,
-  CommandEmptyState,
-  CommandMetricGrid,
-  CommandNotice,
-  CommandPanel,
-  CommandShell,
-  CommandStatusTag,
-} from '../../../components/command/CommandPrimitives'
+  AppH5DataTable,
+  AppH5EmptyState,
+  AppH5Notice,
+  AppH5Panel,
+  AppH5StatusTag,
+  AppH5Surface,
+} from '../../../components/app/AppH5Surface'
+import './assessment-campaign-list-page.css'
 
 const STATUS_LABELS = {
   draft: '草稿',
@@ -142,22 +142,23 @@ function AssessmentCampaignListPage() {
   }
 
   return (
-    <div className="command-page surface-app">
-      <CommandShell
-        eyebrow="考评管理"
-        title="考评活动"
-        summary="统一管理赛事考评活动、成员覆盖范围与邀请码分发链路。"
-        actions={<button className="btn btn--secondary" onClick={() => void loadData()} disabled={loading || saving || Boolean(deletingId)}>刷新</button>}
-      >
-        <CommandMetricGrid items={metrics} />
-      </CommandShell>
+    <AppH5Surface
+      className="assessment-campaign-list-page"
+      eyebrow="考评管理"
+      title="考评活动"
+      summary="统一管理赛事考评活动、成员覆盖范围与邀请码分发链路。"
+      metrics={metrics}
+      actions={<button className="btn btn--secondary" onClick={() => void loadData()} disabled={loading || saving || Boolean(deletingId)}>刷新</button>}
+    >
+      {message ? <AppH5Notice tone={messageTone}>{message}</AppH5Notice> : null}
+      {loading ? <AppH5Notice tone="info">正在加载考评活动与赛事列表...</AppH5Notice> : null}
 
-      {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
-      {loading ? <CommandNotice tone="info">正在加载考评活动与赛事列表...</CommandNotice> : null}
-
-      <div className="command-grid command-grid--two">
-        <CommandPanel title="创建考评活动" subtitle="选择赛事后，系统会自动注入默认考评模板。">
-          <form onSubmit={handleCreate} className="command-stack">
+      <div className="assessment-campaign-list-page__grid">
+        <AppH5Panel
+          title="创建考评活动"
+          summary="选择赛事后，系统会自动注入默认考评模板。"
+        >
+          <form onSubmit={handleCreate} className="assessment-campaign-list-page__form">
             <div className="input-group">
               <label>赛事</label>
               <select
@@ -192,64 +193,69 @@ function AssessmentCampaignListPage() {
               />
             </div>
 
-            <div className="command-actions-row">
+            <div className="assessment-campaign-list-page__actions">
               <button className="btn btn--primary" type="submit" disabled={saving || !form.raceId || Boolean(deletingId)}>
                 {saving ? '创建中...' : '创建活动'}
               </button>
             </div>
           </form>
-        </CommandPanel>
+        </AppH5Panel>
 
-        <CommandPanel title="活动列表" subtitle="进入详情页可以继续管理成员、邀请码、模板和报表。">
+        <AppH5Panel
+          title="活动列表"
+          summary="进入详情页可以继续管理成员、邀请码、模板和报表。"
+        >
           {!loading && campaigns.length === 0 ? (
-            <CommandEmptyState title="暂无考评活动" description="先创建一个考评活动，再进入详情页完成模板和成员配置。" icon="AS" />
+            <AppH5EmptyState title="暂无考评活动" description="先创建一个考评活动，再进入详情页完成模板和成员配置。" icon="AS" />
           ) : null}
 
           {!loading && campaigns.length > 0 ? (
-            <CommandDataTable>
-              <thead>
-                <tr>
-                  <th>名称</th>
-                  <th>赛事</th>
-                  <th>状态</th>
-                  <th>成员</th>
-                  <th>邀请码</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {campaigns.map((campaign) => (
-                  <tr key={campaign.id}>
-                    <td>{campaign.name}</td>
-                    <td>{campaign.raceName || '-'}</td>
-                    <td>
-                      <CommandStatusTag tone={getStatusTone(campaign.status)}>
-                        {STATUS_LABELS[campaign.status] || campaign.status}
-                      </CommandStatusTag>
-                    </td>
-                    <td>{campaign.memberCount}</td>
-                    <td>{campaign.inviteCodeCount}</td>
-                    <td>
-                      <div className="command-actions-row">
-                        <Link className="btn btn--ghost btn--sm" to={`/app/assessment/${campaign.id}`}>详情</Link>
-                        <button
-                          className="btn btn--ghost btn--sm"
-                          type="button"
-                          onClick={() => void handleDelete(campaign)}
-                          disabled={saving || loading || deletingId === campaign.id}
-                        >
-                          {deletingId === campaign.id ? '删除中...' : '删除'}
-                        </button>
-                      </div>
-                    </td>
+            <AppH5DataTable>
+              <table>
+                <thead>
+                  <tr>
+                    <th>名称</th>
+                    <th>赛事</th>
+                    <th>状态</th>
+                    <th>成员</th>
+                    <th>邀请码</th>
+                    <th>操作</th>
                   </tr>
-                ))}
-              </tbody>
-            </CommandDataTable>
+                </thead>
+                <tbody>
+                  {campaigns.map((campaign) => (
+                    <tr key={campaign.id}>
+                      <td>{campaign.name}</td>
+                      <td>{campaign.raceName || '-'}</td>
+                      <td>
+                        <AppH5StatusTag tone={getStatusTone(campaign.status)}>
+                          {STATUS_LABELS[campaign.status] || campaign.status}
+                        </AppH5StatusTag>
+                      </td>
+                      <td>{campaign.memberCount}</td>
+                      <td>{campaign.inviteCodeCount}</td>
+                      <td>
+                        <div className="assessment-campaign-list-page__actions">
+                          <Link className="btn btn--ghost btn--sm" to={`/app/assessment/${campaign.id}`}>详情</Link>
+                          <button
+                            className="btn btn--ghost btn--sm"
+                            type="button"
+                            onClick={() => void handleDelete(campaign)}
+                            disabled={saving || loading || deletingId === campaign.id}
+                          >
+                            {deletingId === campaign.id ? '删除中...' : '删除'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </AppH5DataTable>
           ) : null}
-        </CommandPanel>
+        </AppH5Panel>
       </div>
-    </div>
+    </AppH5Surface>
   )
 }
 

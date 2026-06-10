@@ -1,0 +1,35 @@
+.project-detail-form {
+  display: grid;
+  gap: 16px;
+  max-width: 520px;
+}
+
+.project-detail-field {
+  display: grid;
+  gap: 8px;
+}
+
+.project-detail-field__label {
+  color: var(--layer-text-muted, #78716c);
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: 700;
+}
+
+.project-detail-field__control {
+  width: 100%;
+  max-width: 420px;
+}
+
+.project-detail-task-frame {
+  min-width: 0;
+}
+
+.project-detail-page .app-h5-panel__actions .app-h5-tabs {
+  min-width: min(100%, 280px);
+}
+
+@media (max-width: 768px) {
+  .project-detail-field__control {
+    max-width: none;
+  }
+}

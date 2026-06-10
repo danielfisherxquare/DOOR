@@ -8,6 +8,7 @@ import useReimbursementStore from '../../../stores/reimbursementStore';
 
 const providers = [
   { id: 'qwen', name: '通义千问', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModel: 'qwen3.5-plus' },
+  { id: 'siliconflow', name: '硅基流动', baseUrl: 'https://api.siliconflow.cn/v1', defaultModel: 'Qwen/Qwen3-VL-32B-Instruct' },
   { id: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1', defaultModel: 'gpt-4o' },
   { id: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', defaultModel: 'deepseek-chat' },
   { id: 'custom', name: '自定义', baseUrl: '', defaultModel: '' },
@@ -118,13 +119,13 @@ function LlmConfigModal({ visible, onClose }) {
                 onChange={(e) => setFormData({ ...formData, modelName: e.target.value })}
                 placeholder="qwen3.5-plus"
               />
-              <span className="llm-config-hint">建议使用支持视觉的模型（VL/Vision）</span>
+              <span className="llm-config-hint">必须使用支持视觉的模型（VL/Vision），纯文本模型无法识别图片。硅基流动推荐 Qwen/Qwen3-VL-32B-Instruct</span>
             </div>
           </div>
 
           <div className="llm-config-notice">
             <p>注意：API Key 将存储在浏览器本地，请勿在公共电脑上保存。</p>
-            {hasServerLlmConfig && <p>当前服务端已配置默认 OCR 模型，不填写本地 API Key 也可以直接使用。</p>}
+            {hasServerLlmConfig && <p>当前服务端已配置默认 OCR 模型。填写本地 API Key 后将优先使用本地配置。</p>}
             {saveError && <p className="llm-config-error">{saveError}</p>}
           </div>
         </div>

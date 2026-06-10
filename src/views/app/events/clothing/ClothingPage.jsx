@@ -3,13 +3,13 @@ import { useSearchParams } from 'react-router-dom'
 import clothingApi from '../../../../api/clothing'
 import useRaceContextStore from '../../../../stores/raceContextStore'
 import {
-  CommandDataTable,
-  CommandEmptyState,
-  CommandMetricGrid,
-  CommandPanel,
-  CommandShell,
-  ContextRequirementState,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5ContextState,
+  AppH5DataTable,
+  AppH5EmptyState,
+  AppH5Notice,
+  AppH5Panel,
+  AppH5Surface,
+} from '../../../../components/app/AppH5Surface'
 import './clothing-page.css'
 
 export default function ClothingPage() {
@@ -89,17 +89,17 @@ export default function ClothingPage() {
 
   if (!raceId) {
     return (
-      <div className="command-page surface-app clothing-page">
-        <CommandShell
-          eyebrow="我的赛事"
-          title="服装物资"
-          summary="统一查看当前赛事的服装库存、尺码分布、需求与缺口。"
-        />
-        <ContextRequirementState
+      <AppH5Surface
+        className="clothing-page"
+        eyebrow="我的赛事"
+        title="服装物资"
+        summary="统一查看当前赛事的服装库存、尺码分布、需求与缺口。"
+      >
+        <AppH5ContextState
           title="请先选择赛事"
           description="在顶部控制面板中选择目标赛事后，才能管理服装物资。"
         />
-      </div>
+      </AppH5Surface>
     )
   }
 
@@ -107,20 +107,19 @@ export default function ClothingPage() {
   const sizes = getSizes()
 
   return (
-    <div className="command-page surface-app clothing-page">
-      <CommandShell
-        eyebrow="我的赛事"
-        title="服装物资"
-        summary="围绕当前赛事统一管理库存、缺口和尺码结构，避免把物资状态散落在抽签与排号页面里。"
-      >
-        <CommandMetricGrid items={metrics} />
-      </CommandShell>
+    <AppH5Surface
+      className="clothing-page"
+      eyebrow="我的赛事"
+      title="服装物资"
+      summary="围绕当前赛事统一管理库存、缺口和尺码结构，避免把物资状态散落在抽签与排号页面里。"
+      metrics={metrics}
+    >
 
-      <CommandPanel title="库存概览" subtitle="按项目与性别查看各尺码库存占用，快速定位超配和缺口。">
+      <AppH5Panel title="库存概览" summary="按项目与性别查看各尺码库存占用，快速定位超配和缺口。">
         {loading ? (
-          <div className="clothing-loading">加载中...</div>
+          <AppH5Notice tone="info">正在加载服装物资...</AppH5Notice>
         ) : limits.length === 0 ? (
-          <CommandEmptyState icon="BOX" title="暂无库存数据" description="当前赛事还没有配置服装库存。" />
+          <AppH5EmptyState icon="BOX" title="暂无库存数据" description="当前赛事还没有配置服装库存。" />
         ) : (
           <>
             {events.map(event => (
@@ -176,37 +175,39 @@ export default function ClothingPage() {
             {statistics.length > 0 && (
               <div className="clothing-section">
                 <h3>统计汇总</h3>
-                <CommandDataTable>
-                  <thead>
-                    <tr>
-                      <th>项目</th>
-                      <th>性别</th>
-                      <th>尺码</th>
-                      <th>需求</th>
-                      <th>库存</th>
-                      <th>缺口</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {statistics.map((s, i) => (
-                      <tr key={i}>
-                        <td>{s.event}</td>
-                        <td>{s.gender === 'Male' ? '男子' : '女子'}</td>
-                        <td>{s.size}</td>
-                        <td>{s.demand || 0}</td>
-                        <td>{s.inventory || 0}</td>
-                        <td className={s.gap > 0 ? 'clothing-gap-negative' : ''}>
-                          {s.gap > 0 ? `-${s.gap}` : 0}
-                        </td>
+                <AppH5DataTable>
+                  <table className="clothing-table">
+                    <thead>
+                      <tr>
+                        <th>项目</th>
+                        <th>性别</th>
+                        <th>尺码</th>
+                        <th>需求</th>
+                        <th>库存</th>
+                        <th>缺口</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </CommandDataTable>
+                    </thead>
+                    <tbody>
+                      {statistics.map((s, i) => (
+                        <tr key={i}>
+                          <td>{s.event}</td>
+                          <td>{s.gender === 'Male' ? '男子' : '女子'}</td>
+                          <td>{s.size}</td>
+                          <td>{s.demand || 0}</td>
+                          <td>{s.inventory || 0}</td>
+                          <td className={s.gap > 0 ? 'clothing-gap-negative' : ''}>
+                            {s.gap > 0 ? `-${s.gap}` : 0}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </AppH5DataTable>
               </div>
             )}
           </>
         )}
-      </CommandPanel>
-    </div>
+      </AppH5Panel>
+    </AppH5Surface>
   )
 }

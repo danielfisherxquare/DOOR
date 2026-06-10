@@ -1,11 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 
 import { buildFocusZoneStudioScene } from '../../src/utils/map/focusZoneStudioScene.js'
 import {
   buildGeometryBatchFromStudioScene,
   hasStudioEditorDocument,
 } from '../../server/src/modules/inventory/inventory.spatial.studio-export.js'
+import {
+  executeTerrainWorkZoneExportArtifacts,
+  resolveTerrainWorkZoneExportRoot,
+} from '../../server/src/modules/inventory/inventory.spatial.export.js'
 import {
   buildTerrainWorkZoneExportPackage,
   buildTerrainWorkZonePublishManifest,
@@ -82,6 +88,20 @@ test('studio editor document converts to white model batch meshes', () => {
   assert.equal(batch.version, 'door-white-model-batch-v2')
   assert.equal(batch.source, 'studio-editor-document')
   assert.equal(batch.metadata.source, 'studio-editor-document')
+  assert.equal(batch.metadata.export.kind, 'studio-white-model-batch')
+  assert.equal(batch.metadata.export.export.filenamePolicy, 'ascii-safe')
+  assert.deepEqual(batch.metadata.export.export.coordinateSystem, {
+    type: 'door-local-y-up',
+    xAxis: 'east meters from origin',
+    yAxis: 'up meters',
+    zAxis: 'north meters from origin',
+  })
+  assert.deepEqual(batch.metadata.export.stats, {
+    objectCount: batch.stats.objectCount,
+    meshCount: batch.stats.meshCount,
+    totalVertices: batch.stats.totalVertices,
+    totalTriangles: batch.stats.totalTriangles,
+  })
   assert.equal(batch.meshes.some((mesh) => mesh.sourceObjectId === 'stage-export-1'), true)
   assert.ok(batch.stats.meshCount >= 1)
   assert.ok(batch.stats.totalVertices > 0)
@@ -101,6 +121,17 @@ test('map selection studio snapshot exports even without semantic objects', () =
   const exportPackage = buildTerrainWorkZoneExportPackage(zone, manifest)
   const geometryResource = exportPackage.resources.find((resource) => resource.category === 'geometry-batch')
   assert.ok(geometryResource)
+  assert.equal(manifest.export.kind, 'terrain-work-zone-publish-manifest')
+  assert.equal(manifest.export.export.originalBaseName, '导出区域')
+  assert.equal(manifest.export.export.filenamePolicy, 'ascii-safe')
+  assert.deepEqual(manifest.export.export.coordinateSystem, {
+    type: 'door-local-y-up',
+    xAxis: 'east meters from origin',
+    yAxis: 'up meters',
+    zAxis: 'north meters from origin',
+  })
+  assert.equal(exportPackage.export.kind, 'terrain-work-zone-export-package')
+  assert.equal(exportPackage.export.export.baseName, manifest.export.export.baseName)
 
   const batch = buildGeometryBatchFromStudioScene({
     zone,
@@ -115,4 +146,35 @@ test('map selection studio snapshot exports even without semantic objects', () =
   assert.ok(batch.meshes.some((mesh) => mesh.objectType === 'focus_zone_floor'))
   assert.ok(batch.meshes.some((mesh) => mesh.objectType === 'terrain_patch'))
   assert.ok(batch.stats.totalTriangles > 0)
+})
+
+test('GIS object export batches include shared geometry preflight metadata', async () => {
+  const zone = {
+    ...focusZone,
+    id: 'zone-gis-preflight',
+    snapshotJson: {
+      ...focusZone.snapshotJson,
+    },
+  }
+  const exportRoot = resolveTerrainWorkZoneExportRoot(zone)
+
+  try {
+    const manifest = buildTerrainWorkZonePublishManifest(zone, objects)
+    const exportPackage = buildTerrainWorkZoneExportPackage(zone, manifest)
+    const task = await executeTerrainWorkZoneExportArtifacts({
+      zone,
+      manifest,
+      exportPackage,
+      actorUserId: 'test-user',
+    })
+    const geometryDescriptor = task.resourceDescriptors.find((descriptor) => descriptor.stagedOutput)
+    assert.ok(geometryDescriptor)
+
+    const batch = JSON.parse(await fs.readFile(path.join(task.outputRoot, geometryDescriptor.stagedOutput), 'utf8'))
+    assert.equal(batch.metadata.preflight.status, 'ok')
+    assert.equal(batch.metadata.preflight.meshCount, batch.stats.meshCount)
+    assert.equal(batch.metadata.export.diagnostics.geometry.status, 'ok')
+  } finally {
+    await fs.rm(exportRoot, { recursive: true, force: true })
+  }
 })

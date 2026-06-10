@@ -9,9 +9,11 @@ import { fileURLToPath } from 'url';
 import knex from '../../db/knex.js';
 import { generateThumbnail } from './invoice.storage.js';
 import { renderPdfToImageBuffers } from './ocr.service.js';
+import { attachOcrReview } from './ocr.review.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIRECT_PAYMENT_STORAGE_DIR = path.join(__dirname, '../../../storage/reimbursement-payments');
+const ACTIVE_PROCESSING_STATUSES = ['processing', 'completed'];
 
 async function ensureDir(dir) {
   await fs.promises.mkdir(dir, { recursive: true });
@@ -116,6 +118,11 @@ function toNullableNumber(value) {
   return Number.isFinite(numericValue) ? numericValue : null;
 }
 
+function toPositiveNullableNumber(value) {
+  const result = toNullableNumber(value);
+  return result != null ? Math.abs(result) : null;
+}
+
 function normalizeSortText(value) {
   return String(value || '').trim();
 }
@@ -146,6 +153,118 @@ function compareRecordOrder(left, right) {
   if (dateDiff !== 0) return dateDiff;
 
   return Number(left.index || 0) - Number(right.index || 0);
+}
+
+function isPlainObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function mergeRecordOcrMeta(existingMeta, key, nextMeta) {
+  if (!nextMeta) return existingMeta || null;
+  if (!isPlainObject(existingMeta)) return { [key]: nextMeta };
+
+  const hasGroupedMeta = isPlainObject(existingMeta.invoice) || isPlainObject(existingMeta.payment);
+  if (hasGroupedMeta) {
+    return {
+      ...existingMeta,
+      [key]: nextMeta,
+    };
+  }
+
+  const counterpartKey = key === 'invoice' ? 'payment' : 'invoice';
+  return {
+    [counterpartKey]: existingMeta,
+    [key]: nextMeta,
+  };
+}
+
+function buildPaymentReviewRecordData(paymentData = {}) {
+  return buildStandalonePaymentRecordData(paymentData);
+}
+
+function attachDocumentReview(ocrMeta, documentType, recordData) {
+  if (!ocrMeta || !documentType) return ocrMeta || null;
+  return attachOcrReview(ocrMeta, documentType, recordData);
+}
+
+function reviewLooksInvoiceLike(review) {
+  const issues = Array.isArray(review?.issues) ? review.issues : [];
+  return issues.some((issue) => (
+    issue?.field === 'invoice_number' ||
+    issue?.field === 'invoice_code' ||
+    String(issue?.code || '').includes('invoice')
+  ));
+}
+
+function inferDirectOcrDocumentType(recordData, ocrMeta = {}) {
+  if (ocrMeta?.review?.documentType === 'invoice' || ocrMeta?.review?.documentType === 'payment') {
+    return ocrMeta.review.documentType;
+  }
+
+  if (reviewLooksInvoiceLike(ocrMeta?.review)) {
+    return 'invoice';
+  }
+
+  if (recordData?.has_invoice || recordData?.invoice_number || recordData?.invoice_code) {
+    return 'invoice';
+  }
+
+  return 'payment';
+}
+
+function refreshRecordOcrReviewMeta(ocrMeta, recordData) {
+  if (!isPlainObject(ocrMeta)) return ocrMeta || null;
+
+  const hasGroupedMeta = isPlainObject(ocrMeta.invoice) || isPlainObject(ocrMeta.payment);
+  if (hasGroupedMeta) {
+    return {
+      ...ocrMeta,
+      ...(isPlainObject(ocrMeta.invoice)
+        ? { invoice: attachDocumentReview(ocrMeta.invoice, 'invoice', recordData) }
+        : {}),
+      ...(isPlainObject(ocrMeta.payment)
+        ? { payment: attachDocumentReview(ocrMeta.payment, 'payment', recordData) }
+        : {}),
+    };
+  }
+
+  return attachDocumentReview(
+    ocrMeta,
+    inferDirectOcrDocumentType(recordData, ocrMeta),
+    recordData
+  );
+}
+
+async function refreshOcrReviewMetaForRecords(recordIds) {
+  if (!recordIds || recordIds.length === 0) return;
+
+  const records = await knex('reimbursement_records')
+    .whereIn('id', recordIds);
+
+  for (const record of records) {
+    const refreshedOcrMeta = refreshRecordOcrReviewMeta(record.ocr_meta, record);
+    if (!refreshedOcrMeta) continue;
+    if (JSON.stringify(refreshedOcrMeta) === JSON.stringify(record.ocr_meta)) continue;
+
+    await knex('reimbursement_records')
+      .where({ id: record.id })
+      .update({
+        ocr_meta: refreshedOcrMeta,
+        updated_at: knex.fn.now(),
+      });
+  }
+}
+
+function buildReviewRecordData(documentType, ocrResult = {}) {
+  if (documentType === 'invoice') {
+    return buildInvoiceRecordData(ocrResult);
+  }
+
+  if (documentType === 'payment') {
+    return buildPaymentReviewRecordData(ocrResult);
+  }
+
+  return ocrResult || {};
 }
 
 export async function reorderProjectRecordIndexes(projectId) {
@@ -198,10 +317,10 @@ export function buildInvoiceRecordData(invoiceData = {}) {
     category: invoiceData.category || null,
     sub_category: invoiceData.sub_category ?? invoiceData.subCategory ?? null,
     description: invoiceData.description ?? invoiceData.details ?? null,
-    expense: toNullableNumber(invoiceData.expense ?? invoiceData.amount),
+    expense: toPositiveNullableNumber(invoiceData.expense ?? invoiceData.amount),
     company: invoiceData.company ?? invoiceData.buyer ?? null,
     has_invoice: true,
-    unit_price: toNullableNumber(invoiceData.unit_price ?? invoiceData.unitPrice),
+    unit_price: toPositiveNullableNumber(invoiceData.unit_price ?? invoiceData.unitPrice),
     unit: invoiceData.unit ?? null,
     quantity: toNullableNumber(invoiceData.quantity),
     remarks: invoiceData.remarks ?? null,
@@ -247,6 +366,8 @@ export async function mergeInvoiceIntoRecord(recordId, invoiceData = {}, options
   if (!record) return null;
 
   const normalizedInvoice = buildInvoiceRecordData(invoiceData);
+  const reviewedOcrMeta = attachDocumentReview(options.ocrMeta, 'invoice', normalizedInvoice);
+  const nextOcrMeta = mergeRecordOcrMeta(record.ocr_meta, 'invoice', reviewedOcrMeta);
   const [updated] = await knex('reimbursement_records')
     .where({ id: recordId })
     .update({
@@ -265,15 +386,66 @@ export async function mergeInvoiceIntoRecord(recordId, invoiceData = {}, options
       unit: normalizedInvoice.unit || record.unit,
       quantity: normalizedInvoice.quantity ?? record.quantity,
       preview_file_id: record.preview_file_id || options.previewFileId || null,
+      ocr_meta: nextOcrMeta,
       updated_at: knex.fn.now(),
     })
     .returning('*');
 
+  let finalRecord = updated;
+  const refreshedOcrMeta = refreshRecordOcrReviewMeta(updated.ocr_meta, updated);
+  if (refreshedOcrMeta && JSON.stringify(refreshedOcrMeta) !== JSON.stringify(updated.ocr_meta)) {
+    [finalRecord] = await knex('reimbursement_records')
+      .where({ id: recordId })
+      .update({
+        ocr_meta: refreshedOcrMeta,
+        updated_at: knex.fn.now(),
+      })
+      .returning('*');
+  }
+
   await updateProjectStats(record.project_id);
   await reorderProjectRecordIndexes(record.project_id);
 
-  return updated;
+  return finalRecord;
 }
+
+export async function mergePaymentOcrMetaIntoRecord(recordId, ocrMeta) {
+  if (!ocrMeta) {
+    return knex('reimbursement_records')
+      .where({ id: recordId })
+      .first();
+  }
+
+  const record = await knex('reimbursement_records')
+    .where({ id: recordId })
+    .first();
+
+  if (!record) return null;
+
+  const [updated] = await knex('reimbursement_records')
+    .where({ id: recordId })
+    .update({
+      ocr_meta: mergeRecordOcrMeta(record.ocr_meta, 'payment', ocrMeta),
+      updated_at: knex.fn.now(),
+    })
+    .returning('*');
+
+  const refreshedOcrMeta = refreshRecordOcrReviewMeta(updated.ocr_meta, updated);
+  if (!refreshedOcrMeta || JSON.stringify(refreshedOcrMeta) === JSON.stringify(updated.ocr_meta)) {
+    return updated;
+  }
+
+  const [finalRecord] = await knex('reimbursement_records')
+    .where({ id: recordId })
+    .update({
+      ocr_meta: refreshedOcrMeta,
+      updated_at: knex.fn.now(),
+    })
+    .returning('*');
+
+  return finalRecord;
+}
+
 
 function buildStandalonePaymentRecordData(paymentData = {}, remarks = '由付款凭证识别生成') {
   const amount = Number(paymentData.amount) || 0;
@@ -660,6 +832,7 @@ export async function createStandalonePaymentRecord(projectId, userId, paymentDa
     paymentData,
     options.remarks || '由付款凭证识别生成'
   );
+  const reviewedOcrMeta = attachDocumentReview(options.ocrMeta, 'payment', recordData);
 
   const [record] = await knex('reimbursement_records')
     .insert({
@@ -667,6 +840,7 @@ export async function createStandalonePaymentRecord(projectId, userId, paymentDa
       user_id: userId,
       index: await getNextRecordIndex(projectId),
       ...recordData,
+      ocr_meta: reviewedOcrMeta,
     })
     .returning('*');
 
@@ -716,12 +890,13 @@ export async function getProjectRecords(projectId) {
  * 更新记录（字段白名单防护）
  */
 const RECORD_UPDATABLE_FIELDS = [
-  'category', 'sub_category', 'item_name', 'specification',
-  'quantity', 'unit_price', 'amount', 'income', 'expense',
-  'payment_date', 'payment_method', 'payee', 'payer',
-  'invoice_number', 'invoice_type', 'invoice_date',
-  'tax_rate', 'tax_amount', 'remarks', 'status',
-  'index', 'matched_invoice_id',
+    'category', 'sub_category', 'item_name', 'specification',
+    'quantity', 'unit_price', 'amount', 'income', 'expense',
+    'description', 'reporter', 'company', 'has_invoice', 'unit',
+    'payment_date', 'payment_method', 'payee', 'payer',
+    'invoice_code', 'invoice_number', 'invoice_type', 'invoice_date',
+    'tax_rate', 'tax_amount', 'remarks', 'status',
+    'index', 'matched_invoice_id',
 ];
 
 export async function updateRecord(recordId, updates) {
@@ -748,6 +923,16 @@ export async function updateRecord(recordId, updates) {
       updated_at: knex.fn.now(),
     })
     .returning('*');
+
+  const refreshedOcrMeta = refreshRecordOcrReviewMeta(updated.ocr_meta, updated);
+  if (refreshedOcrMeta) {
+    await knex('reimbursement_records')
+      .where({ id: recordId })
+      .update({
+        ocr_meta: refreshedOcrMeta,
+        updated_at: knex.fn.now(),
+      });
+  }
 
   // 更新项目统计
   await updateProjectStats(record.project_id);
@@ -810,6 +995,8 @@ export async function batchUpdateRecords(recordIds, updates) {
       ...data,
       updated_at: knex.fn.now(),
     });
+
+  await refreshOcrReviewMetaForRecords(recordIds);
 
   // 更新项目统计
   if (firstRecord) {
@@ -1028,41 +1215,48 @@ export async function getOrgStats(orgId) {
  * @returns {Promise<{skipped: boolean, record?: Object, existing?: Object}>}
  */
 export async function startProcessingFile(projectId, userId, { fileName, fileType, fileHash }) {
-  // 检查是否已处理过（按文件内容哈希）
-  const existing = await knex('reimbursement_processed_files')
-    .where({
-      project_id: projectId,
-      file_hash: fileHash,
-      file_type: fileType,
-    })
-    .first();
+  return knex.transaction(async (trx) => {
+    const lockKey = `reimbursement-ocr:${projectId}:${fileType}:${fileHash}`;
+    await trx.raw('SELECT pg_advisory_xact_lock(hashtext(?)::bigint)', [lockKey]);
 
-  if (existing) {
-    const [record] = await knex('reimbursement_processed_files')
+    // 检查是否已有进行中或已完成的同内容文件；error/skipped 允许重新处理。
+    const existing = await trx('reimbursement_processed_files')
+      .where({
+        project_id: projectId,
+        file_hash: fileHash,
+        file_type: fileType,
+      })
+      .whereIn('status', ACTIVE_PROCESSING_STATUSES)
+      .first();
+
+    if (existing) {
+      const [record] = await trx('reimbursement_processed_files')
+        .insert({
+          project_id: projectId,
+          file_name: fileName,
+          file_type: fileType,
+          file_hash: fileHash,
+          status: 'skipped',
+          processed_at: trx.fn.now(),
+        })
+        .returning('*');
+
+      return { skipped: true, record, existing };
+    }
+
+    const [record] = await trx('reimbursement_processed_files')
       .insert({
         project_id: projectId,
         file_name: fileName,
         file_type: fileType,
         file_hash: fileHash,
-        status: 'skipped',
-        processed_at: knex.fn.now(),
+        status: 'processing',
+        started_at: trx.fn.now(),
       })
       .returning('*');
 
-    return { skipped: true, record, existing };
-  }
-
-  const [record] = await knex('reimbursement_processed_files')
-    .insert({
-      project_id: projectId,
-      file_name: fileName,
-      file_type: fileType,
-      file_hash: fileHash,
-      status: 'processing',
-    })
-    .returning('*');
-
-  return { skipped: false, record };
+    return { skipped: false, record };
+  });
 }
 
 /**
@@ -1071,16 +1265,26 @@ export async function startProcessingFile(projectId, userId, { fileName, fileTyp
  * @param {string} status - 状态 (processing/completed/error/skipped)
  * @param {Object} options - 选项
  * @param {string} options.errorMessage - 错误信息
- */
-export async function updateProcessingStatus(recordId, status, { errorMessage } = {}) {
+ * @param {Object} options.ocrResult - OCR 识别结果
+ * @param {Object} options.ocrMeta - OCR 调用元数据
+*/
+export async function updateProcessingStatus(
+  recordId,
+  status,
+  { errorMessage, ocrResult, ocrMeta, documentType } = {}
+) {
+  const reviewedOcrMeta = attachDocumentReview(
+    ocrMeta,
+    documentType,
+    buildReviewRecordData(documentType, ocrResult)
+  );
   const updateData = {
     status,
     processed_at: knex.fn.now(),
     error_message: errorMessage ?? undefined,
+    ocr_result: ocrResult ?? undefined,
+    ocr_meta: reviewedOcrMeta ?? undefined,
   };
-
-  // 如果需要存储错误信息，可以扩展表结构或使用日志
-  // 目前仅更新状态
 
   return knex('reimbursement_processed_files')
     .where({ id: recordId })
@@ -1236,6 +1440,20 @@ export async function resolvePendingMatch(matchId, targetRecordId) {
   await attachPreviewPayment(targetRecordId, match?.payment_data?.previewFileId);
   await attachProcessedPayment(targetRecordId, match?.payment_data);
 
+  if (match?.payment_data?.ocrMeta) {
+    const reviewedOcrMeta = attachDocumentReview(
+      match.payment_data.ocrMeta,
+      'payment',
+      buildPaymentReviewRecordData(match.payment_data)
+    );
+    await knex('reimbursement_records')
+      .where({ id: targetRecordId })
+      .update({
+        ocr_meta: mergeRecordOcrMeta(targetRecord.ocr_meta, 'payment', reviewedOcrMeta),
+        updated_at: knex.fn.now(),
+      });
+  }
+
   return match;
 }
 
@@ -1252,6 +1470,7 @@ export async function rejectPendingMatch(matchId) {
 
   const paymentData = match.payment_data || {};
   const recordData = buildStandalonePaymentRecordData(paymentData, '由待匹配付款凭证独立生成');
+  const reviewedOcrMeta = attachDocumentReview(paymentData.ocrMeta, 'payment', recordData);
   const [record] = await knex('reimbursement_records')
     .insert({
       project_id: match.project_id,
@@ -1259,6 +1478,7 @@ export async function rejectPendingMatch(matchId) {
       index: await getNextRecordIndex(match.project_id),
       ...recordData,
       preview_file_id: paymentData.previewFileId || null,
+      ocr_meta: reviewedOcrMeta,
     })
     .returning('*');
 

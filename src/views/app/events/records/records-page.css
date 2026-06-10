@@ -1,4 +1,4 @@
-/、.records-page {
+.records-page {
   padding: 0;
 }
 
@@ -111,6 +111,25 @@
 .records-pager__status {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
+}
+
+.records-mobile-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--layer-border, #e7e5e4);
+  border-radius: var(--radius-md);
+  background: var(--layer-surface, #fff);
+  color: var(--layer-text-secondary, #57534e);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+}
+
+.records-mobile-select input {
+  width: 18px;
+  height: 18px;
 }
 
 .records-stats {

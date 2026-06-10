@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildFocusZoneStudioScene } from '../../src/utils/map/focusZoneStudioScene.js';
+import { buildGeometryPreflight } from '../../src/utils/exportManifest.js';
 import { buildGeometryBatchFromStudioScene } from '../../server/src/modules/inventory/inventory.spatial.studio-export.js';
 import { buildGlbFromBatchFile } from '../../server/src/modules/inventory/inventory.spatial.export.js';
 
@@ -76,4 +77,34 @@ test('generated scene package can build studio scene, geometry batch and glb', (
     assert.ok(geometryBatch.meshes.length >= 2);
     assert.ok(glbBuffer.length > 20);
     assert.equal(glbBuffer.readUInt32LE(0), 0x46546c67);
+    assert.equal(geometryBatch.metadata.preflight.status, 'ok');
+    assert.equal(geometryBatch.metadata.preflight.meshCount, geometryBatch.stats.meshCount);
+    assert.equal(geometryBatch.metadata.export.diagnostics.geometry.status, 'ok');
+});
+
+test('geometry preflight reports invalid indices before GLB export', () => {
+    const preflight = buildGeometryPreflight([
+        {
+            id: 'bad-mesh',
+            vertices: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+            indices: [0, 1, 4],
+        },
+    ]);
+
+    assert.equal(preflight.status, 'error');
+    assert.equal(preflight.meshCount, 1);
+    assert.equal(preflight.invalidMeshCount, 1);
+    assert.equal(preflight.meshes[0].invalidIndexCount, 1);
+    assert.ok(preflight.meshes[0].warnings.includes('mesh-index-out-of-range'));
+});
+
+test('GLB builder rejects geometry that fails preflight', () => {
+    assert.throws(() => buildGlbFromBatchFile({
+        meshes: [{
+            id: 'bad-glb-mesh',
+            color: '#ffffff',
+            vertices: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+            indices: [0, 1, 4],
+        }],
+    }), /geometry preflight failed/i);
 });

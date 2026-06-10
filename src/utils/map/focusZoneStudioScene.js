@@ -6,6 +6,11 @@ import {
   insertSketchPath,
   normalizeEditorDocument,
 } from '../../3d-studio/model/editorDocument.js'
+import {
+  EXPORT_COORDINATE_SYSTEMS,
+  buildExportManifest,
+  buildTerrainPatchDiagnostics,
+} from '../exportManifest.js'
 import { buildFocusZoneWorkbenchContext } from './focusZoneContext.js'
 import { buildFocusZoneObjectContext } from './focusZoneSpatialObjects.js'
 
@@ -180,6 +185,8 @@ function terrainPatchToMesh(terrainPatch) {
       cols,
       resolutionMeters: terrainPatch?.resolutionMeters || null,
       elevationOffsetMeters: terrainPatch?.elevationOffsetMeters || 0,
+      coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+      diagnostics: buildTerrainPatchDiagnostics(terrainPatch),
     },
   }
 }
@@ -585,6 +592,27 @@ export function buildFocusZoneStudioScene({
   const sourceHash = computeFocusZoneSourceHash({ focusZone, objects })
   const importedAt = new Date().toISOString()
   const warnings = []
+  const exportManifest = buildExportManifest({
+    kind: 'focus-zone-studio-scene',
+    name: focusZoneContext?.name || focusZone?.name || 'GIS 固定区域白模',
+    source: 'gis-focus-zone',
+    coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+    input: {
+      sourceWorkZoneId: focusZone?.id || null,
+      sourceProjectId: focusZone?.projectId || project?.id || null,
+      sourceObjectCount: objectContext.length,
+      originWgs84: focusZone?.originWgs84 || null,
+    },
+    stats: {
+      objectCount: objectContext.length,
+      osmBuildingCount: osmBuildings.length,
+      terrainMeshCount: focusZone?.snapshotJson?.terrainPatch ? 1 : 0,
+    },
+    diagnostics: {
+      terrainPatch: buildTerrainPatchDiagnostics(focusZone?.snapshotJson?.terrainPatch || null),
+    },
+    generatedAt: importedAt,
+  })
 
   let document = createEmptyEditorDocument()
   const terrainMesh = terrainPatchToMesh(focusZone?.snapshotJson?.terrainPatch)
@@ -663,6 +691,7 @@ export function buildFocusZoneStudioScene({
       spatialObjectHash: sourceHash,
       terrainPatchHash: hashValue(focusZone?.snapshotJson?.terrainPatch || null),
       importedAt,
+      export: exportManifest,
       warnings,
     },
   })
@@ -691,6 +720,7 @@ export function buildFocusZoneStudioScene({
       osmSkippedBuildingCount: osmResult.skippedAbnormal,
       focusZoneSourceHash: sourceHash,
       importedAt,
+      export: exportManifest,
       warnings,
     },
   }

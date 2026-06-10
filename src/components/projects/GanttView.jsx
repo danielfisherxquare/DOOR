@@ -85,9 +85,9 @@ export default function GanttView({ projectId }) {
             };
         } else if (zoomScale === 'Week') {
             // week chunking math
-            // To be precise with CSS Grid, week scale means 1 column = 1 week block. 
+            // To be precise with CSS Grid, week scale means 1 column = 1 week block.
             // We need week headers and convert day columns to week ranges.
-            // Simplified for now: just fallback to day-rendering visually grouped, 
+            // Simplified for now: just fallback to day-rendering visually grouped,
             // but the plan says native css grid for Day/Week/Month. Let's do a simplified approach.
             return null; // fallback below
         }

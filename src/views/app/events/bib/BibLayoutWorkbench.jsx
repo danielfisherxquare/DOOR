@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import bibApi from '../../../../api/bib'
 import {
-  CommandEmptyState,
-  CommandNotice,
-  CommandPanel,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5EmptyState,
+  AppH5Notice,
+  AppH5Panel,
+} from '../../../../components/app/AppH5Surface'
 
 const DEFAULT_TEMPLATE_NAME = '标准号码布'
 const TEMPLATE_STORAGE_PREFIX = 'bib-layout-templates:'
@@ -322,18 +322,18 @@ export default function BibLayoutWorkbench({ raceId }) {
 
   if (!activeTemplate) {
     return (
-      <CommandPanel title="号码布排版" subtitle="本地模板初始化中。">
-        <CommandEmptyState title="正在初始化模板" description="请稍候片刻，模板工作台会自动恢复。" icon="TPL" />
-      </CommandPanel>
+      <AppH5Panel title="号码布排版" subtitle="本地模板初始化中。">
+        <AppH5EmptyState title="正在初始化模板" description="请稍候片刻，模板工作台会自动恢复。" icon="TPL" />
+      </AppH5Panel>
     )
   }
 
   return (
     <div className="bib-layout-workbench">
-      {message ? <CommandNotice tone="info">{message}</CommandNotice> : null}
+      {message ? <AppH5Notice tone="info">{message}</AppH5Notice> : null}
 
       <div className="bib-layout-grid">
-        <CommandPanel
+        <AppH5Panel
           title="模板列表"
           subtitle="当前按赛事保存在浏览器本地，可复制 JSON 做共享。"
           footer="如果后续需要多人协同，我们再把这块接成后端模板存储。"
@@ -357,9 +357,9 @@ export default function BibLayoutWorkbench({ raceId }) {
             <button type="button" className="btn btn--ghost" onClick={copyTemplateJson}>复制 JSON</button>
             <button type="button" className="btn btn--ghost" onClick={handleDeleteTemplate}>删除模板</button>
           </div>
-        </CommandPanel>
+        </AppH5Panel>
 
-        <CommandPanel title="字段库" subtitle="点击把字段放到号码布画布里。">
+        <AppH5Panel title="字段库" subtitle="点击把字段放到号码布画布里。">
           <div className="bib-layout-template-list">
             {FIELD_LIBRARY.map((field) => (
               <button
@@ -373,11 +373,11 @@ export default function BibLayoutWorkbench({ raceId }) {
               </button>
             ))}
           </div>
-        </CommandPanel>
+        </AppH5Panel>
       </div>
 
       <div className="bib-layout-main-grid">
-        <CommandPanel title="画布预览" subtitle="拖动字段可移动，右下角手柄可缩放。">
+        <AppH5Panel title="画布预览" subtitle="拖动字段可移动，右下角手柄可缩放。">
           <div className="bib-layout-canvas-shell" ref={stageRef}>
             <div
               className="bib-layout-stage"
@@ -434,9 +434,9 @@ export default function BibLayoutWorkbench({ raceId }) {
               )}
             </select>
           </div>
-        </CommandPanel>
+        </AppH5Panel>
 
-        <CommandPanel title="属性面板" subtitle="可精确微调模板名、底色和字段参数。">
+        <AppH5Panel title="属性面板" subtitle="可精确微调模板名、底色和字段参数。">
           <div className="bib-layout-form-grid">
             <label className="lottery-field">
               <span>模板名称</span>
@@ -531,13 +531,13 @@ export default function BibLayoutWorkbench({ raceId }) {
               </div>
             </div>
           ) : (
-            <CommandEmptyState
+            <AppH5EmptyState
               title="未选中字段"
               description="点击画布里的字段盒子后，这里会显示它的精确参数。"
               icon="LAY"
             />
           )}
-        </CommandPanel>
+        </AppH5Panel>
       </div>
     </div>
   )

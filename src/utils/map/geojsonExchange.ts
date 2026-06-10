@@ -1,4 +1,8 @@
 import type { MapTreeNode } from '../../stores/mapStore';
+import {
+  EXPORT_COORDINATE_SYSTEMS,
+  buildExportManifest,
+} from '../exportManifest.js';
 
 export interface ImportedMapFeature {
   feature: GeoJSON.Feature;
@@ -12,7 +16,11 @@ function getFeatureType(geometry?: GeoJSON.Geometry | null): MapTreeNode['featur
   return 'polygon';
 }
 
-export function buildMapFeatureCollection(treeNodes: MapTreeNode[], drawnFeatures: GeoJSON.Feature[]): GeoJSON.FeatureCollection {
+export function buildMapFeatureCollection(
+  treeNodes: MapTreeNode[],
+  drawnFeatures: GeoJSON.Feature[],
+  options: { exportName?: string; source?: string } = {},
+): GeoJSON.FeatureCollection {
   const nodesById = new Map(treeNodes.map((node) => [node.id, node]));
   const features = drawnFeatures.map((feature) => {
     const props = (feature.properties || {}) as Record<string, any>;
@@ -44,6 +52,24 @@ export function buildMapFeatureCollection(treeNodes: MapTreeNode[], drawnFeature
 
   return {
     type: 'FeatureCollection',
+    properties: {
+      doorExport: buildExportManifest({
+        kind: 'gis-map-feature-collection',
+        name: options.exportName || 'door-gis-map',
+        source: options.source || 'gis-map',
+        coordinateSystem: EXPORT_COORDINATE_SYSTEMS.WGS84,
+        stats: {
+          featureCount: features.length,
+          nodeCount: treeNodes.length,
+        },
+        diagnostics: {
+          syncedFeatureCount: features.filter((feature) => {
+            const props = (feature.properties || {}) as Record<string, any>;
+            return Boolean(props.backendObjectId || props.backendWorkZoneId);
+          }).length,
+        },
+      }),
+    },
     features,
   };
 }

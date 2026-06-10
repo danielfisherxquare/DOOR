@@ -2,15 +2,41 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import recordsApi from '../../../../api/records'
 import { unwrapRecordsQueryResult } from '../../../../utils/apiResponse'
 import {
-  CommandDataTable,
-  CommandEmptyState,
-  CommandNotice,
-  CommandPanel,
-  CommandToolbar,
-  CommandFilterBar,
-} from '../../../../components/command/CommandPrimitives'
+  AppH5DataCard,
+  AppH5DataTable,
+  AppH5EmptyState,
+  AppH5Notice,
+  AppH5Panel,
+  AppH5Toolbar,
+  AppH5FilterBar,
+  AppH5StatusTag,
+} from '../../../../components/app/AppH5Surface'
 
 const PAGE_SIZE = 50
+
+const RECORD_FIELD_LABELS = {
+  name: '姓名',
+  event: '项目',
+  phone: '手机号',
+  idNumber: '证件号',
+  lotteryStatus: '签位状态',
+  bibNumber: '号码布',
+  source: '来源',
+}
+
+const RECORD_MOBILE_FIELDS = ['event', 'phone', 'idNumber', 'lotteryStatus', 'bibNumber', 'source']
+
+function getRecordValue(record, key) {
+  return record?.[key] === undefined || record?.[key] === null || record?.[key] === '' ? '-' : record[key]
+}
+
+function getRecordStatusTone(status) {
+  const value = String(status || '')
+  if (/(中签|保签|通过|已确认|locked)/i.test(value)) return 'success'
+  if (/(剔除|黑名单|拒绝|removed|rejected)/i.test(value)) return 'danger'
+  if (/(待|pending|未处理)/i.test(value)) return 'warning'
+  return 'neutral'
+}
 
 const FILTER_OPERATORS = [
   { value: 'equals', label: '等于' },
@@ -198,15 +224,15 @@ export default function RecordsOverviewPanel({
 
   return (
     <>
-      {message ? <CommandNotice tone={messageTone}>{message}</CommandNotice> : null}
-      {error ? <CommandNotice tone="danger">{`加载失败：${error}`}</CommandNotice> : null}
+      {message ? <AppH5Notice tone={messageTone}>{message}</AppH5Notice> : null}
+      {error ? <AppH5Notice tone="danger">{`加载失败：${error}`}</AppH5Notice> : null}
 
-      <CommandPanel
+      <AppH5Panel
         title="筛选与导出"
         subtitle="先缩小结果范围，再执行导出或后续批量操作。"
       >
-        <CommandToolbar>
-          <CommandFilterBar>
+        <AppH5Toolbar>
+          <AppH5FilterBar>
             <div className="records-search">
               <input
                 type="text"
@@ -230,11 +256,11 @@ export default function RecordsOverviewPanel({
                 导出 Excel
               </button>
             </div>
-          </CommandFilterBar>
-        </CommandToolbar>
+          </AppH5FilterBar>
+        </AppH5Toolbar>
 
         {showFilters ? (
-          <div className="records-filters command-table-wrap">
+          <div className="records-filters app-h5-table-wrap">
             {filters.map((filter, index) => (
               <div key={`${filter.field}-${index}`} className="records-filter-row">
                 <select
@@ -273,24 +299,53 @@ export default function RecordsOverviewPanel({
             </button>
           </div>
         ) : null}
-      </CommandPanel>
+      </AppH5Panel>
 
-      <CommandPanel
+      <AppH5Panel
         title="选手记录"
         subtitle={currentRace ? `当前赛事：${currentRace.name}` : `赛事 ID：${raceId}`}
         footer={<div className="records-stats">{`共 ${total} 条记录`}</div>}
       >
         <div className="records-table-wrapper">
           {loading ? (
-            <CommandNotice tone="info">正在加载选手记录...</CommandNotice>
+            <AppH5Notice tone="info">正在加载选手记录...</AppH5Notice>
           ) : records.length === 0 ? (
-            <CommandEmptyState
+            <AppH5EmptyState
               icon="EMP"
               title="暂无数据"
               description="当前赛事还没有导入选手名单，请先进行名单导入。"
             />
           ) : (
-            <CommandDataTable>
+            <AppH5DataTable
+              mobileCards={records.map((record) => (
+                <AppH5DataCard
+                  key={record.id}
+                  eyebrow={record.idNumber ? `证件号 ${record.idNumber}` : `记录 ${record.id}`}
+                  title={record.name || record.realName || record.idNumber || `记录 ${record.id}`}
+                  meta={(
+                    <AppH5StatusTag tone={getRecordStatusTone(record.lotteryStatus)}>
+                      {getRecordValue(record, 'lotteryStatus')}
+                    </AppH5StatusTag>
+                  )}
+                  fields={RECORD_MOBILE_FIELDS.map((key) => ({
+                    key,
+                    label: RECORD_FIELD_LABELS[key],
+                    value: getRecordValue(record, key),
+                  }))}
+                  actions={(
+                    <label className="records-mobile-select">
+                      <input
+                        type="checkbox"
+                        checked={selectedRecords.has(record.id)}
+                        onChange={() => toggleSelect(record.id)}
+                      />
+                      <span>选择</span>
+                    </label>
+                  )}
+                />
+              ))}
+            >
+              <table>
               <thead>
                 <tr>
                   <th>
@@ -328,13 +383,14 @@ export default function RecordsOverviewPanel({
                   </tr>
                 ))}
               </tbody>
-            </CommandDataTable>
+              </table>
+            </AppH5DataTable>
           )}
         </div>
 
         {total > PAGE_SIZE ? (
           <div className="records-pagination-wrap">
-            <CommandPager
+            <RecordsPager
               page={page}
               totalPages={totalPages}
               onPrev={() => setPage((current) => current - 1)}
@@ -342,12 +398,12 @@ export default function RecordsOverviewPanel({
             />
           </div>
         ) : null}
-      </CommandPanel>
+      </AppH5Panel>
     </>
   )
 }
 
-function CommandPager({ page, totalPages, onPrev, onNext }) {
+function RecordsPager({ page, totalPages, onPrev, onNext }) {
   if (totalPages <= 1) return null
 
   return (
