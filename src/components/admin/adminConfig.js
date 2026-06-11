@@ -1,4 +1,5 @@
-import { buildSurfaceHref } from '../../utils/surfaceContext'
+import { buildSurfaceHref } from '../../utils/surfaceContext.js'
+import { hasModuleAccess } from '../../utils/moduleAccess.js'
 
 const navGroups = [
   {
@@ -10,6 +11,7 @@ const navGroups = [
       {
         key: 'dashboard',
         path: '',
+        moduleId: 'dashboard',
         icon: 'space_dashboard',
         shortLabel: 'CT',
         label: '指挥台',
@@ -24,9 +26,9 @@ const navGroups = [
     caption: '平台级资源维护',
     superAdminOnly: true,
     items: [
-      { key: 'orgs', path: '/orgs', icon: 'corporate_fare', shortLabel: 'OG', label: '机构管理', description: '机构清单、基础资料与账号入口' },
-      { key: 'races', path: '/races', icon: 'emoji_events', shortLabel: 'RC', label: '赛事管理', description: '赛事主数据与项目配置' },
-      { key: 'system-backup', path: '/db-backups', icon: 'backup', shortLabel: 'BK', label: '数据库备份', description: '备份生成、下载与恢复' },
+      { key: 'orgs', path: '/orgs', moduleId: 'orgs', icon: 'corporate_fare', shortLabel: 'OG', label: '机构管理', description: '机构清单、基础资料与账号入口' },
+      { key: 'races', path: '/races', moduleId: 'races', icon: 'emoji_events', shortLabel: 'RC', label: '赛事管理', description: '赛事主数据与项目配置' },
+      { key: 'system-backup', path: '/db-backups', moduleId: 'backups', icon: 'backup', shortLabel: 'BK', label: '数据库备份', description: '备份生成、下载与恢复' },
     ],
   },
   {
@@ -35,8 +37,8 @@ const navGroups = [
     icon: 'badge',
     caption: '成员、账号与权限分配',
     items: [
-      { key: 'identity-center', path: '/identity-center', icon: 'fingerprint', shortLabel: 'ID', label: '身份中心', description: '成员、账号和授权' },
-      { key: 'team', path: '/team', icon: 'group', shortLabel: 'TM', label: '团队管理', description: '成员档案、导入与账号开通' },
+      { key: 'identity-center', path: '/identity-center', moduleId: 'identity-center', icon: 'fingerprint', shortLabel: 'ID', label: '身份中心', description: '成员、账号和授权' },
+      { key: 'team', path: '/team', moduleId: 'team', icon: 'group', shortLabel: 'TM', label: '团队管理', description: '成员档案、导入与账号开通' },
     ],
   },
   {
@@ -45,9 +47,9 @@ const navGroups = [
     icon: 'work',
     caption: '面试评分与候选人管理',
     items: [
-      { key: 'interview-panel', path: '/interview', icon: 'assignment', shortLabel: 'IP', label: '面试面板', description: '创建与更新候选人面试评估' },
-      { key: 'interview-records', path: '/interview/records', icon: 'description', shortLabel: 'IR', label: '面试记录', description: '查看所有面试评分记录' },
-      { key: 'interview-compare', path: '/interview/compare', icon: 'compare', shortLabel: 'IC', label: '面试对比', description: '候选人评分对比分析' },
+      { key: 'interview-panel', path: '/interview', moduleId: 'hr', icon: 'assignment', shortLabel: 'IP', label: '面试面板', description: '创建与更新候选人面试评估' },
+      { key: 'interview-records', path: '/interview/records', moduleId: 'hr', icon: 'description', shortLabel: 'IR', label: '面试记录', description: '查看所有面试评分记录' },
+      { key: 'interview-compare', path: '/interview/compare', moduleId: 'hr', icon: 'compare', shortLabel: 'IC', label: '面试对比', description: '候选人评分对比分析' },
     ],
   },
   {
@@ -56,7 +58,7 @@ const navGroups = [
     icon: 'payments',
     caption: '机构报销总览与导出',
     items: [
-      { key: 'reimbursements', path: '/reimbursements', icon: 'receipt_long', shortLabel: 'RB', label: '报销管理', description: '查看机构或平台范围内的报销汇总数据' },
+      { key: 'reimbursements', path: '/reimbursements', moduleId: 'finance', icon: 'receipt_long', shortLabel: 'RB', label: '报销管理', description: '查看机构或平台范围内的报销汇总数据' },
     ],
   },
   {
@@ -65,10 +67,10 @@ const navGroups = [
     icon: 'id_card',
     caption: '规则、类别与样式模板',
     items: [
-      { key: 'credential-center', path: '/credential-center', icon: 'badge', shortLabel: 'CC', label: '证件中心', description: '证件规则与处理概览' },
-      { key: 'credential-access-areas', path: '/credential/access-areas', icon: 'map', shortLabel: 'CA', label: '通行区域', description: '证件通行区域配置' },
-      { key: 'credential-categories', path: '/credential/categories', icon: 'category', shortLabel: 'CG', label: '证件类别', description: '类别、默认区域和审核规则' },
-      { key: 'credential-styles', path: '/credential/styles', icon: 'style', shortLabel: 'CS', label: '证件样式', description: '样式模板和版式配置' },
+      { key: 'credential-center', path: '/credential-center', moduleId: 'credentials', icon: 'badge', shortLabel: 'CC', label: '证件中心', description: '证件规则与处理概览' },
+      { key: 'credential-access-areas', path: '/credential/access-areas', moduleId: 'credentials', icon: 'map', shortLabel: 'CA', label: '通行区域', description: '证件通行区域配置' },
+      { key: 'credential-categories', path: '/credential/categories', moduleId: 'credentials', icon: 'category', shortLabel: 'CG', label: '证件类别', description: '类别、默认区域和审核规则' },
+      { key: 'credential-styles', path: '/credential/styles', moduleId: 'credentials', icon: 'style', shortLabel: 'CS', label: '证件样式', description: '样式模板和版式配置' },
     ],
   },
   {
@@ -77,7 +79,7 @@ const navGroups = [
     icon: 'palette',
     caption: '配色方案与品牌定制',
     items: [
-      { key: 'color-scheme', path: '/branding/colors', icon: 'format_color_fill', shortLabel: 'CS', label: '配色方案', description: '机构品牌配色定制与预设管理' },
+      { key: 'color-scheme', path: '/branding/colors', moduleId: 'branding', icon: 'format_color_fill', shortLabel: 'CS', label: '配色方案', description: '机构品牌配色定制与预设管理' },
     ],
   },
   {
@@ -86,7 +88,7 @@ const navGroups = [
     icon: 'design_services',
     caption: '需求审核与模板',
     items: [
-      { key: 'design-requests', path: '/design-requests', icon: 'approval', shortLabel: 'DR', label: '设计需求', description: '组织级审批岗位、跨赛事需求和设计模板管理', groupKey: 'design' },
+      { key: 'design-requests', path: '/design-requests', moduleId: 'design-requests', icon: 'approval', shortLabel: 'DR', label: '设计需求', description: '组织级审批岗位、跨赛事需求和设计模板管理', groupKey: 'design' },
     ],
   },
 ]
@@ -125,13 +127,22 @@ const routeMeta = [
   { key: 'inventory-twin-designer', path: '/admin/inventory/twin/designer', title: '空间中心', summary: '旧链接已并入空间中心的 3D 设计视图。', groupKey: 'warehouse' },
 ]
 
-export function getAdminNavGroups({ isSuperAdmin }) {
+function canAccessAdminItem(item, user) {
+  if (!item.moduleId) return true
+  return hasModuleAccess(user, 'admin', item.moduleId)
+}
+
+export function getAdminNavGroups({ isSuperAdmin, user } = {}) {
   return navGroups
     .filter((group) => !group.superAdminOnly || isSuperAdmin)
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => !item.superAdminOnly || isSuperAdmin),
+      items: group.items.filter((item) => (
+        (!item.superAdminOnly || isSuperAdmin)
+        && canAccessAdminItem(item, user)
+      )),
     }))
+    .filter((group) => group.items.length > 0)
 }
 
 export function getAdminRouteMeta(pathname) {

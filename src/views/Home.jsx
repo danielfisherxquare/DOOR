@@ -18,7 +18,7 @@ function Home() {
     orgId: session?.orgId || resolveSurfaceOrgId(searchParams, user),
     raceId: session?.raceId || resolveSurfaceRaceId(searchParams, user, session?.orgId),
   }
-  const portalGroups = getAppNavGroups({ user, hasCapability })
+  const portalGroups = getAppNavGroups({ user, hasCapability, raceId: currentContext.raceId })
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => item.key !== 'dashboard'),

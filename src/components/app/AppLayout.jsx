@@ -167,7 +167,10 @@ useEffect(() => {
     return null
   }, [location.pathname])
 
-  const navGroups = useMemo(() => getAppNavGroups({ user, hasCapability }), [hasCapability, user])
+  const navGroups = useMemo(
+    () => getAppNavGroups({ user, hasCapability, raceId: selectedRaceId }),
+    [hasCapability, selectedRaceId, user],
+  )
   const routeMeta = useMemo(() => getAppRouteMeta(location.pathname), [location.pathname])
 
   const currentGroup = useMemo(
@@ -210,11 +213,18 @@ useEffect(() => {
   }, [user])
 
   const groupTitle = currentGroup?.label || '应用层'
-  const requireAppModule = useCallback((moduleId, element) => (
-    <ModuleProtectedRoute surface="app" moduleId={moduleId}>
-      {element}
-    </ModuleProtectedRoute>
-  ), [])
+  const requireAppModule = useCallback((moduleId, element, options = {}) => {
+    if (options.needsRace && !selectedRaceId) {
+      const redirect = encodeURIComponent(`${location.pathname}${location.search}`)
+      return <Navigate to={`/workspaces?redirect=${redirect}`} replace />
+    }
+
+    return (
+      <ModuleProtectedRoute surface="app" moduleId={moduleId}>
+        {element}
+      </ModuleProtectedRoute>
+    )
+  }, [location.pathname, location.search, selectedRaceId])
   const isNavItemActive = useCallback((item) => {
     return item.path === ''
       ? location.pathname === '/app'
@@ -430,12 +440,12 @@ useEffect(() => {
           <Suspense fallback={<AppRouteLoader />}>
             <Routes>
               <Route index element={<Home />} />
-              <Route path="events/import" element={requireAppModule('events', <ImportPage />)} />
-              <Route path="events/processing" element={requireAppModule('events', <ProcessingCenterPage />)} />
-              <Route path="events/records" element={requireAppModule('events', <RecordsPage />)} />
-              <Route path="events/lottery" element={requireAppModule('events', <LotteryPage />)} />
-              <Route path="events/bib" element={requireAppModule('events', <BibPage />)} />
-              <Route path="events/clothing" element={requireAppModule('events', <ClothingPage />)} />
+              <Route path="events/import" element={requireAppModule('events', <ImportPage />, { needsRace: true })} />
+              <Route path="events/processing" element={requireAppModule('events', <ProcessingCenterPage />, { needsRace: true })} />
+              <Route path="events/records" element={requireAppModule('events', <RecordsPage />, { needsRace: true })} />
+              <Route path="events/lottery" element={requireAppModule('events', <LotteryPage />, { needsRace: true })} />
+              <Route path="events/bib" element={requireAppModule('events', <BibPage />, { needsRace: true })} />
+              <Route path="events/clothing" element={requireAppModule('events', <ClothingPage />, { needsRace: true })} />
               <Route path="design-requests" element={
                 <ModuleProtectedRoute surface="app" moduleId="design-requests">
                   <DesignRequestWorkspace surface="app" mode="designer" />
@@ -550,12 +560,12 @@ useEffect(() => {
                   ))
                 )}
               />
-              <Route path="projects" element={requireAppModule('events', <ProjectListPage />)} />
-              <Route path="projects/:id" element={requireAppModule('events', <ProjectDetailPage />)} />
-              <Route path="assessment" element={requireAppModule('events', <AssessmentCampaignListPage />)} />
-              <Route path="assessment/:id" element={requireAppModule('events', <AssessmentCampaignDetailPage />)} />
-              <Route path="bib-tracking" element={requireAppModule('events', <BibTrackingPage />)} />
-              <Route path="race-dashboard" element={requireAppModule('events', <RaceDashboardPage />)} />
+              <Route path="projects" element={requireAppModule('events', <ProjectListPage />, { needsRace: true })} />
+              <Route path="projects/:id" element={requireAppModule('events', <ProjectDetailPage />, { needsRace: true })} />
+              <Route path="assessment" element={requireAppModule('events', <AssessmentCampaignListPage />, { needsRace: true })} />
+              <Route path="assessment/:id" element={requireAppModule('events', <AssessmentCampaignDetailPage />, { needsRace: true })} />
+              <Route path="bib-tracking" element={requireAppModule('events', <BibTrackingPage />, { needsRace: true })} />
+              <Route path="race-dashboard" element={requireAppModule('events', <RaceDashboardPage />, { needsRace: true })} />
               <Route path="settings" element={<ChangePassword />} />
               <Route path="profile" element={<ProfilePage />} />
               <Route path="*" element={<Navigate to={buildAppHref('', currentContext)} replace />} />

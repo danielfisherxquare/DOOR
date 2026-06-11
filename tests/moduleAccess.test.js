@@ -3,17 +3,20 @@ import assert from 'node:assert/strict'
 import { DEFAULT_MODULES, hasModuleAccess } from '../src/utils/moduleAccess.js'
 import { getAppNavGroups, getAppPortalCards } from '../src/components/app/appConfig.js'
 import { getOpsNavGroups, getOpsPortalCards } from '../src/components/ops/opsConfig.js'
+import { getAdminNavGroups } from '../src/components/admin/adminConfig.js'
 import { listAllModuleIds } from '../server/src/modules/module-access/module-access.registry.js'
 import { getRoleDefaultModules } from '../server/src/utils/capability-policy.js'
 
 describe('module access helper', () => {
-  it('allows default modules for scoped users', () => {
+  it('requires backend-returned default modules for scoped users', () => {
     const user = { role: 'user', moduleAccess: [] }
 
     for (const moduleId of DEFAULT_MODULES) {
       const [surface, id] = moduleId.split(':')
-      assert.equal(hasModuleAccess(user, surface, id), true)
+      assert.equal(hasModuleAccess(user, surface, id), false)
     }
+
+    assert.equal(hasModuleAccess({ role: 'user', moduleAccess: DEFAULT_MODULES }, 'app', 'home'), true)
   })
 
   it('uses explicit moduleAccess for non-default modules', () => {
@@ -36,9 +39,10 @@ describe('module access helper', () => {
     assert.ok(raceAdminDefaults.includes('ops:scan'))
   })
 
-  it('keeps org_admin and super_admin on full access', () => {
-    assert.equal(hasModuleAccess({ role: 'org_admin', moduleAccess: [] }, 'admin', 'dashboard'), true)
-    assert.equal(hasModuleAccess({ role: 'super_admin', moduleAccess: [] }, 'ops', 'scan'), true)
+  it('does not give org_admin or super_admin module access from role alone', () => {
+    assert.equal(hasModuleAccess({ role: 'org_admin', moduleAccess: [] }, 'admin', 'dashboard'), false)
+    assert.equal(hasModuleAccess({ role: 'super_admin', moduleAccess: [] }, 'ops', 'scan'), false)
+    assert.equal(hasModuleAccess({ role: 'org_admin', moduleAccess: ['admin:dashboard'] }, 'admin', 'dashboard'), true)
   })
 
   it('filters app sidebar groups and home cards by module access', () => {
@@ -60,6 +64,25 @@ describe('module access helper', () => {
     assert.equal(navKeys.includes('credential-center'), false)
     assert.equal(portalKeys.includes('reimbursement'), false)
     assert.equal(portalKeys.includes('import'), false)
+  })
+
+  it('keeps organization-level app entries and hides race-scoped entries without a race context', () => {
+    const user = {
+      role: 'user',
+      moduleAccess: ['app:home', 'app:profile', 'app:events', 'app:design-requests'],
+    }
+    const hasCapability = () => true
+
+    const orgScopeKeys = getAppNavGroups({ user, hasCapability, raceId: '' })
+      .flatMap((group) => group.items.map((item) => item.key))
+    const raceScopeKeys = getAppNavGroups({ user, hasCapability, raceId: 'race-1' })
+      .flatMap((group) => group.items.map((item) => item.key))
+
+    assert.ok(orgScopeKeys.includes('design-requests'))
+    assert.equal(orgScopeKeys.includes('import'), false)
+    assert.equal(orgScopeKeys.includes('race-dashboard'), false)
+    assert.ok(raceScopeKeys.includes('import'))
+    assert.ok(raceScopeKeys.includes('race-dashboard'))
   })
 
   it('requires both module access and capability for capability-gated app entries', () => {
@@ -95,27 +118,38 @@ describe('module access helper', () => {
 
     assert.ok(moduleIds.includes('app:design-requests'))
     assert.ok(moduleIds.includes('ops:design-requests'))
+    assert.ok(moduleIds.includes('admin:design-requests'))
+    assert.ok(moduleIds.includes('admin:identity-center'))
+    assert.ok(moduleIds.includes('admin:hr'))
+    assert.ok(moduleIds.includes('admin:finance'))
+    assert.ok(moduleIds.includes('admin:credentials'))
+    assert.ok(moduleIds.includes('admin:inventory'))
+    assert.ok(moduleIds.includes('admin:branding'))
+    assert.ok(moduleIds.includes('admin:backups'))
+    assert.ok(moduleIds.includes('admin:bib-tracking'))
   })
 
-  it('does not give org_admin execute modules without explicit access in strict mode', () => {
+  it('does not give org_admin execute modules without explicit access', () => {
     const user = {
       role: 'org_admin',
       moduleAccess: ['admin:dashboard'],
-      preferences: { strictSurfaceModules: true },
     }
 
     assert.equal(hasModuleAccess(user, 'ops', 'scan'), false)
     assert.equal(hasModuleAccess(user, 'admin', 'dashboard'), true)
   })
 
-  it('keeps super_admin unrestricted in strict mode', () => {
+  it('filters admin navigation by backend-returned module access', () => {
     const user = {
-      role: 'super_admin',
-      moduleAccess: [],
-      preferences: { strictSurfaceModules: true },
+      role: 'org_admin',
+      moduleAccess: ['admin:dashboard', 'admin:identity-center'],
     }
+    const navKeys = getAdminNavGroups({ user, isSuperAdmin: false })
+      .flatMap((group) => group.items.map((item) => item.key))
 
-    assert.equal(hasModuleAccess(user, 'ops', 'scan'), true)
-    assert.equal(hasModuleAccess(user, 'admin', 'dashboard'), true)
+    assert.ok(navKeys.includes('dashboard'))
+    assert.ok(navKeys.includes('identity-center'))
+    assert.equal(navKeys.includes('team'), false)
+    assert.equal(navKeys.includes('design-requests'), false)
   })
 })

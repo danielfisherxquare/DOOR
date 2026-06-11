@@ -16,6 +16,7 @@
     "load:bib-tracking": "node --env-file-if-exists=.env scripts/load-bib-tracking.mjs"
   },
   "dependencies": {
+    "@openfga/sdk": "^0.9.6",
     "axios": "^1.13.6",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

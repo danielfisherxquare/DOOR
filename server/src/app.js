@@ -5,6 +5,7 @@ import { requestId } from './middleware/request-id.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { requireAuth } from './middleware/require-auth.js';
 import { requirePermission } from './middleware/require-permission.js';
+import { requireAuthz } from './middleware/require-authz.js';
 import healthRoutes from './modules/health/health.routes.js';
 import jobRoutes from './modules/jobs/job.routes.js';
 import authRoutes from './modules/auth/auth.routes.js';
@@ -41,6 +42,7 @@ import credentialRoutes from './modules/credential/credential.routes.js';
 import identityCenterRoutes from './modules/identity-center/identity-center.routes.js';
 import approvalRoutes from './modules/approvals/approval.routes.js';
 import profileRoutes from './modules/profile/profile.routes.js';
+import authzRoutes from './modules/authz/authz.routes.js';
 import colorSchemeRoutes from './modules/color-scheme/color-scheme.routes.js';
 import operationLogRoutes from './modules/operation-log/operation-log.routes.js';
 import sysJobRoutes from './modules/sys-job/sys-job.routes.js';
@@ -127,16 +129,16 @@ app.use('/api/app/credentials', requirePermission({ surface: 'app', module: { su
 app.use('/api/app/3d-studio', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: '3d-studio' } }), appThreeStudioRoutes);
 app.use('/api/app/interviews', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'interview' } }), interviewRoutes);
 app.use('/api/app/warehouse', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'inventory' } }), inventoryRoutes);
-app.use('/api/app/design-requests', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'design-requests' } }), createDesignRequestRoutes('app'));
+app.use('/api/app/design-requests', requireAuthz({ surface: 'app', moduleId: 'design-requests' }), createDesignRequestRoutes('app'));
 app.use('/api/app/approvals', requirePermission({ surface: 'app' }), approvalRoutes);
 
 app.use('/api/ops/warehouse', requirePermission({ surface: 'ops', module: { surface: 'ops', moduleId: 'warehouse' } }), inventoryRoutes);
 app.use('/api/ops/credentials', requirePermission({ surface: 'ops', module: { surface: 'ops', moduleId: 'credentials' } }), credentialRoutes);
 app.use('/api/ops/bibs', requirePermission({ surface: 'ops' }), bibTrackingRoutes);
-app.use('/api/ops/design-requests', requirePermission({ surface: 'ops', module: { surface: 'ops', moduleId: 'design-requests' } }), createDesignRequestRoutes('ops'));
+app.use('/api/ops/design-requests', requireAuthz({ surface: 'ops', moduleId: 'design-requests' }), createDesignRequestRoutes('ops'));
 
 app.use('/api/admin/jobs', requirePermission({ surface: 'admin' }), jobRoutes);
-app.use('/api/admin/design-requests', requirePermission({ surface: 'admin' }), createDesignRequestRoutes('admin'));
+app.use('/api/admin/design-requests', requireAuthz({ surface: 'admin', moduleId: 'design-requests' }), createDesignRequestRoutes('admin'));
 app.use('/api/admin/approvals', requirePermission({ surface: 'admin' }), approvalRoutes);
 app.use('/api/admin/races', requirePermission({ surface: 'admin' }), raceRoutes);
 app.use('/api/admin/records', requirePermission({ surface: 'admin' }), recordRoutes);
@@ -162,7 +164,8 @@ app.use('/api/admin/interviews', requirePermission({ surface: 'admin' }), interv
 app.use('/api/admin/warehouse', requirePermission({ surface: 'admin', module: { surface: 'admin', moduleId: 'inventory' } }), inventoryRoutes);
 app.use('/api/admin/ocr', requirePermission({ surface: 'admin', module: { surface: 'admin', moduleId: 'finance' } }), ocrRoutes);
 app.use('/api/admin/credentials', requirePermission({ surface: 'admin', module: { surface: 'admin', moduleId: 'credentials' } }), credentialRoutes);
-app.use('/api/admin/identity-center', requirePermission({ surface: 'admin' }), identityCenterRoutes);
+app.use('/api/admin/identity-center', requireAuthz({ surface: 'admin', moduleId: 'identity-center' }), identityCenterRoutes);
+app.use('/api/authz', authzRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/admin/color-schemes', requirePermission({ surface: 'admin' }), colorSchemeRoutes);
 app.use('/api/admin/dict', requirePermission({ surface: 'admin' }), dictAdminRoutes);

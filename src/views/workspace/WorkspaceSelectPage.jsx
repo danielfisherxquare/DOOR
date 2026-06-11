@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import useWorkspaceStore from '../../features/workspace/workspaceStore'
-import { createWorkspaceSession } from '../../features/workspace/workspaceSession'
+import { createWorkspaceSession, ORG_OPERATION_SCOPE_VALUE } from '../../features/workspace/workspaceSession'
 import { fetchWorkspaceOptions } from '../../features/workspace/workspaceApi'
 import { showError } from '../../utils/toast'
 import './workspace-entry.css'
@@ -23,14 +23,14 @@ function WorkspaceState({ message }) {
 export default function WorkspaceSelectPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { isAuthenticated, isBootstrapping, user, logout } = useAuthStore()
+  const { isAuthenticated, isBootstrapping, user, logout, refreshAuthzProfile } = useAuthStore()
   const workspaceSession = useWorkspaceStore((state) => state.session)
   const setWorkspaceSession = useWorkspaceStore((state) => state.setWorkspaceSession)
   const clearWorkspaceSession = useWorkspaceStore((state) => state.clearWorkspaceSession)
 
   const [options, setOptions] = useState(null)
   const [selectedOrgId, setSelectedOrgId] = useState('')
-  const [selectedRaceId, setSelectedRaceId] = useState('')
+  const [selectedScopeId, setSelectedScopeId] = useState(ORG_OPERATION_SCOPE_VALUE)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -38,9 +38,12 @@ export default function WorkspaceSelectPage() {
     setOptions(nextOptions)
     const nextOrgId = preferredOrgId || nextOptions.current.orgId || nextOptions.organizations[0]?.id || ''
     const org = nextOptions.organizations.find((item) => item.id === nextOrgId) || nextOptions.organizations[0]
-    const nextRaceId = preferredRaceId || nextOptions.current.raceId || org?.races[0]?.id || ''
+    const nextRaceId = preferredRaceId || nextOptions.current.raceId || ''
+    const nextScopeId = org?.scopes.some((scope) => scope.id === nextRaceId)
+      ? nextRaceId
+      : ORG_OPERATION_SCOPE_VALUE
     setSelectedOrgId(org?.id || '')
-    setSelectedRaceId(nextRaceId)
+    setSelectedScopeId(nextScopeId)
   }, [])
 
   const loadOptions = useCallback(async (params = {}) => {
@@ -67,9 +70,12 @@ export default function WorkspaceSelectPage() {
     options?.organizations.find((org) => org.id === selectedOrgId) || null
   ), [options, selectedOrgId])
 
-  const selectedRace = useMemo(() => (
-    selectedOrg?.races.find((race) => race.id === selectedRaceId) || null
-  ), [selectedOrg, selectedRaceId])
+  const selectedScope = useMemo(() => (
+    selectedOrg?.scopes.find((scope) => scope.id === selectedScopeId) || selectedOrg?.scopes[0] || null
+  ), [selectedOrg, selectedScopeId])
+
+  const selectedRaceId = selectedScope?.scopeType === 'race' ? selectedScope.raceId || selectedScope.id : ''
+  const selectedRace = selectedScope?.scopeType === 'race' ? selectedScope : null
 
   if (isBootstrapping) {
     return <WorkspaceState message="正在校验登录状态…" />
@@ -82,7 +88,7 @@ export default function WorkspaceSelectPage() {
   const handleOrgChange = (event) => {
     const nextOrgId = event.target.value
     setSelectedOrgId(nextOrgId)
-    setSelectedRaceId('')
+    setSelectedScopeId(ORG_OPERATION_SCOPE_VALUE)
     if (nextOrgId) {
       loadOptions({ orgId: nextOrgId })
     }
@@ -94,8 +100,8 @@ export default function WorkspaceSelectPage() {
       showError('请选择机构')
       return
     }
-    if (selectedOrg.races.length > 0 && !selectedRace) {
-      showError('请选择赛事')
+    if (!selectedScope) {
+      showError('请选择工作范围')
       return
     }
 
@@ -103,10 +109,12 @@ export default function WorkspaceSelectPage() {
     setWorkspaceSession(createWorkspaceSession({
       orgId: selectedOrg.id,
       orgName: selectedOrg.name,
-      raceId: selectedRace?.id || '',
+      raceId: selectedRaceId,
       raceName: selectedRace?.name || '',
+      scopeType: selectedScope.scopeType,
       surface: 'app',
     }))
+    await refreshAuthzProfile({ orgId: selectedOrg.id, raceId: selectedRaceId })
 
     const redirect = searchParams.get('redirect')
     const target = redirect && redirect.startsWith('/') && !redirect.startsWith('/login')
@@ -121,7 +129,7 @@ export default function WorkspaceSelectPage() {
     navigate('/login', { replace: true })
   }
 
-  const canSubmit = Boolean(selectedOrg) && (!selectedOrg.races.length || Boolean(selectedRace))
+  const canSubmit = Boolean(selectedOrg && selectedScope)
 
   return (
     <div className="workspace-entry layout--app">
@@ -143,8 +151,8 @@ export default function WorkspaceSelectPage() {
         <div className="workspace-entry__header">
           <div>
             <p className="workspace-entry__eyebrow">Workspace</p>
-            <h1 className="workspace-entry__title">选择机构和赛事</h1>
-            <p className="workspace-entry__summary">先选机构和赛事。进入应用层、执行层或管理层后，系统会沿用这个工作区。</p>
+	            <h1 className="workspace-entry__title">选择工作区</h1>
+            <p className="workspace-entry__summary">先选机构，再选择机构运营或具体赛事。进入应用层、执行层或管理层后，系统会沿用这个工作区。</p>
           </div>
         </div>
 
@@ -152,7 +160,7 @@ export default function WorkspaceSelectPage() {
           <div className="workspace-entry__panel-header">
             <div>
               <h2 className="workspace-entry__panel-title">当前工作区</h2>
-              <p className="workspace-entry__panel-note">这里只显示你有权限访问的机构和赛事。</p>
+	              <p className="workspace-entry__panel-note">机构运营用于设计、协同和组织级应用；具体赛事用于名单、证件和现场执行。</p>
             </div>
             {isLoading ? <span className="workspace-entry__chip">加载中</span> : null}
           </div>
@@ -174,23 +182,24 @@ export default function WorkspaceSelectPage() {
             </label>
 
             <label className="workspace-entry__field">
-              <span className="workspace-entry__label">赛事</span>
+              <span className="workspace-entry__label">工作范围</span>
               <select
                 className="workspace-entry__select"
-                value={selectedRaceId}
-                onChange={(event) => setSelectedRaceId(event.target.value)}
+                value={selectedScopeId}
+                onChange={(event) => setSelectedScopeId(event.target.value)}
                 disabled={isLoading || isSubmitting || !selectedOrg}
               >
-                <option value="">{selectedOrg?.races.length ? '请选择赛事' : '当前机构暂无可选赛事'}</option>
-                {(selectedOrg?.races || []).map((race) => (
-                  <option key={race.id} value={race.id}>{race.name}</option>
+                {(selectedOrg?.scopes || []).map((scope) => (
+                  <option key={scope.id} value={scope.id}>
+                    {scope.scopeType === 'org' ? '机构运营（不限定赛事）' : scope.name}
+                  </option>
                 ))}
               </select>
             </label>
 
             <div className="workspace-entry__meta-row">
               {selectedOrg ? <span className="workspace-entry__chip">机构：{selectedOrg.name}</span> : null}
-              {selectedRace ? <span className="workspace-entry__chip">赛事：{selectedRace.name}</span> : null}
+              {selectedScope ? <span className="workspace-entry__chip">范围：{selectedScope.scopeType === 'org' ? '机构运营' : selectedScope.name}</span> : null}
             </div>
 
             <div className="workspace-entry__actions">

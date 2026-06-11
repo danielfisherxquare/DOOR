@@ -4,6 +4,7 @@ import {
   createWorkspaceSession,
   getAvailableWorkspaceSurfaces,
   normalizeWorkspaceOptions,
+  ORG_OPERATION_SCOPE_VALUE,
   parseWorkspaceSession,
   resolveWorkspaceSwitchRedirect,
   resolveWorkspaceFromLegacyContext,
@@ -24,6 +25,7 @@ describe('workspace session', () => {
     assert.equal(session.orgName, '中奥资源')
     assert.equal(session.raceId, 'race-1')
     assert.equal(session.raceName, '测试赛事')
+    assert.equal(session.scopeType, 'race')
     assert.equal(session.surface, 'app')
     assert.equal(session.lastAppPath, '/app')
     assert.equal(session.lastOpsPath, '/ops')
@@ -58,7 +60,55 @@ describe('workspace session', () => {
       orgName: '',
       raceId: '2',
       raceName: '',
+      scopeType: 'race',
       surface: 'ops',
+      lastAppPath: '/app',
+      lastOpsPath: '/ops',
+      lastAdminPath: '/admin',
+    })
+  })
+
+  it('serializes and parses an organization operation workspace without a race', () => {
+    const session = createWorkspaceSession({
+      orgId: 'org-1',
+      orgName: '中奥资源',
+      scopeType: 'org',
+      surface: 'app',
+    })
+
+    assert.deepEqual(parseWorkspaceSession(serializeWorkspaceSession(session)), {
+      orgId: 'org-1',
+      orgName: '中奥资源',
+      raceId: '',
+      raceName: '',
+      scopeType: 'org',
+      surface: 'app',
+      lastAppPath: '/app',
+      lastOpsPath: '/ops',
+      lastAdminPath: '/admin',
+    })
+  })
+
+  it('parses a zustand-persisted workspace session', () => {
+    const persisted = JSON.stringify({
+      state: {
+        session: createWorkspaceSession({
+          orgId: 'org-1',
+          orgName: '中奥资源',
+          scopeType: 'org',
+          surface: 'admin',
+        }),
+      },
+      version: 0,
+    })
+
+    assert.deepEqual(parseWorkspaceSession(persisted), {
+      orgId: 'org-1',
+      orgName: '中奥资源',
+      raceId: '',
+      raceName: '',
+      scopeType: 'org',
+      surface: 'admin',
       lastAppPath: '/app',
       lastOpsPath: '/ops',
       lastAdminPath: '/admin',
@@ -67,7 +117,7 @@ describe('workspace session', () => {
 
   it('rejects empty or malformed persisted sessions', () => {
     assert.equal(parseWorkspaceSession(''), null)
-    assert.equal(parseWorkspaceSession('{"orgId":"org-1"}'), null)
+    assert.equal(parseWorkspaceSession('{"raceId":"race-1"}'), null)
     assert.equal(parseWorkspaceSession('{bad json'), null)
   })
 
@@ -87,6 +137,9 @@ describe('workspace session', () => {
     assert.equal(options.current.orgId, '1')
     assert.equal(options.current.raceId, '11')
     assert.deepEqual(options.organizations.map((org) => org.races.map((race) => race.id)), [['11'], ['22']])
+    assert.deepEqual(options.organizations[0].scopes.map((scope) => scope.id), [ORG_OPERATION_SCOPE_VALUE, '11'])
+    assert.equal(options.organizations[0].scopes[0].scopeType, 'org')
+    assert.equal(options.organizations[0].scopes[1].scopeType, 'race')
   })
 
   it('returns only surfaces the user can access', () => {
@@ -97,10 +150,15 @@ describe('workspace session', () => {
     assert.deepEqual(surfaces.map((surface) => surface.key), ['app', 'admin'])
   })
 
+  it('does not infer available surfaces from role alone', () => {
+    assert.deepEqual(getAvailableWorkspaceSurfaces({ role: 'super_admin' }).map((surface) => surface.key), [])
+    assert.deepEqual(getAvailableWorkspaceSurfaces({ role: 'org_admin' }).map((surface) => surface.key), [])
+  })
+
   it('returns the launcher after a multi-surface user switches workspace inside a surface', () => {
     const redirect = resolveWorkspaceSwitchRedirect({
       currentPath: '/app/events/import',
-      user: { role: 'super_admin' },
+      user: { surfaceAccess: { app: true, ops: true, admin: true } },
     })
 
     assert.equal(redirect, '/launcher')

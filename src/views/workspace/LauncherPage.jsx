@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import useWorkspaceStore from '../../features/workspace/workspaceStore'
@@ -6,10 +7,15 @@ import './workspace-entry.css'
 
 export default function LauncherPage() {
   const navigate = useNavigate()
-  const { isAuthenticated, isBootstrapping, user, logout } = useAuthStore()
+  const { isAuthenticated, isBootstrapping, user, logout, refreshAuthzProfile } = useAuthStore()
   const session = useWorkspaceStore((state) => state.session)
   const setWorkspaceSession = useWorkspaceStore((state) => state.setWorkspaceSession)
   const clearWorkspaceSession = useWorkspaceStore((state) => state.clearWorkspaceSession)
+
+  useEffect(() => {
+    if (!isAuthenticated || !session?.orgId) return
+    refreshAuthzProfile({ orgId: session.orgId, raceId: session.raceId })
+  }, [isAuthenticated, refreshAuthzProfile, session?.orgId, session?.raceId])
 
   if (isBootstrapping) {
     return (
@@ -33,6 +39,7 @@ export default function LauncherPage() {
   }
 
   const surfaces = getAvailableWorkspaceSurfaces(user)
+  const scopeLabel = session.raceName || session.raceId || '机构运营'
 
   const openSurface = (surface) => {
     const path = session[surface.pathKey] || surface.defaultPath
@@ -67,11 +74,11 @@ export default function LauncherPage() {
           <div>
             <p className="workspace-entry__eyebrow">Launcher</p>
             <h1 className="workspace-entry__title">选择入口</h1>
-            <p className="workspace-entry__summary">当前工作区：{session.orgName || session.orgId}{session.raceName ? ` / ${session.raceName}` : ''}</p>
+            <p className="workspace-entry__summary">当前工作区：{session.orgName || session.orgId} / {scopeLabel}</p>
           </div>
           <div className="workspace-entry__meta-row">
             <span className="workspace-entry__chip">机构：{session.orgName || session.orgId}</span>
-            {session.raceName || session.raceId ? <span className="workspace-entry__chip">赛事：{session.raceName || session.raceId}</span> : null}
+            <span className="workspace-entry__chip">范围：{scopeLabel}</span>
           </div>
         </div>
 

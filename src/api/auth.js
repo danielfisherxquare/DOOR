@@ -5,6 +5,12 @@ const authApi = {
   login: (credentials) => request.post('/auth/login', credentials),
   logout: (data) => request.post('/auth/logout', data),
   getCurrentUser: () => request.get('/auth/me'),
+  getAuthzProfile: ({ orgId, raceId } = {}) => request.get('/authz/profile', {
+    params: {
+      ...(orgId ? { orgId } : {}),
+      ...(raceId ? { raceId } : {}),
+    },
+  }),
   verifyEmail: (token) => request.get(`/auth/verify-email/${token}`),
   resendVerification: () => request.post('/auth/resend-verification'),
   forgotPassword: (email) => request.post('/auth/forgot-password', { email }),

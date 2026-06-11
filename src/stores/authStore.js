@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import authApi from '../api/auth'
+import { parseWorkspaceSession } from '../features/workspace/workspaceSession'
+
+const WORKSPACE_SESSION_STORAGE_KEY = 'workspace-session'
 
 function getSurfacePath(surface) {
   switch (surface) {
@@ -11,6 +14,77 @@ function getSurfacePath(surface) {
     case 'app':
     default:
       return '/app'
+  }
+}
+
+function surfaceAccessFromProfile(profile) {
+  const surfaces = Array.isArray(profile?.surfaces) ? profile.surfaces : []
+  return surfaces.reduce((result, surface) => {
+    result[surface] = true
+    return result
+  }, {})
+}
+
+function hasValue(value) {
+  return value !== undefined && value !== null && value !== ''
+}
+
+function toId(value) {
+  return hasValue(value) ? String(value) : ''
+}
+
+function getUserOrgId(user) {
+  return toId(user?.orgId || user?.org?.id || user?.organization?.id)
+}
+
+function readPersistedWorkspaceSession() {
+  if (typeof window === 'undefined' || !window.localStorage) return null
+  return parseWorkspaceSession(window.localStorage.getItem(WORKSPACE_SESSION_STORAGE_KEY))
+}
+
+function getProfileOrgId(user, overrideOrgId) {
+  if (hasValue(overrideOrgId)) return toId(overrideOrgId)
+
+  const workspaceSession = readPersistedWorkspaceSession()
+  const userOrgId = getUserOrgId(user)
+  if (
+    workspaceSession?.orgId
+    && (!userOrgId || userOrgId === workspaceSession.orgId || user?.role === 'super_admin')
+  ) {
+    return workspaceSession.orgId
+  }
+
+  return toId(user?.preferences?.lastOrgId || userOrgId)
+}
+
+function getProfileRaceId(user, overrideRaceId, targetOrgId) {
+  if (overrideRaceId !== undefined && overrideRaceId !== null) return toId(overrideRaceId)
+
+  const workspaceSession = readPersistedWorkspaceSession()
+  if (
+    workspaceSession?.raceId
+    && (!targetOrgId || workspaceSession.orgId === toId(targetOrgId))
+  ) {
+    return workspaceSession.raceId
+  }
+
+  return toId(user?.preferences?.lastRaceId)
+}
+
+function mergeAuthzProfile(user, profile) {
+  if (!user || !profile) return user
+  const surfaceAccess = surfaceAccessFromProfile(profile)
+  const surfaces = Array.isArray(profile.surfaces) ? profile.surfaces : []
+  const defaultSurface = surfaces.includes(user.defaultSurface)
+    ? user.defaultSurface
+    : (surfaces[0] || user.defaultSurface || 'app')
+
+  return {
+    ...user,
+    defaultSurface,
+    surfaceAccess,
+    moduleAccess: Array.isArray(profile.modules) ? profile.modules : [],
+    authzProfile: profile,
   }
 }
 
@@ -39,6 +113,7 @@ const useAuthStore = create(
               isAuthenticated: true,
               isBootstrapping: false,
             })
+            await get().refreshAuthzProfile()
           } else {
             set({ isBootstrapping: false, isAuthenticated: false, user: null, token: null, refreshToken: null })
           }
@@ -48,7 +123,11 @@ const useAuthStore = create(
       },
 
       hasRole: (...roles) => roles.includes(get().user?.role),
-      canAccessSurface: (surface) => Boolean(get().user?.surfaceAccess?.[surface]),
+      canAccessSurface: (surface) => {
+        const access = get().user?.surfaceAccess
+        if (Array.isArray(access)) return access.includes(surface)
+        return Boolean(access?.[surface])
+      },
       hasCapability: (scope, capability) => {
         const scoped = get().user?.scopedCapabilities || {}
         return Array.isArray(scoped[scope]) && scoped[scope].includes(capability)
@@ -64,6 +143,27 @@ const useAuthStore = create(
       canAccessOps: () => get().canAccessSurface('ops'),
       canAccessApp: () => get().canAccessSurface('app'),
 
+      refreshAuthzProfile: async ({ orgId, raceId } = {}) => {
+        const user = get().user
+        const targetOrgId = getProfileOrgId(user, orgId)
+        if (!targetOrgId) return null
+
+        try {
+          const response = await authApi.getAuthzProfile({
+            orgId: targetOrgId,
+            raceId: getProfileRaceId(user, raceId, targetOrgId),
+          })
+          if (response.success) {
+            const nextUser = mergeAuthzProfile(get().user, response.data)
+            set({ user: nextUser })
+            return response.data
+          }
+        } catch {
+          // Keep the authenticated session usable; route guards still call the backend.
+        }
+        return null
+      },
+
       login: async (username, password, rememberMe = false) => {
         set({ isLoading: true, error: null })
         try {
@@ -78,10 +178,12 @@ const useAuthStore = create(
               isLoading: false,
               error: null,
             })
+            await get().refreshAuthzProfile()
+            const refreshedUser = get().user || user
             return {
               success: true,
-              mustChangePassword: Boolean(user?.mustChangePassword),
-              defaultSurface: user?.defaultSurface || 'app',
+              mustChangePassword: Boolean(refreshedUser?.mustChangePassword),
+              defaultSurface: refreshedUser?.defaultSurface || 'app',
             }
           }
           set({ isLoading: false, error: response.message || '登录失败' })
@@ -140,6 +242,7 @@ const useAuthStore = create(
           const response = await authApi.getCurrentUser()
           if (response.success) {
             set({ user: response.data })
+            await get().refreshAuthzProfile()
             return true
           }
           return false

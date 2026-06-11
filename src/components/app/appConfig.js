@@ -365,12 +365,13 @@ const routeMeta = [
 
 function normalizeAccessOptions(optionsOrHasCapability) {
   if (typeof optionsOrHasCapability === 'function') {
-    return { hasCapability: optionsOrHasCapability, user: null }
+    return { hasCapability: optionsOrHasCapability, user: null, raceId: '' }
   }
 
   return {
     hasCapability: optionsOrHasCapability?.hasCapability,
     user: optionsOrHasCapability?.user || null,
+    raceId: optionsOrHasCapability?.raceId || '',
   }
 }
 
@@ -385,6 +386,7 @@ function hasNavigationModuleAccess(group, item, user) {
 }
 
 function isAllowed(item, options) {
+  if (item.needsRace && !options.raceId) return false
   if (!item.requiredCapability) return true
   if (typeof options.hasCapability !== 'function') return false
   return options.hasCapability(item.requiredCapability.scope, item.requiredCapability.capability)

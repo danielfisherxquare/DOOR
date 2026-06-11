@@ -1,0 +1,47 @@
+model
+  schema 1.1
+
+type user
+
+type organization
+  relations
+    define member: [user]
+    define admin: [user]
+    define platform_admin: [user]
+    define can_view: member or admin or platform_admin
+    define can_manage: admin or platform_admin
+
+type race
+  relations
+    define parent: [organization]
+    define viewer: [user, organization#member]
+    define operator: [user]
+    define manager: [user, organization#admin]
+    define can_view: viewer or operator or manager
+    define can_operate: operator or manager
+    define can_manage: manager
+
+type surface
+  relations
+    define parent_org: [organization]
+    define parent_race: [race]
+    define granted: [user, organization#member, organization#admin, organization#platform_admin, race#operator, race#manager]
+    define can_enter: granted
+
+type module
+  relations
+    define parent_surface: [surface]
+    define granted: [user, organization#member, organization#admin, organization#platform_admin, race#operator, race#manager]
+    define can_open: granted and can_enter from parent_surface
+
+type design_request
+  relations
+    define parent_org: [organization]
+    define parent_race: [race]
+    define requester: [user]
+    define designer: [user]
+    define reviewer: [user, organization#admin]
+    define can_view: requester or designer or reviewer
+    define can_create: requester
+    define can_work: designer
+    define can_review: reviewer
