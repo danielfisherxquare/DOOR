@@ -1,5 +1,5 @@
 /**
- * DOOR 赛事抽签流程测试数据生成器
+ * ArcSpro 赛事抽签流程测试数据生成器
  * 生成不少于 1000 人的测试名单 Excel 文件
  */
 
@@ -219,7 +219,7 @@ async function main() {
     const outputFile = process.argv[3] || path.join(__dirname, 'fixtures', 'test-participants.xlsx');
     
     console.log('='.repeat(60));
-    console.log('DOOR 赛事抽签测试数据生成器');
+    console.log('ArcSpro 赛事抽签测试数据生成器');
     console.log('='.repeat(60));
     console.log(`生成人数：${count}`);
     console.log(`输出文件：${outputFile}`);

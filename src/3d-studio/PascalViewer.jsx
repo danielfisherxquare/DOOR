@@ -180,7 +180,7 @@ function ViewerDiagnostics() {
 
     if (typeof window !== 'undefined') {
       const { selection } = useViewer.getState()
-      window.__DOOR_VIEWER_STATE__ = {
+      window.__ARCSPRO_VIEWER_STATE__ = {
         frameAt: new Date().toISOString(),
         elapsed: now,
         rendererBackend: gl?.userData?.renderBackend || gl?.domElement?.dataset?.rendererBackend || 'unknown',
@@ -203,7 +203,7 @@ function ViewerDiagnostics() {
         },
       }
       if (import.meta.env.DEV) {
-        window.__DOOR_VIEWER_DEBUG__ = {
+        window.__ARCSPRO_VIEWER_DEBUG__ = {
           scene,
           camera,
           gl,
@@ -566,7 +566,7 @@ export default function PascalViewer({
         gl.userData.renderBackend = gl.userData.renderBackend || (gl.isWebGLRenderer ? 'webgl2' : (gl.isWebGPURenderer ? 'webgpu' : 'unknown'))
         if (gl.domElement) gl.domElement.dataset.rendererBackend = gl.userData.renderBackend
         if (typeof window !== 'undefined') {
-          window.__DOOR_RENDERERS__ = {
+          window.__ARCSPRO_RENDERERS__ = {
             PascalViewer: {
               backend: gl?.userData?.renderBackend || (gl?.isWebGPURenderer ? 'webgpu' : 'unknown'),
             },

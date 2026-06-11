@@ -1,4 +1,4 @@
-# DOOR Server README（端口统一版）
+# ArcSpro Server README（端口统一版）
 
 ## Docker 镜像与容器命名
 
@@ -8,12 +8,12 @@
 |------|----------|----------|------|
 | PostgreSQL | `postgres:16-alpine` | `door-postgres` | 主数据库 |
 | Redis | `redis:7-alpine` | `door-redis` | 缓存/限流 |
-| API 服务 | `door-server-app:latest` | `door-app` | Express API |
-| Worker | `door-server-app:latest` | `door-worker` | 后台任务 |
+| API 服务 | `arcspro-server-app:latest` | `arcspro-app` | Express API |
+| Worker | `arcspro-server-app:latest` | `door-worker` | 后台任务 |
 | Nginx | `nginx:alpine` | `door-nginx` | SSL 网关 |
 | 自动备份 | `postgres:16-alpine` | `door-pg-backup` | 每6小时 pg_dump |
 
-> `app` 和 `worker` 共用同一个镜像 `door-server-app:latest`，仅启动命令不同。
+> `app` 和 `worker` 共用同一个镜像 `arcspro-server-app:latest`，仅启动命令不同。
 > `pg-backup` 是轻量级 sidecar，复用 postgres 镜像仅执行 `pg_dump`。
 
 ## 本地环境配置文件

@@ -63,6 +63,9 @@ function getCorsOrigin() {
             'http://localhost:5174', 'http://127.0.0.1:5174',
             'http://localhost:3000', 'http://127.0.0.1:3000',
             'http://localhost', 'http://127.0.0.1',
+            /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/,
+            /^http:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/,
+            /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+(:\d+)?$/,
             ...cloudOrigins
         ];
     }
@@ -101,7 +104,7 @@ app.use('/api/public/dict', dictPublicRoutes);
 // API Documentation
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'DOOR API Documentation',
+  customSiteTitle: 'ArcSpro API Documentation',
 }));
 app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
 

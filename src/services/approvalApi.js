@@ -30,6 +30,18 @@ const approvalApi = {
   archiveRaceStaffAssignment: (raceId, assignmentId) => (
     request.delete('/admin/races/' + encodeURIComponent(raceId) + '/staff-assignments/' + encodeURIComponent(assignmentId))
   ),
+  listScopeRoleAssignments: (surface = 'admin', params = {}) => (
+    request.get(approvalBase(surface) + '/scope-role-assignments', { params })
+  ),
+  createScopeRoleAssignment: (surface = 'admin', data = {}) => (
+    request.post(approvalBase(surface) + '/scope-role-assignments', data)
+  ),
+  updateScopeRoleAssignment: (surface = 'admin', assignmentId, data = {}) => (
+    request.patch(approvalBase(surface) + '/scope-role-assignments/' + encodeURIComponent(assignmentId), data)
+  ),
+  archiveScopeRoleAssignment: (surface = 'admin', assignmentId, data = {}) => (
+    request.delete(approvalBase(surface) + '/scope-role-assignments/' + encodeURIComponent(assignmentId), { data })
+  ),
 }
 
 export default approvalApi

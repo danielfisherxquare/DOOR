@@ -1,4 +1,4 @@
-# DOOR 3D Studio UIUX 修复总结
+# ArcSpro 3D Studio UIUX 修复总结
 
 **修复日期**: 2026-03-29  
 **修复脚本**: `fix-3d-studio-critical.mjs`  
@@ -230,7 +230,7 @@ npm run dev
 | `test-3d-studio-debug.mjs` | 页面调试脚本 |
 | `test-3d-studio-full.mjs` | 完整审计脚本 |
 | `fix-3d-studio-critical.mjs` | 关键问题修复脚本 |
-| `DOOR_3D_STUDIO_UIUX_AUDIT_REPORT.md` | 详细审计报告 |
+| `ArcSpro_3D_STUDIO_UIUX_AUDIT_REPORT.md` | 详细审计报告 |
 | `3D_STUDIO_UIUX_FIX_SUMMARY.md` | 本修复总结文档 |
 | `door-audit-screenshots/*.png` | 测试截图 |
 

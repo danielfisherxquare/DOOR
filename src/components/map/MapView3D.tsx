@@ -285,8 +285,8 @@ type GlobeExperienceStatus = {
   tone: GlobeStatusTone;
 };
 type DebugWindow = Window & typeof globalThis & {
-  __DOOR_CESIUM_VIEWER__?: Cesium.Viewer;
-  __DOOR_CESIUM_DEBUG__?: {
+  __ARCSPRO_CESIUM_VIEWER__?: Cesium.Viewer;
+  __ARCSPRO_CESIUM_DEBUG__?: {
     placedModelIds: string[];
     entityMapKeys: string[];
     entityIds: string[];
@@ -1855,8 +1855,8 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
     setViewerReadyToken((token) => token + 1);
     entityMapRef.current.clear();
     if (import.meta.env.DEV) {
-      (window as DebugWindow).__DOOR_CESIUM_VIEWER__ = viewer;
-      (window as DebugWindow).__DOOR_CESIUM_DEBUG__ = {
+      (window as DebugWindow).__ARCSPRO_CESIUM_VIEWER__ = viewer;
+      (window as DebugWindow).__ARCSPRO_CESIUM_DEBUG__ = {
         placedModelIds: [],
         entityMapKeys: [],
         entityIds: [],
@@ -1966,8 +1966,8 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
       viewer.destroy();
       viewerRef.current = null;
       if (import.meta.env.DEV) {
-        delete (window as DebugWindow).__DOOR_CESIUM_VIEWER__;
-        delete (window as DebugWindow).__DOOR_CESIUM_DEBUG__;
+        delete (window as DebugWindow).__ARCSPRO_CESIUM_VIEWER__;
+        delete (window as DebugWindow).__ARCSPRO_CESIUM_DEBUG__;
       }
     };
   }, [hasRenderableSize, setRenderFps, syncRuntimePreviewSummary]);
@@ -2339,7 +2339,7 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
 
     syncPlacedModels(viewer, placedModels, selectedPlacedModelId, entityMapRef.current);
     if (import.meta.env.DEV) {
-      (window as DebugWindow).__DOOR_CESIUM_DEBUG__ = {
+      (window as DebugWindow).__ARCSPRO_CESIUM_DEBUG__ = {
         placedModelIds: placedModels.map((model) => model.id),
         entityMapKeys: Array.from(entityMapRef.current.keys()),
         entityIds: viewer.entities.values.map((entity) => entity.id),
@@ -2422,7 +2422,7 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
           syncRuntimePreviewSummary();
           if (import.meta.env.DEV) {
             const currentPlacedModels = useModelStore.getState().placedModels;
-            (window as DebugWindow).__DOOR_CESIUM_DEBUG__ = {
+            (window as DebugWindow).__ARCSPRO_CESIUM_DEBUG__ = {
               placedModelIds: currentPlacedModels.map((model) => model.id),
               entityMapKeys: Array.from(entityMapRef.current.keys()),
               entityIds: viewer.entities.values.map((entity) => entity.id),

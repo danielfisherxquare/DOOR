@@ -4,7 +4,7 @@ k哦那估计
 ## 一、项目概述
 
 ### 1.1 背景
-- 项目挂载在DOOR系统下
+- 项目挂载在ArcSpro系统下
 - 以机构为中心管理物资，而非以赛事为中心
 - 支持赛事向机构申请物资
 - 需要批量生成和打印二维码
@@ -52,7 +52,7 @@ await knex.schema.createTable('org_inventory_batches', (t) => {
     t.uuid('created_by').nullable();
     t.timestamp('created_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
     t.timestamp('updated_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
-    
+
     t.index(['org_id', 'batch_type']);
 });
 ```
@@ -79,7 +79,7 @@ await knex.schema.createTable('org_inventory_units', (t) => {
     t.string('picked_by', 100).nullable();
     t.timestamp('created_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
     t.timestamp('updated_at', { useTz: true }).notNullable().defaultTo(knex.fn.now());
-    
+
     t.index(['org_id', 'batch_id']);
     t.index(['org_id', 'status']);
     t.index(['qr_code']);
@@ -231,7 +231,7 @@ await knex.schema.createTable('org_inventory_units', (t) => {
 
 ### 4.1 设计系统概述
 
-DOOR系统采用Bento Modern设计系统，定义在 `door/src/styles/soft-design.css` 中。
+ArcSpro系统采用Bento Modern设计系统，定义在 `door/src/styles/soft-design.css` 中。
 
 ### 4.2 颜色系统
 
@@ -572,21 +572,21 @@ const clients = new Map(); // orgId -> Set<ws>
 
 export function initWebSocket(server) {
     wss = new WebSocketServer({ server, path: '/ws/inventory' });
-    
+
     wss.on('connection', (ws, req) => {
         const url = new URL(req.url, 'http://localhost');
         const orgId = url.searchParams.get('orgId');
-        
+
         if (!orgId) {
             ws.close(1008, 'Missing orgId');
             return;
         }
-        
+
         if (!clients.has(orgId)) {
             clients.set(orgId, new Set());
         }
         clients.get(orgId).add(ws);
-        
+
         ws.on('close', () => {
             clients.get(orgId)?.delete(ws);
         });
@@ -596,7 +596,7 @@ export function initWebSocket(server) {
 export function broadcastToOrg(orgId, event) {
     const orgClients = clients.get(orgId);
     if (!orgClients) return;
-    
+
     const message = JSON.stringify(event);
     orgClients.forEach(ws => {
         if (ws.readyState === ws.OPEN) {

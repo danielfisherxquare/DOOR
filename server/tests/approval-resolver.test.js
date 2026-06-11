@@ -93,6 +93,34 @@ async function createAssignment({ member, user, roleKey, roleName, departmentSco
     return assignment;
 }
 
+async function createScopeAssignment({
+    member,
+    user,
+    roleKey,
+    roleName,
+    scopeType = 'org',
+    scopeId = null,
+    departmentScope = null,
+    moduleKey = null,
+    status = 'active',
+}) {
+    const [assignment] = await knex('scope_role_assignments')
+        .insert({
+            org_id: orgId,
+            scope_type: scopeType,
+            scope_id: scopeId,
+            team_member_id: member.id,
+            user_id: user.id,
+            role_key: roleKey,
+            role_name: roleName,
+            department_scope: departmentScope,
+            module_key: moduleKey,
+            status,
+        })
+        .returning('*');
+    return assignment;
+}
+
 describe('approval resolver', () => {
     before(async () => {
         await knex.migrate.latest();
@@ -159,6 +187,21 @@ describe('approval resolver', () => {
             user: raceDirector.user,
             roleKey: 'race_director',
             roleName: '赛事总监',
+        });
+        await createScopeAssignment({
+            member: departmentOwner.member,
+            user: departmentOwner.user,
+            roleKey: 'department_owner',
+            roleName: '部门负责人',
+            scopeType: 'department',
+            departmentScope: '竞赛部',
+        });
+        await createScopeAssignment({
+            member: raceDirector.member,
+            user: raceDirector.user,
+            roleKey: 'race_director',
+            roleName: '赛事总监',
+            scopeType: 'org',
         });
     });
 
@@ -232,5 +275,49 @@ describe('approval resolver', () => {
         assert.equal(result.status, 'blocked');
         assert.equal(result.missingRoleKey, 'race_director');
         assert.match(result.reason, /race_director/);
+    });
+
+    it('resolves department owners from organization scope when no race is selected', async () => {
+        const result = await resolveApprovers(
+            { orgId, requesterUserId: requesterId },
+            {
+                resolverType: 'race_staff_department_role',
+                resolverConfig: {
+                    roleKey: 'department_owner',
+                    departmentField: 'requester_department',
+                },
+                excludeRequester: true,
+            },
+            {
+                requester_department: '竞赛部',
+            },
+        );
+
+        assert.equal(result.status, 'ready');
+        assert.equal(result.approvers.length, 1);
+        assert.equal(String(result.approvers[0].userId), String(departmentOwnerUserId));
+        assert.equal(result.approvers[0].scopeType, 'department');
+        assert.equal(result.approvers[0].departmentScope, '竞赛部');
+    });
+
+    it('falls back to organization role assignments when a race role is not required', async () => {
+        const result = await resolveApprovers(
+            { orgId, requesterUserId: requesterId },
+            {
+                resolverType: 'race_staff_role',
+                resolverConfig: {
+                    roleKey: 'race_director',
+                },
+                excludeRequester: true,
+            },
+            {
+                requester_department: '竞赛部',
+            },
+        );
+
+        assert.equal(result.status, 'ready');
+        assert.equal(result.approvers.length, 1);
+        assert.equal(String(result.approvers[0].userId), String(raceDirectorUserId));
+        assert.equal(result.approvers[0].scopeType, 'org');
     });
 });

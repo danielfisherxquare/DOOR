@@ -1,5 +1,5 @@
 /**
- * DOOR "我的赛事" 名单导入到抽签结束端到端测试
+ * ArcSpro "我的赛事" 名单导入到抽签结束端到端测试
  * 
  * 测试流程：
  * 1. 登录系统
@@ -23,15 +23,15 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 配置
-const BASE_URL = process.env.DOOR_TEST_URL || process.env.URL || 'http://127.0.0.1:5173';
+const BASE_URL = process.env.ARCSPRO_TEST_URL || process.env.URL || 'http://127.0.0.1:5173';
 const TIMEOUT = 300000; // 5 分钟超时（抽签可能需要较长时间）
 const SCREENSHOT_DIR = path.join(__dirname, 'screenshots');
 const FIXTURES_DIR = path.join(__dirname, 'fixtures');
 
 // 测试凭据 - 从环境变量读取或使用默认值
 const CREDENTIALS = {
-    username: process.env.DOOR_TEST_USERNAME || 'test@example.com',
-    password: process.env.DOOR_TEST_PASSWORD || 'TestPassword123!',
+    username: process.env.ARCSPRO_TEST_USERNAME || 'test@example.com',
+    password: process.env.ARCSPRO_TEST_PASSWORD || 'TestPassword123!',
 };
 
 // 确保截图目录存在
@@ -632,7 +632,7 @@ async function testVerifyResults(page) {
  */
 async function runEventLotteryTests() {
     console.log('='.repeat(60));
-    console.log('DOOR "我的赛事" 名单导入到抽签结束端到端测试');
+    console.log('ArcSpro "我的赛事" 名单导入到抽签结束端到端测试');
     console.log('='.repeat(60));
     console.log(`测试环境：${BASE_URL}`);
     console.log(`测试时间：${testResults.timestamp}`);

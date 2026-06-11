@@ -1,8 +1,8 @@
-# DOOR Design Requests Implementation Plan
+# ArcSpro Design Requests Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build the DOOR design request collaboration app across ops, admin, and app surfaces with manager approval before designer work.
+**Goal:** Build the ArcSpro design request collaboration app across ops, admin, and app surfaces with manager approval before designer work.
 
 **Architecture:** Add one backend domain module shared by the three surfaces, with scoped Express mounts and Knex tables. Add one frontend API client and three React pages that reuse the same request/detail components but expose different actions per surface.
 

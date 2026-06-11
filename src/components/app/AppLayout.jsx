@@ -199,13 +199,13 @@ useEffect(() => {
         ...state,
         isInstalled: isStandalone,
         isIos,
-        canPrompt: Boolean(window.__doorInstallPrompt && !isStandalone),
-        promptEvent: window.__doorInstallPrompt || state.promptEvent,
+        canPrompt: Boolean(window.__arcsproInstallPrompt && !isStandalone),
+        promptEvent: window.__arcsproInstallPrompt || state.promptEvent,
       }))
     }
 
     const handleInstallPrompt = (event) => {
-      const promptEvent = event.detail?.promptEvent || window.__doorInstallPrompt || null
+      const promptEvent = event.detail?.promptEvent || window.__arcsproInstallPrompt || null
       setInstallPromptState((state) => ({
         ...state,
         canPrompt: Boolean(promptEvent),
@@ -223,13 +223,13 @@ useEffect(() => {
     }
 
     detectInstallState()
-    window.addEventListener('door:installprompt', handleInstallPrompt)
-    window.addEventListener('door:appinstalled', handleAppInstalled)
+    window.addEventListener('arcspro:installprompt', handleInstallPrompt)
+    window.addEventListener('arcspro:appinstalled', handleAppInstalled)
     displayModeQuery?.addEventListener?.('change', detectInstallState)
 
     return () => {
-      window.removeEventListener('door:installprompt', handleInstallPrompt)
-      window.removeEventListener('door:appinstalled', handleAppInstalled)
+      window.removeEventListener('arcspro:installprompt', handleInstallPrompt)
+      window.removeEventListener('arcspro:appinstalled', handleAppInstalled)
       displayModeQuery?.removeEventListener?.('change', detectInstallState)
     }
   }, [])
@@ -274,12 +274,12 @@ useEffect(() => {
   }
 
   const handleInstallClick = useCallback(async () => {
-    const promptEvent = installPromptState.promptEvent || window.__doorInstallPrompt
+    const promptEvent = installPromptState.promptEvent || window.__arcsproInstallPrompt
 
     if (promptEvent?.prompt) {
       promptEvent.prompt()
       await promptEvent.userChoice.catch(() => null)
-      window.__doorInstallPrompt = null
+      window.__arcsproInstallPrompt = null
       setInstallPromptState((state) => ({
         ...state,
         canPrompt: false,
@@ -377,7 +377,7 @@ useEffect(() => {
               <span className="material-symbols-outlined">hub</span>
             </div>
             <div className="workspace-sidebar__brand-text">
-              <span className="workspace-sidebar__eyebrow">DOOR</span>
+              <span className="workspace-sidebar__eyebrow">中奥致远</span>
               <span className="workspace-sidebar__title">PORTAL</span>
             </div>
           </Link>
@@ -691,7 +691,7 @@ useEffect(() => {
           <aside className="workspace-mobile-menu__panel" aria-label="应用菜单">
             <div className="workspace-mobile-menu__header">
               <div>
-                <span className="workspace-mobile-menu__eyebrow">DOOR APP</span>
+                <span className="workspace-mobile-menu__eyebrow">中奥致远 APP</span>
                 <h2 className="workspace-mobile-menu__title">应用层</h2>
               </div>
               <button

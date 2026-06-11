@@ -140,6 +140,11 @@
   gap: 12px;
 }
 
+.app-h5-section__body > .app-h5-action-grid {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
 .app-h5-panel {
   display: grid;
   gap: 14px;

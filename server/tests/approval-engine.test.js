@@ -97,6 +97,29 @@ async function assignStaff({ account, roleKey, roleName, departmentScope = null 
     });
 }
 
+async function assignScopeRole({
+    account,
+    roleKey,
+    roleName,
+    scopeType = 'org',
+    scopeId = null,
+    departmentScope = null,
+    moduleKey = null,
+}) {
+    await knex('scope_role_assignments').insert({
+        org_id: orgId,
+        scope_type: scopeType,
+        scope_id: scopeId,
+        team_member_id: account.member.id,
+        user_id: account.user.id,
+        role_key: roleKey,
+        role_name: roleName,
+        department_scope: departmentScope,
+        module_key: moduleKey,
+        status: 'active',
+    });
+}
+
 async function seedBaseData({ requesterIsDepartmentOwner = false, includeRaceDirector = true } = {}) {
     const [org] = await knex('organizations')
         .insert({ name: `Approval Engine Org ${Date.now()}`, slug: `approval-engine-${Date.now()}` })
@@ -173,6 +196,20 @@ async function seedBaseData({ requesterIsDepartmentOwner = false, includeRaceDir
         account: designer,
         roleKey: 'design_designer',
         roleName: '设计师',
+    });
+    await assignScopeRole({
+        account: departmentOwner,
+        roleKey: 'department_owner',
+        roleName: '部门负责人',
+        scopeType: 'department',
+        departmentScope: '竞赛部',
+    });
+    await assignScopeRole({
+        account: designLead,
+        roleKey: 'design_lead',
+        roleName: '设计负责人',
+        scopeType: 'module',
+        moduleKey: 'design_requests',
     });
 }
 
@@ -368,5 +405,52 @@ describe('approval engine service', () => {
             { action: 'request_changes', comment: '补充参考图' },
         );
         assert.equal(afterChanges.status, 'needs_info');
+    });
+
+    it('runs organization-level design approval without requiring a race director', async () => {
+        await seedBaseData({ includeRaceDirector: false });
+
+        const started = await startApproval({
+            orgId,
+            userId: requester.user.id,
+            requesterUserId: requester.user.id,
+        }, {
+            businessType: 'design_request',
+            businessId: 'REQ-ORG-1001',
+            actionKey: 'submit',
+            requesterUserId: requester.user.id,
+            businessRecord: {
+                org_id: orgId,
+                requester_department: '竞赛部',
+                title: '组织级品牌模板',
+            },
+        });
+
+        assert.equal(started.status, 'pending');
+        assert.equal(started.raceId, null);
+        assert.equal(started.currentStep.stepKey, 'department_owner_review');
+        assert.equal(String(started.pendingTasks[0].assignedUserId), String(departmentOwner.user.id));
+
+        const afterOwner = await actOnTask(
+            { orgId, userId: departmentOwner.user.id },
+            started.pendingTasks[0].id,
+            { action: 'approve', comment: '组织级需求完整' },
+        );
+        assert.equal(afterOwner.status, 'pending');
+        assert.equal(afterOwner.currentStep.stepKey, 'design_lead_assignment');
+        assert.equal(String(afterOwner.pendingTasks[0].assignedUserId), String(designLead.user.id));
+
+        const completed = await actOnTask(
+            { orgId, userId: designLead.user.id },
+            afterOwner.pendingTasks[0].id,
+            {
+                action: 'assign',
+                comment: '分派给设计师',
+                assignedDesignerId: designer.user.id,
+            },
+        );
+        assert.equal(completed.status, 'approved');
+        assert.equal(completed.raceId, null);
+        assert.equal(completed.result.assignedDesignerId, designer.user.id);
     });
 });

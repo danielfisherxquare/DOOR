@@ -453,7 +453,7 @@ export function buildTerrainWorkZonePublishManifest(zone, spatialObjects = []) {
             kind: 'terrain-work-zone-publish-manifest',
             name: zone?.name || '重点区工作区',
             source: 'gis-focus-zone',
-            coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+            coordinateSystem: EXPORT_COORDINATE_SYSTEMS.ARCSPRO_LOCAL_Y_UP,
             input: {
                 sourceWorkZoneId: zone?.id || null,
                 sourceProjectId: zone?.projectId || null,
@@ -626,7 +626,7 @@ export function buildTerrainWorkZoneExportPackage(zone, manifest) {
         kind: 'terrain-work-zone-export-package',
         name: manifest?.export?.export?.originalBaseName || zone?.name || '重点区工作区',
         source: 'gis-focus-zone',
-        coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+        coordinateSystem: EXPORT_COORDINATE_SYSTEMS.ARCSPRO_LOCAL_Y_UP,
         input: {
             sourceWorkZoneId: zone?.id || null,
             sourceProjectId: zone?.projectId || null,

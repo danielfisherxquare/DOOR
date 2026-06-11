@@ -3,7 +3,7 @@ import { env } from '../config/env.js';
 
 // ── 连接池配置：根据环境和进程类型智能调整 ──────────────
 const isProduction = env.NODE_ENV === 'production';
-const isWorker = process.env.DOOR_PROCESS_TYPE === 'worker';
+const isWorker = process.env.ARCSPRO_PROCESS_TYPE === 'worker';
 
 // Worker 进程通常执行长事务，需要更少但更持久的连接
 // API 进程需要更多连接应对并发请求

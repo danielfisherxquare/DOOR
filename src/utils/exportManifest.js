@@ -5,7 +5,7 @@ export const EXPORT_COORDINATE_SYSTEMS = Object.freeze({
     yAxis: 'latitude',
     zAxis: 'height',
   }),
-  DOOR_LOCAL_Y_UP: Object.freeze({
+  ARCSPRO_LOCAL_Y_UP: Object.freeze({
     type: 'door-local-y-up',
     xAxis: 'east meters from origin',
     yAxis: 'up meters',
@@ -55,9 +55,9 @@ export function buildExportFilenamePolicy(value, options = {}) {
 }
 
 export function resolveExportCoordinateSystem(coordinateSystem) {
-  if (!coordinateSystem) return EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP;
+  if (!coordinateSystem) return EXPORT_COORDINATE_SYSTEMS.ARCSPRO_LOCAL_Y_UP;
   if (typeof coordinateSystem === 'string') {
-    return EXPORT_COORDINATE_SYSTEMS[coordinateSystem] || EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP;
+    return EXPORT_COORDINATE_SYSTEMS[coordinateSystem] || EXPORT_COORDINATE_SYSTEMS.ARCSPRO_LOCAL_Y_UP;
   }
   return {
     type: coordinateSystem.type || 'custom',

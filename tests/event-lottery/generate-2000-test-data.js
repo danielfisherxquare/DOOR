@@ -1,5 +1,5 @@
 /**
- * DOOR 赛事名单导入系统测试数据生成器
+ * ArcSpro 赛事名单导入系统测试数据生成器
  * 生成不少于 2000 人的测试名单 Excel 文件
  * 覆盖所有测试项目：基本信息、参赛项目、服装尺码、成绩数据、紧急联系人等
  */
@@ -578,7 +578,7 @@ async function main() {
     const outputFile = process.argv[3] || path.join(__dirname, 'fixtures', 'test-participants-2000.xlsx');
 
     console.log('='.repeat(70));
-    console.log('DOOR 赛事名单导入系统测试数据生成器');
+    console.log('ArcSpro 赛事名单导入系统测试数据生成器');
     console.log('='.repeat(70));
     console.log(`生成人数：${count}`);
     console.log(`输出文件：${outputFile}`);
@@ -607,7 +607,7 @@ async function main() {
     console.log('\n✅ 测试数据生成全部完成！');
     console.log(`\n文件路径：${outputFile}`);
     console.log('\n使用说明：');
-    console.log('1. 打开 DOOR 系统 -> 我的赛事 -> 名单导入');
+    console.log('1. 打开 ArcSpro 系统 -> 我的赛事 -> 名单导入');
     console.log('2. 选择目标赛事');
     console.log('3. 上传本文件');
     console.log('4. 进行字段映射和数据清洗');

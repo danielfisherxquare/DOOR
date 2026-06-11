@@ -14,7 +14,7 @@
 import crypto from 'crypto';
 import { encryptField, decryptField, isEncrypted } from '../utils/crypto.js';
 
-const CANARY_PLAINTEXT = 'DOOR_KEY_CANARY_2026';
+const CANARY_PLAINTEXT = 'ARCSPRO_KEY_CANARY_2026';
 const SETTING_KEY_CANARY = 'pii_key_canary';
 const SETTING_KEY_FINGERPRINT = 'pii_key_fingerprint';
 

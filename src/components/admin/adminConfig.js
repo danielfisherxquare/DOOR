@@ -74,13 +74,13 @@ const navGroups = [
     icon: 'design_services',
     caption: '需求审核与模板沉淀',
     items: [
-      { key: 'design-requests', path: '/design-requests', icon: 'approval', shortLabel: 'DR', label: '设计需求', description: '部门负责人审批、赛事总监终审、设计师分配和赛事模板管理' },
+      { key: 'design-requests', path: '/design-requests', icon: 'approval', shortLabel: 'DR', label: '设计需求', description: '组织级审批岗位、跨赛事需求和设计模板管理', groupKey: 'design' },
     ],
   },
 ]
 
 const routeMeta = [
-  { key: 'dashboard', path: '/admin', exact: true, title: 'DOOR 指挥台', summary: '', groupKey: 'home' },
+  { key: 'dashboard', path: '/admin', exact: true, title: '中奥致远指挥台', summary: '', groupKey: 'home' },
   { key: 'orgs', path: '/admin/orgs', title: '机构管理', summary: '机构是平台治理的主索引，人员、赛事和项目都从这里延展开。', groupKey: 'platform' },
   { key: 'identity-center', path: '/admin/identity-center', title: '身份与授权中心', summary: '把成员、账号、机构授权和赛事授权收回到一条连续工作流中。', groupKey: 'identity' },
   { key: 'races', path: '/admin/races', title: '赛事管理', summary: '配置赛事主数据、比赛项目与机构归属。', groupKey: 'platform' },
@@ -109,7 +109,7 @@ const routeMeta = [
   { key: 'inventory-analytics-center', path: '/admin/inventory/analytics', title: '复盘报表', summary: '趋势、类型结构和流转记录只服务于复盘与优化，不再承担一线作业入口。', groupKey: 'warehouse' },
   { key: 'reimbursements', path: '/admin/reimbursements', title: '报销管理', summary: '后台承接机构级和平台级报销汇总、查看与导出。', groupKey: 'finance' },
   { key: 'color-scheme', path: '/admin/branding/colors', title: '配色方案', summary: '为机构定制专属品牌配色，支持预设选择与自定义调整。', groupKey: 'branding' },
-  { key: 'design-requests', path: '/admin/design-requests', title: '设计需求', summary: '审核各部门提交的设计需求，分配设计师，并把高质量需求沉淀为赛事模板。', groupKey: 'design', needsRace: true },
+  { key: 'design-requests', path: '/admin/design-requests', title: '设计需求', summary: '在组织级需求池审核各部门设计 brief，配置审批岗位，并把高质量需求沉淀为模板。', groupKey: 'design' },
   { key: 'inventory-twin-designer', path: '/admin/inventory/twin/designer', title: '空间中心', summary: '旧链接已并入空间中心的 3D 设计视图。', groupKey: 'warehouse' },
 ]
 

@@ -35,7 +35,7 @@ function ForgotPassword() {
         <div className="command-auth__logo">PW</div>
         <h1 className="command-auth__title">重置入口</h1>
         <p className="command-auth__description">
-          通过邮箱重置 DOOR 登录密码。系统会保留安全提示，并将结果回收到同一控制台语言中。
+          通过邮箱重置中奥致远赛事管理系统登录密码。系统会保留安全提示，并将结果回收到同一控制台语言中。
         </p>
       </aside>
       <main className="command-auth__content">

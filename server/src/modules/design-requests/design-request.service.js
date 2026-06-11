@@ -65,8 +65,59 @@ async function findRace(raceId) {
     return race;
 }
 
+function normalizeRaceIds(value) {
+    let raw;
+    if (Array.isArray(value)) raw = value;
+    else if (typeof value === 'string' && value.includes(',')) raw = value.split(',');
+    else if (value === null || value === undefined || value === '') raw = [];
+    else raw = [value];
+    return [...new Set(raw.map(Number).filter(Boolean))];
+}
+
+async function resolveOrgAndRaceLinks(context, payload = {}, trx = knex) {
+    const raceIds = normalizeRaceIds([
+        ...normalizeRaceIds(payload.raceIds),
+        ...normalizeRaceIds(payload.raceId),
+        ...normalizeRaceIds(payload.primaryRaceId),
+    ]);
+    const primaryRaceId = payload.primaryRaceId
+        ? Number(payload.primaryRaceId)
+        : payload.raceId
+            ? Number(payload.raceId)
+            : (raceIds[0] || null);
+    if (primaryRaceId && !raceIds.includes(primaryRaceId)) raceIds.unshift(primaryRaceId);
+
+    let orgId = context.orgId || payload.orgId || null;
+    let races = [];
+    if (raceIds.length > 0) {
+        races = await trx('races')
+            .whereIn('id', raceIds)
+            .select('id', 'org_id', 'name');
+        if (races.length !== raceIds.length) throw httpError(404, '关联赛事不存在');
+        const orgIds = new Set(races.map((race) => String(race.org_id)));
+        if (orgIds.size > 1) throw httpError(400, '关联赛事必须属于同一组织');
+        const raceOrgId = races[0].org_id;
+        if (orgId && String(orgId) !== String(raceOrgId)) {
+            if (context.role !== 'super_admin') throw httpError(403, '无权关联其他组织赛事');
+            orgId = raceOrgId;
+        }
+        orgId = orgId || raceOrgId;
+    }
+    if (!orgId) throw httpError(400, '缺少组织上下文');
+
+    return {
+        orgId,
+        primaryRaceId,
+        raceIds,
+        races,
+    };
+}
+
 function applyOrgScope(query, context) {
-    if (context.role === 'super_admin') return query;
+    if (context.role === 'super_admin') {
+        if (context.orgId) return query.where('dr.org_id', context.orgId);
+        return query;
+    }
     if (!context.orgId) return query.whereRaw('1 = 0');
     return query.where('dr.org_id', context.orgId);
 }
@@ -197,13 +248,30 @@ function latestProgressStage(row) {
     return PROGRESS_STAGES.includes(row.progress_stage) ? row.progress_stage : progressStageFromStatus(row.status);
 }
 
-function mapRequest(row, assets = [], reviews = [], currentApproval = null, progressEvents = []) {
+function mapRaceLink(row) {
+    return {
+        id: row.id,
+        raceId: Number(row.race_id),
+        raceName: row.race_name || '',
+        relationType: row.relation_type || 'related',
+        createdAt: row.created_at || null,
+    };
+}
+
+function mapRequest(row, assets = [], reviews = [], currentApproval = null, progressEvents = [], raceLinks = []) {
     const mappedAssets = assets.map(mapAsset);
+    const mappedRaceLinks = raceLinks.map(mapRaceLink);
+    const primaryRaceId = row.primary_race_id || row.race_id ? Number(row.primary_race_id || row.race_id) : null;
     return {
         id: row.id,
         orgId: row.org_id,
-        raceId: Number(row.race_id),
-        raceName: row.race_name || '',
+        raceId: primaryRaceId,
+        primaryRaceId,
+        raceName: row.primary_race_name || row.race_name || '',
+        raceIds: mappedRaceLinks.length > 0
+            ? mappedRaceLinks.map((item) => item.raceId)
+            : (primaryRaceId ? [primaryRaceId] : []),
+        raceLinks: mappedRaceLinks,
         templateId: row.template_id || null,
         eventType: row.event_type,
         requesterDepartment: row.requester_department,
@@ -275,10 +343,38 @@ async function loadProgressEvents(requestIds) {
     return grouped;
 }
 
+async function loadRaceLinks(requestIds, trx = knex) {
+    if (requestIds.length === 0) return new Map();
+    const rows = await trx('design_request_race_links as drl')
+        .leftJoin('races as r', 'r.id', 'drl.race_id')
+        .whereIn('drl.design_request_id', requestIds)
+        .select('drl.*', 'r.name as race_name')
+        .orderBy([{ column: 'drl.relation_type', order: 'asc' }, { column: 'drl.created_at', order: 'asc' }]);
+    const grouped = new Map();
+    for (const row of rows) {
+        const key = row.design_request_id;
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(row);
+    }
+    return grouped;
+}
+
+async function replaceRaceLinks(trx, { requestId, orgId, raceIds, primaryRaceId, createdBy = null }) {
+    await trx('design_request_race_links').where({ design_request_id: requestId }).del();
+    if (!raceIds.length) return;
+    await trx('design_request_race_links').insert(raceIds.map((raceId) => ({
+        org_id: orgId,
+        design_request_id: requestId,
+        race_id: raceId,
+        relation_type: primaryRaceId && Number(raceId) === Number(primaryRaceId) ? 'primary' : 'related',
+        created_by: createdBy,
+    })));
+}
+
 async function getRequestRow(context, requestId, trx = knex) {
     const query = trx('design_requests as dr')
-        .leftJoin('races as r', 'r.id', 'dr.race_id')
-        .select('dr.*', 'r.name as race_name')
+        .leftJoin('races as r', 'r.id', trx.raw('COALESCE(dr.primary_race_id, dr.race_id)'))
+        .select('dr.*', 'r.name as primary_race_name')
         .where('dr.id', requestId);
     applyOrgScope(query, context);
     const row = await query.first();
@@ -334,6 +430,9 @@ export async function createTemplate(context, payload = {}) {
     let raceId = payload.raceId ? Number(payload.raceId) : null;
     if (raceId) {
         const race = await findRace(raceId);
+        if (orgId && String(orgId) !== String(race.org_id) && context.role !== 'super_admin') {
+            throw httpError(403, '无权使用其他组织赛事模板');
+        }
         orgId = race.org_id;
     }
 
@@ -375,12 +474,46 @@ export async function createTemplateFromRequest(context, requestId, payload = {}
 
 export async function listRequests(context, filters = {}) {
     const query = knex('design_requests as dr')
-        .leftJoin('races as r', 'r.id', 'dr.race_id')
-        .select('dr.*', 'r.name as race_name')
+        .leftJoin('races as r', 'r.id', knex.raw('COALESCE(dr.primary_race_id, dr.race_id)'))
+        .select('dr.*', 'r.name as primary_race_name')
         .orderBy('dr.updated_at', 'desc');
 
     applyOrgScope(query, context);
-    if (filters.raceId) query.where('dr.race_id', Number(filters.raceId));
+    if (filters.raceId) {
+        const raceId = Number(filters.raceId);
+        query.where(function linkedRaceFilter() {
+            this.where('dr.race_id', raceId)
+                .orWhere('dr.primary_race_id', raceId)
+                .orWhereExists(function linkedRaceExists() {
+                    this.select(1)
+                        .from('design_request_race_links as drl')
+                        .whereRaw('drl.design_request_id = dr.id')
+                        .where('drl.race_id', raceId);
+                });
+        });
+    }
+    const raceIds = normalizeRaceIds(filters.raceIds);
+    if (!filters.raceId && raceIds.length > 0) {
+        query.where(function linkedRaceGroupFilter() {
+            this.whereIn('dr.race_id', raceIds)
+                .orWhereIn('dr.primary_race_id', raceIds)
+                .orWhereExists(function linkedRaceExists() {
+                    this.select(1)
+                        .from('design_request_race_links as drl')
+                        .whereRaw('drl.design_request_id = dr.id')
+                        .whereIn('drl.race_id', raceIds);
+                });
+        });
+    }
+    if (filters.raceScope === 'unlinked') {
+        query.whereNull('dr.race_id')
+            .whereNull('dr.primary_race_id')
+            .whereNotExists(function noLinkedRaceExists() {
+                this.select(1)
+                    .from('design_request_race_links as drl')
+                    .whereRaw('drl.design_request_id = dr.id');
+            });
+    }
     if (filters.status) query.where('dr.status', normalizeString(filters.status));
     if (filters.eventType) query.where('dr.event_type', normalizeEventType(filters.eventType));
     if (filters.surface === 'app') query.whereIn('dr.status', REQUEST_STATUSES_VISIBLE_TO_DESIGNERS);
@@ -389,6 +522,7 @@ export async function listRequests(context, filters = {}) {
     const ids = rows.map((row) => row.id);
     const assetsByRequest = await loadAssets(ids);
     const progressByRequest = await loadProgressEvents(ids);
+    const raceLinksByRequest = await loadRaceLinks(ids);
     const approvals = new Map();
     for (const id of ids) {
         approvals.set(id, await getCurrentApprovalForBusiness(context, {
@@ -403,6 +537,7 @@ export async function listRequests(context, filters = {}) {
             [],
             approvals.get(row.id) || null,
             progressByRequest.get(row.id) || [],
+            raceLinksByRequest.get(row.id) || [],
         )),
         total: rows.length,
     };
@@ -413,6 +548,7 @@ export async function getRequest(context, requestId) {
     const assets = await loadAssets([row.id]);
     const reviews = await loadReviews([row.id]);
     const progressEvents = await loadProgressEvents([row.id]);
+    const raceLinks = await loadRaceLinks([row.id]);
     const currentApproval = await getCurrentApprovalForBusiness(context, {
         businessType: 'design_request',
         businessId: row.id,
@@ -423,12 +559,11 @@ export async function getRequest(context, requestId) {
         reviews.get(row.id) || [],
         currentApproval,
         progressEvents.get(row.id) || [],
+        raceLinks.get(row.id) || [],
     );
 }
 
 export async function createRequest(context, payload = {}) {
-    const raceId = Number(payload.raceId);
-    const race = await findRace(raceId);
     const title = normalizeString(payload.title);
     const requirementText = normalizeString(payload.requirementText);
     const requesterDepartment = normalizeString(payload.requesterDepartment);
@@ -441,10 +576,12 @@ export async function createRequest(context, payload = {}) {
     const referenceAssets = Array.isArray(payload.referenceAssets) ? payload.referenceAssets : [];
 
     const created = await knex.transaction(async (trx) => {
+        const raceContext = await resolveOrgAndRaceLinks(context, payload, trx);
         const [row] = await trx('design_requests')
             .insert({
-                org_id: race.org_id,
-                race_id: raceId,
+                org_id: raceContext.orgId,
+                race_id: raceContext.primaryRaceId,
+                primary_race_id: raceContext.primaryRaceId,
                 template_id: payload.templateId || null,
                 event_type: normalizeEventType(payload.eventType),
                 requester_department: requesterDepartment,
@@ -463,6 +600,14 @@ export async function createRequest(context, payload = {}) {
                 updated_by: context.userId || null,
             })
             .returning('*');
+
+        await replaceRaceLinks(trx, {
+            requestId: row.id,
+            orgId: raceContext.orgId,
+            raceIds: raceContext.raceIds,
+            primaryRaceId: raceContext.primaryRaceId,
+            createdBy: context.userId || null,
+        });
 
         for (const asset of referenceAssets) {
             const fileName = normalizeString(asset.fileName);
@@ -491,16 +636,25 @@ export async function createRequest(context, payload = {}) {
         });
         await startApproval({
             ...context,
-            orgId: race.org_id,
-            raceId,
+            orgId: raceContext.orgId,
+            primaryRaceId: raceContext.primaryRaceId,
+            raceId: raceContext.primaryRaceId,
+            raceIds: raceContext.raceIds,
             requesterUserId: context.userId || null,
         }, {
             businessType: 'design_request',
             businessId: row.id,
             actionKey: 'submit',
-            raceId,
+            primaryRaceId: raceContext.primaryRaceId,
+            raceId: raceContext.primaryRaceId,
+            raceIds: raceContext.raceIds,
             requesterUserId: context.userId || null,
-            businessRecord: row,
+            businessRecord: {
+                ...row,
+                primaryRaceId: raceContext.primaryRaceId,
+                raceIds: raceContext.raceIds,
+                moduleKey: 'design_requests',
+            },
         }, trx);
         return row;
     });

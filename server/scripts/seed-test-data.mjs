@@ -81,7 +81,7 @@ function generateSlug(name) {
 
 async function seed() {
     console.log('========================================');
-    console.log('    DOOR 测试数据种子脚本');
+    console.log('    ArcSpro 测试数据种子脚本');
     console.log('========================================\n');
     console.log(`配置:`);
     console.log(`  - 清理现有测试数据: ${CLEANUP}`);

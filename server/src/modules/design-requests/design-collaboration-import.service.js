@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import ExcelJS from 'exceljs';
 import knex from '../../db/knex.js';
 import { EVENT_TYPES } from './design-request.defaults.js';
+import { startApproval } from '../approvals/approval.service.js';
 
 const REQUIRED_HEADERS = ['使用区域', '项目', '设计'];
 const EXPORT_MODES = new Set(['blank_template', 'incremental', 'full_marked']);
@@ -51,6 +52,16 @@ function normalizeString(value) {
 function normalizeNullableString(value) {
     const text = normalizeString(value);
     return text || null;
+}
+
+function normalizeUploadedFileName(value) {
+    const fileName = normalizeString(value) || '协同清单.xlsx';
+    const decoded = Buffer.from(fileName, 'latin1').toString('utf8');
+    const looksMojibake = /[ÃÂæèäå]/.test(fileName);
+    if (looksMojibake && /[\u4e00-\u9fff]/.test(decoded) && !decoded.includes('�')) {
+        return decoded;
+    }
+    return fileName;
 }
 
 function normalizeKeyPart(value) {
@@ -193,14 +204,109 @@ function categoryKey(row) {
     return [row.area, row.category].map(normalizeKeyPart).join('|');
 }
 
-async function findRace(raceId) {
-    const race = await knex('races').where({ id: Number(raceId) }).first('id', 'org_id', 'name');
+async function findRace(raceId, trx = knex) {
+    const numericRaceId = Number(raceId);
+    if (!numericRaceId) throw httpError(400, '赛事参数不正确');
+    const race = await trx('races').where({ id: numericRaceId }).first('id', 'org_id', 'name');
     if (!race) throw httpError(404, '赛事不存在');
     return race;
 }
 
+function normalizeRaceIds(value) {
+    const raw = Array.isArray(value)
+        ? value
+        : value === null || value === undefined || value === ''
+            ? []
+            : [value];
+    return [...new Set(raw.map(Number).filter(Boolean))];
+}
+
+function scopeKeyForRaceIds(raceIds = []) {
+    const normalized = normalizeRaceIds(raceIds).sort((a, b) => a - b);
+    if (normalized.length === 0) return 'org';
+    if (normalized.length === 1) return 'race:' + normalized[0];
+    return 'races:' + normalized.join(',');
+}
+
+async function resolveImportScope(context, payload = {}, trx = knex) {
+    const raceIds = normalizeRaceIds([
+        ...normalizeRaceIds(payload.raceIds),
+        ...normalizeRaceIds(payload.primaryRaceId),
+        ...normalizeRaceIds(payload.raceId),
+    ]);
+    const primaryRaceId = payload.primaryRaceId
+        ? Number(payload.primaryRaceId)
+        : payload.raceId
+            ? Number(payload.raceId)
+            : (raceIds[0] || null);
+    const orgFromPayload = payload.orgId || payload.org_id || null;
+
+    if (primaryRaceId) {
+        const race = await findRace(primaryRaceId, trx);
+        if (context.orgId && String(context.orgId) !== String(race.org_id) && context.role !== 'super_admin') {
+            throw httpError(403, '无权使用其他组织赛事');
+        }
+        return {
+            orgId: race.org_id,
+            raceId: primaryRaceId,
+            raceIds: [primaryRaceId],
+            scopeKey: scopeKeyForRaceIds([primaryRaceId]),
+            race,
+        };
+    }
+
+    const orgId = context.orgId || orgFromPayload || null;
+    if (!orgId) throw httpError(400, '缺少组织上下文');
+    return {
+        orgId,
+        raceId: null,
+        raceIds: [],
+        scopeKey: 'org',
+        race: null,
+    };
+}
+
+async function resolveExportScope(context, payload = {}, trx = knex) {
+    const raceIds = normalizeRaceIds([
+        ...normalizeRaceIds(payload.raceIds),
+        ...normalizeRaceIds(payload.primaryRaceId),
+        ...normalizeRaceIds(payload.raceId),
+    ]);
+    const orgFromPayload = payload.orgId || payload.org_id || null;
+
+    if (raceIds.length > 0) {
+        const races = await trx('races').whereIn('id', raceIds).select('id', 'org_id', 'name');
+        if (races.length !== raceIds.length) throw httpError(404, '导出范围内存在不存在的赛事');
+        const orgIds = new Set(races.map((race) => String(race.org_id)));
+        if (orgIds.size > 1) throw httpError(400, '多赛事导出必须限定在同一组织内');
+        const orgId = races[0].org_id;
+        if (context.orgId && String(context.orgId) !== String(orgId) && context.role !== 'super_admin') {
+            throw httpError(403, '无权导出其他组织赛事');
+        }
+        const sortedRaceIds = normalizeRaceIds(raceIds).sort((a, b) => a - b);
+        return {
+            orgId,
+            raceId: sortedRaceIds.length === 1 ? sortedRaceIds[0] : null,
+            raceIds: sortedRaceIds,
+            scopeKey: scopeKeyForRaceIds(sortedRaceIds),
+        };
+    }
+
+    const orgId = context.orgId || orgFromPayload || null;
+    if (!orgId) throw httpError(400, '缺少组织上下文');
+    return {
+        orgId,
+        raceId: null,
+        raceIds: [],
+        scopeKey: 'org',
+    };
+}
+
 function applyImportScope(query, context, alias = 'dci') {
-    if (context.role === 'super_admin') return query;
+    if (context.role === 'super_admin') {
+        if (context.orgId) return query.where(alias + '.org_id', context.orgId);
+        return query;
+    }
     if (!context.orgId) return query.whereRaw('1 = 0');
     return query.where(alias + '.org_id', context.orgId);
 }
@@ -210,7 +316,8 @@ function mapImport(row, items = []) {
         importId: row.id,
         id: row.id,
         orgId: row.org_id,
-        raceId: Number(row.race_id),
+        raceId: row.race_id === null || row.race_id === undefined ? null : Number(row.race_id),
+        scopeKey: row.scope_key || (row.race_id ? 'race:' + row.race_id : 'org'),
         eventType: row.event_type,
         fileName: row.file_name,
         fileHash: row.file_hash,
@@ -238,7 +345,8 @@ function mapItem(row) {
         id: row.id,
         importId: row.import_id,
         orgId: row.org_id,
-        raceId: Number(row.race_id),
+        raceId: row.race_id === null || row.race_id === undefined ? null : Number(row.race_id),
+        scopeKey: row.scope_key || (row.race_id ? 'race:' + row.race_id : 'org'),
         excelRowNumber: Number(row.excel_row_number),
         rowHash: row.row_hash,
         stableKey: row.stable_key || '',
@@ -535,17 +643,17 @@ function rowJsonFromSnapshot(row) {
     };
 }
 
-async function applyDiffTracking(trx, { race, raceId, eventType, importId, items }) {
+async function applyDiffTracking(trx, { scope, eventType, importId, items }) {
     if (items.length === 0) return;
 
     const now = new Date();
     const existingSnapshots = await trx('design_collaboration_item_snapshots')
-        .where({ org_id: race.org_id, race_id: raceId })
+        .where({ org_id: scope.orgId, scope_key: scope.scopeKey })
         .whereIn('stable_key', items.map((item) => item.stable_key));
     const existingByKey = new Map(existingSnapshots.map((row) => [row.stable_key, row]));
 
     const categoryRows = await trx('design_collaboration_item_snapshots')
-        .where({ org_id: race.org_id, race_id: raceId })
+        .where({ org_id: scope.orgId, scope_key: scope.scopeKey })
         .select('area', 'category');
     const hasHistory = categoryRows.length > 0;
     const knownCategories = new Set(categoryRows.map(categoryKey));
@@ -574,8 +682,9 @@ async function applyDiffTracking(trx, { race, raceId, eventType, importId, items
             changeType = hasHistory && !knownCategories.has(nextCategoryKey) ? 'new_category' : 'new';
             const [createdSnapshot] = await trx('design_collaboration_item_snapshots')
                 .insert({
-                    org_id: race.org_id,
-                    race_id: raceId,
+                    org_id: scope.orgId,
+                    race_id: scope.raceId,
+                    scope_key: scope.scopeKey,
                     first_seen_at: firstSeenAt,
                     created_at: now,
                     ...snapshotPayloadFromItem({ ...item, event_type: eventType }, importId, now, { eventType }),
@@ -607,20 +716,21 @@ export async function previewImport(context, { file, body = {} }) {
     if (!file?.buffer) throw httpError(400, '请上传 Excel 文件');
     if (!/\.xlsx$/i.test(file.originalname || '')) throw httpError(400, '仅支持 .xlsx 文件');
 
-    const raceId = Number(body.raceId);
-    const race = await findRace(raceId);
+    const scope = await resolveImportScope(context, body);
     const eventType = normalizeEventType(body.eventType);
     const fileHash = createHash('sha256').update(file.buffer).digest('hex');
+    const fileName = normalizeUploadedFileName(file.originalname);
     const parsed = await parseWorkbook(file.buffer);
     const summary = summarizeRows(parsed.rows);
 
     const importRow = await knex.transaction(async (trx) => {
         const [createdImport] = await trx('design_collaboration_imports')
             .insert({
-                org_id: race.org_id,
-                race_id: raceId,
+                org_id: scope.orgId,
+                race_id: scope.raceId,
+                scope_key: scope.scopeKey,
                 event_type: eventType,
-                file_name: file.originalname || '协同清单.xlsx',
+                file_name: fileName,
                 file_hash: fileHash,
                 sheet_name: parsed.sheetName,
                 row_count: summary.rowCount,
@@ -636,8 +746,9 @@ export async function previewImport(context, { file, body = {} }) {
         if (parsed.rows.length > 0) {
             const insertedItems = await trx('design_collaboration_items').insert(parsed.rows.map((item) => ({
                 import_id: createdImport.id,
-                org_id: race.org_id,
-                race_id: raceId,
+                org_id: scope.orgId,
+                race_id: scope.raceId,
+                scope_key: scope.scopeKey,
                 excel_row_number: item.excelRowNumber,
                 row_hash: item.rowHash,
                 stable_key: item.stableKey,
@@ -669,8 +780,7 @@ export async function previewImport(context, { file, body = {} }) {
                 raw_json: JSON.stringify(item.raw),
             }))).returning('*');
             await applyDiffTracking(trx, {
-                race,
-                raceId,
+                scope,
                 eventType,
                 importId: createdImport.id,
                 items: insertedItems,
@@ -688,7 +798,16 @@ export async function listImports(context, filters = {}) {
         .select('dci.*')
         .orderBy('dci.created_at', 'desc');
     applyImportScope(query, context, 'dci');
-    if (filters.raceId) query.where('dci.race_id', Number(filters.raceId));
+    if (filters.raceId) {
+        const raceId = Number(filters.raceId);
+        query.where(function raceImportScope() {
+            this.where('dci.race_id', raceId)
+                .orWhere('dci.scope_key', scopeKeyForRaceIds([raceId]));
+        });
+    }
+    if (filters.raceScope === 'unlinked') {
+        query.whereNull('dci.race_id').where('dci.scope_key', 'org');
+    }
     const rows = await query;
     return { items: rows.map((row) => mapImport(row)), total: rows.length };
 }
@@ -790,6 +909,18 @@ async function writeHistory(trx, requestId, actorId) {
     });
 }
 
+async function writeProgressEvent(trx, requestId, actorId) {
+    await trx('design_request_progress_events').insert({
+        request_id: requestId,
+        event_type: 'submitted',
+        to_stage: 'intake_review',
+        revision_no: 0,
+        order_status: 'not_ready',
+        comment: '从协同清单同步设计需求',
+        actor_id: actorId || null,
+    });
+}
+
 export async function commitImport(context, importId, payload = {}) {
     const importRow = await getImportRow(context, importId);
     const itemIds = Array.isArray(payload.itemIds) ? payload.itemIds.filter(Boolean) : [];
@@ -819,6 +950,7 @@ export async function commitImport(context, importId, payload = {}) {
                 .insert({
                     org_id: item.org_id,
                     race_id: item.race_id,
+                    primary_race_id: item.race_id,
                     template_id: null,
                     ...requestPayload,
                     status: 'pending_review',
@@ -827,6 +959,16 @@ export async function commitImport(context, importId, payload = {}) {
                     updated_by: context.userId || null,
                 })
                 .returning('*');
+
+            if (item.race_id) {
+                await trx('design_request_race_links').insert({
+                    org_id: item.org_id,
+                    design_request_id: requestRow.id,
+                    race_id: item.race_id,
+                    relation_type: 'primary',
+                    created_by: context.userId || null,
+                }).onConflict(['design_request_id', 'race_id']).ignore();
+            }
 
             if (item.reference_image) {
                 await trx('design_request_assets').insert({
@@ -842,6 +984,24 @@ export async function commitImport(context, importId, payload = {}) {
             }
 
             await writeHistory(trx, requestRow.id, context.userId);
+            await writeProgressEvent(trx, requestRow.id, context.userId);
+            await startApproval({
+                ...context,
+                orgId: item.org_id,
+                primaryRaceId: item.race_id ? Number(item.race_id) : null,
+                raceId: item.race_id ? Number(item.race_id) : null,
+                raceIds: item.race_id ? [Number(item.race_id)] : [],
+                requesterUserId: context.userId || null,
+            }, {
+                businessType: 'design_request',
+                businessId: requestRow.id,
+                actionKey: 'submit',
+                primaryRaceId: item.race_id ? Number(item.race_id) : null,
+                raceId: item.race_id ? Number(item.race_id) : null,
+                raceIds: item.race_id ? [Number(item.race_id)] : [],
+                businessRecord: requestRow,
+                requesterUserId: context.userId || null,
+            }, trx);
             await trx('design_collaboration_items')
                 .where({ id: item.id })
                 .update({
@@ -876,7 +1036,8 @@ function mapExport(row) {
         id: row.id,
         exportId: row.id,
         orgId: row.org_id,
-        raceId: Number(row.race_id),
+        raceId: row.race_id === null || row.race_id === undefined ? null : Number(row.race_id),
+        scopeKey: row.scope_key || (row.race_id ? 'race:' + row.race_id : 'org'),
         eventType: row.event_type,
         roundNo: Number(row.round_no || 0),
         mode: row.mode,
@@ -905,21 +1066,35 @@ async function getExportRow(context, exportId, trx = knex) {
     return row;
 }
 
-async function getBaselineExport(context, raceId, eventType, baselineExportId, trx = knex) {
+async function getBaselineExport(context, scope, eventType, baselineExportId, trx = knex) {
     if (baselineExportId) {
         const row = await getExportRow(context, baselineExportId, trx);
-        if (Number(row.race_id) !== Number(raceId)) throw httpError(400, '基准导出轮次不属于当前赛事');
+        const rowScopeKey = row.scope_key || (row.race_id ? 'race:' + row.race_id : 'org');
+        if (String(row.org_id) !== String(scope.orgId) || rowScopeKey !== scope.scopeKey) {
+            throw httpError(400, '基准导出轮次不属于当前导出范围');
+        }
         return row;
     }
 
     const query = trx('design_collaboration_exports as dce')
-        .where('dce.race_id', Number(raceId))
+        .where('dce.org_id', scope.orgId)
+        .where('dce.scope_key', scope.scopeKey)
         .where('dce.event_type', eventType)
         .whereNot('dce.mode', 'blank_template')
         .orderBy('dce.round_no', 'desc')
         .select('dce.*');
     applyImportScope(query, context, 'dce');
     return query.first();
+}
+
+function applySnapshotScope(query, scope) {
+    query.where('org_id', scope.orgId);
+    if (scope.raceIds.length > 1) {
+        query.whereIn('race_id', scope.raceIds);
+    } else {
+        query.where('scope_key', scope.scopeKey);
+    }
+    return query;
 }
 
 function classifyExportChange(snapshot, baselineByKey, baselineCategories) {
@@ -992,7 +1167,7 @@ function rowValuesForWorkbook(row, sequence, exportRow, changeType) {
 
 async function buildExportWorkbook(exportRow, exportItems) {
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'DOOR';
+    workbook.creator = 'ArcSpro';
     workbook.created = new Date();
     const sheet = workbook.addWorksheet('搭建&设计 清单');
     const headers = [...BASE_HEADERS, ...EXPORT_HELPER_HEADERS];
@@ -1027,26 +1202,37 @@ export async function listExports(context, filters = {}) {
         .select('dce.*')
         .orderBy('dce.round_no', 'desc');
     applyImportScope(query, context, 'dce');
-    if (filters.raceId) query.where('dce.race_id', Number(filters.raceId));
+    if (filters.raceId) {
+        const raceId = Number(filters.raceId);
+        query.where(function raceExportScope() {
+            this.where('dce.race_id', raceId)
+                .orWhere('dce.scope_key', scopeKeyForRaceIds([raceId]))
+                .orWhere('dce.scope_key', 'like', 'races:' + raceId + ',%')
+                .orWhere('dce.scope_key', 'like', 'races:%,' + raceId + ',%')
+                .orWhere('dce.scope_key', 'like', 'races:%,' + raceId);
+        });
+    }
+    if (filters.raceScope === 'unlinked') {
+        query.whereNull('dce.race_id').where('dce.scope_key', 'org');
+    }
     if (filters.eventType) query.where('dce.event_type', normalizeEventType(filters.eventType));
     const rows = await query;
     return { items: rows.map(mapExport), total: rows.length };
 }
 
 export async function createExport(context, payload = {}) {
-    const raceId = Number(payload.raceId);
-    const race = await findRace(raceId);
     const eventType = normalizeEventType(payload.eventType);
     const mode = normalizeExportMode(payload.mode);
 
     const created = await knex.transaction(async (trx) => {
+        const scope = await resolveExportScope(context, payload, trx);
         const [roundRow] = await trx('design_collaboration_exports')
-            .where({ org_id: race.org_id, race_id: raceId })
+            .where({ org_id: scope.orgId, scope_key: scope.scopeKey })
             .max('round_no as max_round');
         const roundNo = Number(roundRow?.max_round || 0) + 1;
         const baseline = mode === 'blank_template'
             ? null
-            : await getBaselineExport(context, raceId, eventType, payload.baselineExportId, trx);
+            : await getBaselineExport(context, scope, eventType, payload.baselineExportId, trx);
 
         let baselineByKey = null;
         let baselineCategories = new Set();
@@ -1059,8 +1245,11 @@ export async function createExport(context, payload = {}) {
 
         const snapshots = mode === 'blank_template'
             ? []
-            : await trx('design_collaboration_item_snapshots')
-                .where({ org_id: race.org_id, race_id: raceId, event_type: eventType })
+            : await applySnapshotScope(
+                trx('design_collaboration_item_snapshots')
+                    .where({ event_type: eventType }),
+                scope,
+            )
                 .orderBy([{ column: 'area', order: 'asc' }, { column: 'item_name', order: 'asc' }]);
 
         const exportRows = snapshots.map((snapshot) => ({
@@ -1073,8 +1262,9 @@ export async function createExport(context, payload = {}) {
 
         const [exportRow] = await trx('design_collaboration_exports')
             .insert({
-                org_id: race.org_id,
-                race_id: raceId,
+                org_id: scope.orgId,
+                race_id: scope.raceId,
+                scope_key: scope.scopeKey,
                 event_type: eventType,
                 round_no: roundNo,
                 mode,

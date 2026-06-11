@@ -1,4 +1,4 @@
-# DOOR 管理后台侧边栏 UI/UX 深度分析报告
+# ArcSpro 管理后台侧边栏 UI/UX 深度分析报告
 
 ## 1. 当前设计状态
 
@@ -7,7 +7,7 @@
 ```
 侧边栏 (320px 宽, 100vh 高)
 ├── 品牌区 (~80px 固定)
-│   ├── eyebrow: "DOOR Console"
+│   ├── eyebrow: "ArcSpro Console"
 │   ├── title: "Operations Grid"
 │   └── summary: 描述文字
 │

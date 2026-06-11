@@ -202,7 +202,7 @@ export default function AdminLayout() {
   const handleOrgChange = useCallback((nextOrgId) => {
     if (
       location.pathname.startsWith('/admin/identity-center') &&
-      window.__DOOR_IDENTITY_CENTER_DIRTY__ &&
+      window.__ARCSPRO_IDENTITY_CENTER_DIRTY__ &&
       !window.confirm('身份中心存在未保存的矩阵改动。切换机构会丢弃这些改动，是否继续？')
     ) {
       return
@@ -244,7 +244,7 @@ export default function AdminLayout() {
               <span className="material-symbols-outlined">emergency</span>
             </div>
             <div className="workspace-sidebar__brand-text">
-              <span className="workspace-sidebar__eyebrow">DOOR</span>
+              <span className="workspace-sidebar__eyebrow">中奥致远</span>
               <span className="workspace-sidebar__title">ADMIN</span>
             </div>
           </Link>

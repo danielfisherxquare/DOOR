@@ -1,7 +1,7 @@
 {
-  "name": "DOOR Portal",
-  "short_name": "DOOR",
-  "description": "DOOR 应用层工作台，支持赛事、报销、仓储、证件和空间工具。",
+  "name": "中奥致远赛事管理系统",
+  "short_name": "中奥致远",
+  "description": "中奥致远赛事管理系统应用层工作台，支持赛事、报销、仓储、证件和空间工具。",
   "id": "/app",
   "start_url": "/app",
   "scope": "/",
@@ -14,19 +14,19 @@
   "lang": "zh-CN",
   "icons": [
     {
-      "src": "/icons/door-icon-192.png",
+      "src": "/icons/arcspro-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/door-icon-512.png",
+      "src": "/icons/arcspro-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/door-icon.svg",
+      "src": "/icons/arcspro-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
@@ -37,13 +37,13 @@
       "name": "我的工作台",
       "short_name": "工作台",
       "url": "/app",
-      "icons": [{ "src": "/icons/door-icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icons/arcspro-icon-192.png", "sizes": "192x192" }]
     },
     {
       "name": "我的报销",
       "short_name": "报销",
       "url": "/app/reimbursements",
-      "icons": [{ "src": "/icons/door-icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/icons/arcspro-icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

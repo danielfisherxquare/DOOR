@@ -1,5 +1,5 @@
 /**
- * DOOR 发票报销模块修复验证脚本
+ * ArcSpro 发票报销模块修复验证脚本
  * 
  * 验证内容：
  * 1. OCR API 配置是否正确
@@ -16,17 +16,17 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 配置
-const FRONTEND_PORT = process.env.DOOR_FRONTEND_PORT || '3000';
-const BACKEND_PORT = process.env.DOOR_BACKEND_PORT || '3001';
-const BASE_URL = process.env.DOOR_TEST_URL || process.env.URL || `http://127.0.0.1:${FRONTEND_PORT}`;
+const FRONTEND_PORT = process.env.ARCSPRO_FRONTEND_PORT || '3000';
+const BACKEND_PORT = process.env.ARCSPRO_BACKEND_PORT || '3001';
+const BASE_URL = process.env.ARCSPRO_TEST_URL || process.env.URL || `http://127.0.0.1:${FRONTEND_PORT}`;
 const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`;
 const TIMEOUT = 90000;
 const SCREENSHOT_DIR = path.join(__dirname, 'screenshots');
 
 // 测试凭据 - 使用环境变量或默认值
 const CREDENTIALS = {
-    username: process.env.DOOR_TEST_USERNAME || process.env.DOOR_USERNAME || 'test@example.com',
-    password: process.env.DOOR_TEST_PASSWORD || process.env.DOOR_PASSWORD || 'TestPassword123!',
+    username: process.env.ARCSPRO_TEST_USERNAME || process.env.ARCSPRO_USERNAME || 'test@example.com',
+    password: process.env.ARCSPRO_TEST_PASSWORD || process.env.ARCSPRO_PASSWORD || 'TestPassword123!',
 };
 
 // 测试配置
@@ -352,7 +352,7 @@ async function testUploadButtonsExist(page) {
  */
 async function runVerificationTests() {
     console.log('='.repeat(60));
-    console.log('DOOR 发票报销模块修复验证');
+    console.log('ArcSpro 发票报销模块修复验证');
     console.log('='.repeat(60));
     console.log(`测试环境：${BASE_URL}`);
     console.log(`测试时间：${testResults.timestamp}`);

@@ -1,8 +1,8 @@
-# Door Approval Foundation Implementation Plan
+# ArcSpro Approval Foundation Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build a reusable DOOR approval foundation and connect the first workflow: design request submission -> department owner approval -> race director approval -> design lead designer assignment.
+**Goal:** Build a reusable ArcSpro approval foundation and connect the first workflow: design request submission -> department owner approval -> race director approval -> design lead designer assignment.
 
 **Architecture:** Keep race visibility in the existing race-access layer. Add race staff assignments as the source of event-specific posts, then add a small approval engine that creates approval instances and tasks for business records. Design requests call the approval engine on submit and receive status updates from approval decisions.
 

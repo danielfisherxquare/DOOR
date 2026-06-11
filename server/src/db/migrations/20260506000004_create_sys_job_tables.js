@@ -1,5 +1,5 @@
 /**
- * Migration: Create sys_job and sys_job_log tables for Phase 4 DOOR optimization.
+ * Migration: Create sys_job and sys_job_log tables for Phase 4 ArcSpro optimization.
  * Provides scheduled task management (cron-based job scheduling).
  */
 export async function up(knex) {

@@ -1,11 +1,11 @@
 /**
- * DOOR to Pascal Data Adapter
- * 转换 DOOR snapshot_json 与 Pascal schema nodes 之间的数据格式
+ * ArcSpro to Pascal Data Adapter
+ * 转换 ArcSpro snapshot_json 与 Pascal schema nodes 之间的数据格式
  *
  * Pascal schema 层级:
  *   site → building → level → wall / zone / slab / ceiling / item
  *
- * DOOR snapshot 结构:
+ * ArcSpro snapshot 结构:
  *   warehouse (flat): lines[], walls[], prefabs[], zones[], racks[], structures[]
  */
 
@@ -33,16 +33,16 @@ function slabId(raw)      { return raw?.startsWith('slab_') ? raw : `slab_${raw 
 const ID_MAP_KEY = '__doorIdMap';
 
 // ──────────────────────────────────────────────────
-// DOOR → Pascal (snapshot → nodes + rootNodeIds)
+// ArcSpro → Pascal (snapshot → nodes + rootNodeIds)
 // ──────────────────────────────────────────────────
 
 /**
- * 将 DOOR snapshot 转换为 Pascal scene 数据
- * @param {Object} snapshot - DOOR snapshot_json（含 warehouse 扁平数据）
+ * 将 ArcSpro snapshot 转换为 Pascal scene 数据
+ * @param {Object} snapshot - ArcSpro snapshot_json（含 warehouse 扁平数据）
  * @param {Object} [meta] - 额外元数据 { warehouseName, warehouseId, buildingName }
  * @returns {{ nodes: Record<string, any>, rootNodeIds: string[] }}
  */
-export function convertDoorSnapshotToPascalScene(snapshot, meta = {}) {
+export function convertArcSproSnapshotToPascalScene(snapshot, meta = {}) {
     if (!snapshot) return { nodes: {}, rootNodeIds: [] };
 
     const nodes = {};
@@ -155,7 +155,7 @@ export function convertDoorSnapshotToPascalScene(snapshot, meta = {}) {
         const wallChildren = [];
 
         // Pascal wall: start/end 为 [x, y] tuples
-        // DOOR wall: start { x, z }, end { x, z }
+        // ArcSpro wall: start { x, z }, end { x, z }
         nodes[pid] = {
             id: pid,
             type: 'wall',
@@ -387,15 +387,15 @@ export function convertDoorSnapshotToPascalScene(snapshot, meta = {}) {
 }
 
 // ──────────────────────────────────────────────────
-// Pascal → DOOR (nodes → snapshot)
+// Pascal → ArcSpro (nodes → snapshot)
 // ──────────────────────────────────────────────────
 
 /**
- * 将 Pascal nodes 转换回 DOOR snapshot
+ * 将 Pascal nodes 转换回 ArcSpro snapshot
  * @param {Record<string, any>} nodes - Pascal nodes
- * @returns {Object} DOOR snapshot_json (flat)
+ * @returns {Object} ArcSpro snapshot_json (flat)
  */
-export function convertPascalNodesToDoorSnapshot(nodes) {
+export function convertPascalNodesToArcSproSnapshot(nodes) {
     const snapshot = {
         lines: [],
         walls: [],
@@ -582,13 +582,13 @@ export function convertPascalNodesToDoorSnapshot(nodes) {
 
 /**
  * 合并 Pascal nodes 变更到现有 snapshot（保留 warehouse / editorState 等顶层字段）
- * @param {Object} currentSnapshot - 当前完整 DOOR snapshot
+ * @param {Object} currentSnapshot - 当前完整 ArcSpro snapshot
  * @param {Record<string, any>} nodes - Pascal nodes
  * @param {Object} [editorDocument] - 可选的 EditorDocument 数据
- * @returns {Object} 合并后的 DOOR snapshot
+ * @returns {Object} 合并后的 ArcSpro snapshot
  */
 export function mergePascalNodesToSnapshot(currentSnapshot, nodes, editorDocument = null) {
-    const converted = convertPascalNodesToDoorSnapshot(nodes);
+    const converted = convertPascalNodesToArcSproSnapshot(nodes);
 
     const result = {
         ...currentSnapshot,
@@ -614,9 +614,9 @@ export function mergePascalNodesToSnapshot(currentSnapshot, nodes, editorDocumen
 // 向后兼容别名
 // ──────────────────────────────────────────────────
 
-/** @deprecated Use convertDoorSnapshotToPascalScene instead */
-export function convertDoorSnapshotToPascalNodes(snapshot) {
-    const { nodes } = convertDoorSnapshotToPascalScene(snapshot);
+/** @deprecated Use convertArcSproSnapshotToPascalScene instead */
+export function convertArcSproSnapshotToPascalNodes(snapshot) {
+    const { nodes } = convertArcSproSnapshotToPascalScene(snapshot);
     return nodes;
 }
 
@@ -636,8 +636,8 @@ function normalizeMaterialPreset(raw) {
 }
 
 export default {
-    convertDoorSnapshotToPascalScene,
-    convertDoorSnapshotToPascalNodes,
-    convertPascalNodesToDoorSnapshot,
+    convertArcSproSnapshotToPascalScene,
+    convertArcSproSnapshotToPascalNodes,
+    convertPascalNodesToArcSproSnapshot,
     mergePascalNodesToSnapshot,
 };

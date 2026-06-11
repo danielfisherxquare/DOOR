@@ -185,7 +185,7 @@ function terrainPatchToMesh(terrainPatch) {
       cols,
       resolutionMeters: terrainPatch?.resolutionMeters || null,
       elevationOffsetMeters: terrainPatch?.elevationOffsetMeters || 0,
-      coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+      coordinateSystem: EXPORT_COORDINATE_SYSTEMS.ARCSPRO_LOCAL_Y_UP,
       diagnostics: buildTerrainPatchDiagnostics(terrainPatch),
     },
   }
@@ -596,7 +596,7 @@ export function buildFocusZoneStudioScene({
     kind: 'focus-zone-studio-scene',
     name: focusZoneContext?.name || focusZone?.name || 'GIS 固定区域白模',
     source: 'gis-focus-zone',
-    coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+    coordinateSystem: EXPORT_COORDINATE_SYSTEMS.ARCSPRO_LOCAL_Y_UP,
     input: {
       sourceWorkZoneId: focusZone?.id || null,
       sourceProjectId: focusZone?.projectId || project?.id || null,

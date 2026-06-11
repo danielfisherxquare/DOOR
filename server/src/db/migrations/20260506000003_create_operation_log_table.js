@@ -1,5 +1,5 @@
 /**
- * Migration: Create operation_log table for Phase 2 DOOR optimization.
+ * Migration: Create operation_log table for Phase 2 ArcSpro optimization.
  * Tracks all write operations (INSERT, UPDATE, DELETE, EXPORT, IMPORT, GRANT).
  */
 export async function up(knex) {

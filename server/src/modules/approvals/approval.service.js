@@ -39,6 +39,7 @@ const DEFAULT_DESIGN_STEPS = [
         resolver_type: 'race_staff_role',
         resolver_config_json: {
             roleKey: 'design_lead',
+            moduleKey: 'design_requests',
         },
         decision_mode: 'single',
         min_approvals: 1,
@@ -67,6 +68,15 @@ function parseJson(value, fallback = {}) {
     } catch (_err) {
         return fallback;
     }
+}
+
+function normalizeRaceIds(value) {
+    let raw;
+    if (Array.isArray(value)) raw = value;
+    else if (typeof value === 'string' && value.includes(',')) raw = value.split(',');
+    else if (value === null || value === undefined || value === '') raw = [];
+    else raw = [value];
+    return [...new Set(raw.map(Number).filter(Boolean))];
 }
 
 function looksLikeUuid(value) {
@@ -105,7 +115,7 @@ function mapTask(row) {
         createdAt: row.created_at,
         businessType: row.business_type,
         businessId: row.business_id,
-        raceId: row.race_id ? Number(row.race_id) : null,
+        raceId: row.primary_race_id || row.race_id ? Number(row.primary_race_id || row.race_id) : null,
         step: row.step_key
             ? {
                 stepKey: row.step_key,
@@ -118,11 +128,16 @@ function mapTask(row) {
 }
 
 function mapInstance(row, currentStep = null, pendingTasks = []) {
+    const businessContext = parseJson(row.business_context_json, {});
     return {
         id: row.id,
         definitionId: row.definition_id,
         orgId: row.org_id,
-        raceId: Number(row.race_id),
+        raceId: row.primary_race_id || row.race_id ? Number(row.primary_race_id || row.race_id) : null,
+        primaryRaceId: row.primary_race_id || row.race_id ? Number(row.primary_race_id || row.race_id) : null,
+        raceIds: Array.isArray(businessContext.raceIds) ? businessContext.raceIds.map(Number).filter(Boolean) : [],
+        scopeType: row.scope_type || null,
+        scopeId: row.scope_id || null,
         businessType: row.business_type,
         businessId: row.business_id,
         actionKey: row.action_key,
@@ -132,6 +147,7 @@ function mapInstance(row, currentStep = null, pendingTasks = []) {
         currentStep,
         pendingTasks,
         result: parseJson(row.result_json, {}),
+        businessContext,
         blockedReason: row.blocked_reason || null,
         startedAt: row.started_at,
         completedAt: row.completed_at,
@@ -335,6 +351,7 @@ async function loadPendingTasks(trx, instanceId) {
             'ai.business_type',
             'ai.business_id',
             'ai.race_id',
+            'ai.primary_race_id',
         )
         .orderBy('at.created_at', 'asc');
     return rows.map(mapTask);
@@ -367,10 +384,33 @@ async function blockInstance(trx, instance, step, blockedReason, actorUserId = n
 }
 
 async function createTasksForStep(trx, instance, step, actorUserId = null) {
+    const stepConfig = parseJson(step.resolver_config_json, {});
+    const instanceRaceId = instance.primary_race_id || instance.race_id || null;
+    if (!instanceRaceId && stepConfig.roleKey === 'race_director') {
+        await writeEvent(trx, instance.id, 'step_skipped', actorUserId, {
+            stepKey: step.step_key,
+            reason: 'organization_scope_without_primary_race',
+        });
+        const nextStep = await getNextStep(trx, instance.definition_id, step.step_order);
+        if (!nextStep) {
+            const [updated] = await trx('approval_instances')
+                .where({ id: instance.id })
+                .update({
+                    status: 'approved',
+                    completed_at: trx.fn.now(),
+                    updated_at: trx.fn.now(),
+                })
+                .returning('*');
+            await writeEvent(trx, instance.id, 'completed', actorUserId, { status: 'approved' });
+            return mapInstance(updated);
+        }
+        return createTasksForStep(trx, instance, nextStep, actorUserId);
+    }
+
     const resolverResult = await resolveApprovers(
         {
             orgId: instance.org_id,
-            raceId: instance.race_id,
+            raceId: instanceRaceId,
             requesterUserId: instance.requester_user_id,
         },
         {
@@ -419,11 +459,30 @@ export async function startApproval(context = {}, input = {}, trx = null) {
     return withTransaction(trx, async (db) => {
         const businessType = normalizeBusinessType(input.businessType);
         const actionKey = normalizeActionKey(input.actionKey);
-        const raceId = Number(input.raceId || context.raceId);
+        const rawRaceIds = Array.isArray(input.raceIds)
+            ? input.raceIds
+            : Array.isArray(context.raceIds)
+                ? context.raceIds
+                : Array.isArray(input.businessRecord?.raceIds)
+                    ? input.businessRecord.raceIds
+                    : [];
+        const raceIds = rawRaceIds.map(Number).filter(Boolean);
+        const rawPrimaryRaceId = input.primaryRaceId
+            || input.raceId
+            || context.primaryRaceId
+            || context.raceId
+            || input.businessRecord?.primary_race_id
+            || input.businessRecord?.primaryRaceId
+            || input.businessRecord?.race_id
+            || input.businessRecord?.raceId
+            || raceIds[0]
+            || null;
+        const primaryRaceId = rawPrimaryRaceId ? Number(rawPrimaryRaceId) : null;
+        const contextRaceIds = raceIds.length ? raceIds : (primaryRaceId ? [primaryRaceId] : []);
         const orgId = context.orgId || input.businessRecord?.org_id || input.businessRecord?.orgId;
         const requesterUserId = input.requesterUserId || context.requesterUserId || context.userId || null;
 
-        if (!businessType || !input.businessId || !raceId || !orgId) {
+        if (!businessType || !input.businessId || !orgId) {
             throw httpError(400, '审批发起参数不完整');
         }
 
@@ -446,13 +505,21 @@ export async function startApproval(context = {}, input = {}, trx = null) {
                 definition_id: definition.id,
                 definition_version: definition.version,
                 org_id: orgId,
-                race_id: raceId,
+                race_id: primaryRaceId,
+                primary_race_id: primaryRaceId,
+                scope_type: primaryRaceId ? 'race' : 'org',
+                scope_id: primaryRaceId ? String(primaryRaceId) : null,
                 business_type: businessType,
                 business_id: String(input.businessId),
                 action_key: actionKey,
                 requester_user_id: requesterUserId,
                 status: 'pending',
                 business_snapshot_json: input.businessRecord || {},
+                business_context_json: {
+                    raceIds: contextRaceIds,
+                    primaryRaceId,
+                    scopeType: primaryRaceId ? 'race' : 'org',
+                },
             })
             .returning('*');
 
@@ -492,6 +559,7 @@ export async function actOnTask(context = {}, taskId, payload = {}, trx = null) 
                 'ai.definition_id',
                 'ai.org_id',
                 'ai.race_id',
+                'ai.primary_race_id',
                 'ai.business_type',
                 'ai.business_id',
                 'ai.status as instance_status',
@@ -643,6 +711,7 @@ export async function listMyApprovalTasks(context = {}, filters = {}, trx = knex
             'ai.business_type',
             'ai.business_id',
             'ai.race_id',
+            'ai.primary_race_id',
             's.step_key',
             's.step_name',
             's.task_type',
@@ -651,7 +720,24 @@ export async function listMyApprovalTasks(context = {}, filters = {}, trx = knex
         .orderBy('at.created_at', 'desc');
 
     if (filters.status) query.where('at.status', filters.status);
-    if (filters.raceId) query.where('ai.race_id', Number(filters.raceId));
+    if (filters.raceId) {
+        const raceId = Number(filters.raceId);
+        query.where((builder) => {
+            builder
+                .where('ai.primary_race_id', raceId)
+                .orWhere('ai.race_id', raceId)
+                .orWhereRaw("ai.business_context_json -> 'raceIds' @> ?::jsonb", [JSON.stringify([raceId])]);
+        });
+    }
+    const raceIds = normalizeRaceIds(filters.raceIds);
+    if (!filters.raceId && raceIds.length > 0) {
+        query.where((builder) => {
+            builder
+                .whereIn('ai.primary_race_id', raceIds)
+                .orWhereIn('ai.race_id', raceIds)
+                .orWhereRaw("ai.business_context_json -> 'raceIds' @> ?::jsonb", [JSON.stringify(raceIds)]);
+        });
+    }
 
     const rows = await query;
     return {

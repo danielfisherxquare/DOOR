@@ -3034,7 +3034,7 @@ export default function TerrainModelPage() {
         terrainFootprintWgs84: activeManualFootprintWgs84,
         terrainFootprintRotationDegrees: terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
         labelText: generationOptions.labelText || distanceLabel,
-        secondaryLabelText: generationOptions.secondaryLabelText || 'DOOR',
+        secondaryLabelText: generationOptions.secondaryLabelText || '中奥致远',
         elevationSourceType: demRaster ? (demRaster.sourceType || 'uploaded-aaigrid-dem') : (useSampledTerrain ? 'arcgis-terrain3d' : ''),
         elevationSourceName: demRaster ? demRaster.sourceName : (useSampledTerrain ? 'ArcGIS WorldElevation3D Terrain3D' : 'GPX 高程'),
         elevationSourceResolutionMeters: demRaster?.resolutionMeters || null,
@@ -3498,7 +3498,7 @@ export default function TerrainModelPage() {
               </label>
               <label>
                 <span>背面文字</span>
-                <input type="text" value={options.secondaryLabelText} placeholder="DOOR" onChange={(event) => updateStringOption('secondaryLabelText', event.target.value)} />
+                <input type="text" value={options.secondaryLabelText} placeholder="中奥致远" onChange={(event) => updateStringOption('secondaryLabelText', event.target.value)} />
               </label>
               <label>
                 <span>文字凸起 mm</span>

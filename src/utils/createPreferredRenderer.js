@@ -17,26 +17,26 @@ function recordRendererBackend(renderer, label, backend) {
   }
 
   if (typeof globalThis !== 'undefined') {
-    const diagnostics = globalThis.__DOOR_RENDERERS__ || {}
+    const diagnostics = globalThis.__ARCSPRO_RENDERERS__ || {}
     diagnostics[label] = {
       backend,
       at: new Date().toISOString(),
     }
-    globalThis.__DOOR_RENDERERS__ = diagnostics
+    globalThis.__ARCSPRO_RENDERERS__ = diagnostics
   }
 }
 
 function recordRendererFailure(label, backend, error) {
   if (typeof globalThis === 'undefined') return
 
-  const diagnostics = globalThis.__DOOR_RENDERERS__ || {}
+  const diagnostics = globalThis.__ARCSPRO_RENDERERS__ || {}
   diagnostics[label] = {
     backend,
     failed: true,
     message: error?.message || String(error),
     at: new Date().toISOString(),
   }
-  globalThis.__DOOR_RENDERERS__ = diagnostics
+  globalThis.__ARCSPRO_RENDERERS__ = diagnostics
 }
 
 function buildWebGPUProps(props, { preserveDrawingBuffer = false } = {}) {

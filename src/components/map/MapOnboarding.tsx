@@ -19,7 +19,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
     title: '欢迎进入 GIS 工作台',
-    description: '这里是 DOOR 的宏观空间视图，用来查看底图、图层、锚点和场地上下文，并与空间工作台连续切换。',
+    description: '这里是中奥致远赛事管理系统的宏观空间视图，用来查看底图、图层、锚点和场地上下文，并与空间工作台连续切换。',
     icon: 'map',
   },
   {

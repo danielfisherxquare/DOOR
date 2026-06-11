@@ -31,7 +31,7 @@ function ScanLogin() {
   return (
     <div style={{ background: '#fff', borderRadius: 24, padding: 20, boxShadow: '0 20px 50px rgba(15, 23, 42, 0.08)' }}>
       <h1 style={{ margin: '0 0 8px', fontSize: 24 }}>扫码登录</h1>
-      <p style={{ margin: '0 0 16px', color: '#475569', fontSize: 14 }}>使用已有 Door 账号登录后开始扫码。</p>
+      <p style={{ margin: '0 0 16px', color: '#475569', fontSize: 14 }}>使用已有中奥致远账号登录后开始扫码。</p>
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
         <input
           className="input"

@@ -13,8 +13,12 @@ const upload = multer({
 });
 
 function buildRequestContext(req, surface) {
+    const requestedOrgId = req.query?.orgId || req.body?.orgId || req.body?.org_id || null;
     return {
         ...req.authContext,
+        orgId: req.authContext?.role === 'super_admin'
+            ? (requestedOrgId || req.authContext?.orgId || null)
+            : req.authContext?.orgId,
         surface,
         requestId: req.id || null,
         raceAccess: req.raceAccess || null,
@@ -22,7 +26,18 @@ function buildRequestContext(req, surface) {
 }
 
 function raceIdFromBody(req) {
-    return req.body?.raceId;
+    return req.body?.primaryRaceId
+        || req.body?.raceId
+        || (Array.isArray(req.body?.raceIds) ? req.body.raceIds[0] : null);
+}
+
+function optionalRaceAccess(resolveRaceId) {
+    const raceAccess = requireRaceAccess(resolveRaceId);
+    return async (req, res, next) => {
+        const raceId = await resolveRaceId(req);
+        if (!raceId) return next();
+        return raceAccess(req, res, next);
+    };
 }
 
 export function createDesignRequestRoutes(surface) {
@@ -62,7 +77,7 @@ export function createDesignRequestRoutes(surface) {
     });
 
     if (surface !== 'app') {
-        router.post('/imports/preview', upload.single('file'), requireRaceAccess(raceIdFromBody), async (req, res, next) => {
+        router.post('/imports/preview', upload.single('file'), optionalRaceAccess(raceIdFromBody), async (req, res, next) => {
             try {
                 res.status(201).json({
                     success: true,
@@ -132,7 +147,7 @@ export function createDesignRequestRoutes(surface) {
         }
     });
 
-    router.post('/collaboration-exports', requireRaceAccess(raceIdFromBody), async (req, res, next) => {
+    router.post('/collaboration-exports', optionalRaceAccess(raceIdFromBody), async (req, res, next) => {
         try {
             res.status(201).json({
                 success: true,
@@ -176,7 +191,7 @@ export function createDesignRequestRoutes(surface) {
         }
     });
 
-    router.post('/requests', requireRaceAccess(raceIdFromBody), async (req, res, next) => {
+    router.post('/requests', optionalRaceAccess(raceIdFromBody), async (req, res, next) => {
         try {
             res.status(201).json({
                 success: true,

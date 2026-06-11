@@ -4,11 +4,11 @@ const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'DOOR Platform API',
+      title: 'ArcSpro Platform API',
       version: '1.0.0',
       description: '赛事运营管理平台 API 文档 — Event Operations Management Platform',
       contact: {
-        name: 'DOOR Team',
+        name: 'ArcSpro Team',
       },
     },
     servers: [

@@ -3,7 +3,7 @@ import knex from '../src/db/knex.js';
 import { ensureSuperAdmin } from '../src/bootstrap/ensure-super-admin.js';
 import { encryptField } from '../src/modules/team/team-crypto.js';
 
-const DEMO_PASSWORD = 'DoorDemo@123';
+const DEMO_PASSWORD = 'ArcSproDemo@123';
 const DEMO_SLUGS = ['demo-east-run', 'demo-mountain-ops', 'demo-bay-volunteers'];
 
 const orgSeeds = [

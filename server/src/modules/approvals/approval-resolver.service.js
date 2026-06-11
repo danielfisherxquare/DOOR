@@ -20,7 +20,7 @@ function buildBlocked(roleKey, departmentScope = '') {
         status: 'blocked',
         approvers: [],
         missingRoleKey: roleKey,
-        reason: `缺少赛事岗位: ${roleKey}${scoped}`,
+        reason: `缺少审批岗位: ${roleKey}${scoped}`,
     };
 }
 
@@ -29,6 +29,8 @@ function mapApprover(row) {
         assignmentId: row.assignment_id,
         userId: row.user_id,
         teamMemberId: row.team_member_id,
+        scopeType: row.scope_type || null,
+        scopeId: row.scope_id || null,
         roleKey: row.role_key,
         roleName: row.role_name,
         departmentScope: row.department_scope || null,
@@ -41,15 +43,80 @@ function mapApprover(row) {
     };
 }
 
-export async function resolveApprovers(context = {}, step = {}, businessRecord = {}, trx = knex) {
-    const orgId = context.orgId || businessRecord.org_id || businessRecord.orgId;
-    const raceId = Number(context.raceId || businessRecord.race_id || businessRecord.raceId);
-    const roleKey = normalizeString(getConfigValue(step, 'roleKey'));
+function resolverKind(step) {
+    return step.resolverType || step.resolver_type || '';
+}
 
-    if (!orgId || !raceId || !roleKey) {
-        return buildBlocked(roleKey || 'unknown');
+function moduleKeyFor(step, businessRecord, roleKey) {
+    return normalizeString(getConfigValue(step, 'moduleKey'))
+        || normalizeString(businessRecord?.module_key)
+        || normalizeString(businessRecord?.moduleKey)
+        || (String(roleKey || '').startsWith('design_') ? 'design_requests' : '');
+}
+
+function applyRequesterExclusion(rows, step, requesterUserId) {
+    return rows
+        .filter((row) => !(step.excludeRequester || step.exclude_requester)
+            || String(row.user_id) !== String(requesterUserId || ''))
+        .map(mapApprover);
+}
+
+function baseScopeQuery(trx, orgId, roleKey) {
+    return trx('scope_role_assignments as sra')
+        .join('team_members as tm', 'tm.id', 'sra.team_member_id')
+        .join('users as u', 'u.id', 'sra.user_id')
+        .where('sra.org_id', orgId)
+        .where('sra.role_key', roleKey)
+        .where('sra.status', 'active')
+        .where('tm.status', 'active')
+        .where('u.status', 'active')
+        .whereNotNull('sra.user_id')
+        .select(
+            'sra.id as assignment_id',
+            'sra.user_id',
+            'sra.team_member_id',
+            'sra.scope_type',
+            'sra.scope_id',
+            'sra.role_key',
+            'sra.role_name',
+            'sra.department_scope',
+            'sra.module_key as module_scope',
+            'sra.is_primary',
+            'tm.employee_name',
+            'tm.employee_code',
+            'tm.department',
+            'tm.position',
+            'u.username',
+        )
+        .orderBy([{ column: 'sra.is_primary', order: 'desc' }, { column: 'sra.created_at', order: 'asc' }]);
+}
+
+async function resolveScopeApprovers({ trx, orgId, raceId, roleKey, departmentScope, moduleKey, requesterUserId, step }) {
+    const candidates = [];
+    if (raceId) {
+        candidates.push((query) => query.where('sra.scope_type', 'race').where('sra.scope_id', String(raceId)));
     }
+    if (departmentScope) {
+        candidates.push((query) => query.where('sra.scope_type', 'department').where('sra.department_scope', departmentScope));
+    }
+    if (moduleKey) {
+        candidates.push((query) => query.where('sra.scope_type', 'module').where('sra.module_key', moduleKey));
+    }
+    candidates.push((query) => query.where('sra.scope_type', 'org'));
 
+    for (const applyCandidate of candidates) {
+        const query = baseScopeQuery(trx, orgId, roleKey);
+        applyCandidate(query);
+        const rows = await query;
+        const approvers = applyRequesterExclusion(rows, step, requesterUserId);
+        if (approvers.length > 0) return approvers;
+        if (raceId && roleKey === 'race_director') return [];
+    }
+    return [];
+}
+
+async function resolveLegacyRaceStaff({ trx, orgId, raceId, roleKey, departmentScope, requesterUserId, step }) {
+    if (!raceId) return [];
     const query = trx('race_staff_assignments as rsa')
         .join('team_members as tm', 'tm.id', 'rsa.team_member_id')
         .join('users as u', 'u.id', 'rsa.user_id')
@@ -64,6 +131,8 @@ export async function resolveApprovers(context = {}, step = {}, businessRecord =
             'rsa.id as assignment_id',
             'rsa.user_id',
             'rsa.team_member_id',
+            trx.raw("'race' as scope_type"),
+            trx.raw('rsa.race_id::text as scope_id'),
             'rsa.role_key',
             'rsa.role_name',
             'rsa.department_scope',
@@ -76,29 +145,58 @@ export async function resolveApprovers(context = {}, step = {}, businessRecord =
             'u.username',
         )
         .orderBy([{ column: 'rsa.is_primary', order: 'desc' }, { column: 'rsa.created_at', order: 'asc' }]);
+    if (departmentScope) query.where('rsa.department_scope', departmentScope);
+    const rows = await query;
+    return applyRequesterExclusion(rows, step, requesterUserId);
+}
+
+export async function resolveApprovers(context = {}, step = {}, businessRecord = {}, trx = knex) {
+    const orgId = context.orgId || businessRecord.org_id || businessRecord.orgId;
+    const rawRaceId = context.raceId || businessRecord.primary_race_id || businessRecord.primaryRaceId || businessRecord.race_id || businessRecord.raceId;
+    const raceId = rawRaceId ? Number(rawRaceId) : null;
+    const roleKey = normalizeString(getConfigValue(step, 'roleKey'));
+
+    if (!orgId || !roleKey) {
+        return buildBlocked(roleKey || 'unknown');
+    }
 
     let departmentScope = '';
-    if (step.resolverType === 'race_staff_department_role' || step.resolver_type === 'race_staff_department_role') {
+    if (resolverKind(step) === 'race_staff_department_role') {
         departmentScope = getDepartmentValue(step, businessRecord);
         if (!departmentScope) {
             return buildBlocked(roleKey);
         }
-        query.where('rsa.department_scope', departmentScope);
     }
 
-    if (step.resolverType !== 'race_staff_role'
-        && step.resolverType !== 'race_staff_department_role'
-        && step.resolver_type !== 'race_staff_role'
-        && step.resolver_type !== 'race_staff_department_role') {
+    if (resolverKind(step) !== 'race_staff_role'
+        && resolverKind(step) !== 'race_staff_department_role') {
         return buildBlocked(roleKey);
     }
 
-    const rows = await query;
     const requesterUserId = context.requesterUserId || businessRecord.created_by || businessRecord.createdBy;
-    const approvers = rows
-        .filter((row) => !(step.excludeRequester || step.exclude_requester)
-            || String(row.user_id) !== String(requesterUserId || ''))
-        .map(mapApprover);
+    const moduleKey = moduleKeyFor(step, businessRecord, roleKey);
+    let approvers = await resolveScopeApprovers({
+        trx,
+        orgId,
+        raceId,
+        roleKey,
+        departmentScope,
+        moduleKey,
+        requesterUserId,
+        step,
+    });
+
+    if (approvers.length === 0) {
+        approvers = await resolveLegacyRaceStaff({
+            trx,
+            orgId,
+            raceId,
+            roleKey,
+            departmentScope,
+            requesterUserId,
+            step,
+        });
+    }
 
     if (approvers.length === 0) {
         return buildBlocked(roleKey, departmentScope);

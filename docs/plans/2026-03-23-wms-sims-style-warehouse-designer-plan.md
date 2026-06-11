@@ -9,9 +9,9 @@ The target is not freeform CAD. The target is:
 1. Direct manipulation on canvas
 2. Fast object placement with clear visual feedback
 3. Low cognitive load for warehouse managers
-4. Structured, parameterized data that still fits the existing DOOR twin backend
+4. Structured, parameterized data that still fits the existing ArcSpro twin backend
 
-This plan is written to be directly executable against the current DOOR codebase.
+This plan is written to be directly executable against the current ArcSpro codebase.
 
 ---
 

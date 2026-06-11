@@ -7,7 +7,7 @@
   gap: var(--terrain-panel-gap);
   color: var(--tm-text);
 
-  /* —— 接入 DOOR 设计系统：本页局部语义令牌 —— */
+  /* —— 接入 ArcSpro 设计系统：本页局部语义令牌 —— */
   --tm-surface: var(--layer-surface);
   --tm-soft: var(--layer-bg-secondary);
   --tm-border: var(--layer-border);

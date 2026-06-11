@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** 按照 DOOR=需求+领取+扫描、TOOL=排版+框选+批量生成 的分工，调整现有组件结构并补齐功能缺口。
+**Goal:** 按照 ArcSpro=需求+领取+扫描、TOOL=排版+框选+批量生成 的分工，调整现有组件结构并补齐功能缺口。
 
 **Tech Stack:** React, Canvas 2D, pdfjs-dist, qr-code-styling, Leaflet, html2canvas, Electron Worker
 
@@ -17,13 +17,13 @@
 **变更内容:**
 1. 删除 `CredentialScanView.tsx`（576 行）
 2. 从路由配置和侧边栏菜单中移除"证件扫码"入口
-3. 扫码功能完全由 DOOR 端 `ScanHome` → `ScanResult` 承担
+3. 扫码功能完全由 ArcSpro 端 `ScanHome` → `ScanResult` 承担
 
 **验证:** TOOL 端侧边栏不再出现"扫码"入口，其他证件功能正常。
 
 ---
 
-### Task 2: DOOR 端扫描链路 — ScanResult 增加证件识别
+### Task 2: ArcSpro 端扫描链路 — ScanResult 增加证件识别
 
 **Files:**
 - 修改: `door/src/views/scan/ScanResult.jsx`
@@ -37,11 +37,11 @@
    - 号码布：显示现有的号码布信息
    - 证件：显示证件编号、类别、姓名、可通行区域列表、状态
 
-**验证:** 在 DOOR 端扫码页面扫描一个证件 QR 码 → 显示证件信息卡片。
+**验证:** 在 ArcSpro 端扫码页面扫描一个证件 QR 码 → 显示证件信息卡片。
 
 ---
 
-### Task 3: DOOR 端领取管理 — 增加证件发放功能
+### Task 3: ArcSpro 端领取管理 — 增加证件发放功能
 
 **Files:**
 - 修改: `door/src/views/admin/credential/CredentialApplicationPage.jsx`（或新建 `CredentialIssuePage.jsx`）
@@ -51,11 +51,11 @@
 2. 功能：列出所有已生成证件（status=generated/printed）→ 支持搜索/筛选 → 点击或扫码标记为"已领取" → 记录领取人和时间
 3. 调用现有 API：`credentialApi.issueCredential(raceId, credentialId, data)`
 
-**验证:** 管理员可以在 DOOR 端查看所有证件列表，点击"发放"按钮后状态变为"已领取"。
+**验证:** 管理员可以在 ArcSpro 端查看所有证件列表，点击"发放"按钮后状态变为"已领取"。
 
 ---
 
-### Task 4: DOOR 端模板管理 — StylePage 降级为只读查看器
+### Task 4: ArcSpro 端模板管理 — StylePage 降级为只读查看器
 
 **Files:**
 - 修改: `door/src/views/admin/credential/CredentialStylePage.jsx`
@@ -66,7 +66,7 @@
 3. 替换为只读的布局预览 + 提示"请使用 TOOL 客户端进行排版编辑"
 4. 保留模板尺寸、状态等元数据的编辑
 
-**验证:** DOOR 端模板页面可以新建/删除模板、修改名称和状态，但排版编辑引导至 TOOL。
+**验证:** ArcSpro 端模板页面可以新建/删除模板、修改名称和状态，但排版编辑引导至 TOOL。
 
 ---
 
@@ -121,12 +121,12 @@
 
 ```
 Task 1 (清理 TOOL 扫码) ──────────── 无依赖，可立即执行
-Task 2 (DOOR 扫描链路) ──────────── 无依赖，可立即执行
-Task 3 (DOOR 领取管理) ──────────── 无依赖，可立即执行
-Task 4 (DOOR 模板查看器) ─────────── 无依赖，可立即执行
+Task 2 (ArcSpro 扫描链路) ──────────── 无依赖，可立即执行
+Task 3 (ArcSpro 领取管理) ──────────── 无依赖，可立即执行
+Task 4 (ArcSpro 模板查看器) ─────────── 无依赖，可立即执行
 Task 5 (TOOL 底板导入) ──────────── 无依赖
 Task 6 (TOOL 真实渲染) ──────────── 依赖 Task 5
 Task 7 (TOOL 地图截图) ──────────── 依赖 Task 6
 ```
 
-Task 1–4 可并行执行（跨 DOOR/TOOL 两端无耦合），Task 5–7 需按顺序执行。
+Task 1–4 可并行执行（跨 ArcSpro/TOOL 两端无耦合），Task 5–7 需按顺序执行。

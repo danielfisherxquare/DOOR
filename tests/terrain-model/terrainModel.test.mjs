@@ -493,7 +493,7 @@ test('buildTerrainModel merges ultra terrain grids without overflowing the call 
     frameWidthMm: 8,
     shapeType: 'rectangle',
     labelText: '54.38KM',
-    secondaryLabelText: 'DOOR',
+    secondaryLabelText: 'ArcSpro',
   })
 
   assert.equal(model.terrain.rows, 320)

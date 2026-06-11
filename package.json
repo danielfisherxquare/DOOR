@@ -1,13 +1,14 @@
 {
-  "name": "door-workspace",
+  "name": "arcspro-event-manage-system",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "check:encoding": "node scripts/check-encoding.mjs",
     "build": "vite build",
     "preview": "vite preview",
+    "test:branding": "node --test tests/branding/branding.test.mjs",
     "test:map": "node --test tests/map/map-utils.test.mjs tests/map/map-e2e.test.mjs",
     "test:map:unit": "node --test tests/map/map-utils.test.mjs",
     "test:map:e2e": "node --test tests/map/map-e2e.test.mjs",

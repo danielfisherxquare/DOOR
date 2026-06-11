@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Rebuild the credential module around `证件类别 + 通行区域编号`, complete the full data migration, and switch both DOOR and TOOL to the new semantics without keeping the old write path alive.
+**Goal:** Rebuild the credential module around `证件类别 + 通行区域编号`, complete the full data migration, and switch both ArcSpro and TOOL to the new semantics without keeping the old write path alive.
 
 **Architecture:** Add a new credential schema layer for access areas, categories, requests, and request/access snapshots, then cut the Express service and React/Electron clients over to the new routes and types. Keep credential issuance, scan, void, reissue, and style-template infrastructure, but replace every old `role-template / zone / application override` assumption with category-color and numeric access-code semantics.
 
@@ -176,7 +176,7 @@ git -C door add server/src/modules/credential/credential.routes.js src/api/crede
 git -C door commit -m "feat: replace credential public routes and web api contract"
 ```
 
-### Task 4: Refactor the DOOR admin navigation and page naming
+### Task 4: Refactor the ArcSpro admin navigation and page naming
 
 **Files:**
 - Modify: `door/src/components/admin/AdminLayout.jsx`
@@ -213,7 +213,7 @@ Expected: PASS.
 
 ```bash
 git -C door add src/components/admin/AdminLayout.jsx src/views/admin/credential src/api/credential.js
-git -C door commit -m "feat: refactor DOOR credential admin pages to category and access-code model"
+git -C door commit -m "feat: refactor ArcSpro credential admin pages to category and access-code model"
 ```
 
 ### Task 5: Update TOOL layout types and default template behavior

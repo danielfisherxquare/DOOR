@@ -54,7 +54,7 @@ test('measureGeometry returns polygon area and perimeter summary', async () => {
   }
 });
 
-test('GeoJSON exchange preserves Door map metadata and imports as local drafts', async () => {
+test('GeoJSON exchange preserves ArcSpro map metadata and imports as local drafts', async () => {
   const { geojsonExchange, cleanup } = await loadMapUtils();
   try {
     const feature = {

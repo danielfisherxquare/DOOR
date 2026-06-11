@@ -15,7 +15,7 @@
 - 在 `CredentialLayoutView` 内部集成 `<div className="toolbarLeft">` 排版命令按钮（左对齐、居中、等距分布等）。
 - 引入 `applySnap` 函数，在拖拽和缩放时提供对齐辅助线，并更新状态 `snapGuides`。
 
-### 2. 同步 DOOR 端数据 (Roles & Zones)
+### 2. 同步 ArcSpro 端数据 (Roles & Zones)
 证件模板需要与业务数据强绑定。在 TOOL 端打开某个赛事的证件排版时，需要：
 - 从后端拉取该赛事的 **证件类别 (Roles)**（包含类别名称、背景色 `bgColor` 等）。
 - 从后端拉取该赛事的 **通行区域 (Zones)**（包含区域代码、名称、颜色等）。

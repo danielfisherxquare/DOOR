@@ -53,6 +53,16 @@ test('app home uses the shared H5 primitives instead of standalone portal cards'
   assert.ok(!home.includes('ENTER <span'), 'Home cards should use localized H5 action copy');
 });
 
+test('app home action grids span the full desktop section width', () => {
+  const css = read('src/components/app/app-h5-surface.css');
+
+  assert.match(
+    css,
+    /\.app-h5-section__body\s*>\s*\.app-h5-action-grid\s*{[\s\S]*grid-column:\s*1\s*\/\s*-1/,
+    'nested action grids should span every desktop section column instead of being constrained to the first card column',
+  );
+});
+
 test('reimbursement app page uses shared H5 inner-page primitives', () => {
   const page = read('src/views/reimbursement/ReimbursementTool.jsx');
 
@@ -72,4 +82,26 @@ test('app shell exposes route summaries as part of the unified page language', (
   assert.ok(layout.includes('workspace-main__summary'), 'AppLayout should provide a summary element');
   assert.ok(css.includes('.workspace-main__summary'), 'workspace summary should be styled');
   assert.ok(css.includes('workspace-main__summary {'), 'summary selector should have concrete rules');
+});
+
+test('design request surfaces are organization-level entries with race association controls', () => {
+  const appConfig = read('src/components/app/appConfig.js');
+  const adminConfig = read('src/components/admin/adminConfig.js');
+  const opsConfig = read('src/components/ops/opsConfig.js');
+  const workspace = read('src/views/design-requests/DesignRequestWorkspace.jsx');
+
+  const appDesignBlock = appConfig.match(/key: 'design-requests',[\s\S]*?cardDescription:[\s\S]*?\n\s*}/)?.[0] || '';
+  const adminDesignBlock = adminConfig.match(/key: 'design-requests',[\s\S]*?groupKey: 'design'[\s\S]*?}/)?.[0] || '';
+  const opsDesignBlock = opsConfig.match(/key: 'design-requests',[\s\S]*?cardDescription:[\s\S]*?\n\s*}/)?.[0] || '';
+
+  assert.ok(appDesignBlock.includes('设计工作台'), 'app design entry should exist');
+  assert.ok(adminDesignBlock.includes('设计需求'), 'admin design entry should exist');
+  assert.ok(opsDesignBlock.includes('设计需求'), 'ops design entry should exist');
+  assert.ok(!appDesignBlock.includes('needsRace: true'), 'app design entry should not require race context');
+  assert.ok(!adminDesignBlock.includes('needsRace: true'), 'admin design entry should not require race context');
+  assert.ok(!opsDesignBlock.includes('needsRace: true'), 'ops design entry should not require race context');
+
+  assert.ok(workspace.includes('raceScope'), 'workspace should support organization-level race scope filtering');
+  assert.ok(workspace.includes('关联赛事'), 'workspace should expose linked race copy');
+  assert.ok(workspace.includes('主审批赛事'), 'workspace should expose primary approval race copy');
 });

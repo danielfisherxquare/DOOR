@@ -1,19 +1,19 @@
-const DOOR_APP_CACHE = 'door-app-shell-v1'
+const ARCSPRO_APP_CACHE = 'zao-event-app-shell-v1'
 const LEGACY_TILE_WORKER = '/sw' + '-tiles.js'
 
 const APP_SHELL_URLS = [
   '/',
   '/app',
   '/manifest.webmanifest',
-  '/icons/door-icon.svg',
-  '/icons/door-icon-180.png',
-  '/icons/door-icon-192.png',
-  '/icons/door-icon-512.png',
+  '/icons/arcspro-icon.svg',
+  '/icons/arcspro-icon-180.png',
+  '/icons/arcspro-icon-192.png',
+  '/icons/arcspro-icon-512.png',
 ]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(DOOR_APP_CACHE)
+    caches.open(ARCSPRO_APP_CACHE)
       .then((cache) => cache.addAll(APP_SHELL_URLS))
       .then(() => self.skipWaiting()),
   )
@@ -24,7 +24,10 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((keys) => Promise.all(
         keys
-          .filter((key) => key.startsWith('door-app-shell-') && key !== DOOR_APP_CACHE)
+          .filter((key) => (
+            key.startsWith('arcspro-app-shell-')
+            || key.startsWith('zao-event-app-shell-')
+          ) && key !== ARCSPRO_APP_CACHE)
           .map((key) => caches.delete(key)),
       ))
       .then(() => self.clients.claim()),
@@ -43,7 +46,7 @@ async function cacheFirst(request) {
   if (cached) return cached
 
   const response = await fetch(request)
-  const cache = await caches.open(DOOR_APP_CACHE)
+  const cache = await caches.open(ARCSPRO_APP_CACHE)
   cache.put(request, response.clone())
   return response
 }
@@ -52,7 +55,7 @@ async function networkFirstNavigation(request) {
   try {
     const response = await fetch(request)
     if (response.ok) {
-      const cache = await caches.open(DOOR_APP_CACHE)
+      const cache = await caches.open(ARCSPRO_APP_CACHE)
       cache.put('/app', response.clone())
     }
     return response

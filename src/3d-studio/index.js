@@ -6,11 +6,11 @@ export { default as Studio3DApp } from './App';
 export { default } from './App';
 export { default as useEditor, TOOL_TYPES } from './store/useEditor';
 export {
-    convertDoorSnapshotToPascalScene,
-    convertDoorSnapshotToPascalNodes,
-    convertPascalNodesToDoorSnapshot,
+    convertArcSproSnapshotToPascalScene,
+    convertArcSproSnapshotToPascalNodes,
+    convertPascalNodesToArcSproSnapshot,
     mergePascalNodesToSnapshot,
-} from './adapters/doorToPascalAdapter';
+} from './adapters/arcsproToPascalAdapter';
 export {
     createEmptyEditorDocument,
     convertEditorDocumentToLegacyScene,

@@ -1,6 +1,6 @@
-# DOOR 系统部署指南
+# 中奥致远赛事管理系统部署指南
 
-DOOR 是一个赛事运营管理平台，包含前端（Vite + React）和后端（Express.js + PostgreSQL）。
+中奥致远赛事管理系统是一个赛事运营管理平台，包含前端（Vite + React）和后端（Express.js + PostgreSQL）。
 
 ---
 
@@ -66,12 +66,12 @@ VITE_API_BASE_URL=/api
 |------|----------|----------|
 | PostgreSQL | `postgres:16-alpine` (公共镜像) | `door-postgres` |
 | Redis | `redis:7-alpine` (公共镜像) | `door-redis` |
-| API 服务 | `door-server-app:latest` (本地构建) | `door-app` |
-| Worker | `door-server-app:latest` (复用) | `door-worker` |
+| API 服务 | `arcspro-server-app:latest` (本地构建) | `arcspro-app` |
+| Worker | `arcspro-server-app:latest` (复用) | `door-worker` |
 | Nginx | `nginx:alpine` (公共镜像) | `door-nginx` |
 
 > [!IMPORTANT]
-> `app` 和 `worker` 共用同一个镜像 `door-server-app:latest`，仅启动命令不同。
+> `app` 和 `worker` 共用同一个镜像 `arcspro-server-app:latest`，仅启动命令不同。
 
 ### 本地环境配置文件
 
@@ -92,8 +92,8 @@ VITE_API_BASE_URL=/api
 
 | 服务 | 默认端口 | 说明 |
 |---|---:|---|
-| DOOR 后端 API | `3001` | `http://localhost:3001/api/...` |
-| DOOR 前端 dev | `5173` | Vite dev server，`/api` 代理到 `3001` |
+| 后端 API | `3001` | `http://localhost:3001/api/...` |
+| 前端 dev | `5173` | Vite dev server，`/api` 代理到 `3001` |
 | PostgreSQL | `5432` | Docker 映射 `5432:5432` |
 | Nginx 网关 | `80` | 本地 HTTP 入口 |
 
@@ -159,7 +159,7 @@ docker compose up -d --build
 启动后的容器：
 - `door-postgres` - PostgreSQL 数据库 (端口 5432)
 - `door-redis` - Redis 缓存
-- `door-app` - API 服务 (端口 3001)
+- `arcspro-app` - API 服务 (端口 3001)
 - `door-worker` - 后台任务处理
 - `door-nginx` - 反向代理 (端口 80)
 
@@ -296,7 +296,7 @@ docker compose up -d postgres redis
 
 | 环境 | 地址 |
 |------|------|
-| DOOR（dev） | `http://localhost:5173` |
+| 中奥致远赛事管理系统（dev） | `http://localhost:5173` |
 | API（直连） | `http://localhost:3001` |
 | 网关（Docker） | `http://localhost` |
 
@@ -306,7 +306,7 @@ docker compose up -d postgres redis
 
 ### 云端部署配置
 
-DOOR 部署在云服务器（阿里云），使用 HTTPS 对外服务。
+中奥致远赛事管理系统部署在服务器上，使用 HTTPS 对外服务。
 
 - 主入口（域名）：`https://www.xquareliu.com` / `https://xquareliu.com`
 - IP 入口：`http://47.251.107.41`（自动跳转到 HTTPS）
@@ -518,7 +518,7 @@ docker compose logs -f app
 
 # 或直接使用容器名
 docker ps --filter "name=door-"
-docker logs -f door-app
+docker logs -f arcspro-app
 ```
 
 ### 进入容器调试
@@ -529,7 +529,7 @@ docker compose exec app sh
 docker compose exec postgres psql -U door -d door
 
 # 或直接使用容器名
-docker exec -it door-app sh
+docker exec -it arcspro-app sh
 docker exec -it door-postgres psql -U door -d door
 ```
 
@@ -547,7 +547,7 @@ docker compose restart app
 docker compose restart nginx
 
 # 或直接使用容器名
-docker restart door-app
+docker restart arcspro-app
 docker restart door-nginx
 ```
 
@@ -666,7 +666,7 @@ docker compose up -d nginx
 
 ## 四层入口
 
-DOOR 采用 `public + app + ops + admin` 四层入口。
+中奥致远赛事管理系统采用 `public + app + ops + admin` 四层入口。
 
 | 入口层 | 路径 | 说明 |
 |------|------|------|

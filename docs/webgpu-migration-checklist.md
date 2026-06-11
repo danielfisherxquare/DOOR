@@ -1,7 +1,7 @@
 # WebGPU 迁移检查清单
 
 **创建日期**: 2026-03-26
-**项目**: door-workspace (3D 资产管理器)
+**项目**: arcspro-event-manage-system (3D 资产管理器)
 
 ---
 

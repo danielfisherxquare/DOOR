@@ -28,6 +28,7 @@ let baseUrl;
 let token;
 let orgId;
 let raceId;
+let secondRaceId;
 let designerId;
 const staffTokens = {};
 
@@ -453,6 +454,29 @@ async function assignStaff({ account, roleKey, roleName, departmentScope = null 
     });
 }
 
+async function assignScopeRole({
+    account,
+    roleKey,
+    roleName,
+    scopeType = 'org',
+    scopeId = null,
+    departmentScope = null,
+    moduleKey = null,
+}) {
+    await knex('scope_role_assignments').insert({
+        org_id: orgId,
+        scope_type: scopeType,
+        scope_id: scopeId,
+        team_member_id: account.member.id,
+        user_id: account.user.id,
+        role_key: roleKey,
+        role_name: roleName,
+        department_scope: departmentScope,
+        module_key: moduleKey,
+        status: 'active',
+    });
+}
+
 async function resetDatabase() {
     const result = await knex.raw(`
         SELECT tablename
@@ -485,6 +509,15 @@ describe('design request collaboration routes', () => {
             })
             .returning('*');
         raceId = Number(race.id);
+        const [secondRace] = await knex('races')
+            .insert({
+                org_id: orgId,
+                name: 'Design Request Trail',
+                date: '2026-08-16',
+                location: 'Aba',
+            })
+            .returning('*');
+        secondRaceId = Number(secondRace.id);
 
         await createUser({
             username: 'design_manager',
@@ -552,6 +585,27 @@ describe('design request collaboration routes', () => {
             account: designLead,
             roleKey: 'design_lead',
             roleName: '设计负责人',
+        });
+        await assignScopeRole({
+            account: departmentOwner,
+            roleKey: 'department_owner',
+            roleName: '部门负责人',
+            scopeType: 'department',
+            departmentScope: '招商部',
+        });
+        await assignScopeRole({
+            account: competitionOwner,
+            roleKey: 'department_owner',
+            roleName: '部门负责人',
+            scopeType: 'department',
+            departmentScope: '竞赛部',
+        });
+        await assignScopeRole({
+            account: designLead,
+            roleKey: 'design_lead',
+            roleName: '设计负责人',
+            scopeType: 'module',
+            moduleKey: 'design_requests',
         });
 
         server = app.listen(0);
@@ -730,6 +784,94 @@ describe('design request collaboration routes', () => {
         assert.equal(stats.body.data.designUploaded, 1);
     });
 
+    it('creates organization-level requests without race context and keeps them visible in the organization pool', async () => {
+        const createResponse = await api('/api/ops/design-requests/requests', {
+            method: 'POST',
+            headers: authHeader(),
+            body: JSON.stringify({
+                eventType: 'general',
+                requesterDepartment: '招商部',
+                requesterName: '李华',
+                title: '组织级视觉规范更新',
+                requirementText: '更新组织通用招商手册、社媒图和物料模板。',
+                referenceNotes: '沿用中奥致远品牌规范。',
+                sizeSpec: 'A4、1080x1920、1920x1080',
+                materialSpec: '电子文件',
+                dueAt: '2026-07-10T18:00:00.000Z',
+                priority: 'normal',
+            }),
+        });
+
+        assert.equal(createResponse.status, 201);
+        assert.equal(createResponse.body.data.orgId, orgId);
+        assert.equal(createResponse.body.data.raceId, null);
+        assert.deepEqual(createResponse.body.data.raceIds, []);
+        assert.deepEqual(createResponse.body.data.raceLinks, []);
+        assert.equal(createResponse.body.data.currentApproval.currentStep.stepKey, 'department_owner_review');
+
+        const requestId = createResponse.body.data.id;
+        const ownerTasks = await api('/api/app/approvals/tasks?status=pending', {
+            headers: authHeaderFor('departmentOwner'),
+        });
+        const ownerTask = ownerTasks.body.data.items.find((item) => item.businessId === requestId);
+        assert.ok(ownerTask);
+        const ownerApprove = await api('/api/app/approvals/tasks/' + ownerTask.id + '/approve', {
+            method: 'POST',
+            headers: authHeaderFor('departmentOwner'),
+            body: JSON.stringify({ comment: '组织级需求完整。' }),
+        });
+        assert.equal(ownerApprove.status, 200);
+        assert.equal(ownerApprove.body.data.currentStep.stepKey, 'design_lead_assignment');
+
+        const allList = await api('/api/admin/design-requests/requests', {
+            headers: authHeader(),
+        });
+        assert.equal(allList.status, 200);
+        assert.ok(allList.body.data.items.some((item) => item.id === requestId));
+
+        const unlinkedList = await api('/api/admin/design-requests/requests?raceScope=unlinked', {
+            headers: authHeader(),
+        });
+        assert.equal(unlinkedList.status, 200);
+        assert.ok(unlinkedList.body.data.items.some((item) => item.id === requestId));
+    });
+
+    it('creates multi-race design requests and filters them by linked race', async () => {
+        const createResponse = await api('/api/ops/design-requests/requests', {
+            method: 'POST',
+            headers: authHeader(),
+            body: JSON.stringify({
+                primaryRaceId: raceId,
+                raceIds: [raceId, secondRaceId],
+                eventType: 'marathon',
+                requesterDepartment: '竞赛部',
+                requesterName: '周敏',
+                title: '系列赛事导视系统',
+                requirementText: '同一套导视系统需要覆盖马拉松和越野赛两个项目。',
+                referenceNotes: '参考上一届城市马拉松和山地越野视觉。',
+                sizeSpec: '导视牌 1m x 2m，背景板 6m x 3m',
+                materialSpec: '雪弗板、喷绘布',
+                dueAt: '2026-07-20T18:00:00.000Z',
+                priority: 'high',
+            }),
+        });
+
+        assert.equal(createResponse.status, 201);
+        assert.equal(createResponse.body.data.raceId, raceId);
+        assert.deepEqual(
+            createResponse.body.data.raceIds.map(Number).sort((a, b) => a - b),
+            [raceId, secondRaceId].sort((a, b) => a - b),
+        );
+        assert.equal(createResponse.body.data.raceLinks.find((item) => Number(item.raceId) === raceId).relationType, 'primary');
+        assert.equal(createResponse.body.data.raceLinks.find((item) => Number(item.raceId) === secondRaceId).relationType, 'related');
+
+        const secondRaceList = await api('/api/admin/design-requests/requests?raceId=' + secondRaceId, {
+            headers: authHeader(),
+        });
+        assert.equal(secondRaceList.status, 200);
+        assert.ok(secondRaceList.body.data.items.some((item) => item.id === createResponse.body.data.id));
+    });
+
     it('tracks design revisions through final approval and ordering', async () => {
         const requestId = await createApprovedDesignRequest({
             title: '多轮返工进度跟踪',
@@ -852,6 +994,7 @@ describe('design request collaboration routes', () => {
         assert.equal(previewResponse.body.data.designCount, 2);
         assert.equal(previewResponse.body.data.readyCount, 1);
         assert.equal(previewResponse.body.data.needsInfoCount, 1);
+        assert.equal(previewResponse.body.data.fileName, '搭建&设计清单.xlsx');
         assert.equal(previewResponse.body.data.items.length, 3);
 
         const missingItem = previewResponse.body.data.items.find((item) => item.syncStatus === 'needs_info');
@@ -901,8 +1044,20 @@ describe('design request collaboration routes', () => {
         const importedRequests = listResponse.body.data.items.filter((item) => item.source === 'collaboration_import');
         assert.equal(importedRequests.length, 2);
         assert.ok(importedRequests.every((item) => item.status === 'pending_review'));
+        assert.ok(importedRequests.every((item) => item.currentApproval?.status === 'pending'));
+        assert.ok(importedRequests.every((item) => item.currentApproval?.currentStep?.stepKey === 'department_owner_review'));
         assert.ok(importedRequests.some((item) => item.title.includes('小票打印')));
         assert.ok(importedRequests.some((item) => item.title.includes('背景墙')));
+
+        const approvalTasks = await api('/api/app/approvals/tasks?status=pending', {
+            headers: authHeaderFor('competitionOwner'),
+        });
+        assert.equal(approvalTasks.status, 200);
+        const importedRequestIds = new Set(importedRequests.map((item) => item.id));
+        const importedApprovalTasks = approvalTasks.body.data.items
+            .filter((item) => importedRequestIds.has(item.businessId));
+        assert.equal(importedApprovalTasks.length, 2);
+        assert.ok(importedApprovalTasks.every((item) => item.step.stepKey === 'department_owner_review'));
     });
 
     it('exports collaboration spreadsheet rounds and detects later upload differences', async () => {

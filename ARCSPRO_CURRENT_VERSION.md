@@ -1,11 +1,11 @@
-# DOOR 当前系统版本整理
+# ArcSpro 当前系统版本整理
 
 整理时间：2026-05-18
 整理对象：本机工作区 `/Users/xquare/scratch/door`
 
 ## 版本定位
 
-当前 DOOR 正在从本机 working snapshot 整理为可 push 的发布候选分支。
+当前 ArcSpro 正在从本机 working snapshot 整理为可 push 的发布候选分支。
 
 | 项目 | 当前值 |
 |---|---|
@@ -13,15 +13,15 @@
 | 基线提交 | `1b46a2d feat: 库存系统升级、抽奖v2 beta、3D studio场景导出` |
 | 远端基线 | `gitee/main@859bebf` |
 | 分支状态 | 从本机 `main` 的当前快照整理出发布候选 |
-| 前端包版本 | `door-workspace@0.0.1` |
-| 后端包版本 | `door-server@1.0.0` |
+| 前端包版本 | `arcspro-event-manage-system@0.0.1` |
+| 后端包版本 | `arcspro-server@0.1.0` |
 | 当前工作区 | 正在排除备份、旧报告、测试结果等非发布文件 |
 
-结论：整理完成并通过验证后，可称为 **DOOR 2026-05-18 内部发布候选版**；在完整运行态验证前，不应直接称为生产正式版。
+结论：整理完成并通过验证后，可称为 **ArcSpro 2026-05-18 内部发布候选版**；在完整运行态验证前，不应直接称为生产正式版。
 
 ## 系统形态
 
-DOOR 当前是一个前后端分离的赛事运营管理系统：
+ArcSpro 当前是一个前后端分离的赛事运营管理系统：
 
 | 层 | 技术栈 | 入口 |
 |---|---|---|
@@ -137,7 +137,7 @@ DOOR 当前是一个前后端分离的赛事运营管理系统：
 在未打 tag、未完成完整运行验证前，建议内部记录为：
 
 ```text
-DOOR internal release candidate 2026-05-18
+ArcSpro internal release candidate 2026-05-18
 base: main@1b46a2d
 state: cleanup branch, frontend build passed, backend lightweight test passed, full runtime verification blocked by missing local PostgreSQL/API
 ```
@@ -145,7 +145,7 @@ state: cleanup branch, frontend build passed, backend lightweight test passed, f
 如果要对外或交付使用，建议先做一个正式收口版本：
 
 ```text
-DOOR v0.1.0-internal
+ArcSpro v0.1.0-internal
 scope: 赛事运营 + 证件 + 仓储 + 报销 + 3D Studio + 管理后台
 gate: full docker/local runtime smoke passed
 ```

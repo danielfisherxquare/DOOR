@@ -1,5 +1,5 @@
 /**
- * DOOR 发票报销模块端到端测试
+ * ArcSpro 发票报销模块端到端测试
  * 
  * 测试目标：验证用户从登录到完成发票报销全流程
  * 1. 正确上传识别发票
@@ -16,14 +16,14 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 配置
-const BASE_URL = process.env.DOOR_TEST_URL || process.env.URL || 'http://127.0.0.1:3001';
+const BASE_URL = process.env.ARCSPRO_TEST_URL || process.env.URL || 'http://127.0.0.1:3001';
 const TIMEOUT = 90000; // 90 秒超时
 const SCREENSHOT_DIR = path.join(__dirname, 'screenshots');
 
 // 测试凭据
 const CREDENTIALS = {
-  username: process.env.DOOR_TEST_USERNAME || 'test@example.com',
-  password: process.env.DOOR_TEST_PASSWORD || 'TestPassword123!',
+  username: process.env.ARCSPRO_TEST_USERNAME || 'test@example.com',
+  password: process.env.ARCSPRO_TEST_PASSWORD || 'TestPassword123!',
   testProjectName: `测试报销项目-${Date.now()}`
 };
 
@@ -57,7 +57,7 @@ async function waitAndScreenshot(page, name) {
 
 /**
  * 测试 1：登录系统
- * DOOR 登录页面使用特定的选择器：
+ * ArcSpro 登录页面使用特定的选择器：
  * - 用户名：input#username
  * - 密码：input#password
  * - 提交按钮：button[type="submit"]
@@ -72,7 +72,7 @@ async function testLogin(page) {
     await page.waitForTimeout(3000); // 等待页面完全加载
     await waitAndScreenshot(page, 'login-page');
     
-    // 使用 DOOR 特定的选择器
+    // 使用 ArcSpro 特定的选择器
     const usernameInput = page.locator('#username');
     const passwordInput = page.locator('#password');
     const submitButton = page.locator('button[type="submit"]');
@@ -502,7 +502,7 @@ async function testExport(page) {
  */
 async function runReimbursementTests() {
   console.log('='.repeat(60));
-  console.log('DOOR 发票报销模块端到端测试');
+  console.log('ArcSpro 发票报销模块端到端测试');
   console.log('='.repeat(60));
   console.log(`测试环境：${BASE_URL}`);
   console.log(`测试时间：${testResults.timestamp}`);

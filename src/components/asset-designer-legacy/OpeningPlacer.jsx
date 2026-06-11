@@ -5,7 +5,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { getWallLength, getWallAngle } from '../../utils/snapEngine'
 import { findValidPosition, openingsOverlap } from '../../utils/csgUtils'
-import { DOOR_PRESETS, WINDOW_PRESETS } from '../../data/openingPresets'
+import { ENTRY_OPENING_PRESETS, WINDOW_PRESETS } from '../../data/openingPresets'
 
 export default function OpeningPlacer({
     walls = [],
@@ -20,7 +20,7 @@ export default function OpeningPlacer({
     const [targetWall, setTargetWall] = useState(null)
 
     // 获取当前选中的预设
-    const preset = activePreset || (openingType === 'door' ? DOOR_PRESETS[0] : WINDOW_PRESETS[0])
+    const preset = activePreset || (openingType === 'door' ? ENTRY_OPENING_PRESETS[0] : WINDOW_PRESETS[0])
 
     // 将世界坐标点投影到局部坐标的墙体上
     const projectToWall = useCallback((worldPoint, wall) => {

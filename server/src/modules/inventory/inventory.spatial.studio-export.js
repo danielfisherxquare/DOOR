@@ -288,7 +288,7 @@ export function buildGeometryBatchFromStudioScene({
         kind: 'studio-white-model-batch',
         name: zone?.name || scene?.name || resource?.id || 'studio-white-model',
         source: 'studio-editor-document',
-        coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+        coordinateSystem: EXPORT_COORDINATE_SYSTEMS.ARCSPRO_LOCAL_Y_UP,
         input: {
             sourceWorkZoneId: zone?.id || null,
             studioSceneType: scene?.sceneType || null,

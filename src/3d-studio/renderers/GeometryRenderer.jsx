@@ -20,9 +20,9 @@ const HANDLE_COLOR = '#fef3c7'
 const PUSHPULL_PREVIEW_COLOR = '#60a5fa'
 
 function traceGeometry(event, data = {}) {
-  if (!import.meta.env.DEV || typeof window === 'undefined' || !window.__DOOR_TRACE_GEOMETRY__) return
+  if (!import.meta.env.DEV || typeof window === 'undefined' || !window.__ARCSPRO_TRACE_GEOMETRY__) return
   const entry = { at: Number(performance.now().toFixed(1)), event, ...data }
-  window.__DOOR_GEOMETRY_TIMINGS__ = [...(window.__DOOR_GEOMETRY_TIMINGS__ || []), entry]
+  window.__ARCSPRO_GEOMETRY_TIMINGS__ = [...(window.__ARCSPRO_GEOMETRY_TIMINGS__ || []), entry]
   console.info('[door-geometry]', event, data)
 }
 

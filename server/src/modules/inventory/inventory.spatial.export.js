@@ -1303,7 +1303,7 @@ function buildGeometryBatchFile({ resource, manifest, terrainOffset, zoneId }) {
                 kind: 'gis-white-model-batch',
                 name: resource?.id || zoneId || 'gis-white-model',
                 source: 'gis-spatial-objects',
-                coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+                coordinateSystem: EXPORT_COORDINATE_SYSTEMS.ARCSPRO_LOCAL_Y_UP,
                 input: {
                     sourceWorkZoneId: zoneId || null,
                     resourceId: resource?.id || null,

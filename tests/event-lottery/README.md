@@ -1,6 +1,6 @@
-# DOOR "我的赛事" 名单导入到抽签结束端到端测试
+# ArcSpro "我的赛事" 名单导入到抽签结束端到端测试
 
-本测试套件用于验证 DOOR 项目中"我的赛事"模块从名单导入到抽签结束的完整流程。
+本测试套件用于验证 ArcSpro 项目中"我的赛事"模块从名单导入到抽签结束的完整流程。
 
 ## 测试流程
 
@@ -41,8 +41,8 @@ npm run dev
 确保有一个有效的测试账号，或者使用环境变量配置：
 
 ```bash
-export DOOR_TEST_USERNAME=your-email@example.com
-export DOOR_TEST_PASSWORD=your-password
+export ARCSPRO_TEST_USERNAME=your-email@example.com
+export ARCSPRO_TEST_PASSWORD=your-password
 ```
 
 ## 运行测试
@@ -120,10 +120,10 @@ cross-env HEADLESS=true node tests/event-lottery/event-lottery-e2e.test.js
 
 | 变量名 | 说明 | 默认值 |
 |--------|------|--------|
-| `DOOR_TEST_URL` | 测试服务器地址 | `http://127.0.0.1:5173` |
+| `ARCSPRO_TEST_URL` | 测试服务器地址 | `http://127.0.0.1:5173` |
 | `URL` | 测试服务器地址（备用） | `http://127.0.0.1:5173` |
-| `DOOR_TEST_USERNAME` | 测试账号用户名 | `test@example.com` |
-| `DOOR_TEST_PASSWORD` | 测试账号密码 | `TestPassword123!` |
+| `ARCSPRO_TEST_USERNAME` | 测试账号用户名 | `test@example.com` |
+| `ARCSPRO_TEST_PASSWORD` | 测试账号密码 | `TestPassword123!` |
 
 ## 故障排除
 

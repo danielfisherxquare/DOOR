@@ -53,10 +53,11 @@ function Login() {
           <div className="login-brand__content">
             <div className="login-brand__header">
               <div className="login-brand__icon-box">
-                <span className="material-symbols-outlined">door_open</span>
+                <span className="material-symbols-outlined">event_available</span>
               </div>
               <div>
-                <span className="login-brand__name">Powered by Xquare</span>
+                <span className="login-brand__name">中奥致远赛事管理系统</span>
+                <span className="login-brand__subname">赛事运营管理平台</span>
               </div>
             </div>
 

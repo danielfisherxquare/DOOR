@@ -1,8 +1,8 @@
-# DOOR Approval Foundation Design
+# ArcSpro Approval Foundation Design
 
 ## Goal
 
-Introduce a system-level approval foundation for DOOR. The first business flow is design request approval:
+Introduce a system-level approval foundation for ArcSpro. The first business flow is design request approval:
 
 ~~~text
 需求方提交设计需求
@@ -32,7 +32,7 @@ Reference links:
 - Odoo approval rules: https://www.odoo.com/documentation/19.0/applications/studio/approval_rules.html
 - Oracle approval workflow participants: https://docs.oracle.com/en/cloud/saas/project-management/fawpm/key-components-of-approval-workflows.html
 
-## Current DOOR Context
+## Current ArcSpro Context
 
 Existing useful foundations:
 
@@ -61,7 +61,7 @@ Missing model:
 
 ## Recommended Architecture
 
-Use a lightweight DOOR approval engine, not an external BPMN engine for the first version.
+Use a lightweight ArcSpro approval engine, not an external BPMN engine for the first version.
 
 ~~~text
 Business module

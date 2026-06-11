@@ -1,8 +1,8 @@
-# DOOR 发票报销模块自动化测试
+# ArcSpro 发票报销模块自动化测试
 
 ## 概述
 
-本测试套件用于验证 DOOR 项目发票报销模块的全流程功能：
+本测试套件用于验证 ArcSpro 项目发票报销模块的全流程功能：
 
 1. ✅ 正确上传识别发票
 2. ✅ 正确上传识别付款凭证
@@ -33,7 +33,7 @@ door/tests/reimbursement/
 
 - Node.js 18+
 - Playwright
-- 运行中的 DOOR 应用（本地或测试环境）
+- 运行中的 ArcSpro 应用（本地或测试环境）
 
 ## 安装
 
@@ -65,9 +65,9 @@ npx playwright install chromium
 ### 方式 2：使用环境变量
 
 ```bash
-export DOOR_TEST_URL=http://localhost:5173
-export DOOR_TEST_USERNAME=test@example.com
-export DOOR_TEST_PASSWORD=TestPassword123!
+export ARCSPRO_TEST_URL=http://localhost:5173
+export ARCSPRO_TEST_USERNAME=test@example.com
+export ARCSPRO_TEST_PASSWORD=TestPassword123!
 ```
 
 ## 准备测试数据
@@ -97,9 +97,9 @@ node tests/reimbursement/reimbursement-e2e.test.js
 ### 使用自定义配置运行
 
 ```bash
-DOOR_TEST_URL=http://localhost:3000 \
-DOOR_TEST_USERNAME=admin@example.com \
-DOOR_TEST_PASSWORD=admin123 \
+ARCSPRO_TEST_URL=http://localhost:3000 \
+ARCSPRO_TEST_USERNAME=admin@example.com \
+ARCSPRO_TEST_PASSWORD=admin123 \
 node tests/reimbursement/reimbursement-e2e.test.js
 ```
 
@@ -183,7 +183,7 @@ headless: true,
 
 ### 登录失败
 - 确认测试账号存在且有权限
-- 检查 DOOR 应用是否正常运行
+- 检查 ArcSpro 应用是否正常运行
 - 查看浏览器控制台错误信息
 
 ### 上传失败
@@ -224,9 +224,9 @@ headless: true,
     npx playwright install chromium
     node tests/reimbursement/reimbursement-e2e.test.js
   env:
-    DOOR_TEST_URL: ${{ secrets.DOOR_TEST_URL }}
-    DOOR_TEST_USERNAME: ${{ secrets.DOOR_TEST_USERNAME }}
-    DOOR_TEST_PASSWORD: ${{ secrets.DOOR_TEST_PASSWORD }}
+    ARCSPRO_TEST_URL: ${{ secrets.ARCSPRO_TEST_URL }}
+    ARCSPRO_TEST_USERNAME: ${{ secrets.ARCSPRO_TEST_USERNAME }}
+    ARCSPRO_TEST_PASSWORD: ${{ secrets.ARCSPRO_TEST_PASSWORD }}
 ```
 
 ## 扩展测试

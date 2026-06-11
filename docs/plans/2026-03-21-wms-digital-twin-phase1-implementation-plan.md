@@ -1,6 +1,6 @@
 # WMS Digital Twin Phase 1 Implementation Plan
 
-**Goal:** Deliver a production-safe first phase of DOOR WMS 3D digital twin capabilities that supports multi-warehouse 3D definitions, rack templates, item shape definitions, location QR codes, scan-based location binding, and basic 3D warehouse visualization without breaking the current WMS flows.
+**Goal:** Deliver a production-safe first phase of ArcSpro WMS 3D digital twin capabilities that supports multi-warehouse 3D definitions, rack templates, item shape definitions, location QR codes, scan-based location binding, and basic 3D warehouse visualization without breaking the current WMS flows.
 
 **Architecture:** Keep the current `inventory` module as the system of record for legacy pages, extend existing warehouse/unit tables with twin-ready fields, add a small set of new twin tables for 3D layout and binding history, and implement all new capabilities behind `/api/inventory/twin/*` routes. New twin write paths must double-write the legacy fields required by `InventoryHome`, `Reports`, `StocktakingManager`, `WarehouseManager`, `BatchInbound`, and `QRCodePrinter`.
 

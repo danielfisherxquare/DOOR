@@ -10,7 +10,7 @@ function read(path) {
   return readFileSync(fromRoot(path), 'utf8')
 }
 
-describe('DOOR H5 app shell', () => {
+describe('中奥致远 H5 app shell', () => {
   it('publishes installable PWA metadata for iOS and Android', () => {
     const index = read('index.html')
 
@@ -18,12 +18,13 @@ describe('DOOR H5 app shell', () => {
     assert.match(index, /<meta name="theme-color" content="#D4A017"/)
     assert.match(index, /<meta name="mobile-web-app-capable" content="yes"/)
     assert.match(index, /<meta name="apple-mobile-web-app-capable" content="yes"/)
-    assert.match(index, /<meta name="apple-mobile-web-app-title" content="DOOR"/)
-    assert.match(index, /<link rel="apple-touch-icon" href="\/icons\/door-icon-180\.png"/)
+    assert.match(index, /<meta name="apple-mobile-web-app-title" content="中奥致远赛事管理系统"/)
+    assert.match(index, /<link rel="apple-touch-icon" href="\/icons\/arcspro-icon-180\.png"/)
 
     const manifest = JSON.parse(read('public/manifest.webmanifest'))
-    assert.equal(manifest.name, 'DOOR Portal')
-    assert.equal(manifest.short_name, 'DOOR')
+    assert.equal(manifest.name, '中奥致远赛事管理系统')
+    assert.equal(manifest.short_name, '中奥致远')
+    assert.match(manifest.description, /中奥致远赛事管理系统/)
     assert.equal(manifest.start_url, '/app')
     assert.equal(manifest.scope, '/')
     assert.equal(manifest.display, 'standalone')
@@ -38,11 +39,11 @@ describe('DOOR H5 app shell', () => {
     assert.match(main, /import '\.\/registerPwa'/)
 
     const registerPwa = read('src/registerPwa.js')
-    assert.match(registerPwa, /navigator\.serviceWorker\.register\('\/door-app-sw\.js'\)/)
+    assert.match(registerPwa, /navigator\.serviceWorker\.register\('\/arcspro-app-sw\.js'\)/)
     assert.match(registerPwa, /beforeinstallprompt/)
 
-    const serviceWorker = read('public/door-app-sw.js')
-    assert.match(serviceWorker, /DOOR_APP_CACHE/)
+    const serviceWorker = read('public/arcspro-app-sw.js')
+    assert.match(serviceWorker, /ARCSPRO_APP_CACHE/)
     assert.match(serviceWorker, /\/manifest\.webmanifest/)
     assert.match(serviceWorker, /\/app/)
     assert.doesNotMatch(serviceWorker, /sw-tiles\.js/)
@@ -77,10 +78,10 @@ describe('DOOR H5 app shell', () => {
 
   it('ships app icons referenced by metadata', () => {
     const iconPaths = [
-      'public/icons/door-icon.svg',
-      'public/icons/door-icon-180.png',
-      'public/icons/door-icon-192.png',
-      'public/icons/door-icon-512.png',
+      'public/icons/arcspro-icon.svg',
+      'public/icons/arcspro-icon-180.png',
+      'public/icons/arcspro-icon-192.png',
+      'public/icons/arcspro-icon-512.png',
     ]
 
     for (const iconPath of iconPaths) {

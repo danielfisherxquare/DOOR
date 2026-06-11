@@ -157,7 +157,7 @@ function buildFastFocusZoneStudioScene({ generatedScene, zone, project, objects 
         kind: 'focus-zone-studio-scene',
         name: zone?.name || 'GIS 固定区域白模',
         source: 'gis-focus-zone',
-        coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+        coordinateSystem: EXPORT_COORDINATE_SYSTEMS.ARCSPRO_LOCAL_Y_UP,
         input: {
             sourceWorkZoneId: zone?.id || null,
             sourceProjectId: zone?.projectId || project?.id || null,
@@ -273,7 +273,7 @@ function buildPackageManifest({ generatedScene, project, zone, studioScene, geom
             kind: 'generated-scene-package',
             name: zone?.name || project?.name || generatedScene.id,
             source: 'gis-focus-zone',
-            coordinateSystem: EXPORT_COORDINATE_SYSTEMS.DOOR_LOCAL_Y_UP,
+            coordinateSystem: EXPORT_COORDINATE_SYSTEMS.ARCSPRO_LOCAL_Y_UP,
             input: {
                 sceneId: generatedScene.id,
                 sourceWorkZoneId: zone?.id || null,

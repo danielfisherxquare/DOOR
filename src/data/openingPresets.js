@@ -2,7 +2,7 @@
  * 门窗预设配置
  */
 
-export const DOOR_PRESETS = [
+export const ENTRY_OPENING_PRESETS = [
     {
         id: 'door_single_wood',
         name: '单开门 (木门)',
@@ -94,14 +94,14 @@ export const WINDOW_PRESETS = [
  * 获取开口预设
  */
 export function getOpeningPreset(id) {
-    return [...DOOR_PRESETS, ...WINDOW_PRESETS].find(p => p.id === id)
+    return [...ENTRY_OPENING_PRESETS, ...WINDOW_PRESETS].find(p => p.id === id)
 }
 
 /**
  * 获取所有门预设
  */
 export function getDoorPresets() {
-    return DOOR_PRESETS
+    return ENTRY_OPENING_PRESETS
 }
 
 /**
@@ -115,7 +115,7 @@ export function getWindowPresets() {
  * 判断预设是否为门
  */
 export function isDoorPreset(preset) {
-    return DOOR_PRESETS.some(p => p.id === preset?.id)
+    return ENTRY_OPENING_PRESETS.some(p => p.id === preset?.id)
 }
 
 /**

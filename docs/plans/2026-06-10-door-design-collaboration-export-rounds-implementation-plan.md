@@ -1,8 +1,8 @@
-# Door Design Collaboration Export Rounds Implementation Plan
+# ArcSpro Design Collaboration Export Rounds Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build multi-round standard spreadsheet export and upload diff detection for DOOR design collaboration.
+**Goal:** Build multi-round standard spreadsheet export and upload diff detection for ArcSpro design collaboration.
 
 **Architecture:** Imports remain immutable batches. A snapshot table stores the latest known row state and timestamps per race. Export rounds freeze selected snapshot rows into downloadable Excel workbooks and become the baseline for later incremental/full-marked exports.
 

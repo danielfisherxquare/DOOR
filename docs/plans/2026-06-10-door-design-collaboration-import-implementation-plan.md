@@ -1,8 +1,8 @@
-# DOOR Design Collaboration Import Implementation Plan
+# ArcSpro Design Collaboration Import Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Add Excel collaboration-list import to the DOOR design request workflow so ops users can upload the common “搭建&设计清单” workbook, review parsed rows, complete missing fields, and sync design-marked rows into the existing approval workflow.
+**Goal:** Add Excel collaboration-list import to the ArcSpro design request workflow so ops users can upload the common “搭建&设计清单” workbook, review parsed rows, complete missing fields, and sync design-marked rows into the existing approval workflow.
 
 **Architecture:** Keep the existing design_requests approval model intact. Add import batch and import item tables to preserve the full Excel context, then create design_requests only for ready rows marked 设计=✅.
 

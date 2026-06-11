@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import approvalApi from '../../services/approvalApi'
 import designRequestApi from '../../services/designRequestApi'
-import useAuthStore from '../../stores/authStore'
 import './design-request-workspace.css'
 
 const EVENT_TYPES = [
@@ -150,6 +149,13 @@ const EXPORT_ACTIONS = [
   { mode: 'full_marked', label: '完整并标记', icon: 'select_all' },
 ]
 
+const RACE_SCOPE_OPTIONS = [
+  { value: 'all', label: '全部' },
+  { value: 'unlinked', label: '未关联赛事' },
+  { value: 'race', label: '单赛事' },
+  { value: 'multi', label: '多赛事' },
+]
+
 function toDateInputValue(date, useDefault = true) {
   if (!date && !useDefault) return ''
   const target = date ? new Date(date) : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
@@ -161,6 +167,8 @@ function toDateInputValue(date, useDefault = true) {
 function createInitialForm(raceId) {
   return {
     raceId: raceId || '',
+    raceIdsText: raceId || '',
+    primaryRaceId: raceId || '',
     eventType: 'marathon',
     requesterDepartment: '',
     requesterName: '',
@@ -215,6 +223,23 @@ function eventTypeLabel(value) {
 
 function priorityLabel(value) {
   return PRIORITIES.find((item) => item.value === value)?.label || value || '普通'
+}
+
+function parseRaceIds(value) {
+  if (Array.isArray(value)) {
+    return [...new Set(value.map(Number).filter(Boolean))]
+  }
+  return [...new Set(String(value || '')
+    .split(/[，,\s]+/)
+    .map(Number)
+    .filter(Boolean))]
+}
+
+function raceSummary(request) {
+  const links = request?.raceLinks || []
+  if (links.length === 0) return '未关联赛事'
+  if (links.length === 1) return links[0].raceName || ('赛事 #' + links[0].raceId)
+  return links.length + ' 场赛事'
 }
 
 function approvalStepLabel(value) {
@@ -343,6 +368,26 @@ function ProgressPill({ progress }) {
   )
 }
 
+function RaceLinkTags({ request }) {
+  const links = request?.raceLinks || []
+  if (links.length === 0) {
+    return <span className="design-request-race-tag design-request-race-tag--empty">未关联赛事</span>
+  }
+  return (
+    <span className="design-request-race-tags">
+      {links.map((link) => (
+        <span
+          key={link.id || link.raceId}
+          className={'design-request-race-tag ' + (link.relationType === 'primary' ? 'is-primary' : '')}
+        >
+          {link.relationType === 'primary' ? '主 ' : ''}
+          {link.raceName || ('赛事 #' + link.raceId)}
+        </span>
+      ))}
+    </span>
+  )
+}
+
 function DesignProgressTracker({ request }) {
   const progress = request?.progress || {}
   const currentIndex = PROGRESS_STEP_ORDER[progress.stage] ?? 0
@@ -444,8 +489,12 @@ function AssetGrid({ title, assets }) {
 
 export default function DesignRequestWorkspace({ surface = 'app', mode = 'designer' }) {
   const [searchParams] = useSearchParams()
-  const user = useAuthStore((state) => state.user)
-  const selectedRaceId = searchParams.get('raceId') || user?.preferences?.lastRaceId || ''
+  const initialRaceId = searchParams.get('raceId') || ''
+  const selectedOrgId = searchParams.get('orgId') || ''
+  const [raceScope, setRaceScope] = useState(initialRaceId ? 'race' : 'all')
+  const [raceFilterId, setRaceFilterId] = useState(initialRaceId)
+  const [raceIdsText, setRaceIdsText] = useState(initialRaceId)
+  const [eventTypeFilter, setEventTypeFilter] = useState('all')
   const [requests, setRequests] = useState([])
   const [templates, setTemplates] = useState([])
   const [stats, setStats] = useState({})
@@ -454,16 +503,19 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
-  const [form, setForm] = useState(() => createInitialForm(selectedRaceId))
+  const [form, setForm] = useState(() => createInitialForm(initialRaceId))
   const [reviewForm, setReviewForm] = useState({ comment: '', assignedDesignerId: '' })
   const [progressForm, setProgressForm] = useState({ comment: '', orderReference: '', orderNote: '' })
   const [approvalTasks, setApprovalTasks] = useState([])
   const [staffAssignments, setStaffAssignments] = useState([])
   const [staffForm, setStaffForm] = useState({
     teamMemberId: '',
+    scopeType: 'org',
+    scopeId: '',
     roleKey: 'department_owner',
     roleName: '部门负责人',
     departmentScope: '',
+    moduleKey: 'design_requests',
   })
   const [deliverable, setDeliverable] = useState({ fileName: '', fileUrl: '', mimeType: 'image/png', note: '' })
   const [importFile, setImportFile] = useState(null)
@@ -479,6 +531,21 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
   const isRequester = mode === 'requester'
   const isManager = mode === 'manager'
   const isDesigner = mode === 'designer'
+  const selectedRaceId = raceScope === 'race' ? raceFilterId : ''
+  const activeRaceIds = useMemo(() => {
+    if (raceScope === 'race') return parseRaceIds(raceFilterId)
+    if (raceScope === 'multi') return parseRaceIds(raceIdsText)
+    return []
+  }, [raceFilterId, raceIdsText, raceScope])
+  const requestScopeParams = useMemo(() => {
+    const params = {}
+    if (raceScope === 'race' && activeRaceIds[0]) params.raceId = activeRaceIds[0]
+    if (raceScope === 'multi' && activeRaceIds.length > 0) params.raceIds = activeRaceIds.join(',')
+    if (raceScope === 'unlinked') params.raceScope = 'unlinked'
+    if (eventTypeFilter !== 'all') params.eventType = eventTypeFilter
+    if (selectedOrgId) params.orgId = selectedOrgId
+    return params
+  }, [activeRaceIds, eventTypeFilter, raceScope, selectedOrgId])
 
   const selectedRequest = useMemo(
     () => requests.find((item) => item.id === selectedId) || requests[0] || null,
@@ -536,7 +603,7 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
   const loadWorkspace = useCallback(async () => {
     setLoading(true)
     setError('')
-    const params = selectedRaceId ? { raceId: selectedRaceId } : {}
+    const params = requestScopeParams
     try {
       const [templateResponse, requestResponse, statsResponse] = await Promise.all([
         designRequestApi.getTemplates(surface, { ...params, eventType: form.eventType || 'marathon' }),
@@ -576,8 +643,8 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
       const taskResponse = await approvalApi.listTasks(surface === 'admin' ? 'admin' : 'app', { ...params, status: 'pending' })
       const taskPayload = getResponseData(taskResponse, { items: [] })
       setApprovalTasks(taskPayload.items || [])
-      if (isManager && selectedRaceId) {
-        const staffResponse = await approvalApi.listRaceStaffAssignments(selectedRaceId, { status: 'active' })
+      if (isManager) {
+        const staffResponse = await approvalApi.listScopeRoleAssignments('admin', { ...params, status: 'active' })
         const staffPayload = getResponseData(staffResponse, { items: [] })
         setStaffAssignments(staffPayload.items || [])
       }
@@ -586,10 +653,16 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
     } finally {
       setLoading(false)
     }
-  }, [form.eventType, isDesigner, isManager, isRequester, selectedRaceId, surface])
+  }, [form.eventType, isDesigner, isManager, isRequester, requestScopeParams, surface])
 
   useEffect(() => {
-    setForm((current) => ({ ...current, raceId: selectedRaceId || current.raceId }))
+    if (!selectedRaceId) return
+    setForm((current) => ({
+      ...current,
+      raceId: selectedRaceId,
+      raceIdsText: current.raceIdsText || selectedRaceId,
+      primaryRaceId: current.primaryRaceId || selectedRaceId,
+    }))
   }, [selectedRaceId])
 
   useEffect(() => {
@@ -648,9 +721,14 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
     setError('')
     setNotice('')
     try {
+      const raceIds = parseRaceIds(form.raceIdsText || form.raceId)
+      const primaryRaceId = Number(form.primaryRaceId || form.raceId || raceIds[0] || 0) || null
       const payload = {
         ...form,
-        raceId: Number(form.raceId || selectedRaceId),
+        orgId: selectedOrgId || undefined,
+        raceId: primaryRaceId || undefined,
+        primaryRaceId: primaryRaceId || undefined,
+        raceIds,
         dueAt: new Date(form.dueAt).toISOString(),
         referenceAssets: form.referenceAsset
           ? [{ ...form.referenceAsset, note: form.referenceNotes }]
@@ -729,29 +807,29 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
 
   const handleCreateStaffAssignment = async (event) => {
     event.preventDefault()
-    if (!selectedRaceId) {
-      setError('请先选择赛事上下文')
-      return
-    }
     setSaving(true)
     setError('')
     setNotice('')
     try {
       const roleName = STAFF_ROLES.find((item) => item.value === staffForm.roleKey)?.label || staffForm.roleName
-      await approvalApi.createRaceStaffAssignment(selectedRaceId, {
+      await approvalApi.createScopeRoleAssignment('admin', {
         ...staffForm,
+        orgId: selectedOrgId || undefined,
         roleName,
       })
       setStaffForm({
         teamMemberId: '',
+        scopeType: 'org',
+        scopeId: '',
         roleKey: 'department_owner',
         roleName: '部门负责人',
         departmentScope: '',
+        moduleKey: 'design_requests',
       })
-      setNotice('赛事岗位已任命。')
+      setNotice('审批岗位已保存。')
       await loadWorkspace()
     } catch (err) {
-      setError(err.message || '赛事岗位保存失败')
+      setError(err.message || '审批岗位保存失败')
     } finally {
       setSaving(false)
     }
@@ -857,7 +935,9 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
     try {
       const formData = new FormData()
       formData.append('file', importFile)
-      formData.append('raceId', String(form.raceId || selectedRaceId))
+      if (selectedOrgId) formData.append('orgId', selectedOrgId)
+      const importRaceId = Number(form.primaryRaceId || form.raceId || selectedRaceId || 0) || null
+      if (importRaceId) formData.append('raceId', String(importRaceId))
       formData.append('eventType', form.eventType || 'marathon')
       const response = await designRequestApi.previewImport(surface, formData)
       const parsedImport = getResponseData(response, null)
@@ -950,9 +1030,13 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
   }
 
   const handleCreateExport = async (mode) => {
-    const raceId = Number(form.raceId || selectedRaceId)
-    if (!raceId) {
-      setError('请先选择赛事上下文')
+    const exportRaceIds = raceScope === 'race'
+      ? parseRaceIds(raceFilterId)
+      : raceScope === 'multi'
+        ? parseRaceIds(raceIdsText)
+        : []
+    if (raceScope === 'multi' && exportRaceIds.length === 0) {
+      setError('请先填写多赛事范围')
       return
     }
     setExportingMode(mode)
@@ -960,7 +1044,9 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
     setNotice('')
     try {
       const response = await designRequestApi.createExport(surface, {
-        raceId,
+        orgId: selectedOrgId || undefined,
+        raceId: exportRaceIds.length === 1 ? exportRaceIds[0] : undefined,
+        raceIds: exportRaceIds.length > 1 ? exportRaceIds : undefined,
         eventType: form.eventType || 'marathon',
         mode,
       })
@@ -985,6 +1071,7 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
   const canRequestRevision = selectedHasDeliverable && selectedProgress.orderStatus !== 'ordered'
   const canApproveFinal = selectedHasDeliverable && selectedRequest?.status === 'design_uploaded' && selectedProgress.orderStatus !== 'ordered'
   const canMarkOrdered = selectedProgress.orderStatus === 'ready'
+  const canMarkDelivered = selectedProgress.orderStatus === 'ordered' && selectedRequest?.status !== 'delivered'
   const designerUploadLocked = !['in_design', 'design_uploaded'].includes(selectedRequest?.status)
     || ['ready', 'ordered'].includes(selectedProgress.orderStatus)
 
@@ -1005,6 +1092,56 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
           {error || notice}
         </div>
       ) : null}
+
+      <section className="design-request-scope-panel" aria-label="设计需求作用域筛选">
+        <div>
+          <span className="design-request-kicker">组织级设计中心</span>
+          <h2>跨项目设计需求池</h2>
+          <p>赛事是关联范围，不再是设计需求的必选归属。</p>
+        </div>
+        <div className="design-request-scope-controls">
+          <div className="design-request-scope-filter">
+            <span>关联范围</span>
+            <div className="design-request-scope-buttons" role="group" aria-label="赛事筛选">
+              {RACE_SCOPE_OPTIONS.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  className={raceScope === item.value ? 'is-active' : ''}
+                  onClick={() => setRaceScope(item.value)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label>
+            <span>单赛事 ID</span>
+            <input
+              value={raceFilterId}
+              onChange={(event) => setRaceFilterId(event.target.value)}
+              placeholder="用于单赛事过滤"
+              disabled={raceScope !== 'race'}
+            />
+          </label>
+          <label>
+            <span>多赛事范围</span>
+            <input
+              value={raceIdsText}
+              onChange={(event) => setRaceIdsText(event.target.value)}
+              placeholder="多个 ID 用逗号分隔"
+              disabled={raceScope !== 'multi'}
+            />
+          </label>
+          <label>
+            <span>赛事类型</span>
+            <select value={eventTypeFilter} onChange={(event) => setEventTypeFilter(event.target.value)}>
+              <option value="all">全部类型</option>
+              {EVENT_TYPES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </label>
+        </div>
+      </section>
 
       {isRequester ? (
         <nav className="design-request-workbench-nav" aria-label="设计需求工作区导航">
@@ -1030,7 +1167,7 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
                 新增 {latestExport.newCount || 0} · 修改 {latestExport.changedCount || 0} · 新类目 {latestExport.newCategoryCount || 0}
               </p>
             ) : (
-              <p>还没有导出轮次，可以先导出空白标准模板。</p>
+              <p>可按组织池、单赛事或多赛事范围导出标准表格。</p>
             )}
           </div>
           <div className="design-request-export-actions">
@@ -1039,7 +1176,7 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
                 key={item.mode}
                 type="button"
                 onClick={() => handleCreateExport(item.mode)}
-                disabled={Boolean(exportingMode) || !(form.raceId || selectedRaceId)}
+                disabled={Boolean(exportingMode)}
               >
                 <span className="material-symbols-outlined">{item.icon}</span>
                 {exportingMode === item.mode ? '生成中...' : item.label}
@@ -1055,7 +1192,7 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
             <div>
               <span className="design-request-kicker">协同清单导入</span>
               <h2>上传搭建&设计清单</h2>
-              <p>识别整张表，保留搭建上下文；只有标记为需设计的行会同步为设计需求。</p>
+	              <p>识别整张表，保留搭建上下文；未选择赛事时进入组织级需求池。</p>
             </div>
             <form className="design-request-import-upload" onSubmit={handlePreviewImport}>
               <label>
@@ -1069,7 +1206,7 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
                 <input type="file" accept=".xlsx" onChange={(event) => setImportFile(event.target.files?.[0] || null)} />
                 <strong>{importFile?.name || '选择 Excel 文件'}</strong>
               </label>
-              <button type="submit" disabled={saving || !importFile || !(form.raceId || selectedRaceId)}>
+	              <button type="submit" disabled={saving || !importFile}>
                 {saving ? '识别中...' : '识别清单'}
               </button>
             </form>
@@ -1268,8 +1405,20 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
             <form className="design-request-form" onSubmit={handleSubmitRequest}>
               <div className="design-request-form__grid">
                 <label>
-                  <span>赛事 ID</span>
-                  <input value={form.raceId} onChange={(event) => updateForm('raceId', event.target.value)} placeholder="从顶部赛事上下文带入" required />
+                  <span>关联赛事</span>
+                  <input
+                    value={form.raceIdsText}
+                    onChange={(event) => updateForm('raceIdsText', event.target.value)}
+                    placeholder="可空；多个 ID 用逗号分隔"
+                  />
+                </label>
+                <label>
+                  <span>主审批赛事</span>
+                  <input
+                    value={form.primaryRaceId}
+                    onChange={(event) => updateForm('primaryRaceId', event.target.value)}
+                    placeholder="可空；用于赛事级审批"
+                  />
                 </label>
                 <label>
                   <span>项目类型</span>
@@ -1330,7 +1479,7 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
               </div>
               <div className="design-request-form__footer">
                 <span>{templates[0]?.name || '通用设计需求模板'}</span>
-                <button type="submit" disabled={saving || !form.raceId}>{saving ? '提交中...' : '提交设计需求'}</button>
+                <button type="submit" disabled={saving}>{saving ? '提交中...' : '提交设计需求'}</button>
               </div>
             </form>
           </details>
@@ -1341,12 +1490,32 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
         <section className="design-request-staff-panel">
           <div className="design-request-section-head">
             <div>
-              <span className="design-request-kicker">赛事岗位</span>
-              <h2>审批岗位任命</h2>
+              <span className="design-request-kicker">组织级审批底座</span>
+              <h2>审批岗位配置</h2>
             </div>
             <span>{staffAssignments.length} 个有效任命</span>
           </div>
           <form className="design-request-staff-form" onSubmit={handleCreateStaffAssignment}>
+            <label>
+              <span>作用域</span>
+              <select
+                value={staffForm.scopeType}
+                onChange={(event) => setStaffForm({ ...staffForm, scopeType: event.target.value })}
+              >
+                <option value="org">组织</option>
+                <option value="department">部门</option>
+                <option value="module">模块</option>
+                <option value="race">赛事</option>
+              </select>
+            </label>
+            <label>
+              <span>作用域 ID</span>
+              <input
+                value={staffForm.scopeId}
+                onChange={(event) => setStaffForm({ ...staffForm, scopeId: event.target.value })}
+                placeholder={staffForm.scopeType === 'race' ? '赛事 ID' : '可空'}
+              />
+            </label>
             <label>
               <span>成员 ID</span>
               <input value={staffForm.teamMemberId} onChange={(event) => setStaffForm({ ...staffForm, teamMemberId: event.target.value })} placeholder="team_member_id" required />
@@ -1367,7 +1536,11 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
               <span>部门范围</span>
               <input value={staffForm.departmentScope} onChange={(event) => setStaffForm({ ...staffForm, departmentScope: event.target.value })} placeholder="部门负责人必填，如竞赛部" />
             </label>
-            <button type="submit" disabled={saving || !selectedRaceId}>任命岗位</button>
+            <label>
+              <span>模块键</span>
+              <input value={staffForm.moduleKey} onChange={(event) => setStaffForm({ ...staffForm, moduleKey: event.target.value })} placeholder="design_requests" />
+            </label>
+            <button type="submit" disabled={saving}>保存岗位</button>
           </form>
           <div className="design-request-staff-list">
             {staffAssignments.map((item) => (
@@ -1375,12 +1548,18 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
                 <span className="material-symbols-outlined">assignment_ind</span>
                 <div>
                   <strong>{item.roleName}</strong>
-                  <small>{item.employeeName || '未命名'} · {item.departmentScope || '全赛事'} · {item.accountUsername || '未绑定账号'}</small>
+                  <small>
+                    {item.employeeName || '未命名'} · {item.scopeType || 'org'}
+                    {item.scopeId ? ' #' + item.scopeId : ''}
+                    {item.departmentScope ? ' · ' + item.departmentScope : ''}
+                    {item.moduleKey ? ' · ' + item.moduleKey : ''}
+                    {' · ' + (item.accountUsername || '未绑定账号')}
+                  </small>
                 </div>
               </div>
             ))}
             {staffAssignments.length === 0 ? (
-              <p className="design-request-empty-line">当前赛事还没有岗位任命</p>
+              <p className="design-request-empty-line">当前组织还没有审批岗位配置</p>
             ) : null}
           </div>
         </section>
@@ -1399,6 +1578,7 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
               <thead>
                 <tr>
                   <th>需求</th>
+                  <th>关联赛事</th>
                   <th>赛事类型</th>
                   <th>状态</th>
                   <th>进度</th>
@@ -1415,8 +1595,9 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
                   >
                     <td>
                       <strong>{requestItem.title}</strong>
-                      <span>{requestItem.requesterDepartment}</span>
+                      <span>{requestItem.requesterDepartment} · {raceSummary(requestItem)}</span>
                     </td>
+                    <td data-label="关联赛事"><RaceLinkTags request={requestItem} /></td>
                     <td data-label="赛事类型">{eventTypeLabel(requestItem.eventType)}</td>
                     <td data-label="状态"><StatusBadge status={requestItem.status} /></td>
                     <td data-label="进度">
@@ -1429,7 +1610,7 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
                 ))}
                 {requests.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="design-request-empty-cell">
+                    <td colSpan="7" className="design-request-empty-cell">
                       {loading ? '加载中...' : '当前上下文暂无设计需求'}
                     </td>
                   </tr>
@@ -1477,6 +1658,14 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
                 <div>
                   <dt>优先级</dt>
                   <dd>{priorityLabel(selectedRequest.priority)}</dd>
+                </div>
+                <div>
+                  <dt>关联赛事</dt>
+                  <dd><RaceLinkTags request={selectedRequest} /></dd>
+                </div>
+                <div>
+                  <dt>主审批赛事</dt>
+                  <dd>{selectedRequest.primaryRaceId ? ('赛事 #' + selectedRequest.primaryRaceId) : '组织级审批'}</dd>
                 </div>
               </dl>
 
@@ -1554,6 +1743,9 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
                   <div className="design-request-action-row">
                     <button type="button" onClick={() => handleProgressAction('mark_ordered')} disabled={saving || !canMarkOrdered}>
                       标记已下单
+                    </button>
+                    <button type="button" className="is-quiet" onClick={() => handleProgressAction('mark_delivered')} disabled={saving || !canMarkDelivered}>
+                      标记交付
                     </button>
                   </div>
                 </section>

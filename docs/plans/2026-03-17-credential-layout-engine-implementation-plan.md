@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Refactor the `CredentialLayoutView` in the TOOL application to use the advanced layout engine from `BibLayoutView` while integrating real DOOR credential data (Zones and Roles).
+**Goal:** Refactor the `CredentialLayoutView` in the TOOL application to use the advanced layout engine from `BibLayoutView` while integrating real ArcSpro credential data (Zones and Roles).
 
 **Architecture:** We will extract the core interaction mechanics (`bibLayoutSnap`, `bibLayoutCommands`) and adapt the canvas rendering logic from `BibLayoutView`. Furthermore, we'll introduce new API endpoints in `tool/src/services/api` or `credentialApi.ts` to fetch `CredentialZone` and `CredentialRole` data from the backend to generate realistic preview data for template design.
 

@@ -87,9 +87,9 @@ export default function IdentityAccessCenterPage() {
   )
 
   useEffect(() => {
-    window.__DOOR_IDENTITY_CENTER_DIRTY__ = hasMatrixChanges
+    window.__ARCSPRO_IDENTITY_CENTER_DIRTY__ = hasMatrixChanges
     return () => {
-      window.__DOOR_IDENTITY_CENTER_DIRTY__ = false
+      window.__ARCSPRO_IDENTITY_CENTER_DIRTY__ = false
     }
   }, [hasMatrixChanges])
 

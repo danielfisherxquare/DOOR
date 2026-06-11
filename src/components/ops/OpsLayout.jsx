@@ -157,7 +157,7 @@ export default function OpsLayout() {
               <span className="material-symbols-outlined">precision_manufacturing</span>
             </div>
             <div className="workspace-sidebar__brand-text">
-              <span className="workspace-sidebar__eyebrow">DOOR</span>
+              <span className="workspace-sidebar__eyebrow">中奥致远</span>
               <span className="workspace-sidebar__title">EXECUTE</span>
             </div>
           </Link>

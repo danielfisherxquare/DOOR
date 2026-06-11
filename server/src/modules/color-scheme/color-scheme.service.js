@@ -12,7 +12,7 @@ const PRESET_SCHEMES = {
     {
       id: 'preset-industrial-red',
       name: '工业红',
-      description: 'DOOR 默认管理层配色',
+      description: 'ArcSpro 默认管理层配色',
       is_preset: true,
       surface: 'admin',
       config: {
@@ -102,7 +102,7 @@ const PRESET_SCHEMES = {
     {
       id: 'preset-amber-gold',
       name: '琥珀黄',
-      description: 'DOOR 应用层配色',
+      description: 'ArcSpro 应用层配色',
       is_preset: true,
       surface: 'app',
       config: {
@@ -170,7 +170,7 @@ const PRESET_SCHEMES = {
     {
       id: 'preset-volcano-orange',
       name: '火山橙',
-      description: 'DOOR 默认执行层配色',
+      description: 'ArcSpro 默认执行层配色',
       is_preset: true,
       surface: 'ops',
       config: {

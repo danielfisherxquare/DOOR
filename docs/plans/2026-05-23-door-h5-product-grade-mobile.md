@@ -1,10 +1,10 @@
-# DOOR H5 Product Grade Mobile Implementation Plan
+# ArcSpro H5 Product Grade Mobile Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Make the DOOR application layer behave like a mature installable H5 app on iOS and Android, with a consistent mobile design language, resilient API data envelopes, and verified mobile layouts.
+**Goal:** Make the ArcSpro application layer behave like a mature installable H5 app on iOS and Android, with a consistent mobile design language, resilient API data envelopes, and verified mobile layouts.
 
-**Architecture:** Keep the existing DOOR app-layer route structure and Vite React stack. Extend the shared H5 primitives instead of creating another shell, then migrate the highest-risk data-heavy pages to desktop table plus mobile card rendering. Backend behavior stays compatible; the frontend normalizes existing response envelopes before filtering or rendering.
+**Architecture:** Keep the existing ArcSpro app-layer route structure and Vite React stack. Extend the shared H5 primitives instead of creating another shell, then migrate the highest-risk data-heavy pages to desktop table plus mobile card rendering. Backend behavior stays compatible; the frontend normalizes existing response envelopes before filtering or rendering.
 
 **Tech Stack:** React 19, Vite, plain CSS, Node built-in test runner, Playwright for rendered mobile QA.
 

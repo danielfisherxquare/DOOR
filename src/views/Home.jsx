@@ -65,7 +65,7 @@ function Home() {
   return (
     <AppH5Surface
       className="app-h5-home"
-      eyebrow="DOOR H5 APP"
+      eyebrow="中奥致远 H5 APP"
       title="应用层工作台"
       summary="把个人任务、赛事处理、报销、证件、仓储和空间工具收在一个可安装的 H5 app 入口里。手机端先从底部快捷栏进入高频功能，其余入口从“全部”菜单展开。"
       actions={(
