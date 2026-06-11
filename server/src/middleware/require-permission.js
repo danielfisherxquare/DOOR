@@ -19,7 +19,7 @@ import {
     hasSurfaceAccess,
     hasCapability,
     hasAllModuleAccess,
-    getDefaultModules,
+    getRoleDefaultModules,
 } from '../utils/capability-policy.js';
 
 /**
@@ -39,6 +39,10 @@ async function checkUserModuleAccess(userId, moduleId) {
         .first();
 
     return Boolean(access);
+}
+
+function usesStrictSurfaceModules(req) {
+    return Boolean(req.authContext?.strictSurfaceModules || req.user?.preferences?.strictSurfaceModules);
 }
 
 /**
@@ -89,11 +93,11 @@ export function requirePermission(options = {}) {
             const { surface, moduleId } = options.module;
 
             // 管理员拥有全部模块权限，直接放行
-            if (!hasAllModuleAccess(role)) {
+            if (!hasAllModuleAccess(role, { strictSurfaceModules: usesStrictSurfaceModules(req) })) {
                 const fullModuleId = `${surface}:${moduleId}`;
 
-                // 默认模块所有用户都有
-                if (!getDefaultModules().includes(fullModuleId)) {
+                const roleDefaultModules = getRoleDefaultModules(role);
+                if (roleDefaultModules !== 'all' && !roleDefaultModules.includes(fullModuleId)) {
                     try {
                         const hasAccess = await checkUserModuleAccess(
                             userId,

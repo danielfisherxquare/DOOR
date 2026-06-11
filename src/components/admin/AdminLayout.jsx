@@ -1,20 +1,15 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
-import profileApi from '../../api/profile'
 import {
   buildAdminHref,
   getAdminNavGroups,
   getAdminRouteMeta,
-  getPriorityShortcuts,
 } from './adminConfig'
 import { AdminEmptyState, AdminSurface } from './AdminWorkbench'
-import { buildAppHref } from '../app/appConfig'
-import { buildOpsHref } from '../ops/opsConfig'
-import ContextSquareEntry from '../shared/ContextSquareEntry'
+import WorkspaceContextDisplay from '../../features/workspace/WorkspaceContextDisplay'
+import useSurfaceWorkspace from '../../features/workspace/useSurfaceWorkspace'
 import useSidebarMotion from '../shared/useSidebarMotion'
-import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../utils/surfaceContext'
-import { showInfo } from '../../utils/toast'
 import '../app/app-layout.css'
 import '../../styles/admin-extras.css'
 
@@ -34,6 +29,14 @@ const InterviewList = lazy(() => import('../../views/interview/InterviewList'))
 const InterviewCompare = lazy(() => import('../../views/interview/InterviewCompare'))
 const InterviewForm = lazy(() => import('../../views/interview/InterviewForm'))
 const DesignRequestWorkspace = lazy(() => import('../../views/design-requests/DesignRequestWorkspace'))
+const CredentialCenterPage = lazy(() => import('../../views/admin/credential/CredentialCenterPage'))
+const CredentialSelectRacePage = lazy(() => import('../../views/admin/credential/CredentialSelectRacePage'))
+const CredentialZonePage = lazy(() => import('../../views/admin/credential/CredentialZonePage'))
+const CredentialRolePage = lazy(() => import('../../views/admin/credential/CredentialRolePage'))
+const CredentialStylePage = lazy(() => import('../../views/admin/credential/CredentialStylePage'))
+const CredentialApplicationPage = lazy(() => import('../../views/admin/credential/CredentialApplicationPage'))
+const CredentialReviewPage = lazy(() => import('../../views/admin/credential/CredentialReviewPage'))
+const CredentialIssuePage = lazy(() => import('../../views/admin/credential/CredentialIssuePage'))
 
 function AdminRouteLoader() {
   return (
@@ -46,28 +49,36 @@ function AdminRouteLoader() {
   )
 }
 
-function AdminDeprecatedRoute() {
+function AdminDeprecatedRoute({
+  title = '入口已下线',
+  description = '该页面不再作为管理层独立工作台。请从当前入口导航或启动台进入新的归属入口。',
+} = {}) {
   return (
-    <AdminSurface title="入口已下线" subtitle="该页面已经收敛进身份中心，不再保留独立工作台。">
+    <AdminSurface title="入口已下线" subtitle={description}>
       <AdminEmptyState
-        title="请改用身份中心"
-        description="组织与授权相关能力已经统一收敛到身份中心。请从侧边栏进入身份中心，再切换到对应治理视图。"
+        title={title}
+        description={description}
       />
     </AdminSurface>
   )
 }
 
+function LegacyIdentityRoute() {
+  return (
+    <AdminDeprecatedRoute
+      title="请改用身份中心"
+      description="组织与授权相关能力已经统一收敛到身份中心。请从侧边栏进入身份中心，再切换到对应治理视图。"
+    />
+  )
+}
+
 export default function AdminLayout() {
-  const { user, logout, updatePreferences } = useAuthStore()
-  const canAccessOps = useAuthStore((state) => state.canAccessOps)
+  const { user, logout } = useAuthStore()
   const isSuperAdmin = user?.role === 'super_admin'
 
   const location = useLocation()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
   const { sidebarCollapsed, sidebarMotionClass, toggleSidebar } = useSidebarMotion()
-  const [contextOptions, setContextOptions] = useState(null)
-  const [contextLoading, setContextLoading] = useState(false)
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
     try {
       const saved = localStorage.getItem('admin-nav-collapsed')
@@ -76,12 +87,14 @@ export default function AdminLayout() {
       return []
     }
   })
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const [scrollState, setScrollState] = useState({ scrolled: false, atBottom: true })
   const navRef = useRef(null)
+  const { session, selectedOrgId, selectedRaceId, switchWorkspace, workspaceMissing } = useSurfaceWorkspace('admin')
 
-  const requestedRaceId = searchParams.get('raceId') || ''
-  const selectedOrgId = resolveSurfaceOrgId(searchParams, user)
-  const selectedRaceId = resolveSurfaceRaceId(searchParams, user, selectedOrgId)
+  useEffect(() => {
+    setMobileDrawerOpen(false)
+  }, [location.pathname])
 
   // 滚动监听
   useEffect(() => {
@@ -112,73 +125,6 @@ export default function AdminLayout() {
     })
   }, [])
 
-  const syncSearchParams = useCallback((nextOrgId, nextRaceId, options = {}) => {
-    const nextParams = new URLSearchParams(searchParams)
-    if (nextOrgId) nextParams.set('orgId', String(nextOrgId))
-    else nextParams.delete('orgId')
-    if (nextRaceId) nextParams.set('raceId', String(nextRaceId))
-    else nextParams.delete('raceId')
-    setSearchParams(nextParams, { replace: Boolean(options.replace) })
-  }, [searchParams, setSearchParams])
-
-  useEffect(() => {
-    let active = true
-    setContextLoading(true)
-
-    profileApi.getContextOptions({
-      orgId: selectedOrgId || undefined,
-      raceId: selectedRaceId || undefined,
-    })
-      .then((res) => {
-        if (!active || !res?.success) return
-        const payload = res.data || {}
-        setContextOptions(payload)
-
-        const resolvedOrgId = payload?.current?.orgId ? String(payload.current.orgId) : ''
-        const resolvedRaceId = payload?.current?.raceId ? String(payload.current.raceId) : ''
-        const orgChanged = resolvedOrgId !== selectedOrgId
-        const raceChanged = resolvedRaceId !== selectedRaceId
-
-        if (orgChanged || raceChanged) {
-          syncSearchParams(resolvedOrgId, resolvedRaceId, { replace: true })
-          if (requestedRaceId && raceChanged && !orgChanged) {
-            showInfo(resolvedRaceId
-              ? '当前赛事已失效，已自动回退到可用赛事。'
-              : '当前赛事已失效，已自动清空赛事上下文。')
-          }
-        }
-      })
-      .catch(() => { })
-      .finally(() => {
-        if (active) setContextLoading(false)
-      })
-
-    return () => {
-      active = false
-    }
-  }, [requestedRaceId, selectedOrgId, selectedRaceId, syncSearchParams])
-
-  // 保存偏好
-  useEffect(() => {
-    if (!user) return
-    const currentPrefs = user?.preferences || {}
-    const normalizedOrgId = selectedOrgId || null
-    const normalizedRaceId = selectedRaceId ? Number(selectedRaceId) : null
-
-    if (currentPrefs.lastOrgId === normalizedOrgId && currentPrefs.lastRaceId === normalizedRaceId) {
-      return
-    }
-
-    const timer = setTimeout(() => {
-      updatePreferences({
-        lastOrgId: normalizedOrgId,
-        lastRaceId: normalizedRaceId,
-      })
-    }, 500)
-
-    return () => clearTimeout(timer)
-  }, [selectedOrgId, selectedRaceId, updatePreferences, user])
-
   const navGroups = useMemo(
     () => getAdminNavGroups({ isSuperAdmin }),
     [isSuperAdmin],
@@ -194,35 +140,31 @@ export default function AdminLayout() {
     [navGroups, routeMeta.groupKey],
   )
 
-  const shortcuts = useMemo(
-    () => getPriorityShortcuts({ selectedOrgId, selectedRaceId }),
-    [selectedOrgId, selectedRaceId],
-  )
-
-  const handleOrgChange = useCallback((nextOrgId) => {
-    if (
-      location.pathname.startsWith('/admin/identity-center') &&
-      window.__ARCSPRO_IDENTITY_CENTER_DIRTY__ &&
-      !window.confirm('身份中心存在未保存的矩阵改动。切换机构会丢弃这些改动，是否继续？')
-    ) {
-      return
-    }
-    syncSearchParams(nextOrgId, '')
-  }, [location.pathname, syncSearchParams])
-
-  const handleRaceChange = useCallback((nextRaceId) => {
-    syncSearchParams(selectedOrgId, nextRaceId)
-  }, [selectedOrgId, syncSearchParams])
-
   const handleLogout = useCallback(async () => {
     await logout()
     navigate('/login')
   }, [logout, navigate])
 
+  const handleSwitchWorkspace = useCallback(() => {
+    if (
+      location.pathname.startsWith('/admin/identity-center') &&
+      window.__ARCSPRO_IDENTITY_CENTER_DIRTY__ &&
+      !window.confirm('身份中心存在未保存的矩阵改动。切换工作区会丢弃这些改动，是否继续？')
+    ) {
+      return
+    }
+    switchWorkspace()
+  }, [location.pathname, switchWorkspace])
+
   const needsRaceNotice = routeMeta.needsRace && !selectedRaceId
   const groupTitle = currentGroup?.label || '后台'
   const groupCaption = currentGroup?.caption || '当前工作区'
   const currentContext = { selectedOrgId, selectedRaceId }
+  const isNavItemActive = useCallback((item) => {
+    return item.path === ''
+      ? location.pathname === '/admin'
+      : location.pathname === `/admin${item.path}` || location.pathname.startsWith(`/admin${item.path}/`)
+  }, [location.pathname])
 
   const roleName = useMemo(() => {
     if (!user) return '管理员'
@@ -232,6 +174,10 @@ export default function AdminLayout() {
     if (user.role === 'user') return '普通用户'
     return '管理员'
   }, [user])
+
+  if (workspaceMissing) {
+    return <Navigate to={`/workspaces?redirect=${encodeURIComponent(location.pathname)}`} replace />
+  }
 
   return (
     <div className={`layout--admin workspace-layout ${sidebarCollapsed ? 'workspace-layout--collapsed' : ''} ${sidebarMotionClass}`.trim()}>
@@ -302,7 +248,7 @@ export default function AdminLayout() {
                 <div className="workspace-nav-list">
                   {group.items.map((item) => {
                     const href = buildAdminHref(item.path, currentContext)
-                    const active = location.pathname === `/admin${item.path}` || location.pathname.startsWith(`/admin${item.path}/`)
+                    const active = isNavItemActive(item)
 
                     return (
                       <Link key={item.key} to={href} className={`workspace-nav-item ${active ? 'workspace-nav-item--active' : ''}`}>
@@ -318,21 +264,6 @@ export default function AdminLayout() {
             )
           })}
         </nav>
-
-        {/* ── 跨层入口 ── */}
-        <div className="workspace-sidebar__switch-stack">
-          <Link to={buildAppHref('', { orgId: selectedOrgId, raceId: selectedRaceId })} className="workspace-sidebar__switch-link" title="返回应用层">
-            <span className="workspace-sidebar__switch-icon">APP</span>
-            <span>返回应用层</span>
-          </Link>
-
-          {canAccessOps() && (
-            <Link to={buildOpsHref('', { orgId: selectedOrgId, raceId: selectedRaceId })} className="workspace-sidebar__switch-link" title="进入执行端">
-              <span className="workspace-sidebar__switch-icon">OPS</span>
-              <span>进入执行端</span>
-            </Link>
-          )}
-        </div>
 
         {/* ── 底部 ── */}
         <div className="workspace-sidebar__footer">
@@ -357,6 +288,15 @@ export default function AdminLayout() {
         {/* ── 顶栏 ── */}
         <header className="workspace-main__topbar">
           <div className="workspace-main__topbar-left">
+            <button
+              type="button"
+              className="workspace-main__mobile-menu-btn"
+              onClick={() => setMobileDrawerOpen(true)}
+              aria-label="打开后台菜单"
+              aria-expanded={mobileDrawerOpen}
+            >
+              <span className="material-symbols-outlined">menu</span>
+            </button>
             <span className="workspace-main__topbar-title">{groupTitle}</span>
           </div>
           <div className="workspace-main__topbar-right">
@@ -367,15 +307,12 @@ export default function AdminLayout() {
             <button type="button" className="workspace-main__topbar-btn" title="通知">
               <span className="material-symbols-outlined">notifications</span>
             </button>
-            <ContextSquareEntry
+            <WorkspaceContextDisplay
               roleName={roleName}
-              contextOptions={contextOptions}
+              session={session}
               selectedOrgId={selectedOrgId}
               selectedRaceId={selectedRaceId}
-              onOrgChange={handleOrgChange}
-              onRaceChange={handleRaceChange}
-              shortcuts={shortcuts}
-              loading={contextLoading}
+              onSwitch={handleSwitchWorkspace}
             />
             <div className="workspace-main__topbar-user">
               <span className="workspace-main__topbar-avatar">{user?.username?.slice(0, 2)?.toUpperCase() || 'AD'}</span>
@@ -398,7 +335,7 @@ export default function AdminLayout() {
         {needsRaceNotice && (
           <div className="admin-state-banner">
             当前页面依赖赛事上下文。请先在右上角“方形上下文入口”中锁定赛事，或者前往
-            <Link to={buildAppHref('/credential/select-race', { orgId: selectedOrgId, raceId: selectedRaceId })} style={{ marginInline: 6 }}>
+            <Link to={buildAdminHref('/credential/select-race', { selectedOrgId, selectedRaceId })} style={{ marginInline: 6 }}>
               证件流程入口
             </Link>
             选择赛事后再继续操作。
@@ -417,12 +354,12 @@ export default function AdminLayout() {
             <Route path="team" element={<TeamListPage />} />
             <Route path="races" element={<RaceManagementPage />} />
             <Route path="design-requests" element={<Suspense fallback={<AdminRouteLoader />}><DesignRequestWorkspace surface="admin" mode="manager" /></Suspense>} />
-            <Route path="import" element={<Navigate to={buildAppHref('/events/import', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="records" element={<Navigate to={buildAppHref('/events/processing', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="processing" element={<Navigate to={buildAppHref('/events/processing', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="lottery" element={<Navigate to={buildAppHref('/events/lottery', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="bib" element={<Navigate to={buildAppHref('/events/bib', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="clothing" element={<Navigate to={buildAppHref('/events/clothing', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
+            <Route path="import" element={<AdminDeprecatedRoute description="导入、记录处理、抽签、号码布和服装作业已从后台移出。请从启动台进入应用层继续处理赛事业务。" />} />
+            <Route path="records" element={<AdminDeprecatedRoute description="记录处理已从后台移出。请从启动台进入应用层继续处理赛事业务。" />} />
+            <Route path="processing" element={<AdminDeprecatedRoute description="赛事处理中心已从后台移出。请从启动台进入应用层继续处理赛事业务。" />} />
+            <Route path="lottery" element={<AdminDeprecatedRoute description="抽签作业已从后台移出。请从启动台进入应用层继续处理赛事业务。" />} />
+            <Route path="bib" element={<AdminDeprecatedRoute description="号码布编排作业已从后台移出。请从启动台进入应用层继续处理赛事业务。" />} />
+            <Route path="clothing" element={<AdminDeprecatedRoute description="服装配置作业已从后台移出。请从启动台进入应用层继续处理赛事业务。" />} />
             <Route path="db-backups" element={<DatabaseBackupPage />} />
             <Route path="bib-tracking" element={<BibTrackingPage />} />
 
@@ -430,38 +367,92 @@ export default function AdminLayout() {
             <Route path="interview/records" element={<Suspense fallback={<AdminRouteLoader />}><InterviewList /></Suspense>} />
             <Route path="interview/compare" element={<Suspense fallback={<AdminRouteLoader />}><InterviewCompare /></Suspense>} />
 
-            <Route path="credential-center" element={<Navigate to={buildAppHref('/credential-center', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="credential" element={<Navigate to={buildAppHref('/credential-center', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="credential/select-race" element={<Navigate to={buildAppHref('/credential/select-race', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="credential/zones" element={<Navigate to={buildAppHref('/credential/access-areas', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="credential/roles" element={<Navigate to={buildAppHref('/credential/categories', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="credential/access-areas" element={<Navigate to={buildAppHref('/credential/access-areas', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="credential/categories" element={<Navigate to={buildAppHref('/credential/categories', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="credential/styles" element={<Navigate to={buildAppHref('/credential/styles', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="credential/applications" element={<Navigate to={buildAppHref('/credential/requests', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="credential/requests" element={<Navigate to={buildAppHref('/credential/requests', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="credential/review" element={<Navigate to={buildAppHref('/credential/review', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="credential/issue" element={<Navigate to={buildAppHref('/credential/issue', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
+            <Route path="credential-center" element={<Suspense fallback={<AdminRouteLoader />}><CredentialCenterPage /></Suspense>} />
+            <Route path="credential" element={<Navigate to={buildAdminHref('/credential-center', currentContext)} replace />} />
+            <Route path="credential/select-race" element={<Suspense fallback={<AdminRouteLoader />}><CredentialSelectRacePage /></Suspense>} />
+            <Route path="credential/zones" element={<Navigate to={buildAdminHref('/credential/access-areas', currentContext)} replace />} />
+            <Route path="credential/roles" element={<Navigate to={buildAdminHref('/credential/categories', currentContext)} replace />} />
+            <Route path="credential/access-areas" element={<Suspense fallback={<AdminRouteLoader />}><CredentialZonePage /></Suspense>} />
+            <Route path="credential/categories" element={<Suspense fallback={<AdminRouteLoader />}><CredentialRolePage /></Suspense>} />
+            <Route path="credential/styles" element={<Suspense fallback={<AdminRouteLoader />}><CredentialStylePage /></Suspense>} />
+            <Route path="credential/applications" element={<Navigate to={buildAdminHref('/credential/requests', currentContext)} replace />} />
+            <Route path="credential/requests" element={<Suspense fallback={<AdminRouteLoader />}><CredentialApplicationPage /></Suspense>} />
+            <Route path="credential/review" element={<Suspense fallback={<AdminRouteLoader />}><CredentialReviewPage /></Suspense>} />
+            <Route path="credential/issue" element={<Suspense fallback={<AdminRouteLoader />}><CredentialIssuePage /></Suspense>} />
 
             <Route path="app-manager" element={<Navigate to={buildAdminHref('', currentContext)} replace />} />
             <Route path="reimbursements" element={<AdminReimbursementPage />} />
             <Route path="branding/colors" element={<ColorSchemePage />} />
 
-            <Route path="inventory" element={<Navigate to={buildAppHref('/inventory', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="inventory/inbound" element={<Navigate to={buildAppHref('/inventory/inbound', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="inventory/outbound" element={<Navigate to={buildAppHref('/inventory/outbound', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="inventory/space" element={<Navigate to={buildAppHref('/inventory/space', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="inventory/control" element={<Navigate to={buildAppHref('/inventory/control', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
-            <Route path="inventory/analytics" element={<Navigate to={buildAppHref('/inventory/analytics', { orgId: selectedOrgId, raceId: selectedRaceId })} replace />} />
+            <Route path="inventory" element={<AdminDeprecatedRoute description="后台仓储治理页还未迁入新入口；一线入库、出库、绑定和盘点请从启动台进入执行层。" />} />
+            <Route path="inventory/inbound" element={<AdminDeprecatedRoute description="入库动作已归入执行层。请从启动台进入执行层仓库入口。" />} />
+            <Route path="inventory/outbound" element={<AdminDeprecatedRoute description="出库动作已归入执行层。请从启动台进入执行层仓库入口。" />} />
+            <Route path="inventory/space" element={<AdminDeprecatedRoute description="仓库空间治理页还未迁入新入口；当前不再从后台跳转到应用层。" />} />
+            <Route path="inventory/control" element={<AdminDeprecatedRoute description="盘点与异常处理已归入执行层。请从启动台进入执行层仓库入口。" />} />
+            <Route path="inventory/analytics" element={<AdminDeprecatedRoute description="仓储复盘报表还未迁入新入口；当前不再从后台跳转到应用层。" />} />
             <Route path="inventory/twin/designer" element={<Navigate to={`/asset-designer${location.search}`} replace />} />
-            <Route path="users" element={<AdminDeprecatedRoute />} />
-            <Route path="module-permissions" element={<AdminDeprecatedRoute />} />
-            <Route path="race-permissions" element={<AdminDeprecatedRoute />} />
-            <Route path="org-race-permissions" element={<AdminDeprecatedRoute />} />
+            <Route path="users" element={<LegacyIdentityRoute />} />
+            <Route path="module-permissions" element={<LegacyIdentityRoute />} />
+            <Route path="race-permissions" element={<LegacyIdentityRoute />} />
+            <Route path="org-race-permissions" element={<LegacyIdentityRoute />} />
             <Route path="*" element={<AdminDeprecatedRoute />} />
           </Routes>
         </section>
       </main>
+      {mobileDrawerOpen && (
+        <div className="workspace-mobile-menu" role="presentation">
+          <button
+            type="button"
+            className="workspace-mobile-menu__backdrop"
+            onClick={() => setMobileDrawerOpen(false)}
+            aria-label="关闭后台菜单"
+          />
+          <aside className="workspace-mobile-menu__panel" aria-label="后台菜单">
+            <div className="workspace-mobile-menu__header">
+              <div>
+                <span className="workspace-mobile-menu__eyebrow">中奥致远 ADMIN</span>
+                <h2 className="workspace-mobile-menu__title">后台管理</h2>
+              </div>
+              <button
+                type="button"
+                className="workspace-mobile-menu__close"
+                onClick={() => setMobileDrawerOpen(false)}
+                aria-label="关闭后台菜单"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <nav className="workspace-mobile-menu__nav">
+              {navGroups.map((group) => (
+                <section key={group.key} className="workspace-mobile-menu__section">
+                  <span className="workspace-mobile-menu__section-title">{group.label}</span>
+                  <div className="workspace-mobile-menu__links">
+                    {group.items.map((item) => {
+                      const active = isNavItemActive(item)
+                      return (
+                        <Link
+                          key={item.key}
+                          to={buildAdminHref(item.path, currentContext)}
+                          className={'workspace-mobile-menu__link ' + (active ? 'workspace-mobile-menu__link--active' : '')}
+                        >
+                          <span className="material-symbols-outlined">{item.icon || 'circle'}</span>
+                          <span>{item.label}</span>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))}
+            </nav>
+
+            <div className="workspace-mobile-menu__footer">
+              <span>{user?.username || '管理员'} · {roleName}</span>
+              <button type="button" onClick={handleLogout}>退出登录</button>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,11 +1,19 @@
 import request from '../utils/request'
+import { resolveSurfacePrefix } from '../utils/surfaceApi'
+
+function getBasePath() {
+  return resolveSurfacePrefix({
+    admin: '/admin/column-mappings',
+    app: '/app/column-mappings',
+  }, 'app')
+}
 
 function unwrap(response) {
   return response?.data ?? response
 }
 
 /**
- * 列映射 API — 对应后端 /api/column-mappings
+ * 列映射 API — 应用层 /api/app/column-mappings，后台层 /api/admin/column-mappings。
  */
 export const columnMappingsApi = {
   /**
@@ -16,13 +24,13 @@ export const columnMappingsApi = {
     if (options?.scope) params.set('scope', options.scope)
     if (options?.orgId) params.set('orgId', options.orgId)
     const suffix = params.toString() ? `?${params.toString()}` : ''
-    return request.get(`/column-mappings${suffix}`).then(unwrap)
+    return request.get(`${getBasePath()}${suffix}`).then(unwrap)
   },
 
   /**
    * 批量保存映射配置
    */
-  save: (mappings, options) => request.post('/column-mappings', {
+  save: (mappings, options) => request.post(getBasePath(), {
     mappings,
     scope: options?.scope,
     orgId: options?.orgId,
@@ -31,7 +39,7 @@ export const columnMappingsApi = {
   /**
    * 批量删除映射
    */
-  delete: (ids, options) => request.delete('/column-mappings', {
+  delete: (ids, options) => request.delete(getBasePath(), {
     data: {
       ids,
       scope: options?.scope,
@@ -47,7 +55,7 @@ export const columnMappingsApi = {
     if (options?.scope) params.set('scope', options.scope)
     if (options?.orgId) params.set('orgId', options.orgId)
     const suffix = params.toString() ? `?${params.toString()}` : ''
-    return request.delete(`/column-mappings/all${suffix}`).then(unwrap)
+    return request.delete(`${getBasePath()}/all${suffix}`).then(unwrap)
   },
 }
 

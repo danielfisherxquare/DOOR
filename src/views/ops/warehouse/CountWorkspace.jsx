@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ControlContent } from '../../inventory/ControlCenter'
+import { ControlContent } from '../../../features/inventory/execute/ControlContent'
 
 /**
  * OPS 盘点作业子模块

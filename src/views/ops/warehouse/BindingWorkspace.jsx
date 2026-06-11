@@ -1,4 +1,4 @@
-import TwinScanBindingPanel from '../../inventory/TwinScanBindingPanel'
+import TwinScanBindingPanel from '../../../features/inventory/execute/TwinScanBindingPanel'
 
 /**
  * OPS 库位绑定子模块

@@ -1,10 +1,12 @@
-import { buildSurfaceHref } from '../../utils/surfaceContext'
+import { buildSurfaceHref } from '../../utils/surfaceContext.js'
+import { hasModuleAccess } from '../../utils/moduleAccess.js'
 
 const navGroups = [
   {
     key: 'home',
     label: '概览',
     icon: 'space_dashboard',
+    moduleId: 'home',
     items: [
       {
         key: 'dashboard',
@@ -13,7 +15,7 @@ const navGroups = [
         shortLabel: 'HM',
         label: '我的工作台',
         description: '个人任务与常用入口',
-        cardDescription: '查看个人待办、近期动态和常用功能的统一入口。',
+        cardDescription: '查看个人待办、近期动态和常用功能。',
       },
     ],
   },
@@ -21,6 +23,7 @@ const navGroups = [
     key: 'events',
     label: '我的赛事',
     icon: 'emoji_events',
+    moduleId: 'events',
     items: [
       {
         key: 'import',
@@ -39,7 +42,7 @@ const navGroups = [
         shortLabel: 'PR',
         label: '名单处理',
         description: '选手查询导出、成绩校验、黑白名单与二次清洗',
-        cardDescription: '集中查询导出、状态概览、成绩校验、黑白名单与五步二次清洗。',
+        cardDescription: '查询导出名单，处理成绩校验、黑白名单和二次清洗。',
         needsRace: true,
       },
       {
@@ -92,6 +95,7 @@ const navGroups = [
       {
         key: 'reimbursement',
         path: '/reimbursements',
+        moduleId: 'reimbursements',
         icon: 'receipt_long',
         shortLabel: 'RB',
         label: '发票报销',
@@ -101,15 +105,17 @@ const navGroups = [
       {
         key: 'design-requests',
         path: '/design-requests',
+        moduleId: 'design-requests',
         icon: 'design_services',
         shortLabel: 'DR',
         label: '设计工作台',
         description: '组织级设计需求池、统计和成品上传',
-        cardDescription: '查看跨赛事设计 brief、参考样例、尺寸材质和交付时间，并上传完成图示。',
+        cardDescription: '查看设计需求、参考样例、尺寸材质和交付时间，上传完成图。',
       },
       {
         key: 'map',
         path: '/map',
+        moduleId: 'map',
         icon: 'map',
         shortLabel: 'MP',
         label: 'GIS 地图',
@@ -119,16 +125,18 @@ const navGroups = [
       {
         key: 'three-studio',
         path: '/3d-studio',
+        moduleId: '3d-studio',
         icon: 'view_in_ar',
         shortLabel: 'SP',
         label: '空间工作台',
-        description: '机构共享的 GIS 锚定空间运营工作区',
-        cardDescription: '统一管理场地地图、仓库建模、资产部署与运营绑定，支持导入历史仓库场景。',
+        description: '场地地图、仓库模型和资产绑定',
+        cardDescription: '管理场地地图、仓库模型、资产部署和运营绑定。',
         requiredCapability: { scope: 'inventory', capability: '3d_studio' },
       },
       {
         key: 'terrain-model',
         path: '/terrain-model',
+        moduleId: '3d-studio',
         icon: 'terrain',
         shortLabel: 'TM',
         label: '轨迹地形模型',
@@ -141,6 +149,7 @@ const navGroups = [
     key: 'credential',
     label: '证件流程',
     icon: 'id_card',
+    moduleId: 'credentials',
     items: [
       {
         key: 'credential-center',
@@ -148,47 +157,8 @@ const navGroups = [
         icon: 'hub',
         shortLabel: 'CF',
         label: '证件中心',
-        description: '证件规则、申请、审核与发放入口',
-        cardDescription: '围绕同一赛事上下文处理证件规则配置、申请建单、审核和发放追踪。',
-      },
-      {
-        key: 'credential-select-race',
-        path: '/credential/select-race',
-        icon: 'emoji_events',
-        shortLabel: 'SR',
-        label: '选择赛事',
-        description: '先锁定赛事，再进入证件流程',
-        cardDescription: '进入证件流程前先锁定赛事上下文，避免在错误作用域下配置规则或处理申请。',
-      },
-      {
-        key: 'credential-access-areas',
-        path: '/credential/access-areas',
-        icon: 'meeting_room',
-        shortLabel: 'AR',
-        label: '通行区域',
-        description: '区域、编码和颜色管理',
-        cardDescription: '管理通行区域、颜色和编码，作为证件类别和申请规则的底层配置。',
-        needsRace: true,
-      },
-      {
-        key: 'credential-categories',
-        path: '/credential/categories',
-        icon: 'category',
-        shortLabel: 'CT',
-        label: '证件类别',
-        description: '类别、默认区域与审核策略',
-        cardDescription: '配置证件类别、默认通行区域与审核规则，统一类别定义与流程约束。',
-        needsRace: true,
-      },
-      {
-        key: 'credential-styles',
-        path: '/credential/styles',
-        icon: 'palette',
-        shortLabel: 'ST',
-        label: '证件样式',
-        description: '模板元数据与样式管理',
-        cardDescription: '维护证件样式模板、编码和启停状态，作为排版与制证的基础元数据。',
-        needsRace: true,
+        description: '申请、审核与状态追踪',
+        cardDescription: '围绕当前工作区处理证件申请、业务审核和状态追踪。',
       },
       {
         key: 'credential-requests',
@@ -197,7 +167,7 @@ const navGroups = [
         shortLabel: 'RQ',
         label: '申请与建单',
         description: '申请池与管理员直建',
-        cardDescription: '把用户自助申请与管理员直建收回同一条建单链路，统一处理申请池。',
+        cardDescription: '查看用户申请，也可以由管理员直接建单。',
         needsRace: true,
       },
       {
@@ -214,8 +184,9 @@ const navGroups = [
   },
   {
     key: 'warehouse',
-    label: '仓储治理',
+    label: '仓储管理',
     icon: 'warehouse',
+    moduleId: 'inventory',
     items: [
       {
         key: 'inventory-workbench',
@@ -224,7 +195,7 @@ const navGroups = [
         shortLabel: 'WH',
         label: '仓储作业台',
         description: '仓储概览、负载与异常入口',
-        cardDescription: '统一查看当前机构的仓储负载、作业队列、异常和未来 7 天趋势。',
+        cardDescription: '查看仓储负载、作业队列、异常和未来 7 天趋势。',
       },
       {
         key: 'inventory-space-center',
@@ -233,7 +204,7 @@ const navGroups = [
         shortLabel: 'SP',
         label: '空间中心',
         description: '仓库主数据、3D 查看与绑定',
-        cardDescription: '统一处理仓库主数据、3D 场景查看、设计和库位绑定。',
+        cardDescription: '维护仓库资料，查看 3D 场景，处理库位绑定。',
       },
       {
         key: 'inventory-control-center',
@@ -242,7 +213,7 @@ const navGroups = [
         shortLabel: 'CTL',
         label: '盘点与异常',
         description: '盘点计划、差异与预警',
-        cardDescription: '集中处理盘点计划、差异项、异常告警和处置动作。',
+        cardDescription: '处理盘点计划、差异项、异常告警和处置记录。',
       },
       {
         key: 'inventory-analytics-center',
@@ -251,7 +222,7 @@ const navGroups = [
         shortLabel: 'ANA',
         label: '复盘报表',
         description: '趋势、分布与流转复盘',
-        cardDescription: '查看仓储趋势、类型分布、状态结构和最近流转记录，用于复盘和优化。',
+        cardDescription: '查看仓储趋势、类型分布、状态结构和最近流转记录。',
       },
     ],
   },
@@ -259,6 +230,7 @@ const navGroups = [
     key: 'management',
     label: '赛事管理',
     icon: 'admin_panel_settings',
+    moduleId: 'events',
     items: [
       {
         key: 'race-dashboard',
@@ -326,6 +298,7 @@ const navGroups = [
       {
         key: 'interview',
         path: '/interview',
+        moduleId: 'interview',
         icon: 'badge',
         shortLabel: 'IV',
         label: '面试面板',
@@ -338,6 +311,7 @@ const navGroups = [
     key: 'account',
     label: '个人',
     icon: 'person',
+    moduleId: 'profile',
     items: [
       {
         key: 'settings',
@@ -355,31 +329,26 @@ const navGroups = [
 const routeMeta = [
   { key: 'dashboard', path: '/app', exact: true, title: '我的工作台', summary: '', groupKey: 'home', sectionLabel: '应用层', surfaceCode: 'APP' },
   { key: 'import', path: '/app/events/import', title: '名单导入', summary: '上传报名数据，完成字段映射、清洗与预览后安全提交。', groupKey: 'events', sectionLabel: '我的赛事', surfaceCode: 'APP', needsRace: true },
-  { key: 'processing', path: '/app/events/processing', title: '名单处理', summary: '集中查询导出、状态概览、成绩校验、黑白名单与五步二次清洗。', groupKey: 'events', sectionLabel: '我的赛事', surfaceCode: 'APP', needsRace: true },
+  { key: 'processing', path: '/app/events/processing', title: '名单处理', summary: '查询导出名单，处理成绩校验、黑白名单和二次清洗。', groupKey: 'events', sectionLabel: '我的赛事', surfaceCode: 'APP', needsRace: true },
   { key: 'records', path: '/app/events/records', title: '名单管理', summary: '围绕当前赛事查看选手记录、字段筛选、排序和导出动作。', groupKey: 'events', sectionLabel: '我的赛事', surfaceCode: 'APP', needsRace: true },
   { key: 'lottery', path: '/app/events/lottery', title: '抽签管理', summary: '定义容量、起点沙盘与成绩筛选，执行抽签并查看结果。', groupKey: 'events', sectionLabel: '我的赛事', surfaceCode: 'APP', needsRace: true },
   { key: 'bib', path: '/app/events/bib', title: '选手排号', summary: '配置号码布模板，自动或手动分配号码布。', groupKey: 'events', sectionLabel: '我的赛事', surfaceCode: 'APP', needsRace: true },
   { key: 'clothing', path: '/app/events/clothing', title: '服装物资', summary: '管理服装库存，查看需求和缺口统计。', groupKey: 'events', sectionLabel: '我的赛事', surfaceCode: 'APP', needsRace: true },
   { key: 'reimbursement-projects', path: '/app/reimbursements/projects', title: '报销项目管理', summary: '集中维护自己的报销项目，支持创建、编辑、清空和删除。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
   { key: 'reimbursement', path: '/app/reimbursements', title: '我的报销', summary: '管理自己的报销项目、识别结果和导出。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
-  { key: 'design-requests', path: '/app/design-requests', title: '设计工作台', summary: '预览组织级设计需求池、关联赛事、参考样例和进度，并上传完成图示。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
+  { key: 'design-requests', path: '/app/design-requests', title: '设计工作台', summary: '查看设计需求、关联赛事、参考样例和进度，并上传完成图。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
   { key: 'map', path: '/app/map', title: 'GIS 地图', summary: '浏览地图、绘制图形、管理图层数据。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
-  { key: 'three-studio', path: '/app/3d-studio', title: '空间工作台', summary: '管理机构共享的 GIS 锚定空间项目，统一进行地图、结构、资产与运营绑定。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
+  { key: 'three-studio', path: '/app/3d-studio', title: '空间工作台', summary: '管理场地地图、仓库结构、资产部署和运营绑定。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
   { key: 'terrain-model', path: '/app/terrain-model', title: '轨迹地形模型', summary: '上传赛事 GPX，生成可预览和导出的地形轨迹模型。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
-  { key: 'credential-center', path: '/app/credential-center', title: '证件中心', summary: '围绕同一赛事上下文串联证件规则配置、申请建单、审核处理和发放追踪。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP' },
-  { key: 'credential-select-race', path: '/app/credential/select-race', title: '选择赛事', summary: '先锁定赛事上下文，再进入证件规则、申请和审核链路。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP' },
-  { key: 'credential-access-areas', path: '/app/credential/access-areas', title: '通行区域', summary: '管理区域、编码与颜色，作为证件流程的底层规则。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP', needsRace: true },
-  { key: 'credential-categories', path: '/app/credential/categories', title: '证件类别', summary: '配置类别、默认区域和审核策略。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP', needsRace: true },
-  { key: 'credential-styles', path: '/app/credential/styles', title: '证件样式', summary: '维护证件样式模板的元数据和状态。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP', needsRace: true },
-  { key: 'credential-requests', path: '/app/credential/requests', title: '申请与建单', summary: '在同一工作台内处理申请池与管理员直建。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP', needsRace: true },
+  { key: 'credential-center', path: '/app/credential-center', title: '证件中心', summary: '处理证件申请、审核和状态追踪。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP' },
+  { key: 'credential-requests', path: '/app/credential/requests', title: '申请与建单', summary: '查看用户申请，也可以由管理员直接建单。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP', needsRace: true },
   { key: 'credential-review', path: '/app/credential/review', title: '审核中心', summary: '连续处理审核、驳回和通过后的后续动作。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP', needsRace: true },
-  { key: 'credential-issue', path: '/app/credential/issue', title: '领取管理', summary: '处理证件发放、实名登记和领取状态。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP', needsRace: true },
-  { key: 'inventory-workbench', path: '/app/inventory', exact: true, title: '仓储作业台', summary: '统一查看仓储负载、异常、流转和作业队列。', groupKey: 'warehouse', sectionLabel: '仓储治理', surfaceCode: 'APP' },
-  { key: 'inventory-inbound-center', path: '/app/inventory/inbound', title: '入库中心', summary: '把预入库、正式入库和标签打印收回同一条链路。', groupKey: 'warehouse', sectionLabel: '仓储治理', surfaceCode: 'APP' },
-  { key: 'inventory-outbound-center', path: '/app/inventory/outbound', title: '出库中心', summary: '处理领取、出库和现场流转的统一入口。', groupKey: 'warehouse', sectionLabel: '仓储治理', surfaceCode: 'APP' },
-  { key: 'inventory-space-center', path: '/app/inventory/space', title: '空间中心', summary: '仓库主数据、3D 查看、设计和库位绑定统一围绕同一个仓库上下文工作。', groupKey: 'warehouse', sectionLabel: '仓储治理', surfaceCode: 'APP' },
-  { key: 'inventory-control-center', path: '/app/inventory/control', title: '盘点与异常', summary: '盘点计划、差异项和预警规则合并为统一控制面。', groupKey: 'warehouse', sectionLabel: '仓储治理', surfaceCode: 'APP' },
-  { key: 'inventory-analytics-center', path: '/app/inventory/analytics', title: '复盘报表', summary: '趋势、类型结构和流转记录只服务于复盘与优化。', groupKey: 'warehouse', sectionLabel: '仓储治理', surfaceCode: 'APP' },
+  { key: 'inventory-workbench', path: '/app/inventory', exact: true, title: '仓储作业台', summary: '查看仓储负载、异常、流转和作业队列。', groupKey: 'warehouse', sectionLabel: '仓储管理', surfaceCode: 'APP' },
+  { key: 'inventory-inbound-center', path: '/app/inventory/inbound', title: '入库中心', summary: '处理预入库、正式入库和标签打印。', groupKey: 'warehouse', sectionLabel: '仓储管理', surfaceCode: 'APP' },
+  { key: 'inventory-outbound-center', path: '/app/inventory/outbound', title: '出库中心', summary: '处理领取、出库和现场流转。', groupKey: 'warehouse', sectionLabel: '仓储管理', surfaceCode: 'APP' },
+  { key: 'inventory-space-center', path: '/app/inventory/space', title: '空间中心', summary: '维护仓库资料，查看 3D 场景，处理库位绑定。', groupKey: 'warehouse', sectionLabel: '仓储管理', surfaceCode: 'APP' },
+  { key: 'inventory-control-center', path: '/app/inventory/control', title: '盘点与异常', summary: '处理盘点计划、差异项和异常预警。', groupKey: 'warehouse', sectionLabel: '仓储管理', surfaceCode: 'APP' },
+  { key: 'inventory-analytics-center', path: '/app/inventory/analytics', title: '复盘报表', summary: '查看趋势、类型结构和最近流转记录。', groupKey: 'warehouse', sectionLabel: '仓储管理', surfaceCode: 'APP' },
   { key: 'projects', path: '/app/projects', exact: true, title: '项目计划', summary: '创建和管理项目计划，配置任务、甘特图和关联赛事。', groupKey: 'management', sectionLabel: '赛事管理', surfaceCode: 'APP' },
   { key: 'projects-detail', path: '/app/projects', title: '项目详情', summary: '编辑项目详情、任务管理和甘特图视图。', groupKey: 'management', sectionLabel: '赛事管理', surfaceCode: 'APP' },
   { key: 'assessment', path: '/app/assessment', exact: true, title: '考评管理', summary: '创建考评活动，管理成员评分、邀请码和绩效报表。', groupKey: 'management', sectionLabel: '赛事管理', surfaceCode: 'APP' },
@@ -394,17 +363,43 @@ const routeMeta = [
   { key: 'settings', path: '/app/settings', title: '个人设置', summary: '修改密码和账户设置。', groupKey: 'account', sectionLabel: '个人', surfaceCode: 'APP' },
 ]
 
-function isAllowed(item, hasCapability) {
-  if (!item.requiredCapability) return true
-  if (typeof hasCapability !== 'function') return false
-  return hasCapability(item.requiredCapability.scope, item.requiredCapability.capability)
+function normalizeAccessOptions(optionsOrHasCapability) {
+  if (typeof optionsOrHasCapability === 'function') {
+    return { hasCapability: optionsOrHasCapability, user: null }
+  }
+
+  return {
+    hasCapability: optionsOrHasCapability?.hasCapability,
+    user: optionsOrHasCapability?.user || null,
+  }
 }
 
-export function getAppNavGroups(hasCapability) {
+function getItemModuleId(group, item) {
+  return item.moduleId || group.moduleId || null
+}
+
+function hasNavigationModuleAccess(group, item, user) {
+  const moduleId = getItemModuleId(group, item)
+  if (!moduleId) return true
+  return hasModuleAccess(user, 'app', moduleId)
+}
+
+function isAllowed(item, options) {
+  if (!item.requiredCapability) return true
+  if (typeof options.hasCapability !== 'function') return false
+  return options.hasCapability(item.requiredCapability.scope, item.requiredCapability.capability)
+}
+
+export function getAppNavGroups(optionsOrHasCapability) {
+  const options = normalizeAccessOptions(optionsOrHasCapability)
+
   return navGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => isAllowed(item, hasCapability)),
+      items: group.items.filter((item) => (
+        hasNavigationModuleAccess(group, item, options.user)
+        && isAllowed(item, options)
+      )),
     }))
     .filter((group) => group.items.length > 0)
 }
@@ -428,9 +423,15 @@ export function buildAppHref(routePath, { orgId, raceId } = {}) {
  * 获取所有可用的应用入口（用于首页卡片网格）
  * 排除 dashboard 本身，只返回功能入口
  */
-export function getAppPortalCards(hasCapability) {
+export function getAppPortalCards(optionsOrHasCapability) {
+  const options = normalizeAccessOptions(optionsOrHasCapability)
+
   return navGroups
-    .flatMap((group) => group.items)
-    .filter((item) => isAllowed(item, hasCapability))
+    .flatMap((group) => group.items.map((item) => ({ group, item })))
+    .filter(({ group, item }) => (
+      hasNavigationModuleAccess(group, item, options.user)
+      && isAllowed(item, options)
+    ))
+    .map(({ item }) => item)
     .filter((item) => item.key !== 'dashboard')
 }

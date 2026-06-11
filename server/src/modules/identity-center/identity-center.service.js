@@ -1,5 +1,5 @@
 import knex from '../../db/knex.js';
-import { getDefaultModules } from '../../utils/capability-policy.js';
+import { getDefaultModules, getRoleDefaultModules } from '../../utils/capability-policy.js';
 import { listVisibleRacesForOrg } from '../races/race-access.service.js';
 import { ALL_MODULES, listAllModuleIds } from '../module-access/module-access.registry.js';
 
@@ -222,7 +222,9 @@ export async function getModuleMatrix(authContext, requestedOrgId, { keyword = '
     const matrix = {};
     for (const user of users) {
         const grantedModules = accesses.filter((item) => item.user_id === user.id).map((item) => item.module_id);
-        matrix[user.id] = [...new Set([...defaultModules, ...grantedModules])];
+        const roleDefaultModules = getRoleDefaultModules(user.role);
+        const effectiveDefaultModules = roleDefaultModules === 'all' ? defaultModules : roleDefaultModules;
+        matrix[user.id] = [...new Set([...effectiveDefaultModules, ...grantedModules])];
     }
 
     return {

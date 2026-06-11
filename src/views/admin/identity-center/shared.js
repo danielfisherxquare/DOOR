@@ -12,10 +12,11 @@ export const ACCOUNT_SOURCE_LABELS = {
 }
 
 export const VIEW_OPTIONS = [
-  { key: 'accounts', label: '账号状态' },
-  { key: 'module-matrix', label: '模块权限' },
-  { key: 'user-race', label: '用户赛事授权' },
-  { key: 'org-race', label: '机构赛事范围', superAdminOnly: true },
+  { key: 'accounts', label: '角色包' },
+  { key: 'user-race', label: '工作区授权' },
+  { key: 'module-matrix', label: '应用授权' },
+  { key: 'capabilities', label: '动作授权' },
+  { key: 'org-race', label: '机构范围', superAdminOnly: true },
 ]
 
 export function formatNumber(value) {

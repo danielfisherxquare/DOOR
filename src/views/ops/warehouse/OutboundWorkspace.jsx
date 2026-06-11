@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { OutboundContent } from '../../inventory/OutboundCenter'
+import { OutboundContent } from '../../../features/inventory/execute/OutboundContent'
 
 /**
  * OPS 出库作业子模块

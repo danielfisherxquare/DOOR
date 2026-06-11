@@ -45,6 +45,7 @@ export async function requireAuth(req, res, next) {
             userId: decoded.userId,
             orgId: decoded.orgId || null,
             role: normalizedRole,
+            strictSurfaceModules: Boolean(decoded.preferences?.strictSurfaceModules),
         };
 
         // 兼容遗留代码 (原本的 tenantContext 设置)

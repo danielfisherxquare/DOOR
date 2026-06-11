@@ -146,7 +146,9 @@ export function getRoleModuleAccess(role) {
  * @param {string} role - 用户角色
  * @returns {boolean}
  */
-export function hasAllModuleAccess(role) {
+export function hasAllModuleAccess(role, options = {}) {
+    if (role === 'super_admin') return true;
+    if (role === 'org_admin' && options.strictSurfaceModules) return false;
     return getRoleModuleAccess(role) === 'all';
 }
 
@@ -156,4 +158,10 @@ export function hasAllModuleAccess(role) {
  */
 export function getDefaultModules() {
     return DEFAULT_MODULES;
+}
+
+export function getRoleDefaultModules(role) {
+    const moduleAccess = getRoleModuleAccess(role);
+    if (moduleAccess === 'all') return 'all';
+    return uniq([...DEFAULT_MODULES, ...moduleAccess]);
 }

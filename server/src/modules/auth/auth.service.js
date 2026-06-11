@@ -21,7 +21,7 @@ const LOCK_DURATION_MINUTES = 15;
 
 function generateAccessToken(user) {
     return jwt.sign(
-        { userId: user.id, orgId: user.org_id || user.orgId, role: user.role },
+        { userId: user.id, orgId: user.org_id || user.orgId, role: user.role, preferences: user.preferences || {} },
         env.JWT_SECRET,
         { expiresIn: ACCESS_TOKEN_EXPIRES },
     );
@@ -50,7 +50,8 @@ async function buildAuthProfile(user) {
     const raceNameMap = new Map(raceRows.map((row) => [Number(row.id), row.name]));
 
     // 获取用户模块访问权限
-    const moduleAccess = await getUserAllModules(user.id, user.role);
+    const strictSurfaceModules = Boolean(user.preferences?.strictSurfaceModules);
+    const moduleAccess = await getUserAllModules(user.id, user.role, { strictSurfaceModules });
 
     return {
         ...userMapper.toApiResponse(user),

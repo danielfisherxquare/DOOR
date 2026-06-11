@@ -9,7 +9,7 @@ function Login() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const { login, isAuthenticated, isLoading, error, clearError, user, getDefaultLandingPath } = useAuthStore()
+  const { login, isAuthenticated, isLoading, error, clearError, user } = useAuthStore()
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -19,10 +19,10 @@ function Login() {
       }
       const params = new URLSearchParams(location.search)
       const redirect = params.get('redirect')
-      const from = location.state?.from?.pathname || (redirect && redirect.startsWith('/') ? redirect : null) || getDefaultLandingPath()
+      const from = location.state?.from?.pathname || (redirect && redirect.startsWith('/') ? redirect : null) || '/workspaces'
       navigate(from, { replace: true })
     }
-  }, [getDefaultLandingPath, isAuthenticated, navigate, location, user])
+  }, [isAuthenticated, navigate, location, user])
 
   useEffect(() => () => clearError(), [clearError])
 

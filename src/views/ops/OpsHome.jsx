@@ -1,21 +1,23 @@
 import { Link, useSearchParams } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import { getOpsPortalCards, buildOpsHref } from '../../components/ops/opsConfig'
+import useWorkspaceStore from '../../features/workspace/workspaceStore'
 import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../utils/surfaceContext'
 
 function OpsHome() {
   const user = useAuthStore((state) => state.user)
+  const session = useWorkspaceStore((state) => state.session)
   const [searchParams] = useSearchParams()
   const currentContext = {
-    orgId: resolveSurfaceOrgId(searchParams, user),
-    raceId: resolveSurfaceRaceId(searchParams, user),
+    orgId: session?.orgId || resolveSurfaceOrgId(searchParams, user),
+    raceId: session?.raceId || resolveSurfaceRaceId(searchParams, user, session?.orgId),
   }
 
-  const portalCards = getOpsPortalCards()
+  const portalCards = getOpsPortalCards({ user })
   return (
     <div>
       {/* 执行入口卡片网格 */}
-      <h3 className="app-portal-section-title">OPERATIONAL_TERMINALS</h3>
+      <h3 className="app-portal-section-title">现场执行</h3>
       <div className="app-portal-grid">
         {portalCards.map((item) => (
           <Link key={item.key} to={buildOpsHref(item.path, currentContext)} className="app-portal-card">
@@ -27,7 +29,7 @@ function OpsHome() {
             </div>
             <span className="app-portal-card__description">{item.cardDescription || item.description}</span>
             <span className="app-portal-card__action">
-              EXECUTE <span className="material-symbols-outlined">arrow_forward</span>
+              进入 <span className="material-symbols-outlined">arrow_forward</span>
             </span>
           </Link>
         ))}

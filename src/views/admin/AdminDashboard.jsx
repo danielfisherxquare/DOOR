@@ -2,14 +2,16 @@ import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import { buildAdminHref, getAdminNavGroups } from '../../components/admin/adminConfig'
+import useWorkspaceStore from '../../features/workspace/workspaceStore'
 import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../utils/surfaceContext'
 
 function AdminDashboard() {
   const user = useAuthStore((state) => state.user)
+  const session = useWorkspaceStore((state) => state.session)
   const [searchParams] = useSearchParams()
   const isSuperAdmin = user?.role === 'super_admin'
-  const selectedOrgId = resolveSurfaceOrgId(searchParams, user)
-  const selectedRaceId = resolveSurfaceRaceId(searchParams, user)
+  const selectedOrgId = session?.orgId || resolveSurfaceOrgId(searchParams, user)
+  const selectedRaceId = session?.raceId || resolveSurfaceRaceId(searchParams, user, session?.orgId)
   const needContext = searchParams.get('needContext')
 
   const currentContext = useMemo(
@@ -39,7 +41,7 @@ function AdminDashboard() {
           当前操作需要先选择赛事。请先在右上角方形上下文入口中锁定赛事。
         </div>
       )}
-      <h3 className="app-portal-section-title">COMMAND_MODULES</h3>
+      <h3 className="app-portal-section-title">后台入口</h3>
       {portalGroups.map((group) => (
         <section key={group.key} className="app-portal-group">
           <div className="app-portal-group__header">
@@ -56,7 +58,7 @@ function AdminDashboard() {
                 </div>
                 <span className="app-portal-card__description">{item.cardDescription || item.description}</span>
                 <span className="app-portal-card__action">
-                  ENTER <span className="material-symbols-outlined">arrow_forward</span>
+                  进入 <span className="material-symbols-outlined">arrow_forward</span>
                 </span>
               </Link>
             ))}

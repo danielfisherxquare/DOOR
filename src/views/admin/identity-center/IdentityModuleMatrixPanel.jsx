@@ -160,17 +160,17 @@ export default function IdentityModuleMatrixPanel({ orgId, refreshToken, onDirty
 
   return (
     <AdminSurface
-      title="模块权限矩阵"
-      subtitle="继续沿用组织 x 用户 x 模块的二维矩阵模型，把入口访问和功能访问放到一张表里治理。"
+      title="应用授权"
+      subtitle="按应用入口分组授权模块，入口能否进入和动作能否执行不再混在同一张表里。"
       footer={(
         <div className="identity-access-center-page__matrix-legend">
           <div className="identity-access-center-page__matrix-legend-item">
             <input type="checkbox" checked disabled />
-            <span>默认模块（自动启用，不可取消）</span>
+            <span>默认应用（自动启用，不可取消）</span>
           </div>
           <div className="identity-access-center-page__matrix-legend-item">
             <input type="checkbox" readOnly />
-            <span>可选模块（可授权/取消）</span>
+            <span>可选应用（可授权/取消）</span>
           </div>
         </div>
       )}
@@ -179,7 +179,7 @@ export default function IdentityModuleMatrixPanel({ orgId, refreshToken, onDirty
         <form className="identity-access-center-page__toolbar" onSubmit={handleSearch}>
           <input
             className="input identity-access-center-page__search"
-            placeholder="搜索矩阵内账号"
+            placeholder="搜索账号"
             value={keywordInput}
             onChange={(event) => setKeywordInput(event.target.value)}
           />
@@ -188,7 +188,7 @@ export default function IdentityModuleMatrixPanel({ orgId, refreshToken, onDirty
             <>
               <button type="button" className="btn btn--ghost" onClick={handleReset}>重置变更</button>
               <button type="button" className="btn btn--primary" onClick={handleSave} disabled={saving}>
-                {saving ? '保存中...' : '保存矩阵'}
+                {saving ? '保存中...' : '保存应用授权'}
               </button>
             </>
           ) : null}
@@ -196,9 +196,9 @@ export default function IdentityModuleMatrixPanel({ orgId, refreshToken, onDirty
       </AdminToolbar>
 
       {loading ? (
-        <AdminEmptyState title="模块矩阵载入中" description="正在读取模块定义和当前授权关系。" />
+        <AdminEmptyState title="应用授权载入中" description="正在读取应用定义和当前授权关系。" />
       ) : users.length === 0 ? (
-        <AdminEmptyState title="暂无可治理账号" description="当前机构下没有需要进入模块矩阵的账号。" />
+        <AdminEmptyState title="暂无可治理账号" description="当前机构下没有需要配置应用授权的账号。" />
       ) : (
         <div className="identity-access-center-page__table-wrapper identity-access-center-page__table-wrapper--module-matrix">
           <table className="identity-access-center-page__matrix-table identity-access-center-page__matrix-table--module">

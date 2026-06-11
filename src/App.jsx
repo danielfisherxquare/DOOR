@@ -6,12 +6,15 @@ import Navbar from './components/Navbar'
 import SurfaceProtectedRoute from './components/SurfaceProtectedRoute'
 import CapabilityProtectedRoute from './components/CapabilityProtectedRoute'
 import useAuthStore from './stores/authStore'
+import useWorkspaceStore from './features/workspace/workspaceStore'
 
 const Login = lazy(() => import('./views/Login'))
 const ForgotPassword = lazy(() => import('./views/ForgotPassword'))
 const ResetPassword = lazy(() => import('./views/ResetPassword'))
 const AssessmentPublicPage = lazy(() => import('./views/assessment/AssessmentPublicPage'))
 const ToolDetail = lazy(() => import('./views/ToolDetail'))
+const WorkspaceSelectPage = lazy(() => import('./views/workspace/WorkspaceSelectPage'))
+const LauncherPage = lazy(() => import('./views/workspace/LauncherPage'))
 
 const AppLayout = lazy(() => import('./components/app/AppLayout'))
 const OpsLayout = lazy(() => import('./components/ops/OpsLayout'))
@@ -41,6 +44,7 @@ function RootRedirect() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const isBootstrapping = useAuthStore((state) => state.isBootstrapping)
   const getDefaultLandingPath = useAuthStore((state) => state.getDefaultLandingPath)
+  const workspaceSession = useWorkspaceStore((state) => state.session)
 
   if (isBootstrapping) {
     return <RouteLoader compact />
@@ -48,6 +52,14 @@ function RootRedirect() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  if (!workspaceSession?.orgId) {
+    return <Navigate to="/workspaces" replace />
+  }
+
+  if (window.location.pathname === '/') {
+    return <Navigate to="/launcher" replace />
   }
 
   return <Navigate to={getDefaultLandingPath()} replace />
@@ -120,6 +132,10 @@ function App() {
           path="/tool/:id"
           element={withSuspense(<ToolDetail />)}
         />
+
+        <Route path="/workspaces" element={withSuspense(<WorkspaceSelectPage />)} />
+        <Route path="/workspaces/select" element={withSuspense(<WorkspaceSelectPage />)} />
+        <Route path="/launcher" element={withSuspense(<LauncherPage />)} />
 
         {/* ============================================
             🏠 应用层 — 需登录且具备 app 入口权限

@@ -11,17 +11,6 @@ function remapApiPath(url) {
     [/^\/projects/, '/admin/projects'],
     [/^\/races/, '/admin/races'],
     [/^\/org/, '/admin/org'],
-    [/^\/records/, '/admin/records'],
-    [/^\/lottery/, '/admin/lottery'],
-    [/^\/audit/, '/admin/audit'],
-    [/^\/bib-tracking/, '/admin/bibs'],
-    [/^\/bib/, '/admin/bib'],
-    [/^\/clothing/, '/admin/clothing'],
-    [/^\/pipeline/, '/admin/pipeline'],
-    [/^\/column-mappings/, '/admin/column-mappings'],
-    [/^\/import-sessions/, '/admin/import-sessions'],
-    [/^\/credential/, '/admin/credentials'],
-    [/^\/jobs/, '/admin/jobs'],
   ]
 
   for (const [pattern, replacement] of replacements) {

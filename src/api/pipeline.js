@@ -1,26 +1,41 @@
 import request from '../utils/request'
 import { unwrapData } from '../utils/apiResponse'
+import { resolveSurfacePrefix } from '../utils/surfaceApi'
+
+function getBasePath() {
+    return resolveSurfacePrefix({
+        admin: '/admin/pipeline',
+        app: '/app/pipeline',
+    }, 'app')
+}
+
+function getClothingBasePath() {
+    return resolveSurfacePrefix({
+        admin: '/admin/clothing',
+        app: '/app/clothing',
+    }, 'app')
+}
 
 /**
- * 出发区 + 成绩规则 API — 对应后端 /api/pipeline
+ * 出发区 + 成绩规则 API — 应用层 /api/app/pipeline，后台层 /api/admin/pipeline。
  */
 export const pipelineApi = {
     // ── start_zones ──────────────────────────────────────────
     getStartZones: (raceId) =>
-        request.get(`/pipeline/start-zones/${raceId}`).then(unwrapData),
+        request.get(`${getBasePath()}/start-zones/${raceId}`).then(unwrapData),
 
     saveStartZone: (data) =>
-        request.post('/pipeline/start-zones', data).then(unwrapData),
+        request.post(`${getBasePath()}/start-zones`, data).then(unwrapData),
 
     deleteStartZone: (id) =>
-        request.delete(`/pipeline/start-zones/${id}`).then(unwrapData),
+        request.delete(`${getBasePath()}/start-zones/${id}`).then(unwrapData),
 
     // ── performance_rules ────────────────────────────────────
     getPerformanceRules: (raceId) =>
-        request.get(`/pipeline/performance-rules/${raceId}`).then(unwrapData),
+        request.get(`${getBasePath()}/performance-rules/${raceId}`).then(unwrapData),
 
     savePerformanceRule: (data) =>
-        request.post('/pipeline/performance-rules', data).then(unwrapData),
+        request.post(`${getBasePath()}/performance-rules`, data).then(unwrapData),
 
     // ── filter execution ──────────────────────────────────────
     /**
@@ -29,23 +44,23 @@ export const pipelineApi = {
      * @returns {Promise<{ qualifiedCount, unqualifiedCount, noTimeCount }>}
      */
     filterPerformance: (raceId) =>
-        request.post(`/pipeline/filter-performance/${raceId}`).then(unwrapData),
+        request.post(`${getBasePath()}/filter-performance/${raceId}`).then(unwrapData),
 
     // ── Phase 6: Pipeline 执行 ────────────────────────────────
     executePipeline: (raceId) =>
-        request.post(`/pipeline/execute/${raceId}`).then(unwrapData),
+        request.post(`${getBasePath()}/execute/${raceId}`).then(unwrapData),
 
     getExecutionStatus: (executionId) =>
-        request.get(`/pipeline/execution/${executionId}`).then(unwrapData),
+        request.get(`${getBasePath()}/execution/${executionId}`).then(unwrapData),
 
     getPreview: (raceId) =>
-        request.get(`/pipeline/preview/${raceId}`).then(unwrapData),
+        request.get(`${getBasePath()}/preview/${raceId}`).then(unwrapData),
 
     previewPipeline: (raceId) =>
         pipelineApi.getPreview(raceId),
 
     getClothingLimits: (raceId) =>
-        request.get(`/clothing/limits/${raceId}`).then(unwrapData),
+        request.get(`${getClothingBasePath()}/limits/${raceId}`).then(unwrapData),
 }
 
 export default pipelineApi

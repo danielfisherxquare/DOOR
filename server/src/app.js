@@ -110,6 +110,18 @@ app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
 
 app.use(requireAuth);
 
+const appEventsPermission = requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'events' } });
+
+app.use('/api/app/jobs', requirePermission({ surface: 'app' }), jobRoutes);
+app.use('/api/app/records', appEventsPermission, recordRoutes);
+app.use('/api/app/column-mappings', appEventsPermission, columnMappingRoutes);
+app.use('/api/app/import-sessions', appEventsPermission, importSessionRoutes);
+app.use('/api/app/lottery', appEventsPermission, lotteryRoutes);
+app.use('/api/app/lottery-v2', appEventsPermission, lotteryV2Routes);
+app.use('/api/app/clothing', appEventsPermission, clothingRoutes);
+app.use('/api/app/pipeline', appEventsPermission, pipelineRoutes);
+app.use('/api/app/bib', appEventsPermission, bibRoutes);
+app.use('/api/app/bibs', appEventsPermission, bibTrackingRoutes);
 app.use('/api/app/reimbursements', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'reimbursements' } }), appReimbursementRoutes);
 app.use('/api/app/credentials', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'credentials' } }), appCredentialRoutes);
 app.use('/api/app/3d-studio', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: '3d-studio' } }), appThreeStudioRoutes);

@@ -4,7 +4,7 @@ import { resolveSurfacePrefix } from '../../utils/surfaceApi'
 function getBasePath() {
   return resolveSurfacePrefix({
     admin: '/admin/bibs',
-    app: '/admin/bibs',
+    app: '/app/bibs',
     ops: '/ops/bibs',
   }, 'app')
 }

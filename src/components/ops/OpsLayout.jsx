@@ -1,21 +1,18 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
-import profileApi from '../../api/profile'
 import { getOpsNavGroups, getOpsRouteMeta, buildOpsHref } from './opsConfig'
-import { buildAdminHref } from '../admin/adminConfig'
-import { buildAppHref } from '../app/appConfig'
-import ContextSquareEntry from '../shared/ContextSquareEntry'
+import WorkspaceContextDisplay from '../../features/workspace/WorkspaceContextDisplay'
+import useSurfaceWorkspace from '../../features/workspace/useSurfaceWorkspace'
+import ModuleProtectedRoute from '../ModuleProtectedRoute'
 import useSidebarMotion from '../shared/useSidebarMotion'
-import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../utils/surfaceContext'
-import { showInfo } from '../../utils/toast'
 import '../app/app-layout.css'
 
 const OpsHome = lazy(() => import('../../views/ops/OpsHome'))
 const ScanHome = lazy(() => import('../../views/scan/ScanHome'))
 const ScanResult = lazy(() => import('../../views/scan/ScanResult'))
 const BibPickupPage = lazy(() => import('../../views/ops/BibPickupPage'))
-const CredentialIssuePage = lazy(() => import('../../views/admin/credential/CredentialIssuePage'))
+const CredentialIssuePage = lazy(() => import('../../features/credential/execute/CredentialIssuePage'))
 const WarehouseWorkbench = lazy(() => import('../../views/ops/WarehouseWorkbench'))
 const DesignRequestWorkspace = lazy(() => import('../../views/design-requests/DesignRequestWorkspace'))
 
@@ -31,98 +28,19 @@ function OpsRouteLoader() {
 }
 
 export default function OpsLayout() {
-  const { user, logout, updatePreferences } = useAuthStore()
-  const canAccessAdmin = useAuthStore((state) => state.canAccessAdmin)
+  const { user, logout } = useAuthStore()
   const location = useLocation()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
   const { sidebarCollapsed, sidebarMotionClass, toggleSidebar } = useSidebarMotion()
-  const [contextOptions, setContextOptions] = useState(null)
-  const [contextLoading, setContextLoading] = useState(false)
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const navRef = useRef(null)
-  const requestedRaceId = searchParams.get('raceId') || ''
-  const selectedOrgId = resolveSurfaceOrgId(searchParams, user)
-  const selectedRaceId = resolveSurfaceRaceId(searchParams, user, selectedOrgId)
-  const currentContext = useMemo(
-    () => ({ orgId: selectedOrgId, raceId: selectedRaceId }),
-    [selectedOrgId, selectedRaceId],
-  )
-
-  const syncSearchParams = useCallback((nextOrgId, nextRaceId, options = {}) => {
-    const nextParams = new URLSearchParams(searchParams)
-    if (nextOrgId) nextParams.set('orgId', String(nextOrgId))
-    else nextParams.delete('orgId')
-    if (nextRaceId) nextParams.set('raceId', String(nextRaceId))
-    else nextParams.delete('raceId')
-    setSearchParams(nextParams, { replace: Boolean(options.replace) })
-  }, [searchParams, setSearchParams])
+  const { session, selectedOrgId, selectedRaceId, currentContext, switchWorkspace, workspaceMissing } = useSurfaceWorkspace('ops')
 
   useEffect(() => {
-    let active = true
-    setContextLoading(true)
+    setMobileDrawerOpen(false)
+  }, [location.pathname])
 
-    profileApi.getContextOptions({
-      orgId: selectedOrgId || undefined,
-      raceId: selectedRaceId || undefined,
-    })
-      .then((res) => {
-        if (!active || !res?.success) return
-        const payload = res.data || {}
-        setContextOptions(payload)
-
-        const resolvedOrgId = payload?.current?.orgId ? String(payload.current.orgId) : ''
-        const resolvedRaceId = payload?.current?.raceId ? String(payload.current.raceId) : ''
-        const orgChanged = resolvedOrgId !== selectedOrgId
-        const raceChanged = resolvedRaceId !== selectedRaceId
-
-        if (orgChanged || raceChanged) {
-          syncSearchParams(resolvedOrgId, resolvedRaceId, { replace: true })
-          if (requestedRaceId && raceChanged && !orgChanged) {
-            showInfo(resolvedRaceId
-              ? '当前赛事已失效，已自动回退到可用赛事。'
-              : '当前赛事已失效，已自动清空赛事上下文。')
-          }
-        }
-      })
-      .catch(() => { })
-      .finally(() => {
-        if (active) setContextLoading(false)
-      })
-
-    return () => {
-      active = false
-    }
-  }, [requestedRaceId, selectedOrgId, selectedRaceId, syncSearchParams])
-
-  useEffect(() => {
-    if (!user) return
-    const currentPrefs = user?.preferences || {}
-    const normalizedOrgId = selectedOrgId || null
-    const normalizedRaceId = selectedRaceId ? Number(selectedRaceId) : null
-
-    if (currentPrefs.lastOrgId === normalizedOrgId && currentPrefs.lastRaceId === normalizedRaceId) {
-      return
-    }
-
-    const timer = setTimeout(() => {
-      updatePreferences({
-        lastOrgId: normalizedOrgId,
-        lastRaceId: normalizedRaceId,
-      })
-    }, 500)
-
-    return () => clearTimeout(timer)
-  }, [selectedOrgId, selectedRaceId, updatePreferences, user])
-
-  const handleOrgChange = useCallback((nextOrgId) => {
-    syncSearchParams(nextOrgId, '')
-  }, [syncSearchParams])
-
-  const handleRaceChange = useCallback((nextRaceId) => {
-    syncSearchParams(selectedOrgId, nextRaceId)
-  }, [selectedOrgId, syncSearchParams])
-
-  const navGroups = useMemo(() => getOpsNavGroups(), [])
+  const navGroups = useMemo(() => getOpsNavGroups({ user }), [user])
   const routeMeta = useMemo(() => getOpsRouteMeta(location.pathname), [location.pathname])
 
   const currentGroup = useMemo(
@@ -145,6 +63,20 @@ export default function OpsLayout() {
   }, [user])
 
   const groupTitle = currentGroup?.label || '执行端'
+  const requireOpsModule = useCallback((moduleId, element) => (
+    <ModuleProtectedRoute surface="ops" moduleId={moduleId}>
+      {element}
+    </ModuleProtectedRoute>
+  ), [])
+  const isNavItemActive = useCallback((item) => {
+    return item.path === ''
+      ? location.pathname === '/ops'
+      : location.pathname === `/ops${item.path}` || location.pathname.startsWith(`/ops${item.path}/`)
+  }, [location.pathname])
+
+  if (workspaceMissing) {
+    return <Navigate to={`/workspaces?redirect=${encodeURIComponent(location.pathname)}`} replace />
+  }
 
   return (
     <div className={`layout--ops workspace-layout ${sidebarCollapsed ? 'workspace-layout--collapsed' : ''} ${sidebarMotionClass}`.trim()}>
@@ -186,9 +118,7 @@ export default function OpsLayout() {
               <div className="workspace-nav-list">
                 {group.items.map((item) => {
                   const href = buildOpsHref(item.path, currentContext)
-                  const active = item.path === ''
-                    ? location.pathname === '/ops'
-                    : location.pathname === `/ops${item.path}` || location.pathname.startsWith(`/ops${item.path}/`)
+                  const active = isNavItemActive(item)
 
                   return (
                     <Link key={item.key} to={href} className={`workspace-nav-item ${active ? 'workspace-nav-item--active' : ''}`}>
@@ -203,21 +133,6 @@ export default function OpsLayout() {
             </section>
           ))}
         </nav>
-
-        {/* ── 跨层入口 ── */}
-        <div className="workspace-sidebar__switch-stack">
-          <Link to={buildAppHref('', currentContext)} className="workspace-sidebar__switch-link" title="返回应用层">
-            <span className="workspace-sidebar__switch-icon">APP</span>
-            <span>返回应用层</span>
-          </Link>
-
-          {canAccessAdmin() && (
-            <Link to={buildAdminHref('', { selectedOrgId, selectedRaceId })} className="workspace-sidebar__switch-link" title="进入管理后台">
-              <span className="workspace-sidebar__switch-icon">ADM</span>
-              <span>进入管理后台</span>
-            </Link>
-          )}
-        </div>
 
         {/* ── 底部 ── */}
         <div className="workspace-sidebar__footer">
@@ -242,6 +157,15 @@ export default function OpsLayout() {
         {/* ── 顶栏 ── */}
         <header className="workspace-main__topbar">
           <div className="workspace-main__topbar-left">
+            <button
+              type="button"
+              className="workspace-main__mobile-menu-btn"
+              onClick={() => setMobileDrawerOpen(true)}
+              aria-label="打开执行菜单"
+              aria-expanded={mobileDrawerOpen}
+            >
+              <span className="material-symbols-outlined">menu</span>
+            </button>
             <span className="workspace-main__topbar-title">{groupTitle}</span>
           </div>
           <div className="workspace-main__topbar-right">
@@ -252,14 +176,12 @@ export default function OpsLayout() {
             <button type="button" className="workspace-main__topbar-btn" title="通知">
               <span className="material-symbols-outlined">notifications</span>
             </button>
-            <ContextSquareEntry
+            <WorkspaceContextDisplay
               roleName={roleName}
-              contextOptions={contextOptions}
+              session={session}
               selectedOrgId={selectedOrgId}
               selectedRaceId={selectedRaceId}
-              onOrgChange={handleOrgChange}
-              onRaceChange={handleRaceChange}
-              loading={contextLoading}
+              onSwitch={switchWorkspace}
             />
             <div className="workspace-main__topbar-user">
               <span className="workspace-main__topbar-avatar">{user?.username?.slice(0, 2)?.toUpperCase() || 'OP'}</span>
@@ -284,17 +206,71 @@ export default function OpsLayout() {
           <Suspense fallback={<OpsRouteLoader />}>
             <Routes>
               <Route index element={<OpsHome />} />
-              <Route path="scan" element={<ScanHome />} />
-              <Route path="scan/result" element={<ScanResult />} />
-              <Route path="bibs/pickup" element={<BibPickupPage />} />
-              <Route path="credentials/issue" element={<CredentialIssuePage />} />
-              <Route path="warehouse/*" element={<WarehouseWorkbench />} />
-              <Route path="design-requests" element={<DesignRequestWorkspace surface="ops" mode="requester" />} />
+              <Route path="scan" element={requireOpsModule('scan', <ScanHome />)} />
+              <Route path="scan/result" element={requireOpsModule('scan', <ScanResult />)} />
+              <Route path="bibs/pickup" element={requireOpsModule('bib-pickup', <BibPickupPage />)} />
+              <Route path="credentials/issue" element={requireOpsModule('credentials', <CredentialIssuePage />)} />
+              <Route path="warehouse/*" element={requireOpsModule('warehouse', <WarehouseWorkbench />)} />
+              <Route path="design-requests" element={requireOpsModule('design-requests', <DesignRequestWorkspace surface="ops" mode="requester" />)} />
               <Route path="*" element={<Navigate to={buildOpsHref('', currentContext)} replace />} />
             </Routes>
           </Suspense>
         </section>
       </main>
+      {mobileDrawerOpen && (
+        <div className="workspace-mobile-menu" role="presentation">
+          <button
+            type="button"
+            className="workspace-mobile-menu__backdrop"
+            onClick={() => setMobileDrawerOpen(false)}
+            aria-label="关闭执行菜单"
+          />
+          <aside className="workspace-mobile-menu__panel" aria-label="执行菜单">
+            <div className="workspace-mobile-menu__header">
+              <div>
+                <span className="workspace-mobile-menu__eyebrow">中奥致远 OPS</span>
+                <h2 className="workspace-mobile-menu__title">执行端</h2>
+              </div>
+              <button
+                type="button"
+                className="workspace-mobile-menu__close"
+                onClick={() => setMobileDrawerOpen(false)}
+                aria-label="关闭执行菜单"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <nav className="workspace-mobile-menu__nav">
+              {navGroups.map((group) => (
+                <section key={group.key} className="workspace-mobile-menu__section">
+                  <span className="workspace-mobile-menu__section-title">{group.label}</span>
+                  <div className="workspace-mobile-menu__links">
+                    {group.items.map((item) => {
+                      const active = isNavItemActive(item)
+                      return (
+                        <Link
+                          key={item.key}
+                          to={buildOpsHref(item.path, currentContext)}
+                          className={'workspace-mobile-menu__link ' + (active ? 'workspace-mobile-menu__link--active' : '')}
+                        >
+                          <span className="material-symbols-outlined">{item.icon || 'circle'}</span>
+                          <span>{item.label}</span>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </section>
+              ))}
+            </nav>
+
+            <div className="workspace-mobile-menu__footer">
+              <span>{user?.username || '执行用户'} · {roleName}</span>
+              <button type="button" onClick={handleLogout}>退出登录</button>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   )
 }

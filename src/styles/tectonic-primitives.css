@@ -236,6 +236,12 @@ a {
   padding-inline: 18px;
 }
 
+@media (pointer: coarse) {
+  .btn {
+    min-height: 44px;
+  }
+}
+
 .btn--primary {
   border-color: var(--accent);
   background: var(--btn-primary-bg);

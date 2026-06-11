@@ -1,9 +1,20 @@
 export const DEFAULT_MODULES = ['app:home', 'app:profile']
 
-export function hasModuleAccess(user, surface, moduleId) {
+export function usesStrictSurfaceModules(user, options = {}) {
+  if (options.strictSurfaceModules !== undefined) {
+    return Boolean(options.strictSurfaceModules)
+  }
+  return Boolean(user?.preferences?.strictSurfaceModules)
+}
+
+export function hasModuleAccess(user, surface, moduleId, options = {}) {
   if (!user) return false
 
-  if (['super_admin', 'org_admin'].includes(user.role)) {
+  if (user.role === 'super_admin') {
+    return true
+  }
+
+  if (user.role === 'org_admin' && !usesStrictSurfaceModules(user, options)) {
     return true
   }
 

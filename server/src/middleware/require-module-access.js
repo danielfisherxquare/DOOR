@@ -5,7 +5,7 @@
  *   router.get('/map', requireModuleAccess('app', 'map'), handler)
  */
 import knex from '../db/knex.js';
-import { hasAllModuleAccess, getDefaultModules } from '../utils/capability-policy.js';
+import { hasAllModuleAccess, getRoleDefaultModules } from '../utils/capability-policy.js';
 
 /**
  * 检查用户是否有特定模块的访问权限
@@ -45,16 +45,16 @@ export function requireModuleAccess(surface, moduleId) {
             });
         }
 
-        // super_admin / org_admin 跳过检查（拥有全部模块权限）
-        if (hasAllModuleAccess(role)) {
+        const strictSurfaceModules = Boolean(req.authContext?.strictSurfaceModules || req.user?.preferences?.strictSurfaceModules);
+        if (hasAllModuleAccess(role, { strictSurfaceModules })) {
             return next();
         }
 
         // 构建完整模块ID
         const fullModuleId = `${surface}:${moduleId}`;
 
-        // 默认模块无需检查（所有用户都有）
-        if (getDefaultModules().includes(fullModuleId)) {
+        const roleDefaultModules = getRoleDefaultModules(role);
+        if (roleDefaultModules === 'all' || roleDefaultModules.includes(fullModuleId)) {
             return next();
         }
 
@@ -83,16 +83,22 @@ export function requireModuleAccess(surface, moduleId) {
  * @param {string} surface - 入口层
  * @returns {Promise<Object>} - 返回 { moduleId: hasAccess } 映射
  */
-export async function batchCheckModuleAccess(userId, role, modules, surface) {
+export async function batchCheckModuleAccess(userId, role, modules, surface, options = {}) {
     // 超级用户拥有全部权限
-    if (hasAllModuleAccess(role)) {
+    if (hasAllModuleAccess(role, options)) {
         return modules.reduce((result, moduleId) => {
             result[`${surface}:${moduleId}`] = true;
             return result;
         }, {});
     }
 
-    const defaultModules = getDefaultModules();
+    const defaultModules = getRoleDefaultModules(role);
+    if (defaultModules === 'all') {
+        return modules.reduce((result, moduleId) => {
+            result[`${surface}:${moduleId}`] = true;
+            return result;
+        }, {});
+    }
     const fullModuleIds = modules.map(m => `${surface}:${m}`);
 
     // 分离默认模块和需要检查的模块
@@ -130,9 +136,9 @@ export async function batchCheckModuleAccess(userId, role, modules, surface) {
  * @param {string} role - 用户角色
  * @returns {Promise<string[]>} - 模块ID列表
  */
-export async function getUserAllModules(userId, role) {
+export async function getUserAllModules(userId, role, options = {}) {
     // 超级用户返回 null 表示全部权限
-    if (hasAllModuleAccess(role)) {
+    if (hasAllModuleAccess(role, options)) {
         return null;
     }
 
@@ -145,7 +151,10 @@ export async function getUserAllModules(userId, role) {
         });
 
     // 合并默认模块
-    const defaultModules = getDefaultModules();
+    const defaultModules = getRoleDefaultModules(role);
+    if (defaultModules === 'all') {
+        return null;
+    }
     const grantedModules = accesses.map(a => a.module_id);
 
     return uniq([...defaultModules, ...grantedModules]);
