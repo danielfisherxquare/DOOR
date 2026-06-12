@@ -8,6 +8,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import knex from '../../db/knex.js';
 import { requireAuth } from '../../middleware/require-auth.js';
+import { buildAuthzProfileFromRows, loadAuthzRows } from '../../authz/profile.service.js';
 import { getUserAllModules } from '../../middleware/require-module-access.js';
 import { listEffectiveRacePermissionsForUser, listVisibleRacesForOrg } from '../races/race-access.service.js';
 
@@ -45,6 +46,35 @@ function pickFirstValid(candidates, validSet) {
     if (validSet.has(normalized)) return normalized;
   }
   return null;
+}
+
+async function canBuildRaceAuthzProfile({ account, race, rows }) {
+  try {
+    await buildAuthzProfileFromRows({
+      authContext: {
+        userId: account.id,
+        role: account.role,
+        orgId: account.org_id || null,
+      },
+      requestedOrgId: race.orgId,
+      requestedRaceId: race.id,
+      rows,
+    });
+    return true;
+  } catch (error) {
+    if (error?.status === 403) return false;
+    throw error;
+  }
+}
+
+async function filterRaceOptionsByAuthzProfile({ account, races, rows }) {
+  const result = [];
+  for (const race of races) {
+    if (await canBuildRaceAuthzProfile({ account, race, rows })) {
+      result.push(race);
+    }
+  }
+  return result;
 }
 
 // 确保上传目录存在
@@ -140,6 +170,7 @@ router.get('/context-options', requireAuth, async (req, res, next) => {
     const requestedRaceId = normalizeRaceId(req.query.raceId);
     const preferredOrgId = normalizeId(account.preferences?.lastOrgId);
     const preferredRaceId = normalizeRaceId(account.preferences?.lastRaceId);
+    const authzRows = await loadAuthzRows();
 
     let organizations = [];
     let races = [];
@@ -175,7 +206,8 @@ router.get('/context-options', requireAuth, async (req, res, next) => {
           inheritedAccessLevel: 'editor',
           explicitAccessLevel: null,
         }));
-        canSwitchRace = true;
+        races = await filterRaceOptionsByAuthzProfile({ account, races, rows: authzRows });
+        canSwitchRace = races.length > 0;
       }
     } else {
       selectedOrgId = normalizeId(account.org_id);
@@ -207,6 +239,7 @@ router.get('/context-options', requireAuth, async (req, res, next) => {
           inheritedAccessLevel: race.orgAccessLevel || 'viewer',
           explicitAccessLevel: null,
         }));
+        races = await filterRaceOptionsByAuthzProfile({ account, races, rows: authzRows });
       } else {
         const effectiveRaces = await listEffectiveRacePermissionsForUser({
           userId: account.id,
@@ -234,6 +267,7 @@ router.get('/context-options', requireAuth, async (req, res, next) => {
             explicitAccessLevel: permission.explicitAccessLevel || null,
           };
         });
+        races = await filterRaceOptionsByAuthzProfile({ account, races, rows: authzRows });
       }
 
       canSwitchRace = races.length > 0;

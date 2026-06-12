@@ -44,7 +44,7 @@ export default function LauncherPage() {
     return <Navigate to="/workspaces" replace />
   }
 
-  const surfaces = getAvailableWorkspaceSurfaces(user)
+  const surfaces = getAvailableWorkspaceSurfaces(user, session)
   const isPlatformScope = session.scopeType === 'platform'
   const scopeLabel = isPlatformScope ? '平台控制台' : (session.raceName || session.raceId || '机构运营')
 

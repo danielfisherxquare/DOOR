@@ -1,4 +1,6 @@
 import Knex from 'knex';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { env } from '../config/env.js';
 
 // ── 连接池配置：根据环境和进程类型智能调整 ──────────────
@@ -21,12 +23,14 @@ const pool = {
     acquireTimeoutMillis: parseInt(process.env.DB_POOL_ACQUIRE_TIMEOUT_MS || '10000', 10),
 };
 
+const migrationsDirectory = join(dirname(fileURLToPath(import.meta.url)), 'migrations');
+
 const knex = Knex({
     client: 'pg',
     connection: env.DATABASE_URL,
     pool,
     migrations: {
-        directory: './src/db/migrations',
+        directory: migrationsDirectory,
         tableName: 'knex_migrations',
     },
 });

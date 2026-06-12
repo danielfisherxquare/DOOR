@@ -2,7 +2,11 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   createWorkspaceSession,
+  canAccessWorkspaceSurface,
+  canCommitWorkspaceProfile,
   getAvailableWorkspaceSurfaces,
+  getWorkspaceProfileKey,
+  getWorkspaceProfileRefreshParams,
   normalizeWorkspaceOptions,
   ORG_OPERATION_SCOPE_VALUE,
   PLATFORM_SCOPE_VALUE,
@@ -209,5 +213,97 @@ describe('workspace session', () => {
     })
 
     assert.equal(redirect, '/app/events/import')
+  })
+
+  it('does not allow stale authz profiles to open a mismatched workspace surface', () => {
+    const session = createWorkspaceSession({
+      orgId: 'org-a',
+      raceId: 'race-1',
+      surface: 'ops',
+    })
+    const user = {
+      surfaceAccess: { app: true, ops: true, admin: false },
+      authzProfile: {
+        scopeType: 'org',
+        orgId: 'org-a',
+        raceId: null,
+        surfaces: ['app', 'ops'],
+      },
+    }
+
+    assert.equal(canAccessWorkspaceSurface({ user, session, surface: 'ops' }), false)
+  })
+
+  it('allows a surface only when the authz profile matches the active workspace', () => {
+    const session = createWorkspaceSession({
+      orgId: 'org-a',
+      raceId: 'race-1',
+      surface: 'ops',
+    })
+    const user = {
+      surfaceAccess: { app: true, ops: true, admin: false },
+      authzProfile: {
+        scopeType: 'race',
+        orgId: 'org-a',
+        raceId: 'race-1',
+        surfaces: ['app', 'ops'],
+      },
+    }
+
+    assert.equal(canAccessWorkspaceSurface({ user, session, surface: 'ops' }), true)
+    assert.equal(canAccessWorkspaceSurface({ user, session, surface: 'admin' }), false)
+  })
+
+  it('requires workspace profile success before committing a workspace selection', () => {
+    const raceScope = {
+      scopeType: 'race',
+      orgId: 'org-a',
+      raceId: 'race-1',
+    }
+
+    assert.equal(canCommitWorkspaceProfile(null, raceScope), false)
+    assert.equal(canCommitWorkspaceProfile({
+      scopeType: 'org',
+      orgId: 'org-a',
+      raceId: null,
+      surfaces: ['app'],
+    }, raceScope), false)
+    assert.equal(canCommitWorkspaceProfile({
+      scopeType: 'race',
+      orgId: 'org-a',
+      raceId: 'race-1',
+      surfaces: ['app'],
+    }, raceScope), true)
+  })
+
+  it('builds explicit authz profile refresh params from the active workspace', () => {
+    assert.deepEqual(getWorkspaceProfileRefreshParams(createWorkspaceSession({
+      scopeType: 'platform',
+      surface: 'admin',
+    })), { scopeType: 'platform' })
+
+    assert.deepEqual(getWorkspaceProfileRefreshParams(createWorkspaceSession({
+      scopeType: 'org',
+      orgId: 'org-a',
+    })), { orgId: 'org-a', raceId: '' })
+
+    assert.deepEqual(getWorkspaceProfileRefreshParams(createWorkspaceSession({
+      scopeType: 'race',
+      orgId: 'org-a',
+      raceId: 'race-1',
+    })), { orgId: 'org-a', raceId: 'race-1' })
+
+    assert.equal(getWorkspaceProfileRefreshParams(createWorkspaceSession({
+      scopeType: 'race',
+      orgId: 'org-a',
+      raceId: '',
+    })), null)
+  })
+
+  it('uses stable workspace profile keys for route guard refresh attempts', () => {
+    assert.equal(getWorkspaceProfileKey({ scopeType: 'platform' }), 'platform')
+    assert.equal(getWorkspaceProfileKey({ scopeType: 'org', orgId: 'org-a' }), 'org-a:')
+    assert.equal(getWorkspaceProfileKey({ scopeType: 'race', orgId: 'org-a', raceId: 'race-1' }), 'org-a:race-1')
+    assert.equal(getWorkspaceProfileKey({ scopeType: 'race', orgId: 'org-a' }), '')
   })
 })

@@ -82,7 +82,64 @@ function canAccessSurface(user, surface) {
   return false
 }
 
-export function getAvailableWorkspaceSurfaces(user) {
+function profileSurfaces(profile) {
+  return Array.isArray(profile?.surfaces) ? profile.surfaces : []
+}
+
+export function canCommitWorkspaceProfile(profile, scope = {}) {
+  if (!profile) return false
+  const expectedScopeType = normalizeScopeType(scope.scopeType, scope.raceId)
+
+  if (expectedScopeType === 'platform') {
+    return profile.scopeType === 'platform'
+  }
+
+  if (toId(profile.orgId) !== toId(scope.orgId)) return false
+
+  if (expectedScopeType === 'race') {
+    return profile.scopeType === 'race' && toId(profile.raceId) === toId(scope.raceId)
+  }
+
+  return profile.scopeType === 'org' && !toId(profile.raceId)
+}
+
+export function getWorkspaceProfileRefreshParams(scope = {}) {
+  const scopeType = normalizeScopeType(scope.scopeType, scope.raceId)
+
+  if (scopeType === 'platform') {
+    return { scopeType: 'platform' }
+  }
+
+  const orgId = toId(scope.orgId)
+  if (!orgId) return null
+
+  if (scopeType === 'race') {
+    const raceId = toId(scope.raceId)
+    if (!raceId) return null
+    return { orgId, raceId }
+  }
+
+  return { orgId, raceId: '' }
+}
+
+export function getWorkspaceProfileKey(scope = {}) {
+  const params = getWorkspaceProfileRefreshParams(scope)
+  if (!params) return ''
+  if (params.scopeType === 'platform') return 'platform'
+  return [params.orgId, params.raceId || ''].join(':')
+}
+
+export function canAccessWorkspaceSurface({ user, session, surface } = {}) {
+  if (!VALID_SURFACES.has(surface)) return false
+  const profile = user?.authzProfile
+  if (!session || !canCommitWorkspaceProfile(profile, session)) return false
+  return profileSurfaces(profile).includes(surface)
+}
+
+export function getAvailableWorkspaceSurfaces(user, session = null) {
+  if (session) {
+    return WORKSPACE_SURFACES.filter((surface) => canAccessWorkspaceSurface({ user, session, surface: surface.key }))
+  }
   return WORKSPACE_SURFACES.filter((surface) => canAccessSurface(user, surface.key))
 }
 

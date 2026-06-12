@@ -97,10 +97,24 @@ describe('profile context options', () => {
             role: 'race_admin',
             orgId: orgAId,
         });
+        await createUser({
+            username: 'ctx_race_admin_no_race',
+            email: 'ctx_race_admin_no_race@test.com',
+            password: 'race-none123',
+            role: 'race_admin',
+            orgId: orgAId,
+        });
         const user = await createUser({
             username: 'ctx_user',
             email: 'ctx_user@test.com',
             password: 'user123',
+            role: 'user',
+            orgId: orgAId,
+        });
+        await createUser({
+            username: 'ctx_user_no_race',
+            email: 'ctx_user_no_race@test.com',
+            password: 'user-none123',
             role: 'user',
             orgId: orgAId,
         });
@@ -117,7 +131,9 @@ describe('profile context options', () => {
             ['super_admin', 'ctx_super', 'super123'],
             ['org_admin', 'ctx_org_admin', 'admin123'],
             ['race_admin', 'ctx_race_admin', 'race123'],
+            ['race_admin_no_race', 'ctx_race_admin_no_race', 'race-none123'],
             ['user', 'ctx_user', 'user123'],
+            ['user_no_race', 'ctx_user_no_race', 'user-none123'],
         ]) {
             const response = await api('/api/auth/login', {
                 method: 'POST',
@@ -205,6 +221,36 @@ describe('profile context options', () => {
                     && item.accessLevel === 'viewer',
             ),
         );
+    });
+
+    it('does not list race options that authz/profile would reject', async () => {
+        const raceAdminResponse = await api('/api/profile/context-options', {
+            headers: authHeader('race_admin_no_race'),
+        });
+        assert.equal(raceAdminResponse.status, 200);
+        assert.deepEqual(raceAdminResponse.body.data.races, []);
+        assert.equal(raceAdminResponse.body.data.canSwitchRace, false);
+        assert.equal(raceAdminResponse.body.data.current.raceId, null);
+
+        const raceProfileResponse = await api(
+            `/api/authz/profile?orgId=${orgAId}&raceId=${raceAId}`,
+            { headers: authHeader('race_admin_no_race') },
+        );
+        assert.equal(raceProfileResponse.status, 403);
+
+        const userResponse = await api('/api/profile/context-options', {
+            headers: authHeader('user_no_race'),
+        });
+        assert.equal(userResponse.status, 200);
+        assert.deepEqual(userResponse.body.data.races, []);
+        assert.equal(userResponse.body.data.canSwitchRace, false);
+        assert.equal(userResponse.body.data.current.raceId, null);
+
+        const userRaceProfileResponse = await api(
+            `/api/authz/profile?orgId=${orgAId}&raceId=${raceAId}`,
+            { headers: authHeader('user_no_race') },
+        );
+        assert.equal(userRaceProfileResponse.status, 403);
     });
 
     it('auth/me returns enriched racePermissions metadata', async () => {

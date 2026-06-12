@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import useWorkspaceStore from '../../features/workspace/workspaceStore'
 import {
+  canCommitWorkspaceProfile,
   createWorkspaceSession,
   ORG_OPERATION_SCOPE_VALUE,
   PLATFORM_SCOPE_VALUE,
@@ -149,17 +150,33 @@ export default function WorkspaceSelectPage() {
 
     setIsSubmitting(true)
     if (selectedScope.scopeType === 'platform') {
+      const profile = await refreshAuthzProfile({ scopeType: 'platform' })
+      if (!canCommitWorkspaceProfile(profile, { scopeType: 'platform' })) {
+        showError('当前账号无法进入该工作区')
+        setIsSubmitting(false)
+        return
+      }
       setWorkspaceSession(createWorkspaceSession({
         scopeType: 'platform',
         surface: 'admin',
       }))
-      await refreshAuthzProfile({ scopeType: 'platform' })
 
       const redirect = searchParams.get('redirect')
       const target = redirect && redirect.startsWith('/admin') && !redirect.startsWith('/login')
         ? redirect
         : '/admin'
       navigate(target, { replace: true })
+      return
+    }
+
+    const profile = await refreshAuthzProfile({ orgId: selectedOrg.id, raceId: selectedRaceId })
+    if (!canCommitWorkspaceProfile(profile, {
+      scopeType: selectedScope.scopeType,
+      orgId: selectedOrg.id,
+      raceId: selectedRaceId,
+    })) {
+      showError('当前账号无法进入该工作区')
+      setIsSubmitting(false)
       return
     }
 
@@ -171,7 +188,6 @@ export default function WorkspaceSelectPage() {
       scopeType: selectedScope.scopeType,
       surface: redirectSurface || 'app',
     }))
-    await refreshAuthzProfile({ orgId: selectedOrg.id, raceId: selectedRaceId })
 
     const redirect = searchParams.get('redirect')
     const target = redirect && redirect.startsWith('/') && !redirect.startsWith('/login')
