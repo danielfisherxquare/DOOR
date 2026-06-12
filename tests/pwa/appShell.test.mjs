@@ -39,13 +39,17 @@ describe('中奥致远 H5 app shell', () => {
     assert.match(main, /import '\.\/registerPwa'/)
 
     const registerPwa = read('src/registerPwa.js')
-    assert.match(registerPwa, /navigator\.serviceWorker\.register\('\/arcspro-app-sw\.js'\)/)
+    assert.match(registerPwa, /APP_SERVICE_WORKER_URL = '\/arcspro-app-sw\.js'/)
+    assert.match(registerPwa, /navigator\.serviceWorker\.register\(APP_SERVICE_WORKER_URL\)/)
+    assert.match(registerPwa, /cleanupLocalAppShellServiceWorkers/)
     assert.match(registerPwa, /beforeinstallprompt/)
 
     const serviceWorker = read('public/arcspro-app-sw.js')
     assert.match(serviceWorker, /ARCSPRO_APP_CACHE/)
     assert.match(serviceWorker, /\/manifest\.webmanifest/)
     assert.match(serviceWorker, /\/app/)
+    assert.match(serviceWorker, /isLocalPreviewWorker/)
+    assert.match(serviceWorker, /self\.registration\.unregister/)
     assert.doesNotMatch(serviceWorker, /sw-tiles\.js/)
   })
 
