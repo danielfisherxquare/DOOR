@@ -13,9 +13,15 @@ export default function LauncherPage() {
   const clearWorkspaceSession = useWorkspaceStore((state) => state.clearWorkspaceSession)
 
   useEffect(() => {
-    if (!isAuthenticated || !session?.orgId) return
-    refreshAuthzProfile({ orgId: session.orgId, raceId: session.raceId })
-  }, [isAuthenticated, refreshAuthzProfile, session?.orgId, session?.raceId])
+    if (!isAuthenticated) return
+    if (session?.scopeType === 'platform') {
+      refreshAuthzProfile({ scopeType: 'platform' })
+      return
+    }
+    if (session?.orgId) {
+      refreshAuthzProfile({ orgId: session.orgId, raceId: session.raceId })
+    }
+  }, [isAuthenticated, refreshAuthzProfile, session?.orgId, session?.raceId, session?.scopeType])
 
   if (isBootstrapping) {
     return (
@@ -34,14 +40,20 @@ export default function LauncherPage() {
     return <Navigate to="/login" replace />
   }
 
-  if (!session?.orgId) {
+  if (!session?.orgId && session?.scopeType !== 'platform') {
     return <Navigate to="/workspaces" replace />
   }
 
   const surfaces = getAvailableWorkspaceSurfaces(user)
-  const scopeLabel = session.raceName || session.raceId || '机构运营'
+  const isPlatformScope = session.scopeType === 'platform'
+  const scopeLabel = isPlatformScope ? '平台控制台' : (session.raceName || session.raceId || '机构运营')
 
   const openSurface = (surface) => {
+    if (isPlatformScope && surface.key !== 'admin') {
+      navigate(`/workspaces/select?redirect=${encodeURIComponent(surface.defaultPath)}`)
+      return
+    }
+
     const path = session[surface.pathKey] || surface.defaultPath
     setWorkspaceSession({ ...session, surface: surface.key })
     navigate(path)
@@ -74,10 +86,10 @@ export default function LauncherPage() {
           <div>
             <p className="workspace-entry__eyebrow">Launcher</p>
             <h1 className="workspace-entry__title">选择入口</h1>
-            <p className="workspace-entry__summary">当前工作区：{session.orgName || session.orgId} / {scopeLabel}</p>
+            <p className="workspace-entry__summary">当前工作区：{session.orgName || session.orgId || '系统平台'} / {scopeLabel}</p>
           </div>
           <div className="workspace-entry__meta-row">
-            <span className="workspace-entry__chip">机构：{session.orgName || session.orgId}</span>
+            <span className="workspace-entry__chip">{isPlatformScope ? '平台：系统平台' : `机构：${session.orgName || session.orgId}`}</span>
             <span className="workspace-entry__chip">范围：{scopeLabel}</span>
           </div>
         </div>

@@ -3,6 +3,47 @@ import assert from 'node:assert/strict';
 import { buildAuthzProfileFromRows } from '../../src/authz/profile.service.js';
 
 describe('authz profile service', () => {
+  it('returns a platform profile for super admins without requiring organization context', async () => {
+    const profile = await buildAuthzProfileFromRows({
+      authContext: { userId: 'u-super', orgId: null, role: 'super_admin' },
+      rows: {
+        organizations: [
+          { id: 'org-1', name: '中奥资源' },
+          { id: 'org-2', name: '合作机构' },
+        ],
+        users: [{ id: 'u-super', org_id: null, role: 'super_admin' }],
+        races: [{ id: 1001, org_id: 'org-1', name: '测试赛事' }],
+        userRacePermissions: [],
+        orgRacePermissions: [],
+        userModuleAccess: [],
+      },
+    });
+
+    assert.equal(profile.scopeType, 'platform');
+    assert.equal(profile.orgId, null);
+    assert.equal(profile.raceId, null);
+    assert.deepEqual(profile.surfaces, ['app', 'ops', 'admin']);
+    assert.equal(profile.modules.includes('app:home'), true);
+    assert.equal(profile.modules.includes('app:design-requests'), true);
+    assert.equal(profile.modules.includes('ops:home'), true);
+    assert.equal(profile.modules.includes('ops:scan'), true);
+    assert.equal(profile.modules.includes('ops:warehouse'), true);
+    assert.equal(profile.modules.includes('admin:dashboard'), true);
+    assert.equal(profile.modules.includes('admin:orgs'), true);
+    assert.equal(profile.modules.includes('admin:identity-center'), true);
+    assert.equal(profile.modules.includes('admin:finance'), true);
+    assert.equal(profile.modules.includes('admin:credentials'), true);
+    assert.deepEqual(profile.workspaceScopes, [
+      {
+        scopeType: 'platform',
+        orgId: null,
+        orgName: '系统平台',
+        raceId: null,
+        raceName: null,
+      },
+    ]);
+  });
+
   it('returns only explicitly granted app modules for a scoped user', async () => {
     const profile = await buildAuthzProfileFromRows({
       authContext: { userId: 'u-designer', orgId: 'org-1', role: 'user' },

@@ -5,7 +5,9 @@ const DEFAULT_PATHS = {
 }
 
 const VALID_SURFACES = new Set(['app', 'ops', 'admin'])
-const VALID_SCOPE_TYPES = new Set(['org', 'race'])
+const VALID_SCOPE_TYPES = new Set(['platform', 'org', 'race'])
+export const PLATFORM_WORKSPACE_ID = '__platform__'
+export const PLATFORM_SCOPE_VALUE = '__platform_control__'
 export const ORG_OPERATION_SCOPE_VALUE = '__org_operation__'
 
 export const WORKSPACE_SURFACES = [
@@ -29,13 +31,14 @@ function normalizeScopeType(scopeType, raceId) {
 
 export function createWorkspaceSession(input = {}) {
   const raceId = toId(input.raceId)
+  const scopeType = normalizeScopeType(input.scopeType, raceId)
   return {
-    orgId: toId(input.orgId),
-    orgName: input.orgName || '',
+    orgId: scopeType === 'platform' ? '' : toId(input.orgId),
+    orgName: scopeType === 'platform' ? (input.orgName || '系统平台') : (input.orgName || ''),
     raceId,
     raceName: input.raceName || '',
-    scopeType: normalizeScopeType(input.scopeType, raceId),
-    surface: normalizeSurface(input.surface),
+    scopeType,
+    surface: normalizeSurface(input.surface || (scopeType === 'platform' ? 'admin' : 'app')),
     lastAppPath: input.lastAppPath || DEFAULT_PATHS.app,
     lastOpsPath: input.lastOpsPath || DEFAULT_PATHS.ops,
     lastAdminPath: input.lastAdminPath || DEFAULT_PATHS.admin,
@@ -59,7 +62,7 @@ export function parseWorkspaceSession(value) {
   try {
     const parsed = typeof value === 'string' ? JSON.parse(value) : value
     const session = parsed?.state?.session || parsed?.session || parsed
-    if (!session?.orgId) return null
+    if (!session?.orgId && session?.scopeType !== 'platform') return null
     return createWorkspaceSession(session)
   } catch {
     return null
@@ -99,18 +102,19 @@ function normalizeOptionId(value) {
 export function normalizeWorkspaceOptions(payload = {}) {
   const races = Array.isArray(payload.races) ? payload.races : []
   const racesByOrgId = new Map()
+  const isSuperAdmin = payload.role === 'super_admin'
 
   for (const race of races) {
     const orgId = normalizeOptionId(race.orgId || race.org_id)
     if (!orgId) continue
-      const normalizedRace = {
-        id: normalizeOptionId(race.id || race.raceId),
-        name: race.name || race.raceName || '未命名赛事',
-        orgId,
-        scopeType: 'race',
-        accessLevel: race.accessLevel || '',
-        sourceType: race.sourceType || race.source || '',
-      }
+    const normalizedRace = {
+      id: normalizeOptionId(race.id || race.raceId),
+      name: race.name || race.raceName || '未命名赛事',
+      orgId,
+      scopeType: 'race',
+      accessLevel: race.accessLevel || '',
+      sourceType: race.sourceType || race.source || '',
+    }
     if (!normalizedRace.id) continue
     const orgRaces = racesByOrgId.get(orgId) || []
     orgRaces.push(normalizedRace)
@@ -145,16 +149,38 @@ export function normalizeWorkspaceOptions(payload = {}) {
       }
     })
     .filter((org) => org.id)
+  const allOrganizations = isSuperAdmin
+    ? [
+        {
+          id: PLATFORM_WORKSPACE_ID,
+          name: '系统平台',
+          slug: 'platform',
+          races: [],
+          scopes: [
+            {
+              id: PLATFORM_SCOPE_VALUE,
+              name: '平台控制台',
+              orgId: '',
+              raceId: '',
+              raceName: '',
+              scopeType: 'platform',
+            },
+          ],
+        },
+        ...organizations,
+      ]
+    : organizations
+  const currentScopeType = payload.current?.scopeType || (payload.current?.raceId ? 'race' : (isSuperAdmin && !payload.current?.orgId ? 'platform' : 'org'))
 
   return {
     role: payload.role || '',
     canSwitchOrg: Boolean(payload.canSwitchOrg),
     canSwitchRace: Boolean(payload.canSwitchRace),
     current: {
-      orgId: normalizeOptionId(payload.current?.orgId),
+      orgId: currentScopeType === 'platform' ? PLATFORM_WORKSPACE_ID : normalizeOptionId(payload.current?.orgId),
       raceId: normalizeOptionId(payload.current?.raceId),
-      scopeType: payload.current?.scopeType || (payload.current?.raceId ? 'race' : 'org'),
+      scopeType: currentScopeType,
     },
-    organizations,
+    organizations: allOrganizations,
   }
 }

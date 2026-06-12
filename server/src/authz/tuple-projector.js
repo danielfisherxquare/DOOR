@@ -1,7 +1,9 @@
 import { getDefaultModules, getRoleDefaultModules } from '../utils/capability-policy.js';
+import { ALL_MODULES } from '../modules/module-access/module-access.registry.js';
 import {
   moduleObjectId,
   organizationObjectId,
+  platformObjectId,
   raceObjectId,
   surfaceObjectId,
   userObjectId,
@@ -17,12 +19,19 @@ const ORG_ADMIN_GOVERNANCE_MODULES = [
 ];
 
 const PLATFORM_ADMIN_GOVERNANCE_MODULES = [
-  ...ORG_ADMIN_GOVERNANCE_MODULES,
-  'admin:orgs',
-  'admin:backups',
-  'admin:audit',
-  'admin:system',
+  ...ALL_MODULES.admin.map((item) => item.id),
 ];
+
+const PLATFORM_ADMIN_ORG_MODULES = [
+  ...ALL_MODULES.app.map((item) => item.id),
+  ...PLATFORM_ADMIN_GOVERNANCE_MODULES,
+];
+
+const PLATFORM_ADMIN_RACE_MODULES = [
+  ...ALL_MODULES.ops.map((item) => item.id),
+];
+
+const PLATFORM_OBJECT = platformObjectId();
 
 function normalizeId(value) {
   if (value === undefined || value === null || value === '') return null;
@@ -105,13 +114,21 @@ export function projectAuthzTuples({
 } = {}) {
   const tuples = createTupleCollector();
   const organizationIds = organizations.map((org) => normalizeId(org.id)).filter(Boolean);
+  const racesByOrgId = new Map();
+
+  for (const orgId of organizationIds) {
+    tuples.add(PLATFORM_OBJECT, 'parent_platform', organizationObjectId(orgId));
+  }
 
   for (const race of races) {
     const orgId = normalizeId(race.org_id || race.orgId);
     const raceId = normalizeRaceId(race.id || race.race_id || race.raceId);
     if (!orgId || !raceId) continue;
+    if (!racesByOrgId.has(orgId)) racesByOrgId.set(orgId, []);
+    racesByOrgId.get(orgId).push(raceId);
     tuples.add(organizationObjectId(orgId), 'parent', raceObjectId(raceId));
     tuples.add(`${organizationObjectId(orgId)}#admin`, 'manager', raceObjectId(raceId));
+    tuples.add(`${organizationObjectId(orgId)}#platform_admin`, 'manager', raceObjectId(raceId));
   }
 
   for (const permission of orgRacePermissions) {
@@ -133,16 +150,18 @@ export function projectAuthzTuples({
     const role = user.role || 'user';
 
     if (role === 'super_admin') {
+      tuples.add(userObject, 'admin', PLATFORM_OBJECT);
       const targetOrgs = organizationIds.length > 0 ? organizationIds : [orgId].filter(Boolean);
       for (const targetOrgId of targetOrgs) {
-        tuples.add(userObject, 'platform_admin', organizationObjectId(targetOrgId));
         tuples.add(`${organizationObjectId(targetOrgId)}#platform_admin`, 'granted', surfaceObjectId({ orgId: targetOrgId, surface: 'app' }));
         tuples.add(`${organizationObjectId(targetOrgId)}#platform_admin`, 'granted', surfaceObjectId({ orgId: targetOrgId, surface: 'admin' }));
-        for (const moduleId of getDefaultModules()) {
+        for (const moduleId of PLATFORM_ADMIN_ORG_MODULES) {
           grantModuleId(tuples, { user: userObject, orgId: targetOrgId, moduleId });
         }
-        for (const moduleId of PLATFORM_ADMIN_GOVERNANCE_MODULES) {
-          grantModuleId(tuples, { user: userObject, orgId: targetOrgId, moduleId });
+        for (const targetRaceId of racesByOrgId.get(targetOrgId) || []) {
+          for (const moduleId of PLATFORM_ADMIN_RACE_MODULES) {
+            grantModuleId(tuples, { user: userObject, orgId: targetOrgId, raceId: targetRaceId, moduleId });
+          }
         }
       }
       continue;

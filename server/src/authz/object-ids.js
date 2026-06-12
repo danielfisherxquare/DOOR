@@ -35,6 +35,10 @@ export function raceObjectId(raceId) {
   return `race:${normalizeRequiredId(raceId, 'raceId')}`;
 }
 
+export function platformObjectId(platformId = 'root') {
+  return `platform:${normalizeRequiredId(platformId, 'platformId')}`;
+}
+
 export function surfaceObjectId({ orgId, raceId, surface } = {}) {
   return `surface:${scopeKey({ orgId, raceId })}/${normalizeSurface(surface)}`;
 }

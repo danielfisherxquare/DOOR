@@ -57,10 +57,31 @@ describe('authz tuple projector', () => {
     });
     const set = tupleSet(tuples);
 
-    assert.equal(set.has('user:u-super|platform_admin|organization:org-1'), true);
+    assert.equal(set.has('user:u-super|admin|platform:root'), true);
+    assert.equal(set.has('platform:root|parent_platform|organization:org-1'), true);
+    assert.equal(set.has('organization:org-1#platform_admin|granted|surface:org-1/admin'), true);
     assert.equal(set.has('user:u-super|granted|module:org-1/app/home'), true);
     assert.equal(set.has('user:u-super|granted|module:org-1/app/profile'), true);
     assert.equal(set.has('user:u-super|granted|module:org-1/admin/identity-center'), true);
+    assert.equal(set.has('user:u-super|granted|module:org-1/admin/finance'), true);
+    assert.equal(set.has('user:u-super|granted|module:org-1/admin/credentials'), true);
+  });
+
+  it('projects platform admins into race-scoped execution modules without forcing org-operation ops', () => {
+    const tuples = projectAuthzTuples({
+      organizations: [{ id: 'org-1' }],
+      users: [{ id: 'u-super', org_id: null, role: 'super_admin' }],
+      races: [{ id: 1001, org_id: 'org-1' }],
+      userRacePermissions: [],
+      orgRacePermissions: [],
+      userModuleAccess: [],
+    });
+    const set = tupleSet(tuples);
+
+    assert.equal(set.has('user:u-super|granted|module:race-1001/ops/scan'), true);
+    assert.equal(set.has('user:u-super|granted|module:race-1001/ops/warehouse'), true);
+    assert.equal(set.has('organization:org-1#platform_admin|manager|race:1001'), true);
+    assert.equal(set.has('user:u-super|granted|module:org-1/ops/scan'), false);
   });
 
   it('projects race_admin role defaults into race-scoped ops module tuples', () => {

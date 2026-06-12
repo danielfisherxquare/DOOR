@@ -1,6 +1,7 @@
 export default function WorkspaceContextDisplay({ roleName, session, selectedOrgId, selectedRaceId, onSwitch }) {
-  const orgLabel = session?.orgName || selectedOrgId || '未选择机构'
-  const scopeLabel = session?.raceName || selectedRaceId || '机构运营'
+  const isPlatformScope = session?.scopeType === 'platform'
+  const orgLabel = isPlatformScope ? '系统平台' : (session?.orgName || selectedOrgId || '未选择机构')
+  const scopeLabel = isPlatformScope ? '平台控制台' : (session?.raceName || selectedRaceId || '机构运营')
 
   return (
     <button type="button" className="workspace-context-display" onClick={onSwitch} title="切换工作区">

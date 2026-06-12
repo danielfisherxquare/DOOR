@@ -84,7 +84,22 @@ export function createLocalChecker({ tuples = [] } = {}) {
 
     const objectType = parseObjectType(object);
 
+    if (objectType === 'platform') {
+      if (relation === 'can_manage') {
+        return evaluate({ user, relation: 'admin', object, state });
+      }
+    }
+
     if (objectType === 'organization') {
+      if (relation === 'platform_admin') {
+        const parentPlatformTuples = tuplesForObjectRelation(object, 'parent_platform');
+        for (const tuple of parentPlatformTuples) {
+          if (await evaluate({ user, relation: 'admin', object: tuple.user, state })) {
+            return true;
+          }
+        }
+        return false;
+      }
       if (relation === 'can_view') {
         return anyRelation(user, ['member', 'admin', 'platform_admin'], object, state);
       }

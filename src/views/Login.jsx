@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import useAuthStore from '../stores/authStore'
+import useWorkspaceStore from '../features/workspace/workspaceStore'
+import { createWorkspaceSession } from '../features/workspace/workspaceSession'
 
 function Login() {
   const [username, setUsername] = useState('')
@@ -9,7 +11,8 @@ function Login() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const { login, isAuthenticated, isLoading, error, clearError, user } = useAuthStore()
+  const { login, isAuthenticated, isLoading, error, clearError, user, getDefaultLandingPath } = useAuthStore()
+  const setWorkspaceSession = useWorkspaceStore((state) => state.setWorkspaceSession)
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -19,10 +22,15 @@ function Login() {
       }
       const params = new URLSearchParams(location.search)
       const redirect = params.get('redirect')
-      const from = location.state?.from?.pathname || (redirect && redirect.startsWith('/') ? redirect : null) || '/workspaces'
+      const hasPlatformProfile = user?.role === 'super_admin' && user?.authzProfile?.scopeType === 'platform'
+      if (hasPlatformProfile) {
+        setWorkspaceSession(createWorkspaceSession({ scopeType: 'platform', surface: 'admin' }))
+      }
+      const platformLanding = hasPlatformProfile ? getDefaultLandingPath() : '/workspaces'
+      const from = location.state?.from?.pathname || (redirect && redirect.startsWith('/') ? redirect : null) || platformLanding
       navigate(from, { replace: true })
     }
-  }, [isAuthenticated, navigate, location, user])
+  }, [getDefaultLandingPath, isAuthenticated, navigate, location, setWorkspaceSession, user])
 
   useEffect(() => () => clearError(), [clearError])
 

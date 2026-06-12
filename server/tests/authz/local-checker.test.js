@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   moduleObjectId,
   organizationObjectId,
+  platformObjectId,
   raceObjectId,
   surfaceObjectId,
   userObjectId,
@@ -13,6 +14,7 @@ describe('authz object ids', () => {
   it('builds stable OpenFGA object ids for workspace resources', () => {
     assert.equal(userObjectId('u-1'), 'user:u-1');
     assert.equal(organizationObjectId('org-1'), 'organization:org-1');
+    assert.equal(platformObjectId(), 'platform:root');
     assert.equal(raceObjectId(1001), 'race:1001');
     assert.equal(surfaceObjectId({ orgId: 'org-1', surface: 'admin' }), 'surface:org-1/admin');
     assert.equal(surfaceObjectId({ raceId: 1001, surface: 'ops' }), 'surface:race-1001/ops');
@@ -23,6 +25,24 @@ describe('authz object ids', () => {
     assert.equal(
       moduleObjectId({ raceId: 1001, surface: 'ops', moduleId: 'scan' }),
       'module:race-1001/ops/scan',
+    );
+  });
+
+  it('derives organization platform_admin from the platform parent', async () => {
+    const checker = createLocalChecker({
+      tuples: [
+        { user: 'user:u-super', relation: 'admin', object: 'platform:root' },
+        { user: 'platform:root', relation: 'parent_platform', object: 'organization:org-1' },
+      ],
+    });
+
+    assert.equal(
+      await checker.check({ user: 'user:u-super', relation: 'can_view', object: 'organization:org-1' }),
+      true,
+    );
+    assert.equal(
+      await checker.check({ user: 'user:u-super', relation: 'can_manage', object: 'organization:org-1' }),
+      true,
     );
   });
 });

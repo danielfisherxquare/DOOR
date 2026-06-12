@@ -5,6 +5,8 @@ import {
   getAvailableWorkspaceSurfaces,
   normalizeWorkspaceOptions,
   ORG_OPERATION_SCOPE_VALUE,
+  PLATFORM_SCOPE_VALUE,
+  PLATFORM_WORKSPACE_ID,
   parseWorkspaceSession,
   resolveWorkspaceSwitchRedirect,
   resolveWorkspaceFromLegacyContext,
@@ -89,6 +91,25 @@ describe('workspace session', () => {
     })
   })
 
+  it('serializes and parses a platform workspace without organization or race context', () => {
+    const session = createWorkspaceSession({
+      scopeType: 'platform',
+      surface: 'admin',
+    })
+
+    assert.deepEqual(parseWorkspaceSession(serializeWorkspaceSession(session)), {
+      orgId: '',
+      orgName: '系统平台',
+      raceId: '',
+      raceName: '',
+      scopeType: 'platform',
+      surface: 'admin',
+      lastAppPath: '/app',
+      lastOpsPath: '/ops',
+      lastAdminPath: '/admin',
+    })
+  })
+
   it('parses a zustand-persisted workspace session', () => {
     const persisted = JSON.stringify({
       state: {
@@ -118,7 +139,24 @@ describe('workspace session', () => {
   it('rejects empty or malformed persisted sessions', () => {
     assert.equal(parseWorkspaceSession(''), null)
     assert.equal(parseWorkspaceSession('{"raceId":"race-1"}'), null)
+    assert.equal(parseWorkspaceSession('{"scopeType":"org"}'), null)
     assert.equal(parseWorkspaceSession('{bad json'), null)
+  })
+
+  it('normalizes super admin workspace options with a platform control scope first', () => {
+    const options = normalizeWorkspaceOptions({
+      role: 'super_admin',
+      current: { scopeType: 'platform' },
+      organizations: [{ id: 'org-1', name: '中奥资源' }],
+      races: [{ raceId: 11, raceName: '测试赛事 A', orgId: 'org-1' }],
+    })
+
+    assert.equal(options.current.orgId, PLATFORM_WORKSPACE_ID)
+    assert.equal(options.current.scopeType, 'platform')
+    assert.equal(options.organizations[0].id, PLATFORM_WORKSPACE_ID)
+    assert.equal(options.organizations[0].name, '系统平台')
+    assert.deepEqual(options.organizations[0].scopes.map((scope) => scope.id), [PLATFORM_SCOPE_VALUE])
+    assert.deepEqual(options.organizations[1].scopes.map((scope) => scope.id), [ORG_OPERATION_SCOPE_VALUE, '11'])
   })
 
   it('normalizes context options into organizations with races', () => {

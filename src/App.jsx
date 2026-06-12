@@ -43,6 +43,7 @@ function withSuspense(element, options = {}) {
 function RootRedirect() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const isBootstrapping = useAuthStore((state) => state.isBootstrapping)
+  const user = useAuthStore((state) => state.user)
   const getDefaultLandingPath = useAuthStore((state) => state.getDefaultLandingPath)
   const workspaceSession = useWorkspaceStore((state) => state.session)
 
@@ -54,12 +55,15 @@ function RootRedirect() {
     return <Navigate to="/login" replace />
   }
 
-  if (!workspaceSession?.orgId) {
+  const hasPlatformScope = workspaceSession?.scopeType === 'platform'
+    || (user?.role === 'super_admin' && user?.authzProfile?.scopeType === 'platform')
+
+  if (!workspaceSession?.orgId && !hasPlatformScope) {
     return <Navigate to="/workspaces" replace />
   }
 
   if (window.location.pathname === '/') {
-    return <Navigate to="/launcher" replace />
+    return <Navigate to={hasPlatformScope ? getDefaultLandingPath() : '/launcher'} replace />
   }
 
   return <Navigate to={getDefaultLandingPath()} replace />

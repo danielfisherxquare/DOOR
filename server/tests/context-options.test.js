@@ -135,6 +135,16 @@ describe('profile context options', () => {
     });
 
     it('super_admin can switch org/race and gets platform source metadata', async () => {
+        const platformResponse = await api('/api/profile/context-options', {
+            headers: authHeader('super_admin'),
+        });
+        assert.equal(platformResponse.status, 200);
+        assert.equal(platformResponse.body.data.current.orgId, null);
+        assert.equal(platformResponse.body.data.current.raceId, null);
+        assert.equal(platformResponse.body.data.current.scopeType, 'platform');
+        assert.equal(platformResponse.body.data.canSwitchOrg, true);
+        assert.equal(platformResponse.body.data.canSwitchRace, false);
+
         const response = await api(`/api/profile/context-options?orgId=${orgAId}&raceId=${raceAId}`, {
             headers: authHeader('super_admin'),
         });
@@ -144,6 +154,7 @@ describe('profile context options', () => {
         assert.equal(response.body.data.canSwitchRace, true);
         assert.equal(response.body.data.current.orgId, orgAId);
         assert.equal(String(response.body.data.current.raceId), String(raceAId));
+        assert.equal(response.body.data.current.scopeType, 'race');
         assert.ok(response.body.data.organizations.some((item) => item.id === orgBId));
         assert.ok(
             response.body.data.races.some(

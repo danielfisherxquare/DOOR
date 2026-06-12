@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import useWorkspaceStore from '../../features/workspace/workspaceStore'
-import { createWorkspaceSession, ORG_OPERATION_SCOPE_VALUE } from '../../features/workspace/workspaceSession'
+import {
+  createWorkspaceSession,
+  ORG_OPERATION_SCOPE_VALUE,
+  PLATFORM_SCOPE_VALUE,
+  PLATFORM_WORKSPACE_ID,
+} from '../../features/workspace/workspaceSession'
 import { fetchWorkspaceOptions } from '../../features/workspace/workspaceApi'
 import { showError } from '../../utils/toast'
 import './workspace-entry.css'
@@ -23,6 +28,14 @@ function WorkspaceState({ message }) {
 export default function WorkspaceSelectPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const redirect = searchParams.get('redirect') || ''
+  const redirectSurface = redirect.startsWith('/ops')
+    ? 'ops'
+    : redirect.startsWith('/app')
+      ? 'app'
+      : redirect.startsWith('/admin')
+        ? 'admin'
+        : ''
   const { isAuthenticated, isBootstrapping, user, logout, refreshAuthzProfile } = useAuthStore()
   const workspaceSession = useWorkspaceStore((state) => state.session)
   const setWorkspaceSession = useWorkspaceStore((state) => state.setWorkspaceSession)
@@ -36,35 +49,60 @@ export default function WorkspaceSelectPage() {
 
   const applyOptions = useCallback((nextOptions, preferredOrgId = '', preferredRaceId = '') => {
     setOptions(nextOptions)
-    const nextOrgId = preferredOrgId || nextOptions.current.orgId || nextOptions.organizations[0]?.id || ''
+    const wantsOperationalSurface = redirectSurface === 'app' || redirectSurface === 'ops'
+    const usesPlatformScope = nextOptions.current.scopeType === 'platform' && !preferredOrgId && !wantsOperationalSurface
+    const firstBusinessOrgId = nextOptions.organizations.find((item) => item.id !== PLATFORM_WORKSPACE_ID)?.id || ''
+    const nextOrgId = usesPlatformScope
+      ? PLATFORM_WORKSPACE_ID
+      : (preferredOrgId || (wantsOperationalSurface && nextOptions.current.scopeType === 'platform' ? firstBusinessOrgId : nextOptions.current.orgId) || nextOptions.organizations[0]?.id || '')
     const org = nextOptions.organizations.find((item) => item.id === nextOrgId) || nextOptions.organizations[0]
-    const nextRaceId = preferredRaceId || nextOptions.current.raceId || ''
-    const nextScopeId = org?.scopes.some((scope) => scope.id === nextRaceId)
-      ? nextRaceId
-      : ORG_OPERATION_SCOPE_VALUE
+    const nextRaceId = usesPlatformScope ? '' : (preferredRaceId || nextOptions.current.raceId || '')
+    const raceScope = org?.scopes.find((scope) => scope.scopeType === 'race')
+    const nextScopeId = usesPlatformScope
+      ? PLATFORM_SCOPE_VALUE
+      : (redirectSurface === 'ops' && !nextRaceId && raceScope
+          ? raceScope.id
+          : org?.scopes.some((scope) => scope.id === nextRaceId)
+          ? nextRaceId
+          : (org?.scopes[0]?.id || ORG_OPERATION_SCOPE_VALUE))
     setSelectedOrgId(org?.id || '')
     setSelectedScopeId(nextScopeId)
-  }, [])
+  }, [redirectSurface])
 
   const loadOptions = useCallback(async (params = {}) => {
     setIsLoading(true)
     try {
       const nextOptions = await fetchWorkspaceOptions(params)
+      const firstBusinessOrgId = nextOptions.organizations.find((item) => item.id !== PLATFORM_WORKSPACE_ID)?.id || ''
+      if (
+        (redirectSurface === 'app' || redirectSurface === 'ops')
+        && !params.orgId
+        && nextOptions.current.scopeType === 'platform'
+        && firstBusinessOrgId
+      ) {
+        const scopedOptions = await fetchWorkspaceOptions({ orgId: firstBusinessOrgId })
+        applyOptions(scopedOptions, firstBusinessOrgId, params.raceId ? String(params.raceId) : '')
+        return
+      }
       applyOptions(nextOptions, params.orgId ? String(params.orgId) : '', params.raceId ? String(params.raceId) : '')
     } catch (error) {
       showError(error.message || '工作区选项加载失败')
     } finally {
       setIsLoading(false)
     }
-  }, [applyOptions])
+  }, [applyOptions, redirectSurface])
 
   useEffect(() => {
     if (!isAuthenticated) return
+    const defaultToPlatform = user?.role === 'super_admin'
+      && user?.authzProfile?.scopeType === 'platform'
+      && redirectSurface !== 'app'
+      && redirectSurface !== 'ops'
     loadOptions({
-      orgId: workspaceSession?.orgId || '',
-      raceId: workspaceSession?.raceId || '',
+      orgId: defaultToPlatform ? '' : (workspaceSession?.orgId || ''),
+      raceId: defaultToPlatform ? '' : (workspaceSession?.raceId || ''),
     })
-  }, [isAuthenticated, loadOptions, workspaceSession?.orgId, workspaceSession?.raceId])
+  }, [isAuthenticated, loadOptions, redirectSurface, user, workspaceSession?.orgId, workspaceSession?.raceId, workspaceSession?.scopeType])
 
   const selectedOrg = useMemo(() => (
     options?.organizations.find((org) => org.id === selectedOrgId) || null
@@ -88,6 +126,10 @@ export default function WorkspaceSelectPage() {
   const handleOrgChange = (event) => {
     const nextOrgId = event.target.value
     setSelectedOrgId(nextOrgId)
+    if (nextOrgId === PLATFORM_WORKSPACE_ID) {
+      setSelectedScopeId(PLATFORM_SCOPE_VALUE)
+      return
+    }
     setSelectedScopeId(ORG_OPERATION_SCOPE_VALUE)
     if (nextOrgId) {
       loadOptions({ orgId: nextOrgId })
@@ -106,13 +148,28 @@ export default function WorkspaceSelectPage() {
     }
 
     setIsSubmitting(true)
+    if (selectedScope.scopeType === 'platform') {
+      setWorkspaceSession(createWorkspaceSession({
+        scopeType: 'platform',
+        surface: 'admin',
+      }))
+      await refreshAuthzProfile({ scopeType: 'platform' })
+
+      const redirect = searchParams.get('redirect')
+      const target = redirect && redirect.startsWith('/admin') && !redirect.startsWith('/login')
+        ? redirect
+        : '/admin'
+      navigate(target, { replace: true })
+      return
+    }
+
     setWorkspaceSession(createWorkspaceSession({
       orgId: selectedOrg.id,
       orgName: selectedOrg.name,
       raceId: selectedRaceId,
       raceName: selectedRace?.name || '',
       scopeType: selectedScope.scopeType,
-      surface: 'app',
+      surface: redirectSurface || 'app',
     }))
     await refreshAuthzProfile({ orgId: selectedOrg.id, raceId: selectedRaceId })
 
@@ -151,8 +208,8 @@ export default function WorkspaceSelectPage() {
         <div className="workspace-entry__header">
           <div>
             <p className="workspace-entry__eyebrow">Workspace</p>
-	            <h1 className="workspace-entry__title">选择工作区</h1>
-            <p className="workspace-entry__summary">先选机构，再选择机构运营或具体赛事。进入应用层、执行层或管理层后，系统会沿用这个工作区。</p>
+            <h1 className="workspace-entry__title">选择工作区</h1>
+            <p className="workspace-entry__summary">系统管理员可直接进入平台控制台；机构和赛事工作区用于限定应用层、执行层和管理层的数据范围。</p>
           </div>
         </div>
 
@@ -160,7 +217,7 @@ export default function WorkspaceSelectPage() {
           <div className="workspace-entry__panel-header">
             <div>
               <h2 className="workspace-entry__panel-title">当前工作区</h2>
-	              <p className="workspace-entry__panel-note">机构运营用于设计、协同和组织级应用；具体赛事用于名单、证件和现场执行。</p>
+              <p className="workspace-entry__panel-note">系统平台用于全局治理；机构运营用于组织级应用；具体赛事用于名单、证件和现场执行。</p>
             </div>
             {isLoading ? <span className="workspace-entry__chip">加载中</span> : null}
           </div>
@@ -191,7 +248,7 @@ export default function WorkspaceSelectPage() {
               >
                 {(selectedOrg?.scopes || []).map((scope) => (
                   <option key={scope.id} value={scope.id}>
-                    {scope.scopeType === 'org' ? '机构运营（不限定赛事）' : scope.name}
+                    {scope.scopeType === 'platform' ? '平台控制台' : (scope.scopeType === 'org' ? '机构运营（不限定赛事）' : scope.name)}
                   </option>
                 ))}
               </select>
@@ -199,7 +256,7 @@ export default function WorkspaceSelectPage() {
 
             <div className="workspace-entry__meta-row">
               {selectedOrg ? <span className="workspace-entry__chip">机构：{selectedOrg.name}</span> : null}
-              {selectedScope ? <span className="workspace-entry__chip">范围：{selectedScope.scopeType === 'org' ? '机构运营' : selectedScope.name}</span> : null}
+              {selectedScope ? <span className="workspace-entry__chip">范围：{selectedScope.scopeType === 'platform' ? '平台控制台' : (selectedScope.scopeType === 'org' ? '机构运营' : selectedScope.name)}</span> : null}
             </div>
 
             <div className="workspace-entry__actions">

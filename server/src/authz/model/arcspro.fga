@@ -3,11 +3,17 @@ model
 
 type user
 
+type platform
+  relations
+    define admin: [user]
+    define can_manage: admin
+
 type organization
   relations
+    define parent_platform: [platform]
     define member: [user]
     define admin: [user]
-    define platform_admin: [user]
+    define platform_admin: [user] or admin from parent_platform
     define can_view: member or admin or platform_admin
     define can_manage: admin or platform_admin
 
@@ -16,7 +22,7 @@ type race
     define parent: [organization]
     define viewer: [user, organization#member]
     define operator: [user]
-    define manager: [user, organization#admin]
+    define manager: [user, organization#admin, organization#platform_admin]
     define can_view: viewer or operator or manager
     define can_operate: operator or manager
     define can_manage: manager

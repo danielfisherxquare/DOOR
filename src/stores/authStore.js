@@ -42,14 +42,18 @@ function readPersistedWorkspaceSession() {
   return parseWorkspaceSession(window.localStorage.getItem(WORKSPACE_SESSION_STORAGE_KEY))
 }
 
-function getProfileOrgId(user, overrideOrgId) {
+function getProfileOrgId(user, overrideOrgId, scopeType) {
+  if (user?.role === 'super_admin' && scopeType === 'platform') return ''
   if (hasValue(overrideOrgId)) return toId(overrideOrgId)
 
   const workspaceSession = readPersistedWorkspaceSession()
+  if (user?.role === 'super_admin' && workspaceSession?.scopeType === 'platform') return ''
+  if (user?.role === 'super_admin') return ''
+
   const userOrgId = getUserOrgId(user)
   if (
     workspaceSession?.orgId
-    && (!userOrgId || userOrgId === workspaceSession.orgId || user?.role === 'super_admin')
+    && (!userOrgId || userOrgId === workspaceSession.orgId)
   ) {
     return workspaceSession.orgId
   }
@@ -111,9 +115,9 @@ const useAuthStore = create(
             set({
               user: response.data,
               isAuthenticated: true,
-              isBootstrapping: false,
             })
-            await get().refreshAuthzProfile()
+            await get().refreshAuthzProfile(response.data?.role === 'super_admin' ? { scopeType: 'platform' } : {})
+            set({ isBootstrapping: false, isAuthenticated: true })
           } else {
             set({ isBootstrapping: false, isAuthenticated: false, user: null, token: null, refreshToken: null })
           }
@@ -143,15 +147,16 @@ const useAuthStore = create(
       canAccessOps: () => get().canAccessSurface('ops'),
       canAccessApp: () => get().canAccessSurface('app'),
 
-      refreshAuthzProfile: async ({ orgId, raceId } = {}) => {
+      refreshAuthzProfile: async ({ orgId, raceId, scopeType } = {}) => {
         const user = get().user
-        const targetOrgId = getProfileOrgId(user, orgId)
-        if (!targetOrgId) return null
+        const targetOrgId = getProfileOrgId(user, orgId, scopeType)
+        const usesPlatformScope = user?.role === 'super_admin' && !targetOrgId
+        if (!targetOrgId && !usesPlatformScope) return null
 
         try {
           const response = await authApi.getAuthzProfile({
-            orgId: targetOrgId,
-            raceId: getProfileRaceId(user, raceId, targetOrgId),
+            orgId: usesPlatformScope ? undefined : targetOrgId,
+            raceId: usesPlatformScope ? undefined : getProfileRaceId(user, raceId, targetOrgId),
           })
           if (response.success) {
             const nextUser = mergeAuthzProfile(get().user, response.data)
@@ -174,12 +179,18 @@ const useAuthStore = create(
               user,
               token: accessToken,
               refreshToken,
+              isAuthenticated: false,
+              isLoading: true,
+              error: null,
+            })
+            await get().refreshAuthzProfile(user.role === 'super_admin' ? { scopeType: 'platform' } : {})
+            const refreshedUser = get().user || user
+            set({
+              user: refreshedUser,
               isAuthenticated: true,
               isLoading: false,
               error: null,
             })
-            await get().refreshAuthzProfile()
-            const refreshedUser = get().user || user
             return {
               success: true,
               mustChangePassword: Boolean(refreshedUser?.mustChangePassword),

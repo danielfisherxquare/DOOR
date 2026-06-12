@@ -36,6 +36,31 @@ await authorize(req, {
 
 ## 设计原则
 
+### 先分清授权级别，再分配模块
+
+系统里有四个层级，不能互相冒充：
+
+| 层级 | OpenFGA 对象 | 典型账号 | 默认入口 | 说明 |
+| --- | --- | --- | --- | --- |
+| 平台层 | `platform:root` | `super_admin` | `/admin` | 系统治理、机构治理、全局身份、全局财务和审计。平台层不需要先选机构或赛事。 |
+| 机构层 | `organization:<orgId>` | `org_admin` | `/admin` 或 `/app` | 管理本机构资料、成员、授权、赛事配置和机构级应用。 |
+| 赛事层 | `race:<raceId>` | `race_admin`、执行人员 | `/ops` 或 `/app` | 现场执行、扫码、领取、仓储、证件等赛事级动作。 |
+| 模块层 | `module:<scope>/<surface>/<moduleId>` | 所有账号 | 随所属入口 | 控制具体应用是否可见、可打开。 |
+
+`super_admin` 的授权来源是 `platform:root#admin`，不是某个组织或赛事。组织和赛事只是在他进入具体业务视图后作为数据过滤上下文。登录后如果没有显式选择工作区，后端必须返回：
+
+```json
+{
+  "scopeType": "platform",
+  "orgId": null,
+  "raceId": null,
+  "surfaces": ["app", "ops", "admin"],
+  "modules": ["app:home", "ops:scan", "admin:dashboard", "admin:orgs", "admin:identity-center"]
+}
+```
+
+这条规则解决“系统管理员必须选择赛事才能管理系统”的根因。
+
 ### 不再把角色当权限答案
 
 角色只负责初始化关系和管理后台展示。运行时不问“这个人是不是 `org_admin`”，只问：
@@ -111,11 +136,17 @@ model
 
 type user
 
+type platform
+  relations
+    define admin: [user]
+    define can_manage: admin
+
 type organization
   relations
+    define parent_platform: [platform]
     define member: [user]
     define admin: [user]
-    define platform_admin: [user]
+    define platform_admin: [user] or admin from parent_platform
     define can_view: member or admin or platform_admin
     define can_manage: admin or platform_admin
 
@@ -124,7 +155,7 @@ type race
     define parent: [organization]
     define viewer: [user, organization#member]
     define operator: [user]
-    define manager: [user, organization#admin]
+    define manager: [user, organization#admin, organization#platform_admin]
     define can_view: viewer or operator or manager
     define can_operate: operator or manager
     define can_manage: manager
@@ -163,7 +194,8 @@ type design_request
 
 ```json
 [
-  { "user": "user:u_super", "relation": "platform_admin", "object": "organization:org_1" },
+  { "user": "user:u_super", "relation": "admin", "object": "platform:root" },
+  { "user": "platform:root", "relation": "parent_platform", "object": "organization:org_1" },
   { "user": "user:u_org_admin", "relation": "admin", "object": "organization:org_1" },
   { "user": "user:u_designer", "relation": "member", "object": "organization:org_1" }
 ]
@@ -269,6 +301,7 @@ GET /api/authz/profile?orgId=org_1&raceId=1001
 {
   "success": true,
   "data": {
+    "scopeType": "race",
     "orgId": "org_1",
     "raceId": "1001",
     "surfaces": ["app", "ops", "admin"],
@@ -276,6 +309,34 @@ GET /api/authz/profile?orgId=org_1&raceId=1001
     "workspaceScopes": [
       { "scopeType": "org", "orgId": "org_1", "raceId": null },
       { "scopeType": "race", "orgId": "org_1", "raceId": "1001" }
+    ]
+  }
+}
+```
+
+超级管理员不带组织和赛事上下文时返回平台画像：
+
+```http
+GET /api/authz/profile
+```
+
+```json
+{
+  "success": true,
+  "data": {
+    "scopeType": "platform",
+    "orgId": null,
+    "raceId": null,
+    "surfaces": ["app", "ops", "admin"],
+    "modules": ["app:home", "ops:scan", "admin:dashboard", "admin:orgs", "admin:identity-center"],
+    "workspaceScopes": [
+      {
+        "scopeType": "platform",
+        "orgId": null,
+        "orgName": "系统平台",
+        "raceId": null,
+        "raceName": null
+      }
     ]
   }
 }
@@ -302,7 +363,8 @@ GET /api/authz/profile?orgId=org_1&raceId=1001
 
 ### Phase 2: 从旧数据投影 tuples
 
-- `users.role` 投影到 `organization#admin/member/platform_admin`。
+- `super_admin` 投影到 `platform:root#admin`，再由 `organization#parent_platform` 派生 `organization#platform_admin`。
+- `org_admin` 和普通成员投影到 `organization#admin/member`。
 - `user_race_permissions` 和 `org_race_permissions` 投影到 `race#viewer/operator/manager`。
 - `user_module_access` 投影到 `module#granted`。
 - role 默认模块不再在运行时 bypass，而是在投影时写成明确 tuple。
@@ -357,7 +419,7 @@ curl -H "Authorization: Bearer <token>" \
 - 设计师：能看到“设计工作台”，直接访问 `/admin/design-requests` 被拒绝。
 - 执行人员：能进执行层扫码或发放入口，不能看到后台规则配置。
 - 组织管理员：能进身份中心和组织管理；没有执行授权时执行层入口不可见。
-- 超级管理员：能进平台治理，但业务动作仍由对象关系决定。
+- 超级管理员：登录后默认进入平台治理，不需要先选机构或赛事；入口权限包含应用端、执行端、管理端。切到应用端或执行端时先选择机构或赛事作为数据上下文，不改变平台授权来源。
 
 ## 风险处理
 

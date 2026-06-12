@@ -255,6 +255,9 @@ router.get('/context-options', requireAuth, async (req, res, next) => {
         current: {
           orgId: selectedOrgId,
           raceId: selectedRaceId,
+          scopeType: account.role === 'super_admin' && !selectedOrgId
+            ? 'platform'
+            : (selectedRaceId ? 'race' : 'org'),
         },
         organizations,
         races,

@@ -11,6 +11,9 @@ import {
 import { projectAuthzTuples } from './tuple-projector.js';
 
 const SURFACES = ['app', 'ops', 'admin'];
+const PLATFORM_ADMIN_MODULES = SURFACES.flatMap((surface) => (
+  (ALL_MODULES[surface] || []).map((item) => item.id)
+));
 
 function normalizeId(value) {
   if (value === undefined || value === null || value === '') return null;
@@ -44,6 +47,25 @@ function objectForModule({ orgId, raceId, fullModuleId }) {
   return moduleObjectId({ orgId, surface: parsed.surface, moduleId: parsed.moduleId });
 }
 
+function buildPlatformProfile() {
+  return {
+    scopeType: 'platform',
+    orgId: null,
+    raceId: null,
+    surfaces: SURFACES,
+    modules: PLATFORM_ADMIN_MODULES,
+    workspaceScopes: [
+      {
+        scopeType: 'platform',
+        orgId: null,
+        orgName: '系统平台',
+        raceId: null,
+        raceName: null,
+      },
+    ],
+  };
+}
+
 async function check(authz, user, relation, object) {
   return authz.check({ user, relation, object });
 }
@@ -57,6 +79,10 @@ export async function buildAuthzProfileFromRows({
   const userId = normalizeId(authContext?.userId);
   const orgId = normalizeId(requestedOrgId || authContext?.orgId);
   const raceId = normalizeId(requestedRaceId);
+
+  if (authContext?.role === 'super_admin' && !orgId) {
+    return buildPlatformProfile();
+  }
 
   if (!userId || !orgId) {
     throw forbidden();
@@ -128,6 +154,7 @@ export async function buildAuthzProfileFromRows({
   }
 
   return {
+    scopeType: raceId ? 'race' : 'org',
     orgId,
     raceId: raceId || null,
     surfaces,
