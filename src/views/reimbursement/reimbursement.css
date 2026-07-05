@@ -2758,6 +2758,60 @@
   min-height: 0;
 }
 
+.reimbursement-tool__mobile-content {
+  display: none;
+}
+
+.reimbursement-tool__desktop-content {
+  display: block;
+}
+
+.reimbursement-mobile-home {
+  display: grid;
+  gap: 14px;
+}
+
+.reimbursement-mobile-home__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reimbursement-mobile-home__actions .btn {
+  min-height: 48px;
+}
+
+.reimbursement-mobile-home__notice,
+.reimbursement-mobile-home__warning {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.reimbursement-mobile-home__section {
+  display: grid;
+  gap: 10px;
+}
+
+.reimbursement-mobile-home__section h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+}
+
+@media (max-width: 768px) {
+  .reimbursement-tool__mobile-content {
+    display: block;
+  }
+
+  .reimbursement-tool__desktop-content {
+    display: none;
+  }
+}
+
 .reimbursement-tool__tabs {
   display: flex;
   gap: var(--spacing-xs);
