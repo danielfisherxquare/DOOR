@@ -111,7 +111,7 @@ function MatchingCenterModal({ visible, onClose }) {
 
   return (
     <div className="matching-modal-overlay" onClick={onClose}>
-      <div className="matching-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="matching-modal matching-modal--mobile-wizard" onClick={(e) => e.stopPropagation()}>
         {/* 头部 */}
         <div className="matching-modal__header">
           <h2 className="matching-modal__title">
@@ -144,7 +144,7 @@ function MatchingCenterModal({ visible, onClose }) {
         {/* 内容区域 */}
         <div className="matching-modal__content">
           {/* 左侧：付款凭证信息 */}
-          <div className="matching-modal__payment">
+          <section className="matching-modal__payment matching-modal__wizard-step matching-modal__wizard-step--payment">
             <h3 className="matching-modal__section-title">待分配的付款凭证</h3>
             <div className="matching-modal__payment-card">
               <div className="matching-modal__payment-info">
@@ -176,10 +176,10 @@ function MatchingCenterModal({ visible, onClose }) {
                 放弃关联，独立作为新记录
               </button>
             </div>
-          </div>
+          </section>
 
           {/* 右侧：候选发票列表 */}
-          <div className="matching-modal__candidates">
+          <section className="matching-modal__candidates matching-modal__wizard-step matching-modal__wizard-step--candidates">
             <h3 className="matching-modal__section-title">候选发票记录</h3>
             {candidates.length > 0 ? (
               <div className="matching-modal__candidates-list">
@@ -222,7 +222,7 @@ function MatchingCenterModal({ visible, onClose }) {
                 未能找到候选记录
               </div>
             )}
-          </div>
+          </section>
         </div>
 
         {/* 底部导航 */}

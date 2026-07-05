@@ -1725,8 +1725,34 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .matching-modal-overlay {
+    align-items: flex-end;
+  }
+
+  .matching-modal--mobile-wizard {
+    position: relative;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    max-height: min(86dvh, 720px);
+    border-radius: 16px 16px 0 0;
+  }
+
   .matching-modal__content {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .matching-modal__wizard-step {
+    display: grid;
+    gap: 10px;
+  }
+
+  .matching-modal__match-btn,
+  .matching-modal__reject-btn,
+  .matching-modal__nav-btn {
+    min-height: 44px;
   }
 }
 

@@ -163,3 +163,12 @@ test('mobile reimbursement queue preserves OCR review and upload metadata', () =
   assert.ok(store.includes("metadata = {}"), 'importToPreview should accept optional upload metadata');
   assert.ok(store.includes("formData.append('sourceDevice'"), 'mobile camera uploads should preserve sourceDevice metadata');
 });
+
+test('matching center supports mobile wizard layout', () => {
+  const modal = read('src/views/reimbursement/components/MatchingCenterModal.jsx');
+  const css = read('src/views/reimbursement/reimbursement.css');
+
+  assert.ok(modal.includes('matching-modal__wizard-step'), 'matching modal should expose wizard sections');
+  assert.ok(css.includes('.matching-modal--mobile-wizard'), 'matching modal should have mobile wizard class');
+  assert.ok(css.includes('bottom: 0'), 'mobile matching modal should behave like a bottom sheet');
+});
