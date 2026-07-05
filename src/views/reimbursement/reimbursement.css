@@ -2911,6 +2911,57 @@
   justify-content: flex-end;
 }
 
+.reimbursement-mobile-record-card {
+  border-radius: var(--radius-md);
+}
+
+.reimbursement-mobile-record-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.reimbursement-mobile-record-card__edit-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.reimbursement-mobile-record-card__edit-field {
+  display: grid;
+  gap: 6px;
+}
+
+.reimbursement-mobile-record-card__edit-field span {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.reimbursement-mobile-record-card__edit-field input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.reimbursement-mobile-record-card__issues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reimbursement-mobile-record-card__issues span {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-light);
+  color: var(--warning);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
   .reimbursement-tool__mobile-content {
     display: block;
