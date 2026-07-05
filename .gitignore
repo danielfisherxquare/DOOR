@@ -76,6 +76,9 @@ server/uploads/apps/*.zip
 # Git backup (auto-created, never needed)
 .git_disabled/
 
+# Local feature worktrees
+.worktrees/
+
 # Build/runtime output
 output/
 dist/
