@@ -135,3 +135,18 @@ test('export actions expose busy and failure feedback instead of raw promise han
   assert.ok(!table.includes('onClick={exportToExcel}'), 'Excel export should not attach the raw async store function');
   assert.ok(!table.includes('onClick={exportWithImages}'), 'ZIP export should not attach the raw async store function');
 });
+
+test('reimbursement module exposes mobile capture and card-first surfaces', () => {
+  const page = read('src/views/reimbursement/ReimbursementTool.jsx');
+  const mobileShell = read('src/views/reimbursement/components/ReimbursementMobileHome.jsx');
+  const table = read('src/views/reimbursement/components/ReimbursementTable.jsx');
+  const css = read('src/views/reimbursement/reimbursement.css');
+
+  assert.ok(page.includes('ReimbursementMobileHome'), 'ReimbursementTool should render a mobile workflow surface');
+  assert.ok(mobileShell.includes('capture="environment"'), 'mobile capture should hint rear camera capture');
+  assert.ok(mobileShell.includes('MobileOcrQueue'), 'mobile flow should render an OCR queue');
+  assert.ok(mobileShell.includes('MobileReviewCard'), 'mobile flow should render review cards');
+  assert.ok(table.includes('AppH5DataTable'), 'record table should use the shared responsive table primitive');
+  assert.ok(table.includes('mobileCards='), 'record table should provide mobile cards');
+  assert.ok(css.includes('.reimbursement-mobile-home'), 'mobile reimbursement shell should have concrete styles');
+});
