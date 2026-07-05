@@ -150,3 +150,16 @@ test('reimbursement module exposes mobile capture and card-first surfaces', () =
   assert.ok(table.includes('mobileCards='), 'record table should provide mobile cards');
   assert.ok(css.includes('.reimbursement-mobile-home'), 'mobile reimbursement shell should have concrete styles');
 });
+
+test('mobile reimbursement queue preserves OCR review and upload metadata', () => {
+  const queue = read('src/views/reimbursement/components/MobileOcrQueue.jsx');
+  const card = read('src/views/reimbursement/components/MobileReviewCard.jsx');
+  const store = read('src/stores/reimbursementStore.js');
+
+  assert.ok(queue.includes("file.status === 'ocr_processing'"), 'mobile queue should keep processing files visible and locked');
+  assert.ok(queue.includes('recognizeFromFile(projectId, file.id, false, { refresh: false })'), 'mobile queue should use the existing paid OCR recognition path');
+  assert.ok(card.includes('getOcrReviewStatus'), 'mobile review cards should show OCR review status');
+  assert.ok(card.includes('getRecordExportIssueLabels'), 'mobile review cards should keep export risk labels visible');
+  assert.ok(store.includes("metadata = {}"), 'importToPreview should accept optional upload metadata');
+  assert.ok(store.includes("formData.append('sourceDevice'"), 'mobile camera uploads should preserve sourceDevice metadata');
+});

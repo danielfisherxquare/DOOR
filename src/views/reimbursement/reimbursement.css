@@ -2802,6 +2802,115 @@
   font-size: var(--font-size-base);
 }
 
+.mobile-ocr-queue,
+.mobile-review-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.mobile-ocr-queue__header,
+.mobile-review-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mobile-ocr-queue__header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+}
+
+.mobile-ocr-queue__header span,
+.mobile-ocr-queue__copy span,
+.mobile-review-card__title span {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.mobile-ocr-queue__notice,
+.mobile-ocr-queue__empty {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted, rgba(15, 23, 42, 0.04));
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.mobile-ocr-queue__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-subtle, rgba(15, 23, 42, 0.08));
+}
+
+.mobile-ocr-queue__copy,
+.mobile-review-card__title {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mobile-ocr-queue__copy strong,
+.mobile-review-card__title strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-review-card__fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.mobile-review-card__fields div {
+  display: grid;
+  gap: 2px;
+}
+
+.mobile-review-card__fields dt {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.mobile-review-card__fields dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.mobile-review-card__issues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mobile-review-card__issues span {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-light);
+  color: var(--warning);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.mobile-review-card__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (max-width: 768px) {
   .reimbursement-tool__mobile-content {
     display: block;
@@ -2809,6 +2918,10 @@
 
   .reimbursement-tool__desktop-content {
     display: none;
+  }
+
+  .mobile-review-card__fields {
+    grid-template-columns: 1fr;
   }
 }
 

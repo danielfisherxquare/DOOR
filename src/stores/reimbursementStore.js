@@ -658,7 +658,7 @@ const useReimbursementStore = create(
         }
       },
 
-      importToPreview: async (projectId, files, documentType = 'invoice') => {
+      importToPreview: async (projectId, files, documentType = 'invoice', metadata = {}) => {
         set({ isLoading: true, error: null });
         try {
           const formData = new FormData();
@@ -666,6 +666,8 @@ const useReimbursementStore = create(
             formData.append('files', file);
           });
           formData.append('documentType', documentType);
+          if (metadata.sourceDevice) formData.append('sourceDevice', metadata.sourceDevice);
+          if (metadata.clientUploadId) formData.append('clientUploadId', metadata.clientUploadId);
 
           const token = getAuthToken();
           const response = await fetch(
