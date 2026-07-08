@@ -4,6 +4,8 @@ import useImportStore from '../../../../stores/importStore'
 import columnMappingsApi from '../../../../api/column-mappings'
 import { parseFile } from '../../../../utils/excelProcessor'
 import useAuthStore from '../../../../stores/authStore'
+import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
+import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../../../utils/surfaceContext'
 import {
   AppH5ContextState,
   AppH5EmptyState,
@@ -26,10 +28,10 @@ const STEPS = [
 
 export default function ImportPage() {
   const [searchParams] = useSearchParams()
-  const raceId = searchParams.get('raceId')
-  const orgId = searchParams.get('orgId')
-
   const user = useAuthStore((state) => state.user)
+  const session = useWorkspaceStore((state) => state.session)
+  const orgId = resolveSurfaceOrgId(searchParams, user, session)
+  const raceId = resolveSurfaceRaceId(searchParams, user, orgId, session)
   const role = user?.role
 
   const {

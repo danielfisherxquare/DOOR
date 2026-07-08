@@ -3,7 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import bibApi from '../../../../api/bib'
 import bibTrackingApi from '../../../../api/bibTracking'
 import pipelineApi from '../../../../api/pipeline'
+import useAuthStore from '../../../../stores/authStore'
 import useRaceContextStore from '../../../../stores/raceContextStore'
+import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
+import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../../../utils/surfaceContext'
 import {
   AppH5ContextState,
   AppH5DataTable,
@@ -246,7 +249,11 @@ function buildEventPlans(eligibleByEventExcludingS, startZones, zonePreviewRecor
 
 export default function BibPage() {
   const [searchParams] = useSearchParams()
-  const raceId = Number(searchParams.get('raceId') || 0)
+  const user = useAuthStore((state) => state.user)
+  const session = useWorkspaceStore((state) => state.session)
+  const orgId = resolveSurfaceOrgId(searchParams, user, session)
+  const resolvedRaceId = resolveSurfaceRaceId(searchParams, user, orgId, session)
+  const raceId = Number(resolvedRaceId || 0)
   const currentRace = useRaceContextStore((state) => state.currentRace)
   const [loading, setLoading] = useState(false)
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)

@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import racesApi from '../../../../api/races'
+import useAuthStore from '../../../../stores/authStore'
 import useRaceContextStore from '../../../../stores/raceContextStore'
+import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
 import { unwrapData } from '../../../../utils/apiResponse'
+import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../../../utils/surfaceContext'
 import {
   AppH5ContextState,
   AppH5Surface,
@@ -25,7 +28,10 @@ const TABS = [
 
 export default function ProcessingCenterPage() {
   const [searchParams] = useSearchParams()
-  const raceId = searchParams.get('raceId')
+  const user = useAuthStore((state) => state.user)
+  const session = useWorkspaceStore((state) => state.session)
+  const orgId = resolveSurfaceOrgId(searchParams, user, session)
+  const raceId = resolveSurfaceRaceId(searchParams, user, orgId, session)
   const tabParam = searchParams.get('tab')
   const initialTab = TABS.some((item) => item.key === tabParam) ? tabParam : 'records'
   const [activeTab, setActiveTab] = useState(initialTab)

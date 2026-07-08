@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import useAuthStore from '../../../../stores/authStore'
 import useRaceContextStore from '../../../../stores/raceContextStore'
+import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
+import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../../../utils/surfaceContext'
 import {
   AppH5ContextState,
   AppH5Surface,
@@ -10,7 +13,10 @@ import './records-page.css'
 
 export default function RecordsPage() {
   const [searchParams] = useSearchParams()
-  const raceId = searchParams.get('raceId')
+  const user = useAuthStore((state) => state.user)
+  const session = useWorkspaceStore((state) => state.session)
+  const orgId = resolveSurfaceOrgId(searchParams, user, session)
+  const raceId = resolveSurfaceRaceId(searchParams, user, orgId, session)
   const currentRace = useRaceContextStore((state) => state.currentRace)
 
   const metrics = useMemo(() => ([

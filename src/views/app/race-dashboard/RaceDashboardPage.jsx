@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import useAuthStore from '../../../stores/authStore';
+import useWorkspaceStore from '../../../features/workspace/workspaceStore';
 import racesApi from '../../../api/races';
+import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../../utils/surfaceContext';
 import { useDashboardData } from './hooks/useDashboardData';
 import StatCardGrid from './components/StatCardGrid';
 import EventDistribution from './components/EventDistribution';
@@ -16,10 +18,11 @@ const REFRESH_INTERVAL = 30000; // 30 seconds
 
 function RaceDashboardPage() {
     const { user } = useAuthStore();
+    const session = useWorkspaceStore((state) => state.session);
     const [searchParams] = useSearchParams();
 
-    const selectedOrgId = searchParams.get('orgId') || '';
-    const selectedRaceId = searchParams.get('raceId') || '';
+    const selectedOrgId = resolveSurfaceOrgId(searchParams, user, session);
+    const selectedRaceId = resolveSurfaceRaceId(searchParams, user, selectedOrgId, session);
     const fullscreenParam = searchParams.get('fullscreen') === 'true';
 
     const [races, setRaces] = useState([]);

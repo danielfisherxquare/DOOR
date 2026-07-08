@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import clothingApi from '../../../../api/clothing'
+import useAuthStore from '../../../../stores/authStore'
 import useRaceContextStore from '../../../../stores/raceContextStore'
+import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
+import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../../../utils/surfaceContext'
 import {
   AppH5ContextState,
   AppH5DataTable,
@@ -14,7 +17,10 @@ import './clothing-page.css'
 
 export default function ClothingPage() {
   const [searchParams] = useSearchParams()
-  const raceId = searchParams.get('raceId')
+  const user = useAuthStore((state) => state.user)
+  const session = useWorkspaceStore((state) => state.session)
+  const orgId = resolveSurfaceOrgId(searchParams, user, session)
+  const raceId = resolveSurfaceRaceId(searchParams, user, orgId, session)
   const currentRace = useRaceContextStore(state => state.currentRace)
 
   const [loading, setLoading] = useState(false)

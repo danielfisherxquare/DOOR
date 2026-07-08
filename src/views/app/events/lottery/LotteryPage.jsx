@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import pipelineApi from '../../../../api/pipeline'
 import racesApi from '../../../../api/races'
+import useAuthStore from '../../../../stores/authStore'
 import useRaceContextStore from '../../../../stores/raceContextStore'
+import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
 import { unwrapData } from '../../../../utils/apiResponse'
+import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../../../utils/surfaceContext'
 import {
   AppH5ContextState,
   AppH5Notice,
@@ -27,7 +30,10 @@ const STEPS = [
 
 export default function LotteryPage() {
   const [searchParams] = useSearchParams()
-  const raceId = searchParams.get('raceId')
+  const user = useAuthStore((state) => state.user)
+  const session = useWorkspaceStore((state) => state.session)
+  const orgId = resolveSurfaceOrgId(searchParams, user, session)
+  const raceId = resolveSurfaceRaceId(searchParams, user, orgId, session)
   const currentRace = useRaceContextStore((state) => state.currentRace)
   const [activeStep, setActiveStep] = useState('capacity')
   const [raceDetail, setRaceDetail] = useState(null)

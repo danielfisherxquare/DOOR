@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import bibTrackingApi from '../../../../api/app/bibTracking'
 import racesApi from '../../../../api/races'
 import useAuthStore from '../../../../stores/authStore'
+import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
+import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../../../utils/surfaceContext'
 import {
     AppH5ContextState,
     AppH5DataTable,
@@ -69,11 +71,12 @@ function statusTone(value) {
 
 function BibTrackingPage() {
     const { user } = useAuthStore()
+    const session = useWorkspaceStore((state) => state.session)
     const isSuperAdmin = user?.role === 'super_admin'
     const [searchParams, setSearchParams] = useSearchParams()
 
-    const selectedOrgId = searchParams.get('orgId') || ''
-    const selectedRaceId = searchParams.get('raceId') || ''
+    const selectedOrgId = resolveSurfaceOrgId(searchParams, user, session)
+    const selectedRaceId = resolveSurfaceRaceId(searchParams, user, selectedOrgId, session)
     const statusParam = searchParams.get('status') || ''
     const keywordParam = searchParams.get('keyword') || ''
     const currentPage = Math.max(1, Number(searchParams.get('page') || 1))

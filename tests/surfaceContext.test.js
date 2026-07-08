@@ -39,4 +39,19 @@ describe('surface context helpers', () => {
 
     assert.equal(resolveSurfaceRaceId(searchParams, user, 'org-a'), '42')
   })
+
+  it('uses the workspace session race when legacy URL params are absent', () => {
+    const searchParams = createSearchParams()
+    const user = {
+      preferences: { lastOrgId: 'org-old', lastRaceId: 'race-old' },
+    }
+    const session = {
+      orgId: 'org-workspace',
+      raceId: 'race-workspace',
+      scopeType: 'race',
+    }
+
+    assert.equal(resolveSurfaceOrgId(searchParams, user, session), 'org-workspace')
+    assert.equal(resolveSurfaceRaceId(searchParams, user, 'org-workspace', session), 'race-workspace')
+  })
 })
