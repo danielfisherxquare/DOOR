@@ -5,16 +5,39 @@ const TABLE = 'jobs';
 
 /**
  * 入队一个 Job（幂等）
- * 若同 org_id + type + idempotency_key 已有 queued/running 的 Job，则返回旧 Job
+ * 若同 org_id + type + idempotency_key 已有 queued/running 的 Job，则返回旧 Job；
+ * 若已有 failed Job，则重置为 queued 支持原业务动作重试。
  */
 export async function enqueue(orgId, type, payload, idempotencyKey, createdBy, raceId = null) {
-    // 先查是否已有未完成的同 key Job
+    // 先查是否已有同 key Job。表上有唯一约束，failed Job 也会占用 key。
     const existing = await knex(TABLE)
         .where({ org_id: orgId, type, idempotency_key: idempotencyKey })
-        .whereIn('status', ['queued', 'running'])
         .first();
 
     if (existing) {
+        if (existing.status === 'failed') {
+            const [row] = await knex(TABLE)
+                .where({ id: existing.id, status: 'failed' })
+                .update({
+                    race_id: raceId,
+                    status: 'queued',
+                    progress: 0,
+                    message: null,
+                    payload: JSON.stringify(payload),
+                    result: null,
+                    error: null,
+                    attempt_count: 0,
+                    lease_owner: null,
+                    lease_expires_at: null,
+                    started_at: null,
+                    finished_at: null,
+                    created_by: createdBy,
+                })
+                .returning('*');
+
+            return fromDbRow(row);
+        }
+
         return fromDbRow(existing);
     }
 

@@ -53,6 +53,29 @@ describe('Job Repository', () => {
             assert.equal(job1.id, job2.id);
         });
 
+        it('同 key 的 failed Job 可重置为 queued 以支持重试', async () => {
+            const job1 = await jobRepo.enqueue(
+                TEST_ORG_ID, 'echo', { v: 1 }, 'retry-key', TEST_USER_ID
+            );
+            const claimed = await jobRepo.claim(WORKER_ID, LEASE_MS);
+            await jobRepo.fail(claimed.id, WORKER_ID, {
+                code: 'TEST_ERROR',
+                message: 'failed once',
+            });
+
+            const job2 = await jobRepo.enqueue(
+                TEST_ORG_ID, 'echo', { v: 2 }, 'retry-key', TEST_USER_ID
+            );
+
+            assert.equal(job2.id, job1.id);
+            assert.equal(job2.status, 'queued');
+            assert.equal(job2.progress, 0);
+            assert.equal(job2.attemptCount, 0);
+            assert.deepEqual(job2.payload, { v: 2 });
+            assert.equal(job2.error, null);
+            assert.equal(job2.finishedAt, null);
+        });
+
         it('不同 key 可以同时入队', async () => {
             const job1 = await jobRepo.enqueue(
                 TEST_ORG_ID, 'echo', {}, 'key-a', TEST_USER_ID

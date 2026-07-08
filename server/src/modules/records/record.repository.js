@@ -437,6 +437,43 @@ export function streamByRaceId(orgId, raceId) {
 
 // ── 校验成绩导入 ──────────────────────────────────────
 
+const PERSONAL_BEST_COLUMNS = new Set(['personal_best_full', 'personal_best_half']);
+
+export function buildPersonalBestCaseUpdateSql({ items, column, raceId, orgId }) {
+    if (!PERSONAL_BEST_COLUMNS.has(column)) {
+        throw new Error(`Invalid personal best column: ${column}`);
+    }
+    if (!Array.isArray(items) || items.length === 0) {
+        throw new Error('items must be a non-empty array');
+    }
+
+    const hashes = items.map(b => b.hash);
+    const whenClauses = items.map(() => 'WHEN id_number_hash = ? THEN ?::jsonb').join(' ');
+    const whenParams = items.flatMap(b => [b.hash, b.pbJson]);
+
+    const orgClause = orgId ? 'AND org_id = ?' : '';
+    const orgParams = orgId ? [orgId] : [];
+
+    const sql = `
+        UPDATE records
+        SET ${column} = CASE ${whenClauses} END,
+            updated_at = NOW()
+        WHERE race_id = ?
+          AND id_number_hash IN (${hashes.map(() => '?').join(',')})
+          ${orgClause}
+    `;
+
+    return {
+        sql,
+        params: [
+            ...whenParams,
+            raceId,
+            ...hashes,
+            ...orgParams,
+        ],
+    };
+}
+
 /**
  * 批量导入校验成绩（更新 personal_best_full / personal_best_half）
  * @param {string} orgId
@@ -497,28 +534,13 @@ export async function importVerificationResults(orgId, raceId, results) {
         async function batchCaseUpdate(items, column) {
             for (let i = 0; i < items.length; i += BATCH) {
                 const batch = items.slice(i, i + BATCH);
-                const hashes = batch.map(b => b.hash);
-                const whenClauses = batch.map(() => 'WHEN id_number_hash = ? THEN ?::text').join(' ');
-                const whenParams = batch.flatMap(b => [b.hash, b.pbJson]);
-
-                const orgClause = orgId ? 'AND org_id = ?' : '';
-                const orgParams = orgId ? [orgId] : [];
-
-                const sql = `
-                    UPDATE records
-                    SET ${column} = CASE ${whenClauses} END,
-                        updated_at = NOW()
-                    WHERE race_id = ?
-                      AND id_number_hash IN (${hashes.map(() => '?').join(',')})
-                      ${orgClause}
-                `;
-
-                const result = await trx.raw(sql, [
-                    ...whenParams,
-                    safeRaceId,
-                    ...hashes,
-                    ...orgParams,
-                ]);
+                const { sql, params } = buildPersonalBestCaseUpdateSql({
+                    items: batch,
+                    column,
+                    raceId: safeRaceId,
+                    orgId,
+                });
+                const result = await trx.raw(sql, params);
 
                 totalUpdated += result.rowCount || 0;
             }
@@ -534,4 +556,3 @@ export async function importVerificationResults(orgId, raceId, results) {
 
     return { updated: totalUpdated };
 }
-
