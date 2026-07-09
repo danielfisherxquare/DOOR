@@ -16,6 +16,15 @@ test('audit API uses surface-aware app and admin routes', () => {
   assert.equal(source.includes("request.post(`/audit/"), false)
 })
 
+test('audit job polling uses surface-aware app and admin job routes', () => {
+  const source = read('src/api/audit.js')
+
+  assert.equal(source.includes("app: '/app/jobs'"), true)
+  assert.equal(source.includes("admin: '/admin/jobs'"), true)
+  assert.equal(source.includes("request.get(`/jobs/"), false)
+  assert.match(source, /request\.get\(`\$\{getJobsBasePath\(\)\}\//)
+})
+
 test('app event routes expose audit endpoints for the H5 processing surface', () => {
   const source = read('server/src/app.js')
 

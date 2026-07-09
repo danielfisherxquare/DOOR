@@ -22,6 +22,16 @@ function getBasePath() {
     )
 }
 
+function getJobsBasePath() {
+    return resolveSurfacePrefix(
+        {
+            admin: '/admin/jobs',
+            app: '/app/jobs',
+        },
+        'app'
+    )
+}
+
 /**
  * 轮询 Job 结果
  * @param {string} jobId - Job ID
@@ -36,7 +46,7 @@ async function pollJobResult(jobId, options = {}) {
     const startTime = Date.now()
 
     while (true) {
-        const resp = await request.get(`/jobs/${jobId}`)
+        const resp = await request.get(`${getJobsBasePath()}/${jobId}`)
         const job = unwrapData(resp)
 
         if (!job) throw new Error('Job 不存在')
