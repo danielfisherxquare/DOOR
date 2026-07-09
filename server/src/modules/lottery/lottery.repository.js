@@ -261,8 +261,20 @@ export async function getConflicts(orgId, raceId) {
             'w.list_type': 'whitelist',
             'b.list_type': 'blacklist',
         })
-        .select('w.id_number', 'w.name');
-    // 使用 mapper 解密 id_number
+        .select(
+            'w.id',
+            'w.org_id',
+            'w.race_id',
+            'w.list_type',
+            'w.name',
+            'w.id_number',
+            'w.phone',
+            'w.matched_record_id',
+            'w.match_type',
+            'w.created_at',
+            'w.id_number_hash',
+        );
+    // 使用 mapper 解密 id_number，必须保留 org_id / race_id 以匹配加密时的 AAD
     return rows.map(lotteryListMapper.fromDbRow);
 }
 

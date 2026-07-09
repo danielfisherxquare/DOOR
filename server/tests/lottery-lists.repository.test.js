@@ -93,4 +93,37 @@ describe('lottery list repository fallback upsert', () => {
             `);
         }
     });
+
+    it('decrypts conflict rows with the lottery list encryption context', async () => {
+        const idNumber = '320101199902021111';
+
+        await lotteryRepo.saveLists(orgId, [
+            {
+                raceId,
+                listType: 'whitelist',
+                name: 'Whitelist Runner',
+                idNumber,
+                phone: '13900139000',
+                matchedRecordId: null,
+                matchType: null,
+            },
+            {
+                raceId,
+                listType: 'blacklist',
+                name: 'Blacklist Runner',
+                idNumber,
+                phone: '13900139001',
+                matchedRecordId: null,
+                matchType: null,
+            },
+        ]);
+
+        const conflicts = await lotteryRepo.getConflicts(orgId, raceId);
+        const conflict = conflicts.find(entry => entry.name === 'Whitelist Runner');
+
+        assert.ok(conflict);
+        assert.equal(conflict.idNumber, idNumber);
+        assert.equal(conflict.phone, '13900139000');
+        assert.notEqual(conflict.idNumber, '***解密失败***');
+    });
 });
