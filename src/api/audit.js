@@ -1,5 +1,6 @@
 import request from '../utils/request'
 import { unwrapData } from '../utils/apiResponse'
+import { resolveSurfacePrefix } from '../utils/surfaceApi'
 
 /**
  * 审核 API — 对应后端 /api/audit
@@ -10,6 +11,16 @@ import { unwrapData } from '../utils/apiResponse'
 
 const JOB_POLL_INTERVAL = 1000  // 1 秒
 const JOB_POLL_TIMEOUT = 120000 // 2 分钟
+
+function getBasePath() {
+    return resolveSurfacePrefix(
+        {
+            admin: '/admin/audit',
+            app: '/app/audit',
+        },
+        'app'
+    )
+}
 
 /**
  * 轮询 Job 结果
@@ -57,11 +68,11 @@ async function pollJobResult(jobId, options = {}) {
 export const auditApi = {
     // ── 统计 ──────────────────────────────────────────────────
     getPrepStats: (raceId) =>
-        request.get(`/audit/prep-stats/${raceId}`).then(unwrapData),
+        request.get(`${getBasePath()}/prep-stats/${raceId}`).then(unwrapData),
 
     // ── 重置 ──────────────────────────────────────────────────
     resetAudit: (raceId) =>
-        request.post(`/audit/reset/${raceId}`).then(unwrapData),
+        request.post(`${getBasePath()}/reset/${raceId}`).then(unwrapData),
 
     // ── 5 步审核（含 Job 轮询封装）──────────────────────────
     /**
@@ -73,7 +84,7 @@ export const auditApi = {
      * @returns {Promise<{ affected: number, remaining: number }>}
      */
     runAuditStep: async (stepName, raceId, payload = {}, options = {}) => {
-        const resp = await request.post(`/audit/step/${stepName}/${raceId}`, payload)
+        const resp = await request.post(`${getBasePath()}/step/${stepName}/${raceId}`, payload)
         const { jobId } = unwrapData(resp)
         return pollJobResult(jobId, options)
     },

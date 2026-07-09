@@ -120,6 +120,7 @@ app.use('/api/app/column-mappings', appEventsPermission, columnMappingRoutes);
 app.use('/api/app/import-sessions', appEventsPermission, importSessionRoutes);
 app.use('/api/app/lottery', appEventsPermission, lotteryRoutes);
 app.use('/api/app/lottery-v2', appEventsPermission, lotteryV2Routes);
+app.use('/api/app/audit', appEventsPermission, auditRoutes);
 app.use('/api/app/clothing', appEventsPermission, clothingRoutes);
 app.use('/api/app/pipeline', appEventsPermission, pipelineRoutes);
 app.use('/api/app/bib', appEventsPermission, bibRoutes);
