@@ -25,6 +25,7 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
   const [activeListType, setActiveListType] = useState('whitelist')
   const [listEntries, setListEntries] = useState([])
   const [fullRecords, setFullRecords] = useState([])
+  const [recordTotal, setRecordTotal] = useState(0)
   const [conflictRule, setConflictRule] = useState('strict')
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(false)
@@ -39,20 +40,21 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
 
     setLoading(true)
     try {
-      const [listsResponse, records, raceResponse] = await Promise.all([
+      const [listsResponse, statsResponse, raceResponse] = await Promise.all([
         lotteryApi.getLotteryLists(Number(raceId)),
-        fetchAllRecords(Number(raceId)),
+        recordsApi.quickStats(Number(raceId)).catch(() => null),
         raceDetail ? Promise.resolve({ data: raceDetail }) : racesApi.getById(Number(raceId)).catch(() => null),
       ])
 
       setListEntries(unwrapData(listsResponse) || [])
-      setFullRecords(records)
+      setRecordTotal(Number(unwrapData(statsResponse)?.totalRows || 0))
       setConflictRule(unwrapData(raceResponse)?.conflictRule || raceDetail?.conflictRule || 'strict')
     } catch (err) {
       setMessage(`加载黑白名单失败：${err.message}`)
       setMessageTone('danger')
       setListEntries([])
       setFullRecords([])
+      setRecordTotal(0)
     } finally {
       setLoading(false)
     }
@@ -68,8 +70,19 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
     setMatching(true)
     try {
       const effectiveRule = ruleOverride || conflictRule
-      const records = await fetchAllRecords(Number(raceId))
       const currentEntries = unwrapData(await lotteryApi.getLotteryLists(Number(raceId))) || []
+
+      if (currentEntries.length === 0) {
+        setListEntries([])
+        setFullRecords([])
+        if (announce) {
+          setMessage('当前没有黑白名单条目，无需重新应用匹配。')
+          setMessageTone('info')
+        }
+        return
+      }
+
+      const records = await fetchAllRecords(Number(raceId))
       const resolvedEntries = buildResolvedEntries(currentEntries, records)
 
       if (resolvedEntries.length > 0) {
@@ -242,8 +255,8 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
       }
 
       await lotteryApi.bulkPutLotteryLists(entries)
-      await refreshMatching({ announce: false })
-      setMessage(`已导入 ${entries.length} 条${activeListType === 'whitelist' ? '白' : '黑'}名单。`)
+      await loadData()
+      setMessage(`已导入 ${entries.length} 条${activeListType === 'whitelist' ? '白' : '黑'}名单。需要写回选手状态时，请点击“重新应用匹配”。`)
       setMessageTone('success')
     } catch (err) {
       setMessage(`导入失败：${err.message}`)
@@ -251,7 +264,7 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
     } finally {
       setLoading(false)
     }
-  }, [activeListType, listEntries, raceId, refreshMatching])
+  }, [activeListType, listEntries, loadData, raceId])
 
   const currentEntries = useMemo(() => {
     const current = listEntries.filter((entry) => entry.listType === activeListType)
@@ -273,9 +286,9 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
       whitelistMatched: whitelist.filter((entry) => entry.matchedRecordId).length,
       blacklistTotal: blacklist.length,
       blacklistMatched: blacklist.filter((entry) => entry.matchedRecordId).length,
-      recordTotal: fullRecords.length,
+      recordTotal: fullRecords.length || recordTotal,
     }
-  }, [fullRecords.length, listEntries])
+  }, [fullRecords.length, listEntries, recordTotal])
 
   const currentTabMeta = LIST_TABS.find((item) => item.key === activeListType) || LIST_TABS[0]
 

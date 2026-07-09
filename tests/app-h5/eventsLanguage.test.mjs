@@ -224,3 +224,20 @@ test('event workbench inner panels use H5 primitives', () => {
     }
   }
 });
+
+test('lottery lists import avoids automatic full-record rematching', () => {
+  const page = read('src/views/app/events/processing/LotteryListsPanel.jsx');
+  const loadDataBlock = page.slice(
+    page.indexOf('const loadData = useCallback'),
+    page.indexOf('const refreshMatching = useCallback'),
+  );
+  const importBlock = page.slice(
+    page.indexOf('const handleImport = useCallback'),
+    page.indexOf('const currentEntries = useMemo'),
+  );
+
+  assert.ok(loadDataBlock.includes('recordsApi.quickStats'), 'initial list load should use lightweight record stats');
+  assert.ok(!loadDataBlock.includes('fetchAllRecords'), 'initial list load should not fetch every record');
+  assert.ok(!importBlock.includes('refreshMatching('), 'Excel import should not automatically run full rematching');
+  assert.ok(importBlock.includes('await loadData()'), 'Excel import should refresh list data after saving entries');
+});
