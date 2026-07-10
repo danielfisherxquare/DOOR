@@ -1,50 +1,18 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useMatch, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import { getAppNavGroups, getAppRouteMeta, buildAppHref } from './appConfig'
 import AppMapLayout from './AppMapLayout'
-import CapabilityProtectedRoute from '../CapabilityProtectedRoute'
-import ModuleProtectedRoute from '../ModuleProtectedRoute'
 import WorkspaceContextDisplay from '../../features/workspace/WorkspaceContextDisplay'
 import useSurfaceWorkspace from '../../features/workspace/useSurfaceWorkspace'
 import useSidebarMotion from '../shared/useSidebarMotion'
 import { showInfo } from '../../utils/toast'
+import AppSurfaceRoutes, { AppRouteGuard } from '../../routes/appRoutes'
 import './app-layout.css'
 
-const Home = lazy(() => import('../../views/Home'))
-const ReimbursementTool = lazy(() => import('../../views/reimbursement/ReimbursementTool'))
-const ChangePassword = lazy(() => import('../../views/ChangePassword'))
-const StudioProjectsPage = lazy(() => import('../../views/app/StudioProjectsPage'))
 const StudioProjectPage = lazy(() => import('../../views/app/StudioProjectPage'))
-const TerrainModelPage = lazy(() => import('../../views/app/terrain-model/TerrainModelPage'))
-const ProfilePage = lazy(() => import('../../views/profile/ProfilePage'))
-const ImportPage = lazy(() => import('../../views/app/events/import/ImportPage'))
-const ProcessingCenterPage = lazy(() => import('../../views/app/events/processing/ProcessingCenterPage'))
-const RecordsPage = lazy(() => import('../../views/app/events/records/RecordsPage'))
-const LotteryPage = lazy(() => import('../../views/app/events/lottery/LotteryPage'))
-const BibPage = lazy(() => import('../../views/app/events/bib/BibPage'))
-const ClothingPage = lazy(() => import('../../views/app/events/clothing/ClothingPage'))
-const WmsDashboard = lazy(() => import('../../views/inventory/WmsDashboard'))
-const InboundCenter = lazy(() => import('../../views/inventory/InboundCenter'))
-const OutboundCenter = lazy(() => import('../../views/inventory/OutboundCenter'))
-const SpaceCenter = lazy(() => import('../../views/inventory/SpaceCenter'))
-const ControlCenter = lazy(() => import('../../views/inventory/ControlCenter'))
-const Reports = lazy(() => import('../../views/inventory/Reports'))
-const CredentialCenterPage = lazy(() => import('../../features/credential/app/CredentialCenterPage'))
-const CredentialApplicationPage = lazy(() => import('../../features/credential/app/CredentialApplicationPage'))
-const CredentialReviewPage = lazy(() => import('../../features/credential/app/CredentialReviewPage'))
 const MechanicalClock = lazy(() => import('../tools/MechanicalClock'))
 const MechanicalClock3D = lazy(() => import('../tools/MechanicalClock3D'))
-const InterviewList = lazy(() => import('../../views/interview/InterviewList'))
-const InterviewCompare = lazy(() => import('../../views/interview/InterviewCompare'))
-const InterviewForm = lazy(() => import('../../views/interview/InterviewForm'))
-const ProjectListPage = lazy(() => import('../../views/app/projects/ProjectListPage'))
-const ProjectDetailPage = lazy(() => import('../../views/app/projects/ProjectDetailPage'))
-const AssessmentCampaignListPage = lazy(() => import('../../views/app/assessment/AssessmentCampaignListPage'))
-const AssessmentCampaignDetailPage = lazy(() => import('../../views/app/assessment/AssessmentCampaignDetailPage'))
-const BibTrackingPage = lazy(() => import('../../views/app/events/bib-tracking/BibTrackingPage'))
-const RaceDashboardPage = lazy(() => import('../../views/app/race-dashboard/RaceDashboardPage'))
-const DesignRequestWorkspace = lazy(() => import('../../views/design-requests/DesignRequestWorkspace'))
 
 function AppRouteLoader() {
   return (
@@ -213,18 +181,6 @@ useEffect(() => {
   }, [user])
 
   const groupTitle = currentGroup?.label || '应用层'
-  const requireAppModule = useCallback((moduleId, element, options = {}) => {
-    if (options.needsRace && !selectedRaceId) {
-      const redirect = encodeURIComponent(`${location.pathname}${location.search}`)
-      return <Navigate to={`/workspaces?redirect=${redirect}`} replace />
-    }
-
-    return (
-      <ModuleProtectedRoute surface="app" moduleId={moduleId}>
-        {element}
-      </ModuleProtectedRoute>
-    )
-  }, [location.pathname, location.search, selectedRaceId])
   const isNavItemActive = useCallback((item) => {
     return item.path === ''
       ? location.pathname === '/app'
@@ -261,18 +217,26 @@ useEffect(() => {
   return (
     <>
       {isMapRoute ? (
-        requireAppModule('map', <AppMapLayout context={currentContext} />)
+        <AppRouteGuard
+          routeKey="map"
+          selectedRaceId={selectedRaceId}
+          currentRequestPath={`${location.pathname}${location.search}`}
+        >
+          <AppMapLayout context={currentContext} />
+        </AppRouteGuard>
       ) : isStudioImmersiveRoute ? (
-        requireAppModule('3d-studio', (
+        <AppRouteGuard
+          routeKey={location.pathname === '/app/3d-studio/new' ? 'three-studio-new' : 'three-studio-project'}
+          selectedRaceId={selectedRaceId}
+          currentRequestPath={`${location.pathname}${location.search}`}
+        >
           <Suspense fallback={<AppRouteLoader />}>
-            <CapabilityProtectedRoute scope="inventory" capability="3d_studio">
-              <StudioProjectPage
-                mode={location.pathname === '/app/3d-studio/new' ? 'new' : 'existing'}
-                routeProjectId={studioProjectMatch?.params?.projectId || null}
-              />
-            </CapabilityProtectedRoute>
+            <StudioProjectPage
+              mode={location.pathname === '/app/3d-studio/new' ? 'new' : 'existing'}
+              routeProjectId={studioProjectMatch?.params?.projectId || null}
+            />
           </Suspense>
-        ))
+        </AppRouteGuard>
       ) : immersiveToolComponent ? (
         <main className="command-tool-fullscreen" aria-label="沉浸式工具视图">
           <button
@@ -437,140 +401,12 @@ useEffect(() => {
 
         {/* ── 内容区 ── */}
         <section className="workspace-main__content">
-          <Suspense fallback={<AppRouteLoader />}>
-            <Routes>
-              <Route index element={<Home />} />
-              <Route path="events/import" element={requireAppModule('events', <ImportPage />, { needsRace: true })} />
-              <Route path="events/processing" element={requireAppModule('events', <ProcessingCenterPage />, { needsRace: true })} />
-              <Route path="events/records" element={requireAppModule('events', <RecordsPage />, { needsRace: true })} />
-              <Route path="events/lottery" element={requireAppModule('events', <LotteryPage />, { needsRace: true })} />
-              <Route path="events/bib" element={requireAppModule('events', <BibPage />, { needsRace: true })} />
-              <Route path="events/clothing" element={requireAppModule('events', <ClothingPage />, { needsRace: true })} />
-              <Route path="design-requests" element={
-                <ModuleProtectedRoute surface="app" moduleId="design-requests">
-                  <DesignRequestWorkspace surface="app" mode="designer" />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="credential-center" element={
-                <ModuleProtectedRoute surface="app" moduleId="credentials">
-                  <CredentialCenterPage />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="credential" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/select-race" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/zones" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/roles" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/access-areas" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/categories" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/styles" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/applications" element={<Navigate to={buildAppHref('/credential/requests', currentContext)} replace />} />
-              <Route path="credential/requests" element={
-                <ModuleProtectedRoute surface="app" moduleId="credentials">
-                  <CredentialApplicationPage />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="credential/review" element={
-                <ModuleProtectedRoute surface="app" moduleId="credentials">
-                  <CredentialReviewPage />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="credential/issue" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="inventory" element={
-                <ModuleProtectedRoute surface="app" moduleId="inventory">
-                  <WmsDashboard />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="inventory/inbound" element={
-                <ModuleProtectedRoute surface="app" moduleId="inventory">
-                  <InboundCenter />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="inventory/outbound" element={
-                <ModuleProtectedRoute surface="app" moduleId="inventory">
-                  <OutboundCenter />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="inventory/space" element={
-                <ModuleProtectedRoute surface="app" moduleId="inventory">
-                  <SpaceCenter />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="inventory/control" element={
-                <ModuleProtectedRoute surface="app" moduleId="inventory">
-                  <ControlCenter />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="inventory/analytics" element={
-                <ModuleProtectedRoute surface="app" moduleId="inventory">
-                  <Reports />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="inventory/twin/designer" element={<Navigate to={`/asset-designer${location.search}`} replace />} />
-              <Route path="tools/mechanical-clock" element={<MechanicalClock />} />
-              <Route path="tools/mechanical-clock-3d" element={<MechanicalClock3D />} />
-              <Route path="interview" element={
-                <ModuleProtectedRoute surface="app" moduleId="interview">
-                  <InterviewForm />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="interview/records" element={
-                <ModuleProtectedRoute surface="app" moduleId="interview">
-                  <InterviewList />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="interview/compare" element={
-                <ModuleProtectedRoute surface="app" moduleId="interview">
-                  <InterviewCompare />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="reimbursements/*" element={
-                <ModuleProtectedRoute surface="app" moduleId="reimbursements">
-                  <ReimbursementTool />
-                </ModuleProtectedRoute>
-              } />
-              <Route path="downloads" element={<Navigate to={buildAppHref('', currentContext)} replace />} />
-              <Route
-                path="3d-studio"
-                element={(
-                  requireAppModule('3d-studio', (
-                    <CapabilityProtectedRoute scope="inventory" capability="3d_studio">
-                      <StudioProjectsPage />
-                    </CapabilityProtectedRoute>
-                  ))
-                )}
-              />
-              <Route path="terrain-model" element={requireAppModule('3d-studio', <TerrainModelPage />)} />
-              <Route
-                path="3d-studio/new"
-                element={(
-                  requireAppModule('3d-studio', (
-                    <CapabilityProtectedRoute scope="inventory" capability="3d_studio">
-                      <StudioProjectPage mode="new" />
-                    </CapabilityProtectedRoute>
-                  ))
-                )}
-              />
-              <Route
-                path="3d-studio/:projectId"
-                element={(
-                  requireAppModule('3d-studio', (
-                    <CapabilityProtectedRoute scope="inventory" capability="3d_studio">
-                      <StudioProjectPage mode="existing" />
-                    </CapabilityProtectedRoute>
-                  ))
-                )}
-              />
-              <Route path="projects" element={requireAppModule('events', <ProjectListPage />, { needsRace: true })} />
-              <Route path="projects/:id" element={requireAppModule('events', <ProjectDetailPage />, { needsRace: true })} />
-              <Route path="assessment" element={requireAppModule('events', <AssessmentCampaignListPage />, { needsRace: true })} />
-              <Route path="assessment/:id" element={requireAppModule('events', <AssessmentCampaignDetailPage />, { needsRace: true })} />
-              <Route path="bib-tracking" element={requireAppModule('events', <BibTrackingPage />, { needsRace: true })} />
-              <Route path="race-dashboard" element={requireAppModule('events', <RaceDashboardPage />, { needsRace: true })} />
-              <Route path="settings" element={<ChangePassword />} />
-              <Route path="profile" element={<ProfilePage />} />
-              <Route path="*" element={<Navigate to={buildAppHref('', currentContext)} replace />} />
-            </Routes>
-          </Suspense>
+          <AppSurfaceRoutes
+            selectedRaceId={selectedRaceId}
+            currentRequestPath={`${location.pathname}${location.search}`}
+            currentContext={currentContext}
+            locationSearch={location.search}
+          />
         </section>
       </main>
       {mobileDrawerOpen && (

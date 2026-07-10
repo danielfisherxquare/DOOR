@@ -1,7 +1,7 @@
 import { buildSurfaceHref } from '../../utils/surfaceContext.js'
 import { hasModuleAccess } from '../../utils/moduleAccess.js'
 
-const navGroups = [
+export const APP_NAV_GROUPS = [
   {
     key: 'home',
     label: '概览',
@@ -326,7 +326,7 @@ const navGroups = [
   },
 ]
 
-const routeMeta = [
+export const APP_ROUTE_META = [
   { key: 'dashboard', path: '/app', exact: true, title: '我的工作台', summary: '', groupKey: 'home', sectionLabel: '应用层', surfaceCode: 'APP' },
   { key: 'import', path: '/app/events/import', title: '名单导入', summary: '上传报名数据，完成字段映射、清洗与预览后安全提交。', groupKey: 'events', sectionLabel: '我的赛事', surfaceCode: 'APP', needsRace: true },
   { key: 'processing', path: '/app/events/processing', title: '名单处理', summary: '查询导出名单，处理成绩校验、黑白名单和二次清洗。', groupKey: 'events', sectionLabel: '我的赛事', surfaceCode: 'APP', needsRace: true },
@@ -361,7 +361,106 @@ const routeMeta = [
   { key: 'interview-records', path: '/app/interview/records', title: '面试记录', summary: '查看和维护候选人面试记录。', groupKey: 'tools', sectionLabel: '我的工具', surfaceCode: 'APP' },
   { key: 'interview-compare', path: '/app/interview/compare', title: '候选人对比', summary: '对比候选人评分结构与总分。', groupKey: 'tools', sectionLabel: '我的工具', surfaceCode: 'APP' },
   { key: 'settings', path: '/app/settings', title: '个人设置', summary: '修改密码和账户设置。', groupKey: 'account', sectionLabel: '个人', surfaceCode: 'APP' },
+  { key: 'profile', path: '/app/profile', title: '个人资料', summary: '查看和维护个人资料、技能与工作经历。', groupKey: 'account', sectionLabel: '个人', surfaceCode: 'APP' },
 ]
+
+const navigationByKey = new Map(
+  APP_NAV_GROUPS.flatMap((group) => group.items.map((item) => [
+    item.key,
+    {
+      ...item,
+      groupKey: group.key,
+      moduleId: item.moduleId || group.moduleId || null,
+    },
+  ])),
+)
+
+const metaByKey = new Map(APP_ROUTE_META.map((item) => [item.key, item]))
+
+const componentRoutes = [
+  ['dashboard', '', 'home'],
+  ['import', 'events/import', 'import'],
+  ['processing', 'events/processing', 'processing'],
+  ['records', 'events/records', 'records'],
+  ['lottery', 'events/lottery', 'lottery'],
+  ['bib', 'events/bib', 'bib'],
+  ['clothing', 'events/clothing', 'clothing'],
+  ['reimbursement', 'reimbursements/*', 'reimbursement'],
+  ['design-requests', 'design-requests', 'design-requests'],
+  ['map', 'map/*', 'map', { renderMode: 'immersive' }],
+  ['three-studio', '3d-studio', 'studio-projects'],
+  ['three-studio-new', '3d-studio/new', 'studio-project', {
+    navKey: 'three-studio',
+    moduleId: '3d-studio',
+    renderMode: 'immersive',
+  }],
+  ['three-studio-project', '3d-studio/:projectId', 'studio-project', {
+    navKey: 'three-studio',
+    moduleId: '3d-studio',
+    renderMode: 'immersive',
+  }],
+  ['terrain-model', 'terrain-model', 'terrain-model'],
+  ['credential-center', 'credential-center', 'credential-center'],
+  ['credential-root', 'credential', 'redirect-credential-center', { moduleId: 'credentials' }],
+  ['credential-select-race', 'credential/select-race', 'redirect-credential-center', { moduleId: 'credentials' }],
+  ['credential-zones', 'credential/zones', 'redirect-credential-center', { moduleId: 'credentials' }],
+  ['credential-roles', 'credential/roles', 'redirect-credential-center', { moduleId: 'credentials' }],
+  ['credential-access-areas', 'credential/access-areas', 'redirect-credential-center', { moduleId: 'credentials' }],
+  ['credential-categories', 'credential/categories', 'redirect-credential-center', { moduleId: 'credentials' }],
+  ['credential-styles', 'credential/styles', 'redirect-credential-center', { moduleId: 'credentials' }],
+  ['credential-applications', 'credential/applications', 'redirect-credential-requests', { moduleId: 'credentials' }],
+  ['credential-requests', 'credential/requests', 'credential-requests'],
+  ['credential-review', 'credential/review', 'credential-review'],
+  ['credential-issue', 'credential/issue', 'redirect-credential-center', { moduleId: 'credentials' }],
+  ['inventory-workbench', 'inventory', 'inventory-workbench'],
+  ['inventory-inbound-center', 'inventory/inbound', 'inventory-inbound', { moduleId: 'inventory' }],
+  ['inventory-outbound-center', 'inventory/outbound', 'inventory-outbound', { moduleId: 'inventory' }],
+  ['inventory-space-center', 'inventory/space', 'inventory-space'],
+  ['inventory-control-center', 'inventory/control', 'inventory-control'],
+  ['inventory-analytics-center', 'inventory/analytics', 'inventory-analytics'],
+  ['inventory-twin-designer', 'inventory/twin/designer', 'asset-designer-redirect', { moduleId: 'inventory' }],
+  ['mechanical-clock', 'tools/mechanical-clock', 'mechanical-clock', { renderMode: 'immersive' }],
+  ['mechanical-clock-3d', 'tools/mechanical-clock-3d', 'mechanical-clock-3d', { renderMode: 'immersive' }],
+  ['interview', 'interview', 'interview-form'],
+  ['interview-records', 'interview/records', 'interview-list', { moduleId: 'interview' }],
+  ['interview-compare', 'interview/compare', 'interview-compare', { moduleId: 'interview' }],
+  ['downloads', 'downloads', 'redirect-home'],
+  ['projects', 'projects', 'projects', { needsRace: true }],
+  ['projects-detail', 'projects/:id', 'project-detail', { moduleId: 'events', needsRace: true }],
+  ['assessment', 'assessment', 'assessment', { needsRace: true }],
+  ['assessment-detail', 'assessment/:id', 'assessment-detail', { moduleId: 'events', needsRace: true }],
+  ['bib-tracking', 'bib-tracking', 'bib-tracking'],
+  ['race-dashboard', 'race-dashboard', 'race-dashboard'],
+  ['settings', 'settings', 'settings'],
+  ['profile', 'profile', 'profile', { moduleId: 'profile' }],
+]
+
+export const APP_ROUTE_REGISTRY = componentRoutes.map(([
+  key,
+  routePath,
+  componentKey,
+  overrides = {},
+]) => {
+  const navigation = navigationByKey.get(overrides.navKey || key) || null
+  const meta = metaByKey.get(key) || (overrides.navKey ? metaByKey.get(overrides.navKey) : null) || null
+  return {
+    ...navigation,
+    ...meta,
+    ...overrides,
+    key,
+    routePath,
+    componentKey,
+    moduleId: overrides.moduleId ?? navigation?.moduleId ?? null,
+    needsRace: overrides.needsRace ?? meta?.needsRace ?? navigation?.needsRace ?? false,
+    requiredCapability: overrides.requiredCapability || navigation?.requiredCapability || null,
+    renderMode: overrides.renderMode || 'standard',
+    path: meta?.path || `/app/${routePath.replace(/\/\*$/, '')}`.replace(/\/$/, ''),
+  }
+})
+
+export function findAppRoute(key) {
+  return APP_ROUTE_REGISTRY.find((route) => route.key === key) || null
+}
 
 function normalizeAccessOptions(optionsOrHasCapability) {
   if (typeof optionsOrHasCapability === 'function') {
@@ -372,6 +471,7 @@ function normalizeAccessOptions(optionsOrHasCapability) {
     hasCapability: optionsOrHasCapability?.hasCapability,
     user: optionsOrHasCapability?.user || null,
     raceId: optionsOrHasCapability?.raceId || '',
+    includeUnauthorized: optionsOrHasCapability?.includeUnauthorized === true,
   }
 }
 
@@ -395,25 +495,27 @@ function isAllowed(item, options) {
 export function getAppNavGroups(optionsOrHasCapability) {
   const options = normalizeAccessOptions(optionsOrHasCapability)
 
-  return navGroups
+  return APP_NAV_GROUPS
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => (
-        hasNavigationModuleAccess(group, item, options.user)
-        && isAllowed(item, options)
+        options.includeUnauthorized
+        || (hasNavigationModuleAccess(group, item, options.user) && isAllowed(item, options))
       )),
     }))
     .filter((group) => group.items.length > 0)
 }
 
 export function getAppRouteMeta(pathname) {
-  const sorted = [...routeMeta].sort((left, right) => right.path.length - left.path.length)
+  const sorted = APP_ROUTE_REGISTRY
+    .filter((route) => route.title)
+    .sort((left, right) => right.path.length - left.path.length)
   return (
     sorted.find((item) => (
       item.exact
         ? pathname === item.path
         : pathname === item.path || pathname.startsWith(`${item.path}/`)
-    )) || routeMeta[0]
+    )) || APP_ROUTE_REGISTRY[0]
   )
 }
 
@@ -428,7 +530,7 @@ export function buildAppHref(routePath, { orgId, raceId } = {}) {
 export function getAppPortalCards(optionsOrHasCapability) {
   const options = normalizeAccessOptions(optionsOrHasCapability)
 
-  return navGroups
+  return APP_NAV_GROUPS
     .flatMap((group) => group.items.map((item) => ({ group, item })))
     .filter(({ group, item }) => (
       hasNavigationModuleAccess(group, item, options.user)

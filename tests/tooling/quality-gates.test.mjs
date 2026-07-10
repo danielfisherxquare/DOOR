@@ -31,3 +31,9 @@ test('Prettier gate has an explicit legacy-debt boundary', async () => {
   assert.match(ignore, /^src\/$/m)
   assert.match(ignore, /Remove `src\/`/)
 })
+
+test('default frontend test gate includes route registry contracts', async () => {
+  const packageJson = JSON.parse(await readFile(new URL('package.json', rootUrl), 'utf8'))
+
+  assert.match(packageJson.scripts.test, /tests\/routes\/\*\.test\.mjs/)
+})
