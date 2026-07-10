@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import request from '../../../utils/request'
-import useAuthStore from '../../../stores/authStore'
-
-const DIRECT_API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
+import request, { requestRaw } from '../../../utils/request'
 
 import {
   CommandDataTable,
@@ -70,24 +67,10 @@ function AdminView({ canViewAll, orgId }) {
 
   const handleExport = async (projectId, projectName) => {
     try {
-      const response = await fetch(`${DIRECT_API_BASE}/admin/reimbursements/projects/${projectId}/export`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
+      const response = await requestRaw.get(`/admin/reimbursements/projects/${projectId}/export`, {
+        responseType: 'blob',
       })
-
-      if (response.status === 401) {
-        useAuthStore.getState().logout()
-        window.location.href = '/login'
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error('导出失败')
-      }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
+      const url = window.URL.createObjectURL(response.data)
       const a = document.createElement('a')
       a.href = url
       a.download = `${projectName || '报销单'}_${new Date().toISOString().slice(0, 10)}.xlsx`

@@ -1,6 +1,4 @@
-import request from '../utils/request'
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+import request, { requestRaw } from '../utils/request'
 
 const adminApi = {
   getOrgs: (params) => request.get('/admin/orgs', { params }),
@@ -34,17 +32,11 @@ const adminApi = {
 
   getTeamMembers: (params) => request.get('/admin/org/team-members', { params }),
   getTeamMember: (teamMemberId, params) => request.get(`/admin/org/team-members/${teamMemberId}`, { params }),
-  getTeamMemberPhoto: async (teamMemberId, orgId, token) => {
-    const response = await fetch(`${API_BASE_URL}/admin/org/team-members/${teamMemberId}/photo${orgId ? `?orgId=${orgId}` : ''}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+  getTeamMemberPhoto: async (teamMemberId, orgId) => {
+    const response = await requestRaw.get(`/admin/org/team-members/${teamMemberId}/photo${orgId ? `?orgId=${orgId}` : ''}`, {
+      responseType: 'blob',
     })
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(errorText || '读取成员照片失败')
-    }
-    return response.blob()
+    return response.data
   },
   createTeamMember: (data, orgId) => request.post(`/admin/org/team-members${orgId ? `?orgId=${orgId}` : ''}`, data),
   updateTeamMember: (teamMemberId, data, orgId) => request.patch(`/admin/org/team-members/${teamMemberId}${orgId ? `?orgId=${orgId}` : ''}`, data),

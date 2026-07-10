@@ -2,9 +2,16 @@ import axios from 'axios'
 import { notifyAuthExpired, readAccessToken } from '../auth/auth-session-adapter.js'
 import { toApiError } from './apiResponse.js'
 
+const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL || '/api'
+
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: API_BASE_URL,
   timeout: 30000
+})
+
+export const requestRaw = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000,
 })
 
 function isInvalidAuthResponse(error) {
@@ -31,51 +38,36 @@ function handleRequestError(error) {
   return Promise.reject(apiError)
 }
 
+function attachRequestContext(config) {
+  const token = readAccessToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  if (!(config.data instanceof FormData) && !config.headers['Content-Type']) {
+    config.headers['Content-Type'] = 'application/json'
+  }
+  return config
+}
+
+function configureRequestClient(client, { unwrapResponse }) {
+  client.interceptors.request.use(
+    attachRequestContext,
+    (error) => Promise.reject(error),
+  )
+  client.interceptors.response.use(
+    (response) => (unwrapResponse ? response.data : response),
+    handleRequestError,
+  )
+}
+
 // 用于 OCR 识别等长时间请求的 axios 实例（10 分钟超时）
 export const requestWithLongTimeout = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: API_BASE_URL,
   timeout: 600000
 })
 
-// 为长超时实例添加相同的请求拦截器和响应拦截器
-requestWithLongTimeout.interceptors.request.use(
-  (config) => {
-    const token = readAccessToken()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    // FormData 不需要设置 Content-Type，让浏览器自动设置
-    if (!(config.data instanceof FormData) && !config.headers['Content-Type']) {
-      config.headers['Content-Type'] = 'application/json'
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-// 为长超时实例添加响应拦截器，处理 401 错误
-requestWithLongTimeout.interceptors.response.use(
-  (response) => response.data,
-  handleRequestError,
-)
-
-request.interceptors.request.use(
-  (config) => {
-    const token = readAccessToken()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    if (!(config.data instanceof FormData) && !config.headers['Content-Type']) {
-      config.headers['Content-Type'] = 'application/json'
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-request.interceptors.response.use(
-  (response) => response.data,
-  handleRequestError,
-)
+configureRequestClient(request, { unwrapResponse: true })
+configureRequestClient(requestRaw, { unwrapResponse: false })
+configureRequestClient(requestWithLongTimeout, { unwrapResponse: true })
 
 export default request

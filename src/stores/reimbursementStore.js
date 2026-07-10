@@ -6,39 +6,14 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import request, { requestWithLongTimeout } from '../utils/request';
-import useAuthStore from './authStore';
+import request, { requestRaw, requestWithLongTimeout } from '../utils/request';
 
-const DIRECT_API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 const DEFAULT_LLM_CONFIG = {
   provider: 'qwen',
   baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
   apiKey: '',
   modelName: 'qwen3.5-plus',
 };
-
-// 从 request.js 导出 getAuthToken 函数
-function getAuthToken() {
-  const storeToken = request.defaults?.headers?.common?.Authorization;
-  if (storeToken) {
-    return String(storeToken).replace(/^Bearer\s+/i, '');
-  }
-
-  try {
-    const persisted = JSON.parse(window.localStorage.getItem('auth-storage') || '{}');
-    return persisted?.state?.token || '';
-  } catch {
-    return '';
-  }
-}
-
-// 为原生 fetch 请求添加错误处理（处理 401 登出）
-function handleFetchError(response) {
-  if (response.status === 401) {
-    useAuthStore.getState().logout();
-    window.location.href = '/login';
-  }
-}
 
 function parseContentDispositionFilename(contentDisposition) {
   if (!contentDisposition) return '';
@@ -69,30 +44,7 @@ function downloadBlob(blob, fallbackName, contentDisposition) {
 }
 
 async function uploadWithAuth(path, formData) {
-  const token = getAuthToken();
-  const response = await fetch(`${DIRECT_API_BASE}${path}`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
-
-  // 处理 401 错误，自动登出
-  if (response.status === 401) {
-    handleFetchError(response);
-  }
-
-  if (!response.ok) {
-    let message = '请求失败';
-    try {
-      const error = await response.json();
-      message = error?.message || error?.error || message;
-    } catch {
-      // ignore JSON parse errors for non-JSON responses
-    }
-    throw new Error(message);
-  }
-
-  return response.json();
+  return request.post(path, formData);
 }
 
 function mergeLlmConfig(...configs) {
@@ -667,22 +619,10 @@ const useReimbursementStore = create(
           });
           formData.append('documentType', documentType);
 
-          const token = getAuthToken();
-          const response = await fetch(
-            `${DIRECT_API_BASE}/app/reimbursements/projects/${projectId}/preview/import`,
-            {
-              method: 'POST',
-              headers: token ? { Authorization: `Bearer ${token}` } : {},
-              body: formData,
-            }
+          const result = await request.post(
+            `/app/reimbursements/projects/${projectId}/preview/import`,
+            formData
           );
-
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error?.error || '导入失败');
-          }
-
-          const result = await response.json();
           await get().fetchPreviewFiles(projectId);
           await get().fetchPendingMatches();
           set({ isLoading: false });
@@ -767,38 +707,38 @@ const useReimbursementStore = create(
 
       getAttachmentUrl: async (storagePath) => {
         if (!storagePath) return null;
-        const token = getAuthToken();
-        const response = await fetch(`${DIRECT_API_BASE}${storagePath}`, {
-          method: 'GET',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!response.ok) return null;
-        const blob = await response.blob();
-        return URL.createObjectURL(blob);
+        try {
+          const response = await requestRaw.get(storagePath, { responseType: 'blob' });
+          return URL.createObjectURL(response.data);
+        } catch {
+          return null;
+        }
       },
 
       getAttachmentThumbnail: async (attachmentId) => {
         if (!attachmentId) return null;
-        const token = getAuthToken();
-        const response = await fetch(`${DIRECT_API_BASE}/app/reimbursements/attachments/${attachmentId}/thumbnail`, {
-          method: 'GET',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!response.ok) return null;
-        const blob = await response.blob();
-        return URL.createObjectURL(blob);
+        try {
+          const response = await requestRaw.get(
+            `/app/reimbursements/attachments/${attachmentId}/thumbnail`,
+            { responseType: 'blob' }
+          );
+          return URL.createObjectURL(response.data);
+        } catch {
+          return null;
+        }
       },
 
       getAttachmentImage: async (attachmentId) => {
         if (!attachmentId) return null;
-        const token = getAuthToken();
-        const response = await fetch(`${DIRECT_API_BASE}/app/reimbursements/attachments/${attachmentId}/image`, {
-          method: 'GET',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!response.ok) return null;
-        const blob = await response.blob();
-        return URL.createObjectURL(blob);
+        try {
+          const response = await requestRaw.get(
+            `/app/reimbursements/attachments/${attachmentId}/image`,
+            { responseType: 'blob' }
+          );
+          return URL.createObjectURL(response.data);
+        } catch {
+          return null;
+        }
       },
 
       // ==================== 导出功能 ====================
@@ -807,104 +747,38 @@ const useReimbursementStore = create(
         const projectId = get().activeProjectId;
         if (!projectId) throw new Error('没有活跃项目');
 
-        const token = getAuthToken();
-        const response = await fetch(`${DIRECT_API_BASE}/app/reimbursements/export`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ projectId }),
+        const response = await requestRaw.post('/app/reimbursements/export', { projectId }, {
+          responseType: 'blob',
         });
-
-        if (!response.ok) {
-          throw new Error('导出失败');
-        }
-
-        const blob = await response.blob();
         const fallbackName = `${get().activeProject?.name || '报销单'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-        downloadBlob(blob, fallbackName, response.headers.get('content-disposition'));
+        downloadBlob(response.data, fallbackName, response.headers['content-disposition']);
       },
 
       exportWithImages: async () => {
         const projectId = get().activeProjectId;
         if (!projectId) throw new Error('没有活跃项目');
 
-        const token = getAuthToken();
-        const response = await fetch(
-          `${DIRECT_API_BASE}/app/reimbursements/projects/${projectId}/export-with-images`,
-          {
-            method: 'GET',
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
-          }
+        const response = await requestRaw.get(
+          `/app/reimbursements/projects/${projectId}/export-with-images`,
+          { responseType: 'blob' }
         );
-
-        if (!response.ok) {
-          let message = '导出失败';
-          try {
-            const error = await response.json();
-            message = error?.message || error?.error || message;
-          } catch {
-            // ignore non-json export error responses
-          }
-          throw new Error(message);
-        }
-
-        const blob = await response.blob();
         const fallbackName = `${get().activeProject?.name || '报销单'}_${new Date().toISOString().slice(0, 10)}.zip`;
-        downloadBlob(blob, fallbackName, response.headers.get('content-disposition'));
+        downloadBlob(response.data, fallbackName, response.headers['content-disposition']);
       },
 
       // ==================== 附件管理 ====================
 
       deleteAttachment: async (attachmentId) => {
-        const token = getAuthToken();
-        const response = await fetch(`${DIRECT_API_BASE}/app/reimbursements/attachments/${attachmentId}`, {
-          method: 'DELETE',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-
-        handleFetchError(response);
-
-        if (!response.ok) {
-          let message = '删除失败';
-          try {
-            const error = await response.json();
-            message = error?.error || error?.message || message;
-          } catch {
-            // 非 JSON 响应（如 502/504），使用默认错误文案
-          }
-          throw new Error(message);
-        }
-
-        return response.json();
+        return request.delete(`/app/reimbursements/attachments/${attachmentId}`);
       },
 
       replaceAttachment: async (attachmentId, file) => {
-        const token = getAuthToken();
         const formData = new FormData();
         formData.append('file', file);
-
-        const response = await fetch(`${DIRECT_API_BASE}/app/reimbursements/attachments/${attachmentId}/replace`, {
-          method: 'PUT',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-          body: formData,
-        });
-
-        handleFetchError(response);
-
-        if (!response.ok) {
-          let message = '替换失败';
-          try {
-            const error = await response.json();
-            message = error?.error || error?.message || message;
-          } catch {
-            // 非 JSON 响应（如 502/504），使用默认错误文案
-          }
-          throw new Error(message);
-        }
-
-        return response.json();
+        return request.put(
+          `/app/reimbursements/attachments/${attachmentId}/replace`,
+          formData
+        );
       },
 
       // ==================== 清理 ====================

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import adminApi from '../../api/adminApi'
-import useAuthStore from '../../stores/authStore'
+import { requestRaw } from '../../utils/request'
 import {
   CommandDataTable,
   CommandEmptyState,
@@ -10,8 +10,6 @@ import {
   CommandShell,
   CommandStatusTag,
 } from '../../components/command/CommandPrimitives'
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 
 function formatDate(value) {
   if (!value) return '未完成'
@@ -53,7 +51,7 @@ function FingerprintDisplay({ value, label }) {
 }
 
 /* ── 密钥安全面板 ─────────────────────────────────────── */
-function KeyGuardPanel({ encStatus, token, onMessage }) {
+function KeyGuardPanel({ encStatus, onMessage }) {
   if (!encStatus) return null
 
   const { healthy, current, stored, envBackups, reason } = encStatus
@@ -62,13 +60,11 @@ function KeyGuardPanel({ encStatus, token, onMessage }) {
 
   const handleDownloadEnv = async (envFilename) => {
     try {
-      const response = await fetch(
-        `${API_BASE}/admin/system/backups/${encodeURIComponent(envFilename)}/download-env`,
-        { headers: { Authorization: `Bearer ${token || ''}` } },
+      const response = await requestRaw.get(
+        `/admin/system/backups/${encodeURIComponent(envFilename)}/download-env`,
+        { responseType: 'blob' },
       )
-      if (!response.ok) throw new Error('下载 .env 备份失败')
-      const blob = await response.blob()
-      const objectUrl = window.URL.createObjectURL(blob)
+      const objectUrl = window.URL.createObjectURL(response.data)
       const link = document.createElement('a')
       link.href = objectUrl
       link.download = envFilename
@@ -181,7 +177,6 @@ function KeyGuardPanel({ encStatus, token, onMessage }) {
 }
 
 export default function DatabaseBackupPage() {
-  const token = useAuthStore((state) => state.token)
   const fileInputRef = useRef(null)
   const envFileInputRef = useRef(null)
   const [backups, setBackups] = useState([])
@@ -282,24 +277,10 @@ export default function DatabaseBackupPage() {
   const handleDownload = async (filename) => {
     setMessage(null)
     try {
-      const response = await fetch(`${API_BASE}/admin/system/backups/${encodeURIComponent(filename)}/download`, {
-        headers: {
-          Authorization: `Bearer ${token || ''}`,
-        },
+      const response = await requestRaw.get(`/admin/system/backups/${encodeURIComponent(filename)}/download`, {
+        responseType: 'blob',
       })
-      if (!response.ok) {
-        let errorMessage = '下载备份失败'
-        try {
-          const data = await response.json()
-          errorMessage = data.message || errorMessage
-        } catch {
-          // noop
-        }
-        throw new Error(errorMessage)
-      }
-
-      const blob = await response.blob()
-      const objectUrl = window.URL.createObjectURL(blob)
+      const objectUrl = window.URL.createObjectURL(response.data)
       const link = document.createElement('a')
       link.href = objectUrl
       link.download = filename
@@ -316,23 +297,10 @@ export default function DatabaseBackupPage() {
   const handleDownloadEnv = async (envFilename) => {
     setMessage(null)
     try {
-      const response = await fetch(`${API_BASE}/admin/system/backups/${encodeURIComponent(envFilename)}/download-env`, {
-        headers: {
-          Authorization: `Bearer ${token || ''}`,
-        },
+      const response = await requestRaw.get(`/admin/system/backups/${encodeURIComponent(envFilename)}/download-env`, {
+        responseType: 'blob',
       })
-      if (!response.ok) {
-        let errorMessage = '下载 .env 备份失败'
-        try {
-          const data = await response.json()
-          errorMessage = data.message || errorMessage
-        } catch {
-          // noop
-        }
-        throw new Error(errorMessage)
-      }
-      const blob = await response.blob()
-      const objectUrl = window.URL.createObjectURL(blob)
+      const objectUrl = window.URL.createObjectURL(response.data)
       const link = document.createElement('a')
       link.href = objectUrl
       link.download = envFilename
@@ -357,15 +325,9 @@ export default function DatabaseBackupPage() {
       formData.append('file', file)
       if (envFile) formData.append('envFile', envFile)
 
-      const response = await fetch(`${API_BASE}/admin/system/restores/upload`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token || ''}`,
-        },
-        body: formData,
-      })
-      const data = await response.json()
-      if (!response.ok || !data.success) {
+      const response = await requestRaw.post('/admin/system/restores/upload', formData)
+      const data = response.data
+      if (!data.success) {
         throw new Error(data.message || '上传恢复文件失败')
       }
 
@@ -427,7 +389,6 @@ export default function DatabaseBackupPage() {
       {!loading && (
         <KeyGuardPanel
           encStatus={encStatus}
-          token={token}
           onMessage={setMessage}
         />
       )}
@@ -609,4 +570,3 @@ export default function DatabaseBackupPage() {
     </div>
   )
 }
-

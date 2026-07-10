@@ -5,6 +5,7 @@
 
 import type { ModelInfo, ModelFormat } from '../stores/modelStore';
 import { generateModelId } from '../stores/modelStore';
+import request from '../utils/request';
 
 // API 基础路径 (可通过环境变量配置)
 const API_BASE = import.meta.env.VITE_API_BASE || '';
@@ -92,37 +93,12 @@ export async function uploadModel(
     formData.append('model', file);
     formData.append('name', file.name);
 
-    const xhr = new XMLHttpRequest();
-
-    // 监听上传进度
-    if (onProgress) {
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          const progress = Math.round((event.loaded / event.total) * 100);
-          onProgress(progress);
-        }
-      });
-    }
-
-    // 发送请求
-    const response = await new Promise<Response>((resolve, reject) => {
-      xhr.onload = () => {
-        resolve({
-          ok: xhr.status >= 200 && xhr.status < 300,
-          status: xhr.status,
-          json: async () => JSON.parse(xhr.responseText),
-        } as Response);
-      };
-      xhr.onerror = () => reject(new Error('Upload failed'));
-      xhr.open('POST', MODEL_API_PATH);
-      xhr.send(formData);
+    const data = await request.post(MODEL_API_PATH, formData, {
+      onUploadProgress: (event) => {
+        if (!onProgress || !event.total) return;
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      },
     });
-
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.status}`);
-    }
-
-    const data = await response.json();
 
     return {
       success: true,
@@ -183,11 +159,7 @@ export async function listModels(): Promise<ModelInfo[]> {
   }
 
   try {
-    const response = await fetch(MODEL_API_PATH);
-    if (!response.ok) {
-      throw new Error(`Failed to list models: ${response.status}`);
-    }
-    return await response.json();
+    return await request.get(MODEL_API_PATH);
   } catch (error) {
     console.error('Failed to list models:', error);
     return [];
@@ -204,13 +176,9 @@ export async function getModel(id: string): Promise<ModelInfo | null> {
   }
 
   try {
-    const response = await fetch(`${MODEL_API_PATH}/${id}`);
-    if (!response.ok) {
-      if (response.status === 404) return null;
-      throw new Error(`Failed to get model: ${response.status}`);
-    }
-    return await response.json();
+    return await request.get(`${MODEL_API_PATH}/${id}`);
   } catch (error) {
+    if (typeof error === 'object' && error && 'status' in error && error.status === 404) return null;
     console.error('Failed to get model:', error);
     return null;
   }
@@ -229,10 +197,8 @@ export async function deleteModel(id: string): Promise<boolean> {
   }
 
   try {
-    const response = await fetch(`${MODEL_API_PATH}/${id}`, {
-      method: 'DELETE',
-    });
-    return response.ok;
+    await request.delete(`${MODEL_API_PATH}/${id}`);
+    return true;
   } catch (error) {
     console.error('Failed to delete model:', error);
     return false;

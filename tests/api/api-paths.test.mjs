@@ -1,11 +1,28 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { describe, it } from 'node:test'
 
 const rootUrl = new URL('../../', import.meta.url)
 
 async function source(relativePath) {
   return readFile(new URL(relativePath, rootUrl), 'utf8')
+}
+
+async function sourceFiles(relativeDirectory) {
+  const directoryUrl = new URL(relativeDirectory, rootUrl)
+  const entries = await readdir(directoryUrl, { withFileTypes: true })
+  const files = []
+
+  for (const entry of entries) {
+    const relativePath = `${relativeDirectory.replace(/\/$/, '')}/${entry.name}`
+    if (entry.isDirectory()) {
+      files.push(...await sourceFiles(relativePath))
+    } else if (/\.(?:js|jsx|ts|tsx)$/.test(entry.name)) {
+      files.push(relativePath)
+    }
+  }
+
+  return files
 }
 
 describe('API path ownership', () => {
@@ -120,5 +137,28 @@ describe('API path ownership', () => {
       const workspaceSource = await source(relativePath)
       assert.match(workspaceSource, /opsInventoryApi/, relativePath)
     }
+  })
+
+  it('limits raw fetch to explicitly external resources', async () => {
+    const allowedRawFetchFiles = [
+      'src/components/map/CustomTileSourceWizard.tsx',
+      'src/components/map/DownloadAreaPanel.tsx',
+      'src/components/map/MapAdvancedPanel.tsx',
+      'src/components/map/MapView3D.tsx',
+      'src/services/modelStorageService.ts',
+      'src/stores/clockStore.js',
+      'src/utils/map/focusZoneOsmBuildings.js',
+    ]
+    const rawFetchFiles = []
+
+    for (const relativePath of await sourceFiles('src')) {
+      if (/\bfetch\s*\(/.test(await source(relativePath))) rawFetchFiles.push(relativePath)
+    }
+
+    assert.deepEqual(rawFetchFiles.sort(), allowedRawFetchFiles.sort())
+
+    const requestSource = await source('src/utils/request.js')
+    assert.match(requestSource, /export const requestRaw/)
+    assert.match(requestSource, /configureRequestClient\(requestRaw, \{ unwrapResponse: false \}\)/)
   })
 })

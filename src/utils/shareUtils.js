@@ -2,6 +2,8 @@
  * 分享工具函数
  */
 
+import request from './request'
+
 /**
  * 生成分享短链接
  */
@@ -14,23 +16,17 @@ export async function generateShareLink(sceneData, options = {}) {
   // 调用后端 API 生成短链接
   // 注意：如果后端 API 未就绪，返回模拟数据
   try {
-    const response = await fetch('/api/share/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: compressed,
-        expiresIn,
-      }),
+    const response = await request.post('/share/create', {
+      data: compressed,
+      expiresIn,
     })
+    const result = response.data
 
-    if (response.ok) {
-      const result = await response.json()
-      return {
-        id: result.id,
-        shortUrl: `${window.location.origin}/s/${result.id}`,
-        embedCode: generateEmbedCode(result.id),
-        expiresAt: result.expiresAt,
-      }
+    return {
+      id: result.id,
+      shortUrl: `${window.location.origin}/s/${result.id}`,
+      embedCode: generateEmbedCode(result.id),
+      expiresAt: result.expiresAt,
     }
   } catch (error) {
     console.warn('分享 API 不可用，使用本地模拟')
@@ -51,13 +47,8 @@ export async function generateShareLink(sceneData, options = {}) {
  * 获取分享数据
  */
 export async function getShareData(shareId) {
-  const response = await fetch(`/api/share/${shareId}`)
-
-  if (!response.ok) {
-    throw new Error('分享链接无效或已过期')
-  }
-
-  const result = await response.json()
+  const response = await request.get(`/share/${shareId}`)
+  const result = response.data
   const sceneData = await decompressSceneData(result.data)
 
   return {

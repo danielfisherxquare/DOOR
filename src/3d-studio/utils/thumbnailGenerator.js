@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import request from '../../utils/request';
 
 /**
  * 从模型文件生成缩略图
@@ -122,17 +123,7 @@ export async function generateAndUploadThumbnail(assetId, source, orgId) {
     const thumbnail = await generateThumbnail(source);
 
     // 上传缩略图
-    const response = await fetch(`/api/app/3d-studio/assets/${assetId}/thumbnail${orgId ? `?orgId=${orgId}` : ''}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ thumbnail }),
-    });
-
-    if (!response.ok) {
-        throw new Error('缩略图上传失败');
-    }
+    await request.post(`/app/3d-studio/assets/${assetId}/thumbnail${orgId ? `?orgId=${orgId}` : ''}`, { thumbnail });
 
     return thumbnail;
 }

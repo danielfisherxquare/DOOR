@@ -17,34 +17,20 @@ const profileApi = {
    * 上传头像
    * @param {File} file - 图片文件
    */
-  uploadAvatar: async (file) => {
+  uploadAvatar: (file) => {
     const formData = new FormData();
     formData.append('avatar', file);
-    const response = await fetch('/api/profile/avatar', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('auth-storage') ? JSON.parse(localStorage.getItem('auth-storage'))?.state?.token : ''}`,
-      },
-      body: formData,
-    });
-    return response.json();
+    return request.post('/profile/avatar', formData);
   },
 
   /**
    * 上传证件照片
    * @param {File} file - 图片文件
    */
-  uploadCredentialPhoto: async (file) => {
+  uploadCredentialPhoto: (file) => {
     const formData = new FormData();
     formData.append('photo', file);
-    const response = await fetch('/api/profile/credential-photo', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('auth-storage') ? JSON.parse(localStorage.getItem('auth-storage'))?.state?.token : ''}`,
-      },
-      body: formData,
-    });
-    return response.json();
+    return request.post('/profile/credential-photo', formData);
   },
 
   /**
