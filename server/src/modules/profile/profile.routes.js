@@ -9,7 +9,7 @@ import fs from 'fs/promises';
 import knex from '../../db/knex.js';
 import { requireAuth } from '../../middleware/require-auth.js';
 import { buildAuthzProfileFromRows, loadAuthzRows } from '../../authz/profile.service.js';
-import { getUserAllModules } from '../../middleware/require-module-access.js';
+import { getUserAllModules } from '../../authz/module-grants.js';
 import { listEffectiveRacePermissionsForUser, listVisibleRacesForOrg } from '../races/race-access.service.js';
 
 const router = Router();

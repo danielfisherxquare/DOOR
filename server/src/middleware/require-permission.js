@@ -6,9 +6,7 @@ import { authorization as defaultAuthorization } from '../authz/authorization.js
 import { createAuthorize } from './authorize.js'
 
 function usesStrictSurfaceModules(req) {
-  return Boolean(
-    req.authContext?.strictSurfaceModules || req.user?.preferences?.strictSurfaceModules,
-  )
+  return Boolean(req.authContext?.strictSurfaceModules)
 }
 
 export function createRequirePermission({ authorization = defaultAuthorization } = {}) {

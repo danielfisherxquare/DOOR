@@ -114,7 +114,7 @@ function readRequestConfig(req) {
 }
 
 export async function resolveOcrConfig(req) {
-  const userId = req.user?.userId || req.authContext?.userId;
+  const userId = req.authContext?.userId;
   const settings = userId ? await service.getUserSettings(userId) : null;
   const requestConfig = readRequestConfig(req);
 
@@ -193,7 +193,7 @@ export async function ocrInvoice(req, res, next) {
       return res.status(400).json({ success: false, error: '未上传文件' });
     }
 
-    const userId = req.user?.userId || req.authContext?.userId;
+    const userId = req.authContext?.userId;
     const projectId = req.body?.projectId;
 
     // 计算文件哈希用于去重
@@ -272,7 +272,7 @@ export async function ocrPayment(req, res, next) {
       return res.status(400).json({ success: false, error: '未上传文件' });
     }
 
-    const userId = req.user?.userId || req.authContext?.userId;
+    const userId = req.authContext?.userId;
     const projectId = req.body?.projectId;
 
     // 计算文件哈希用于去重
@@ -418,8 +418,8 @@ export async function ocrPayment(req, res, next) {
 export async function createProject(req, res, next) {
   try {
     const { name, description, shortName } = req.body;
-    const userId = req.user.userId;
-    const orgId = req.user.orgId;
+    const userId = req.authContext.userId;
+    const orgId = req.authContext.orgId;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: '项目名称不能为空' });
@@ -443,7 +443,7 @@ export async function createProject(req, res, next) {
  */
 export async function getProjects(req, res, next) {
   try {
-    const userId = req.user.userId;
+    const userId = req.authContext.userId;
     const projects = await service.getUserProjects(userId);
     res.json({ projects });
   } catch (error) {
@@ -531,7 +531,7 @@ export async function deleteProject(req, res, next) {
 export async function addRecord(req, res, next) {
   try {
     const { id: projectId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.authContext.userId;
     const recordData = req.body;
 
     const record = await service.addRecord(projectId, userId, recordData);
@@ -653,7 +653,7 @@ export async function clearRecords(req, res, next) {
  */
 export async function getSettings(req, res, next) {
   try {
-    const userId = req.user.userId;
+    const userId = req.authContext.userId;
     const settings = await service.getUserSettings(userId);
     res.json({ settings: toSettingsResponse(settings) });
   } catch (error) {
@@ -666,7 +666,7 @@ export async function getSettings(req, res, next) {
  */
 export async function updateSettings(req, res, next) {
   try {
-    const userId = req.user.userId;
+    const userId = req.authContext.userId;
     const current = await service.getUserSettings(userId);
     const requestConfig = req.body?.llmConfig ?? req.body?.llm_config;
     const nextConfig = requestConfig

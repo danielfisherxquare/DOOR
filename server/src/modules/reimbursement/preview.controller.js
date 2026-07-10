@@ -57,7 +57,7 @@ export function resolveLlmConfig(userConfig, serverConfig = getServerLlmConfig()
 export async function importToPreview(req, res, next) {
     try {
         const { id: projectId } = req.params;
-        const userId = req.user?.userId || req.authContext?.userId;
+        const userId = req.authContext?.userId;
         const documentType = req.body?.documentType === 'payment' ? 'payment' : 'invoice';
 
         if (!req.files || req.files.length === 0) {
@@ -123,7 +123,7 @@ export async function recognizeFromPreview(req, res, next) {
     try {
         const { id: projectId, fileId } = req.params;
         const { forceRecognize } = req.body;
-        const userId = req.user?.userId || req.authContext?.userId;
+        const userId = req.authContext?.userId;
 
         // 获取用户的LLM配置
         const userSettings = await getProjectSettings(projectId);

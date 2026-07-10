@@ -17,12 +17,12 @@ function resolveTargetOrgId(req) {
 
     if (paramOrgId) {
         if (req.authContext?.role !== 'super_admin') {
-            return req.orgAccess?.orgId || null;
+            return req.authContext?.orgId || null;
         }
         return paramOrgId;
     }
 
-    return req.orgAccess?.orgId || null;
+    return req.authContext?.orgId || null;
 }
 
 function orgIdRequiredResponse(req, res) {

@@ -257,7 +257,7 @@ async function uploadAndProcessInvoice(req, res, next) {
         }
 
         const { projectId } = req.params;
-        const userId = req.user?.userId || req.authContext?.userId;
+        const userId = req.authContext?.userId;
 
         // 计算文件哈希
         const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');
@@ -343,7 +343,7 @@ async function uploadAndProcessPayment(req, res, next) {
         }
 
         const { projectId } = req.params;
-        const userId = req.user?.userId || req.authContext?.userId;
+        const userId = req.authContext?.userId;
 
         // 计算文件哈希
         const fileHash = crypto.createHash('sha256').update(req.file.buffer).digest('hex');

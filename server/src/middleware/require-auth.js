@@ -1,23 +1,6 @@
-/**
- * Require Auth 中间件 — 认证与角色兼容映射核心
- * 替代原 tenantContext 成为统一门禁
- */
+/** Require Auth middleware — verifies the JWT and builds the canonical request context. */
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
-
-// TODO: Remove this map after 2026-07-01 (3-month migration window from 2026-04-01).
-// Legacy tokens issued before the permission consolidation migration will have expired by then.
-// 兼容旧版 token，过渡期平滑支持
-const ROLE_MIGRATION_MAP = {
-    owner: 'org_admin',
-    admin: 'org_admin',
-    org_finance: 'org_admin',
-    member: 'user',
-    race_editor: 'race_admin',
-    race_viewer: 'user',
-    editor: 'race_admin',
-    viewer: 'user',
-};
 
 export async function requireAuth(req, res, next) {
     const authHeader = req.headers.authorization;
@@ -34,29 +17,11 @@ export async function requireAuth(req, res, next) {
     try {
         const decoded = jwt.verify(token, env.JWT_SECRET);
 
-        // 映射纠正旧 token 带来的旧版角色名称
-        if (ROLE_MIGRATION_MAP[decoded.role]) {
-            console.warn(`[DEPRECATED] Legacy role "${decoded.role}" detected for user ${decoded.userId}. ` +
-                         `Mapped to "${ROLE_MIGRATION_MAP[decoded.role]}". User should re-login to get updated token.`);
-        }
-        const normalizedRole = ROLE_MIGRATION_MAP[decoded.role] || decoded.role;
-
         req.authContext = {
             userId: decoded.userId,
             orgId: decoded.orgId || null,
-            role: normalizedRole,
+            role: decoded.role,
             strictSurfaceModules: Boolean(decoded.preferences?.strictSurfaceModules),
-        };
-
-        // 兼容遗留代码 (原本的 tenantContext 设置)
-        req.tenantContext = req.authContext;
-        req.user = decoded;
-
-        // 兼容 inventory 模块的 orgAccess
-        req.orgAccess = {
-            orgId: decoded.orgId || null,
-            userId: decoded.userId,
-            role: normalizedRole,
         };
 
         next();

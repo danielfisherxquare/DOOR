@@ -1,4 +1,3 @@
-import knex from '../db/knex.js'
 import {
   getRoleDefaultModules,
   hasAllModuleAccess,
@@ -9,6 +8,7 @@ import { authz as defaultAuthz, createAuthzService } from './authz.service.js'
 import { moduleObjectId, surfaceObjectId } from './object-ids.js'
 import { loadAuthzRows } from './profile.service.js'
 import { projectAuthzTuples } from './tuple-projector.js'
+import { hasExplicitModuleGrant } from './module-grants.js'
 
 function authorizationError(status, code, message, details) {
   const error = new Error(message)
@@ -27,18 +27,6 @@ async function resolveDefaultRelationService() {
     provider: 'local',
     tuples: projectAuthzTuples(rows),
   })
-}
-
-async function checkUserModuleAccess(userId, moduleId) {
-  const access = await knex('user_module_access')
-    .where('user_id', userId)
-    .where('module_id', moduleId)
-    .where(function validAccess() {
-      this.whereNull('expires_at').orWhere('expires_at', '>', knex.fn.now())
-    })
-    .first()
-
-  return Boolean(access)
 }
 
 function assertAction(actual, expected, resourceKind) {
@@ -109,7 +97,7 @@ async function assertLegacyModule(authContext, resource, checkExplicitModuleAcce
 
 export function createAuthorization({
   resolveRelationService = resolveDefaultRelationService,
-  checkUserModuleAccess: checkExplicitModuleAccess = checkUserModuleAccess,
+  checkUserModuleAccess: checkExplicitModuleAccess = hasExplicitModuleGrant,
 } = {}) {
   async function assertAll(authContext, decisions = []) {
     let relationServicePromise = null

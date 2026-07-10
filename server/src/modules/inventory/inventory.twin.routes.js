@@ -12,7 +12,7 @@ function defaultOrgIdRequiredResponse(req, res) {
 
 export function createInventoryTwinRouter(options = {}) {
     const router = Router();
-    const resolveTargetOrgId = options.resolveTargetOrgId || ((req) => req.orgAccess?.orgId);
+    const resolveTargetOrgId = options.resolveTargetOrgId || ((req) => req.authContext?.orgId);
     const orgIdRequiredResponse = options.orgIdRequiredResponse || defaultOrgIdRequiredResponse;
 
     function requireOrgId(req, res) {
@@ -71,15 +71,15 @@ export function createInventoryTwinRouter(options = {}) {
 
     router.post('/bindings/scan', handleMutation((orgId, req) => twinService.scanBinding(orgId, {
         ...req.body,
-        operatorId: req.orgAccess?.userId || req.authContext?.userId || null,
+        operatorId: req.authContext?.userId || null,
     })));
     router.post('/bindings/move', handleMutation((orgId, req) => twinService.moveBinding(orgId, {
         ...req.body,
-        operatorId: req.orgAccess?.userId || req.authContext?.userId || null,
+        operatorId: req.authContext?.userId || null,
     })));
     router.post('/bindings/unbind', handleMutation((orgId, req) => twinService.unbindBinding(orgId, {
         ...req.body,
-        operatorId: req.orgAccess?.userId || req.authContext?.userId || null,
+        operatorId: req.authContext?.userId || null,
     })));
 
     router.get('/scene/:warehouseId', handleMutation((orgId, req) => twinService.getTwinScene(orgId, Number(req.params.warehouseId))));

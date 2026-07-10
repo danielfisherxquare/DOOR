@@ -20,7 +20,7 @@ function resolveTargetOrgId(req) {
         return paramOrgId;
     }
 
-    return req.orgAccess?.orgId;
+    return req.authContext?.orgId;
 }
 
 function orgIdRequiredResponse(req, res) {
@@ -138,7 +138,7 @@ router.post('/pre-inbound/items', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await repo.createPreInboundItem(orgId, req.body, req.orgAccess.userId);
+        const data = await repo.createPreInboundItem(orgId, req.body, req.authContext.userId);
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -153,7 +153,7 @@ router.put('/pre-inbound/items/:id', async (req, res, next) => {
             orgId,
             Number(req.params.id),
             req.body,
-            req.orgAccess.userId
+            req.authContext.userId
         );
         res.json({ success: true, data });
     } catch (err) {
@@ -169,7 +169,7 @@ router.post('/pre-inbound/items/:id/notes', async (req, res, next) => {
             orgId,
             Number(req.params.id),
             req.body.note,
-            req.orgAccess.userId
+            req.authContext.userId
         );
         res.json({ success: true, data });
     } catch (err) {
@@ -186,7 +186,7 @@ router.post('/pre-inbound/items/:id/advance', async (req, res, next) => {
             Number(req.params.id),
             req.body.stage,
             req.body.note,
-            req.orgAccess.userId
+            req.authContext.userId
         );
         res.json({ success: true, data });
     } catch (err) {
@@ -201,7 +201,7 @@ router.post('/pre-inbound/items/:id/start-inbound', async (req, res, next) => {
         const data = await repo.startPreInboundInbound(
             orgId,
             Number(req.params.id),
-            req.orgAccess.userId
+            req.authContext.userId
         );
         res.json({ success: true, data });
     } catch (err) {
@@ -241,7 +241,7 @@ router.post('/batches', async (req, res, next) => {
 
         const data = await repo.createBatch(targetOrgId, {
             ...req.body,
-            createdBy: req.orgAccess.userId,
+            createdBy: req.authContext.userId,
         });
         res.json({ success: true, data });
     } catch (err) {
@@ -342,7 +342,7 @@ router.post('/units/batch', async (req, res, next) => {
 
             const twinSync = await twinService.syncLegacyUnitsToTwinObjects(orgId, createdUnits, {
                 currentWarehouseId: requestedWarehouseId || undefined,
-                createdBy: req.orgAccess?.userId || null,
+                createdBy: req.authContext?.userId || null,
             }, trx);
 
             return { units: createdUnits, twinSync };
@@ -368,7 +368,7 @@ router.post('/units/scan', async (req, res, next) => {
         const { qrCode, action, raceId, runnerId } = req.body;
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const userId = req.orgAccess.userId;
+        const userId = req.authContext.userId;
         const normalizedRunnerId = String(runnerId || '').trim();
 
         const unit = await repo.getUnitByQR(orgId, qrCode);
@@ -538,7 +538,7 @@ router.put('/requests/:id/approve', async (req, res, next) => {
             orgId,
             Number(req.params.id),
             approvedQuantity,
-            req.orgAccess.userId
+            req.authContext.userId
         );
         res.json({ success: true, data });
     } catch (err) {
@@ -624,7 +624,7 @@ router.put('/alerts/:id/resolve', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        await alertService.markAsResolved(orgId, Number(req.params.id), req.orgAccess.userId);
+        await alertService.markAsResolved(orgId, Number(req.params.id), req.authContext.userId);
         res.json({ success: true });
     } catch (err) {
         next(err);
@@ -693,7 +693,7 @@ router.post('/stocktaking/plans', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await stocktakingService.createPlan(orgId, req.body, req.orgAccess.userId);
+        const data = await stocktakingService.createPlan(orgId, req.body, req.authContext.userId);
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -730,7 +730,7 @@ router.post('/stocktaking/scan', async (req, res, next) => {
             orgId,
             req.body.planId,
             req.body,
-            req.orgAccess.userId
+            req.authContext.userId
         );
         res.json({ success: true, data });
     } catch (err) {

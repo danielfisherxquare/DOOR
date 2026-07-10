@@ -2,7 +2,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 
-import { tenantContext } from '../src/middleware/tenant-context.js';
+import { requireAuth } from '../src/middleware/require-auth.js';
 import { errorHandler } from '../src/middleware/error-handler.js';
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
@@ -78,7 +78,7 @@ describe('Phase 7 Routes', () => {
         app.use('/api/auth', authRoutes);
         app.use('/api/races', raceRoutes);
         app.use('/api/records', recordRoutes);
-        app.use('/api/pipeline', tenantContext, pipelineRoutes);
+        app.use('/api/pipeline', requireAuth, pipelineRoutes);
         app.use(errorHandler);
 
         server = app.listen(0);

@@ -37,8 +37,7 @@ test('inventory twin integration flow keeps legacy location fields in sync and r
     const app = express();
     app.use(express.json());
     app.use((req, _res, next) => {
-        req.authContext = { role: 'org_admin' };
-        req.orgAccess = { orgId: org.id, userId: null };
+        req.authContext = { role: 'org_admin', orgId: org.id, userId: null };
         next();
     });
     app.use('/api/inventory', inventoryRoutes);

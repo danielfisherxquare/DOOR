@@ -10,7 +10,7 @@ import * as authRepo from './auth.repository.js';
 import { userMapper } from '../../db/mappers/auth.js';
 import { listEffectiveRacePermissionsForUser, listVisibleRacesForOrg } from '../races/race-access.service.js';
 import { buildAuthzProfile } from '../../utils/capability-policy.js';
-import { getUserAllModules } from '../../middleware/require-module-access.js';
+import { getUserAllModules } from '../../authz/module-grants.js';
 
 const ACCESS_TOKEN_EXPIRES = '1h';
 const REFRESH_TOKEN_DAYS = 30;

@@ -42,9 +42,7 @@
  */
 
 function resolveRoles(req) {
-  const role = req.authContext?.role || req.user?.role || null;
-  const legacyRoles = Array.isArray(req.user?.roles) ? req.user.roles : [];
-  return role ? [...new Set([role, ...legacyRoles])] : legacyRoles;
+  return req.authContext?.role ? [req.authContext.role] : [];
 }
 
 function canAccessOwnedResource({ ownerUserId, resourceOrgId }, { userId, orgId, roles }) {
@@ -221,8 +219,8 @@ async function checkBatchRecords(knex, recordIds, { userId, orgId, roles }) {
  */
 export function requireReimbursementAccess(options = {}) {
   return async (req, res, next) => {
-    const userId = req.authContext?.userId || req.user?.userId;
-    const orgId = req.authContext?.orgId || req.user?.orgId;
+    const userId = req.authContext?.userId;
+    const orgId = req.authContext?.orgId;
     const roles = resolveRoles(req);
 
     // Not logged in
