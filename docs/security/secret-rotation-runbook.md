@@ -34,12 +34,12 @@ Acceptable evidence is a provider rotation event ID, deployment ID, database rol
 
 Do not overwrite V1 in place. Ciphertext records include their key version, so V1 must remain available while old rows are read.
 
-The current code can select versioned keys in `server/src/utils/crypto.js`, but `server/src/utils/key-guard.js` still fingerprints V1 directly. Complete and test active-version key-guard support before changing `PII_ACTIVE_KEY_VERSION`.
+The current code selects versioned keys in `server/src/utils/crypto.js`. `server/src/utils/key-guard.js` fingerprints both active encryption and HMAC keys, rejects same-version drift, and re-encrypts a successfully verified older canary before that old key is retired. Verify that this behavior is present in the deployed release before changing `PII_ACTIVE_KEY_VERSION`.
 
 1. Take and verify a restorable PostgreSQL backup. Record row counts for encrypted `records` and `lottery_lists` fields.
 2. Generate independent 32-byte encryption and HMAC keys outside the repository. Store them as `PII_ENCRYPTION_KEY_V2` and `PII_HMAC_KEY_V2` in the secret manager.
 3. Deploy app and worker with V1 and V2 present while `PII_ACTIVE_KEY_VERSION=v1`. Verify readiness and decrypt samples through normal APIs.
-4. After active-version key-guard support is deployed, set `PII_ACTIVE_KEY_VERSION=v2` for app and worker together. Verify new writes have an `enc:v1:v2:` prefix and remain readable.
+4. Set `PII_ACTIVE_KEY_VERSION=v2` for app and worker together. Verify the key guard reports a V1-to-V2 canary migration, and verify new writes have an `enc:v1:v2:` prefix and remain readable.
 5. Run the approved re-encryption job in bounded batches. For each row: decrypt with the ciphertext version, encrypt with V2 using the same AAD context, and recompute blind indexes with the V2 HMAC key.
 6. Compare row counts, null counts, decryption failures, blind-index lookup results, and canary status. Roll back from the verified backup on any mismatch.
 7. Keep V1 available for the agreed observation window. Remove V1 only after a full scan finds no V1 ciphertext and no V1 blind-index dependency.

@@ -26,14 +26,51 @@ function computeKeyFingerprint(keyHex) {
   return crypto.createHash('sha256').update(keyHex).digest('hex').slice(0, 16);
 }
 
+function getActiveKeyVersion() {
+  return process.env.PII_ACTIVE_KEY_VERSION || 'v1';
+}
+
+function getVersionedKey(prefix, version) {
+  return process.env[`${prefix}_${version.toUpperCase()}`] || '';
+}
+
+function getCiphertextKeyVersion(ciphertext) {
+  if (!isEncrypted(ciphertext)) return null;
+  const parts = ciphertext.split(':');
+  return parts.length === 6 ? parts[2] : null;
+}
+
+function parseStoredFingerprints(value) {
+  try {
+    return JSON.parse(value || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function getSameVersionFingerprintMismatch(stored, current) {
+  if (!stored?.version || stored.version !== current.version) return null;
+  if (
+    stored.encryptionKeyFingerprint &&
+    stored.encryptionKeyFingerprint !== current.encryptionKeyFingerprint
+  ) {
+    return 'encryption_key_mismatch';
+  }
+  if (stored.hmacKeyFingerprint && stored.hmacKeyFingerprint !== current.hmacKeyFingerprint) {
+    return 'hmac_key_mismatch';
+  }
+  return null;
+}
+
 /**
  * 获取当前环境的密钥指纹
  */
 export function getCurrentKeyFingerprints() {
-  const encKeyHex = process.env.PII_ENCRYPTION_KEY_V1 || '';
-  const hmacKeyHex = process.env.PII_HMAC_KEY_V1 || '';
+  const version = getActiveKeyVersion();
+  const encKeyHex = getVersionedKey('PII_ENCRYPTION_KEY', version);
+  const hmacKeyHex = getVersionedKey('PII_HMAC_KEY', version);
   return {
-    version: process.env.PII_ACTIVE_KEY_VERSION || 'v1',
+    version,
     encryptionKeyFingerprint: computeKeyFingerprint(encKeyHex),
     hmacKeyFingerprint: computeKeyFingerprint(hmacKeyHex),
   };
@@ -95,6 +132,7 @@ export async function verifyEncryptionKeys(knex) {
   const fingerprints = getCurrentKeyFingerprints();
   const storedCanary = await getSetting(knex, SETTING_KEY_CANARY);
   const storedFingerprint = await getSetting(knex, SETTING_KEY_FINGERPRINT);
+  const storedFP = parseStoredFingerprints(storedFingerprint);
 
   // ── 首次运行：写入 canary ──────────────────────────────────────
   if (!storedCanary) {
@@ -113,30 +151,45 @@ export async function verifyEncryptionKeys(knex) {
   // ── 后续运行：验证 canary 可解密 ───────────────────────────────
   const decrypted = decryptField(storedCanary);
   const canaryValid = decrypted === CANARY_PLAINTEXT;
+  const fingerprintMismatch = getSameVersionFingerprintMismatch(storedFP, fingerprints);
 
-  if (canaryValid) {
-    // 更新指纹记录（密钥正确但指纹可能因格式变化需要刷新）
+  if (canaryValid && !fingerprintMismatch) {
+    const canaryVersion = getCiphertextKeyVersion(storedCanary);
+    const canaryRotatedFrom =
+      canaryVersion === fingerprints.version ? null : canaryVersion || 'plaintext';
+
+    if (canaryRotatedFrom) {
+      const rotatedCanary = encryptField(CANARY_PLAINTEXT);
+      await setSetting(knex, SETTING_KEY_CANARY, rotatedCanary);
+      console.log(
+        `[key-guard] ✅ canary 已从 ${canaryRotatedFrom} 迁移到 ${fingerprints.version}`,
+      );
+    }
+
+    // 更新当前活跃版本的指纹记录。
     await setSetting(knex, SETTING_KEY_FINGERPRINT, JSON.stringify(fingerprints));
 
     console.log('[key-guard] ✅ 加密密钥验证通过');
     console.log(`[key-guard]    密钥指纹: ${fingerprints.encryptionKeyFingerprint}`);
 
-    return { status: 'ok', details: fingerprints };
+    return {
+      status: 'ok',
+      details: {
+        ...fingerprints,
+        ...(canaryRotatedFrom ? { canaryRotatedFrom } : {}),
+      },
+    };
   }
 
   // ── 密钥不匹配！──────────────────────────────────────────────
-  let storedFP = {};
-  try {
-    storedFP = JSON.parse(storedFingerprint || '{}');
-  } catch { /* ignore */ }
-
   const errorMsg = [
     '',
     '╔══════════════════════════════════════════════════════════════╗',
-    '║  ⛔  加密密钥不匹配！数据库中的加密数据将无法解密              ║',
+    '║  ⛔  PII 密钥不匹配！加密数据或盲索引将不可用                  ║',
     '╠══════════════════════════════════════════════════════════════╣',
     `║  数据库记录的密钥指纹: ${storedFP.encryptionKeyFingerprint || 'UNKNOWN'}`,
     `║  当前 .env 的密钥指纹: ${fingerprints.encryptionKeyFingerprint}`,
+    `║  不匹配类型: ${fingerprintMismatch || 'canary_decryption_failed'}`,
     '║',
     '║  可能原因：',
     '║  1. .env 文件被意外替换或覆盖',
@@ -146,9 +199,8 @@ export async function verifyEncryptionKeys(knex) {
     '║  解决方法：',
     '║  1. 从备份中恢复正确的 .env 文件',
     `║     (检查 backups/ 目录下的 door_backup_*.env 文件)`,
-    '║  2. 确认 PII_ENCRYPTION_KEY_V1 与加密数据时使用的密钥一致',
-    '║  3. 如果确认要使用新密钥（旧数据将丢失），删除 system_settings 表',
-    '║     中 key=pii_key_canary 的记录后重启',
+    `║  2. 确认 ${fingerprintMismatch === 'hmac_key_mismatch' ? 'PII_HMAC_KEY' : 'PII_ENCRYPTION_KEY'}_${fingerprints.version.toUpperCase()} 与当前活跃版本一致`,
+    '║  3. 不要删除 pii_key_canary；按密钥轮换手册恢复旧密钥或执行受控迁移',
     '╚══════════════════════════════════════════════════════════════╝',
     '',
   ].join('\n');
@@ -157,7 +209,9 @@ export async function verifyEncryptionKeys(knex) {
 
   // 生产环境：拒绝启动
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('[key-guard] FATAL: 加密密钥不匹配，拒绝启动。请参照上方日志恢复正确的 .env 文件。');
+    throw new Error(
+      `[key-guard] FATAL: PII key mismatch (${fingerprintMismatch || 'canary_decryption_failed'}); refusing startup.`,
+    );
   }
 
   // 开发环境：警告但继续
@@ -179,9 +233,21 @@ export async function checkKeyHealth(knex) {
     const storedCanary = await getSetting(knex, SETTING_KEY_CANARY);
     if (!storedCanary) return { healthy: true, reason: 'no_canary_yet' };
 
+    const storedFingerprint = parseStoredFingerprints(
+      await getSetting(knex, SETTING_KEY_FINGERPRINT),
+    );
+    const fingerprints = getCurrentKeyFingerprints();
+    const fingerprintMismatch = getSameVersionFingerprintMismatch(
+      storedFingerprint,
+      fingerprints,
+    );
+    if (fingerprintMismatch) {
+      return { healthy: false, reason: fingerprintMismatch };
+    }
+
     const decrypted = decryptField(storedCanary);
     if (decrypted === CANARY_PLAINTEXT) {
-      return { healthy: true, fingerprint: getCurrentKeyFingerprints().encryptionKeyFingerprint };
+      return { healthy: true, fingerprint: fingerprints.encryptionKeyFingerprint };
     }
 
     return { healthy: false, reason: 'key_mismatch' };
