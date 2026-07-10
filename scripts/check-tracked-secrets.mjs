@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const allowedEnvironmentFiles = new Set(['.env.example', '.env.sample', '.env.template'])
 const secretKeyPattern =
-  /(?:^|_)(?:API_KEY|SECRET|TOKEN|PASSWORD|ENCRYPTION_KEY|HMAC_KEY|PRIVATE_KEY|PEPPER)$/i
+  /(?:^|_)(?:API_KEY|SECRET|TOKEN|PASSWORD|ENCRYPTION_KEY|HMAC_KEY|PRIVATE_KEY|PEPPER)(?:_V\d+)?$/i
 const credentialValuePattern = /^(?:sk|pk|rk|ak)-[A-Za-z0-9_-]{12,}$/i
 const binaryExtensionPattern =
   /\.(?:3mf|7z|avif|bin|docx?|eot|gif|gz|ico|jpe?g|mp4|pdf|png|rar|ttf|webm|webp|woff2?|xlsx?|zip)$/i
@@ -30,7 +30,12 @@ export function isPlaceholderSecretValue(value) {
   if (!normalized) return true
   if (/^\$\{[^}]+\}$/.test(normalized)) return true
   if (/^<[^>]+>$/.test(normalized)) return true
-  if (/^(?:your_|change[_-]?me|replace[_-]?me|placeholder|x{6,})/i.test(normalized)) {
+  if (/^([0-9a-f])\1{63}$/i.test(normalized)) return true
+  if (
+    /^(?:your_|test[_-]|ci[_-]|change[_-]?me|replace[_-]?me|placeholder|x{6,})/i.test(
+      normalized,
+    )
+  ) {
     return true
   }
   return false

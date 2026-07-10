@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install from lockfile
+        run: npm ci --ignore-scripts
+
+      - name: Check source encoding
+        run: npm run check:encoding
+
+      - name: Check tracked secrets
+        run: npm run check:secrets
+
+      - name: Lint correctness errors
+        run: npm run lint -- --quiet
+
+      - name: Type-check TypeScript sources
+        run: npm run typecheck
+
+      - name: Check governed formatting
+        run: npm run format:check
+
+      - name: Run frontend tests
+        run: npm test
+
+      - name: Build production frontend
+        run: npm run build
+
+  backend:
+    name: Backend gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: door_test
+          POSTGRES_USER: door
+          POSTGRES_PASSWORD: test_postgres_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U door -d door_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://door:test_postgres_password@127.0.0.1:5432/door_test
+      JWT_SECRET: test_jwt_secret_at_least_32_characters
+      ASSESSMENT_FIELD_ENCRYPTION_KEY: test_assessment_field_key
+      ASSESSMENT_SESSION_JWT_SECRET: test_assessment_session_secret
+      ASSESSMENT_HASH_PEPPER: test_assessment_hash_pepper
+      PII_ACTIVE_KEY_VERSION: v1
+      PII_ENCRYPTION_KEY_V1: '1111111111111111111111111111111111111111111111111111111111111111'
+      PII_HMAC_KEY_V1: '2222222222222222222222222222222222222222222222222222222222222222'
+      AUTHZ_PROVIDER: local
+      DISABLE_REGISTRATION: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install server from lockfile
+        working-directory: server
+        run: npm ci --ignore-scripts
+
+      - name: Verify test database guard
+        working-directory: server
+        run: npm run test:safety
+
+      - name: Run server tests serially against PostgreSQL
+        working-directory: server
+        run: npm test
