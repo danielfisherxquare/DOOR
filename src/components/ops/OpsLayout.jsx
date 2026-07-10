@@ -1,20 +1,12 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import { getOpsNavGroups, getOpsRouteMeta, buildOpsHref } from './opsConfig'
 import WorkspaceContextDisplay from '../../features/workspace/WorkspaceContextDisplay'
 import useSurfaceWorkspace from '../../features/workspace/useSurfaceWorkspace'
-import ModuleProtectedRoute from '../ModuleProtectedRoute'
 import useSidebarMotion from '../shared/useSidebarMotion'
+import OpsSurfaceRoutes from '../../routes/opsRoutes'
 import '../app/app-layout.css'
-
-const OpsHome = lazy(() => import('../../views/ops/OpsHome'))
-const ScanHome = lazy(() => import('../../views/scan/ScanHome'))
-const ScanResult = lazy(() => import('../../views/scan/ScanResult'))
-const BibPickupPage = lazy(() => import('../../views/ops/BibPickupPage'))
-const CredentialIssuePage = lazy(() => import('../../features/credential/execute/CredentialIssuePage'))
-const WarehouseWorkbench = lazy(() => import('../../views/ops/WarehouseWorkbench'))
-const DesignRequestWorkspace = lazy(() => import('../../views/design-requests/DesignRequestWorkspace'))
 
 function OpsRouteLoader() {
   return (
@@ -63,11 +55,6 @@ export default function OpsLayout() {
   }, [user])
 
   const groupTitle = currentGroup?.label || '执行端'
-  const requireOpsModule = useCallback((moduleId, element) => (
-    <ModuleProtectedRoute surface="ops" moduleId={moduleId}>
-      {element}
-    </ModuleProtectedRoute>
-  ), [])
   const isNavItemActive = useCallback((item) => {
     return item.path === ''
       ? location.pathname === '/ops'
@@ -204,16 +191,7 @@ export default function OpsLayout() {
         {/* ── 内容区 ── */}
         <section className="workspace-main__content">
           <Suspense fallback={<OpsRouteLoader />}>
-            <Routes>
-              <Route index element={<OpsHome />} />
-              <Route path="scan" element={requireOpsModule('scan', <ScanHome />)} />
-              <Route path="scan/result" element={requireOpsModule('scan', <ScanResult />)} />
-              <Route path="bibs/pickup" element={requireOpsModule('bib-pickup', <BibPickupPage />)} />
-              <Route path="credentials/issue" element={requireOpsModule('credentials', <CredentialIssuePage />)} />
-              <Route path="warehouse/*" element={requireOpsModule('warehouse', <WarehouseWorkbench />)} />
-              <Route path="design-requests" element={requireOpsModule('design-requests', <DesignRequestWorkspace surface="ops" mode="requester" />)} />
-              <Route path="*" element={<Navigate to={buildOpsHref('', currentContext)} replace />} />
-            </Routes>
+            <OpsSurfaceRoutes fallbackHref={buildOpsHref('', currentContext)} />
           </Suspense>
         </section>
       </main>
