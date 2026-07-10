@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { access, readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 const packageJsonUrl = new URL('../../package.json', import.meta.url)
@@ -36,4 +36,16 @@ test('root scripts expose one repeatable verification entry point', async () => 
   assert.ok(pkg.scripts.lint)
   assert.ok(pkg.scripts['format:check'])
   assert.ok(pkg.scripts.typecheck)
+})
+
+test('workspace uses one lockfile and patched dependency releases', async () => {
+  const pkg = await readPackageJson()
+
+  await assert.rejects(access(new URL('../../server/package-lock.json', import.meta.url)), {
+    code: 'ENOENT',
+  })
+  assert.equal(pkg.dependencies.xlsx, 'https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz')
+  assert.equal(pkg.devDependencies.vite, '^8.1.4')
+  assert.equal(pkg.devDependencies['@vitejs/plugin-react'], '^6.0.3')
+  assert.equal(pkg.overrides.exceljs.uuid, '^11.1.1')
 })
