@@ -7,7 +7,6 @@
     "src/modules/inventory/inventory.routes.js",
     "src/modules/operation-log/operation-log.routes.js",
     "src/modules/pipeline/pipeline-config.routes.js",
-    "src/modules/profile/profile.routes.js",
     "src/modules/projects/projects.controller.js",
     "src/modules/races/race.routes.js",
     "src/modules/reimbursement/invoice.controller.js",
