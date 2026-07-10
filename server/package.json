@@ -12,7 +12,10 @@
     "migrate": "node node_modules/knex/bin/cli.js migrate:latest --knexfile knexfile.js",
     "migrate:make": "node node_modules/knex/bin/cli.js migrate:make --knexfile knexfile.js",
     "seed:demo": "node --env-file-if-exists=.env scripts/seed-demo-data.mjs",
-    "test": "node --env-file-if-exists=.env --test --test-concurrency=1",
+    "test": "node ./tests/support/test-environment.mjs && node --import ./tests/support/test-environment.mjs --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js",
+    "test:safety": "node ./tests/support/test-environment.mjs && node --import ./tests/support/test-environment.mjs --test tests/test-environment.test.js",
+    "test:unit": "node ./tests/support/test-environment.mjs && node --import ./tests/support/test-environment.mjs --test tests/test-environment.test.js",
+    "test:integration": "node ./tests/support/test-environment.mjs && node --import ./tests/support/test-environment.mjs --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js",
     "load:bib-tracking": "node --env-file-if-exists=.env scripts/load-bib-tracking.mjs"
   },
   "dependencies": {
