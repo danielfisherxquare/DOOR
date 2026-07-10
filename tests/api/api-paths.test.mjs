@@ -77,4 +77,26 @@ describe('API path ownership', () => {
     assert.match(credentialSource, /adminCredentialApi/)
     assert.match(credentialSource, /opsCredentialApi/)
   })
+
+  it('passes the interview surface explicitly from views to the store', async () => {
+    const interviewApiSource = await source('src/api/interview.js')
+    const interviewStoreSource = await source('src/stores/interviewStore.js')
+    const interviewSurfaceSource = await source('src/views/interview/useInterviewSurface.js')
+
+    assert.doesNotMatch(interviewApiSource, /window\.location/)
+    assert.match(interviewApiSource, /adminInterviewApi/)
+    assert.match(interviewApiSource, /appInterviewApi/)
+    assert.match(interviewStoreSource, /getInterviewApi\(surface\)/)
+    assert.match(interviewSurfaceSource, /\bsurface,/)
+
+    for (const relativePath of [
+      'src/views/interview/InterviewList.jsx',
+      'src/views/interview/InterviewCompare.jsx',
+      'src/views/interview/InterviewForm.jsx',
+    ]) {
+      const viewSource = await source(relativePath)
+      assert.match(viewSource, /useInterviewSurface\(\)/, relativePath)
+      assert.match(viewSource, /(?:fetch|save|delete)Interview(?:s)?\([^)]*surface/, relativePath)
+    }
+  })
 })

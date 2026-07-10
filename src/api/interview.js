@@ -1,20 +1,24 @@
 import request from '../utils/request'
 
-function getInterviewApiBasePath() {
-  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/app/')) {
-    return '/app/interviews'
+const BASE_PATHS = {
+  admin: '/admin/interviews',
+  app: '/app/interviews',
+}
+
+export function createInterviewApi(surface) {
+  const basePath = BASE_PATHS[surface]
+  if (!basePath) throw new Error(`Unsupported interview surface: ${surface}`)
+
+  return {
+    list: (params = {}) => request.get(basePath, { params }),
+    getById: (id) => request.get(`${basePath}/${id}`),
+    create: (data) => request.post(basePath, data),
+    update: (id, data) => request.put(`${basePath}/${id}`, data),
+    delete: (id) => request.delete(`${basePath}/${id}`),
+    compare: (ids) => request.post(`${basePath}/compare`, { ids }),
+    getCriteria: () => request.get(`${basePath}/criteria`),
   }
-  return '/admin/interviews'
 }
 
-export const interviewApi = {
-  list: (params = {}) => request.get(getInterviewApiBasePath(), { params }),
-  getById: (id) => request.get(`${getInterviewApiBasePath()}/${id}`),
-  create: (data) => request.post(getInterviewApiBasePath(), data),
-  update: (id, data) => request.put(`${getInterviewApiBasePath()}/${id}`, data),
-  delete: (id) => request.delete(`${getInterviewApiBasePath()}/${id}`),
-  compare: (ids) => request.post(`${getInterviewApiBasePath()}/compare`, { ids }),
-  getCriteria: () => request.get(`${getInterviewApiBasePath()}/criteria`),
-}
-
-export default interviewApi
+export const adminInterviewApi = createInterviewApi('admin')
+export const appInterviewApi = createInterviewApi('app')

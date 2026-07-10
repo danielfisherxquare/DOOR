@@ -15,14 +15,14 @@ import {
 
 export default function InterviewCompare() {
   const { interviews, isLoading, fetchInterviews } = useInterviewStore()
-  const { buildPath } = useInterviewSurface()
+  const { buildPath, surface } = useInterviewSurface()
   const chartRef = useRef(null)
   const chartInstance = useRef(null)
   const [selectedIds, setSelectedIds] = useState([])
 
   useEffect(() => {
-    fetchInterviews()
-  }, [fetchInterviews])
+    fetchInterviews(surface)
+  }, [fetchInterviews, surface])
 
   useEffect(() => {
     let cancelled = false

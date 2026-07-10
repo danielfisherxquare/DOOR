@@ -1,6 +1,17 @@
 import { create } from 'zustand';
-import interviewApi from '../api/interview';
+import { adminInterviewApi, appInterviewApi } from '../api/interview';
 import { getTodayInBeijing, normalizeInterviewDate } from '../utils/beijingDate';
+
+const INTERVIEW_APIS = {
+    admin: adminInterviewApi,
+    app: appInterviewApi,
+};
+
+function getInterviewApi(surface) {
+    const interviewApi = INTERVIEW_APIS[surface];
+    if (!interviewApi) throw new Error(`Unsupported interview surface: ${surface}`);
+    return interviewApi;
+}
 
 export const CRITERIA_DATA = [
     { 
@@ -192,9 +203,10 @@ const useInterviewStore = create((set, get) => ({
         });
     },
 
-    fetchInterviews: async () => {
+    fetchInterviews: async (surface) => {
         set({ isLoading: true, error: null });
         try {
+            const interviewApi = getInterviewApi(surface);
             const result = await interviewApi.list();
             if (result.success) {
                 set({ interviews: result.data, isLoading: false });
@@ -206,9 +218,10 @@ const useInterviewStore = create((set, get) => ({
         }
     },
 
-    fetchInterview: async (id) => {
+    fetchInterview: async (id, surface) => {
         set({ isLoading: true, error: null });
         try {
+            const interviewApi = getInterviewApi(surface);
             const result = await interviewApi.getById(id);
             if (result.success) {
                 set({ currentInterview: result.data, isLoading: false });
@@ -223,7 +236,7 @@ const useInterviewStore = create((set, get) => ({
         }
     },
 
-    saveInterview: async () => {
+    saveInterview: async (surface) => {
         const { scores, scenarioScores, candidateName, interviewDate, interviewer, notes, editingId } = get();
         
         if (!candidateName || !interviewDate) {
@@ -233,6 +246,7 @@ const useInterviewStore = create((set, get) => ({
         set({ isLoading: true, error: null });
         
         try {
+            const interviewApi = getInterviewApi(surface);
             const data = {
                 candidate_name: candidateName,
                 interview_date: interviewDate,
@@ -251,7 +265,7 @@ const useInterviewStore = create((set, get) => ({
 
             if (result.success) {
                 get().resetForm();
-                await get().fetchInterviews();
+                await get().fetchInterviews(surface);
                 set({ isLoading: false });
                 return { success: true, data: result.data };
             } else {
@@ -264,12 +278,13 @@ const useInterviewStore = create((set, get) => ({
         }
     },
 
-    deleteInterview: async (id) => {
+    deleteInterview: async (id, surface) => {
         set({ isLoading: true, error: null });
         try {
+            const interviewApi = getInterviewApi(surface);
             const result = await interviewApi.delete(id);
             if (result.success) {
-                await get().fetchInterviews();
+                await get().fetchInterviews(surface);
                 set({ isLoading: false });
                 return { success: true };
             } else {
@@ -282,9 +297,10 @@ const useInterviewStore = create((set, get) => ({
         }
     },
 
-    compareInterviews: async (ids) => {
+    compareInterviews: async (ids, surface) => {
         set({ isLoading: true, error: null });
         try {
+            const interviewApi = getInterviewApi(surface);
             const result = await interviewApi.compare(ids);
             if (result.success) {
                 set({ isLoading: false });

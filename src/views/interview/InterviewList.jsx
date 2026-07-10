@@ -9,13 +9,13 @@ import { average, summarizeInterview } from './interviewTheme'
 
 export default function InterviewList() {
   const navigate = useNavigate()
-  const { buildPath } = useInterviewSurface()
+  const { buildPath, surface } = useInterviewSurface()
   const { interviews, isLoading, fetchInterviews, deleteInterview } = useInterviewStore()
   const [deleteConfirm, setDeleteConfirm] = useState(null)
 
   useEffect(() => {
-    fetchInterviews()
-  }, [fetchInterviews])
+    fetchInterviews(surface)
+  }, [fetchInterviews, surface])
 
   const stats = useMemo(() => {
     const recommendedCount = interviews.filter((item) => ['S', 'A'].includes(item.tier)).length
@@ -41,7 +41,7 @@ export default function InterviewList() {
   }, [interviews])
 
   const handleDelete = async (id) => {
-    const result = await deleteInterview(id)
+    const result = await deleteInterview(id, surface)
     if (!result.success) {
       showError(result.error || '删除面试记录失败')
       return

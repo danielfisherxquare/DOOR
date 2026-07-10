@@ -154,7 +154,7 @@ export default function InterviewForm() {
   const editId = searchParams.get('edit')
   const chartRef = useRef(null)
   const chartInstance = useRef(null)
-  const { buildPath } = useInterviewSurface()
+  const { buildPath, surface } = useInterviewSurface()
 
   const {
     scores,
@@ -185,13 +185,13 @@ export default function InterviewForm() {
 
   useEffect(() => {
     if (editId) {
-      fetchInterview(editId).then((data) => {
+      fetchInterview(editId, surface).then((data) => {
         if (data) loadForEdit(data)
       })
     }
 
     return () => resetForm()
-  }, [editId, fetchInterview, loadForEdit, resetForm])
+  }, [editId, fetchInterview, loadForEdit, resetForm, surface])
 
   useEffect(() => {
     let cancelled = false
@@ -280,7 +280,7 @@ export default function InterviewForm() {
   ]
 
   const handleSave = async () => {
-    const result = await saveInterview()
+    const result = await saveInterview(surface)
     if (!result.success) {
       showError(result.error || '保存失败')
       return
