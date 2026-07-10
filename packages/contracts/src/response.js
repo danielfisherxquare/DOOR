@@ -22,12 +22,12 @@ export function createErrorResponse({ code, message, details, requestId } = {}) 
     throw new TypeError('API error message must be a non-empty string')
   }
 
-  const error = details === undefined
+  const errorDetails = details === undefined
     ? { code, message }
     : { code, message, details }
-  const response = { success: false, error, message }
+  const error = requestId ? { ...errorDetails, requestId } : errorDetails
 
-  return requestId ? { ...response, requestId } : response
+  return { success: false, error, message }
 }
 
 export function isApiErrorResponse(value) {

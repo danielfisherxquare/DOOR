@@ -64,9 +64,9 @@ describe('shared contracts', () => {
           code: 'VALIDATION_FAILED',
           message: '字段不合法',
           details: { field: 'email' },
+          requestId: 'req-7',
         },
         message: '字段不合法',
-        requestId: 'req-7',
       },
     )
   })

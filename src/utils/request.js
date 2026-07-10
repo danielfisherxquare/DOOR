@@ -1,6 +1,6 @@
 import axios from 'axios'
-import { ApiError, isApiErrorResponse } from '@arcspro/contracts'
 import { notifyAuthExpired, readAccessToken } from '../auth/auth-session-adapter.js'
+import { toApiError } from './apiResponse.js'
 
 function remapApiPath(url) {
   if (typeof url !== 'string' || !url.startsWith('/')) return url
@@ -39,44 +39,17 @@ function isInvalidAuthResponse(error) {
   )
 }
 
-function getRequestId(error) {
-  return error.response?.data?.requestId
-    || error.response?.headers?.['x-request-id']
-    || ''
-}
-
-function toApiError(error) {
-  const responseData = error.response?.data
-  const structuredError = isApiErrorResponse(responseData) ? responseData.error : null
-  const isHtmlError = typeof responseData === 'string' && responseData.trim().startsWith('<')
-  const legacyError = typeof responseData?.error === 'string' ? responseData.error : null
-  const status = Number.isInteger(error.response?.status) ? error.response.status : 0
-  const message =
-    structuredError?.message
-    || responseData?.message
-    || legacyError
-    || (isHtmlError ? 'API 返回了 HTML 错误页，请检查后端服务或 Nginx /api 反代配置' : null)
-    || error.message
-    || '请求失败'
-
-  return new ApiError(message, {
-    code: structuredError?.code || (status ? `HTTP_${status}` : 'NETWORK_ERROR'),
-    status,
-    details: structuredError?.details,
-    requestId: getRequestId(error),
-    cause: error,
-  })
-}
-
 function handleRequestError(error) {
+  const apiError = toApiError(error)
   if (isInvalidAuthResponse(error)) {
     notifyAuthExpired({
-      status: error.response?.status || 0,
-      requestId: getRequestId(error),
+      status: apiError.status,
+      code: apiError.code,
+      requestId: apiError.requestId,
     })
   }
 
-  return Promise.reject(toApiError(error))
+  return Promise.reject(apiError)
 }
 
 // 用于 OCR 识别等长时间请求的 axios 实例（10 分钟超时）
