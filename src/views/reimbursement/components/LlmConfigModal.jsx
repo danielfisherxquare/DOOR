@@ -124,8 +124,8 @@ function LlmConfigModal({ visible, onClose }) {
           </div>
 
           <div className="llm-config-notice">
-            <p>注意：API Key 将存储在浏览器本地，请勿在公共电脑上保存。</p>
-            {hasServerLlmConfig && <p>当前服务端已配置默认 OCR 模型。填写本地 API Key 后将优先使用本地配置。</p>}
+            <p>API Key 将通过当前登录会话提交，并加密保存到服务端；浏览器仅保留脱敏占位符。请勿在公共电脑上输入敏感凭据。</p>
+            {hasServerLlmConfig && <p>当前服务端已配置默认 OCR 模型。填写个人 API Key 后将优先使用个人加密配置。</p>}
             {saveError && <p className="llm-config-error">{saveError}</p>}
           </div>
         </div>
