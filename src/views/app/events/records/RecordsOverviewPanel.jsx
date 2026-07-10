@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import recordsApi from '../../../../api/records'
-import { unwrapRecordsQueryResult } from '../../../../utils/apiResponse'
 import {
   AppH5DataCard,
   AppH5DataTable,
@@ -82,7 +81,7 @@ export default function RecordsOverviewPanel({
         limit: PAGE_SIZE,
         sort,
       })
-      const result = unwrapRecordsQueryResult(response)
+      const result = response.data || { records: [], total: 0 }
       setRecords(result.records || [])
       setTotal(result.total || 0)
     } catch (err) {
@@ -171,7 +170,7 @@ export default function RecordsOverviewPanel({
           limit,
           sort,
         })
-        const result = unwrapRecordsQueryResult(response)
+        const result = response.data || { records: [], total: 0 }
         allRecords.push(...(result.records || []))
         if ((result.records || []).length < limit) break
         offset += limit

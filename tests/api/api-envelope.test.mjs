@@ -43,3 +43,11 @@ test('lottery API returns canonical envelopes across HTTP and job polling', asyn
   assert.doesNotMatch(source, /\.then\(/)
   assert.match(source, /response\.data/)
 })
+
+test('the client has no response-shape guessing helpers', async () => {
+  const source = await readFile(new URL('src/utils/apiResponse.js', rootUrl), 'utf8')
+
+  assert.doesNotMatch(source, /unwrapData/)
+  assert.doesNotMatch(source, /unwrapListData/)
+  assert.doesNotMatch(source, /unwrapRecordsQueryResult/)
+})

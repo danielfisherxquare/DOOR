@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
 import recordsApi from '../../../../api/records'
-import { unwrapData } from '../../../../utils/apiResponse'
 import { parseVerificationExcel } from '../../../../utils/excelProcessor'
 import {
   AppH5DataCard,
@@ -56,7 +55,7 @@ export default function VerificationImportPanel({ raceId, onImported }) {
     try {
       setImporting(true)
       const response = await recordsApi.importVerification(raceId, parsedPreview.results)
-      const result = unwrapData(response)
+      const result = response.data
       setMessage(`导入成功，已更新 ${result?.updated || 0} 位选手的成绩证明。`)
       setMessageTone('success')
       setParsedPreview(null)

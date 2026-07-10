@@ -92,7 +92,6 @@ export const recordsApi = {
  * @returns {Promise<Array>}
  */
 export async function fetchAllRecords(raceId) {
-  const { unwrapRecordsQueryResult } = await import('../utils/apiResponse')
   const all = []
   let offset = 0
   const limit = 1000
@@ -104,7 +103,7 @@ export async function fetchAllRecords(raceId) {
       limit,
       sort: { field: 'id', direction: 'asc' },
     })
-    const result = unwrapRecordsQueryResult(response)
+    const result = response.data || { records: [], total: 0 }
     const batch = result.records || []
     all.push(...batch)
     if (batch.length < limit) break

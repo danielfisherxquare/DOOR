@@ -4,7 +4,6 @@ import racesApi from '../../../../api/races'
 import useAuthStore from '../../../../stores/authStore'
 import useRaceContextStore from '../../../../stores/raceContextStore'
 import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
-import { unwrapData } from '../../../../utils/apiResponse'
 import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../../../utils/surfaceContext'
 import {
   AppH5ContextState,
@@ -50,7 +49,7 @@ export default function ProcessingCenterPage() {
     racesApi.getById(Number(raceId))
       .then((response) => {
         if (!alive) return
-        setRaceDetail(unwrapData(response) || null)
+        setRaceDetail(response?.data || null)
       })
       .catch(() => {
         if (!alive) return

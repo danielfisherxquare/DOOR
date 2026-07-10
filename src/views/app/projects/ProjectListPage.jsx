@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import projectsApi from '../../../api/projects'
-import { unwrapListData } from '../../../utils/apiResponse'
 import {
   AppH5DataCard,
   AppH5DataTable,
@@ -24,7 +23,7 @@ export default function ProjectListPage() {
           setError(response.message || '加载项目失败')
           setProjects([])
         } else {
-          setProjects(unwrapListData(response, ['projects']))
+          setProjects(Array.isArray(response.data) ? response.data : [])
         }
         setLoading(false)
       })
