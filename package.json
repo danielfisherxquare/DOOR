@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "check:encoding": "node scripts/check-encoding.mjs",
+    "check:secrets": "node scripts/check-tracked-secrets.mjs",
     "lint": "eslint src tests",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
@@ -24,7 +25,7 @@
     "test:3d-studio": "node --test tests/3d-studio/editorDocument.test.js tests/3d-studio/focusZoneStudioScene.test.js tests/3d-studio/studioExport.test.js",
     "test:reimbursement": "node tests/reimbursement/reimbursement-e2e.test.js",
     "test:reimbursement:headless": "cross-env HEADLESS=true node tests/reimbursement/reimbursement-e2e.test.js",
-    "test": "node --test tests/tooling/*.test.mjs tests/surfaceContext.test.js tests/workspaceSession.test.js tests/moduleAccess.test.js tests/surfaceBoundaries.test.js tests/3d-studio/editorDocument.test.js tests/3d-studio/focusZoneStudioScene.test.js tests/3d-studio/studioExport.test.js tests/terrain-model/terrainModel.test.mjs tests/map/map-utils.test.mjs tests/branding/branding.test.mjs"
+    "test": "node --test tests/tooling/*.test.mjs tests/security/*.test.mjs tests/surfaceContext.test.js tests/workspaceSession.test.js tests/moduleAccess.test.js tests/surfaceBoundaries.test.js tests/3d-studio/editorDocument.test.js tests/3d-studio/focusZoneStudioScene.test.js tests/3d-studio/studioExport.test.js tests/terrain-model/terrainModel.test.mjs tests/map/map-utils.test.mjs tests/branding/branding.test.mjs"
   },
   "dependencies": {
     "@geoman-io/leaflet-geoman-free": "^2.19.2",

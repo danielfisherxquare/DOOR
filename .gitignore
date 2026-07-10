@@ -8,6 +8,8 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.dev
+.env.*.dev
 
 # IDE
 .vscode/
@@ -32,6 +34,7 @@ tsc_output.txt
 # Temporary & debug files
 .tmp-*
 tmp-*
+tmp/
 .runtime/
 result.json
 public/minimal.3mf
