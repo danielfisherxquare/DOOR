@@ -5,6 +5,7 @@ import request from 'supertest';
 import { createInventoryTwinRouter } from '../src/modules/inventory/inventory.twin.routes.js';
 import { parseTwinPayload } from '../src/modules/inventory/inventory.twin.schema.js';
 import { twinValidation } from '../src/modules/inventory/inventory.twin.service.js';
+import { errorHandler } from '../src/middleware/error-handler.js';
 
 function collectRoutes(router, prefix = '') {
     const routes = [];
@@ -165,4 +166,23 @@ test('inventory twin routes derive audit actors from auth context', async () => 
             createdBy: 'user-real',
         },
     });
+});
+
+test('inventory twin validation errors use a stable 400 response', async () => {
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+        req.authContext = { userId: 'user-real', orgId: 'org-real' };
+        next();
+    });
+    app.use(createInventoryTwinRouter({ resolveTargetOrgId: () => 'org-real' }));
+    app.use(errorHandler);
+
+    const response = await request(app)
+        .post('/warehouses')
+        .send({ code: 'WH-1', name: 'Main', floorCount: -1 });
+
+    assert.equal(response.status, 400);
+    assert.equal(response.body.error.code, 'INVENTORY_TWIN_INPUT_INVALID');
+    assert.match(response.body.error.message, /floorCount/);
 });

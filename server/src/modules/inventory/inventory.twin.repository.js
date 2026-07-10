@@ -85,13 +85,14 @@ export async function getTwinWarehouseLayout(orgId, warehouseId, db) {
         .first();
 }
 
-export async function saveTwinWarehouseLayout(orgId, warehouseId, layoutJson, sceneVersion, db) {
-    const [result] = await dbOrKnex(db)('warehouses')
+export async function saveTwinWarehouseLayout(orgId, warehouseId, layoutJson, db) {
+    const database = dbOrKnex(db);
+    const [result] = await database('warehouses')
         .where({ org_id: orgId, id: warehouseId })
         .update({
             layout_json: toJsonb(layoutJson),
-            scene_version: sceneVersion,
-            updated_at: dbOrKnex(db).fn.now(),
+            scene_version: database.raw('scene_version + 1'),
+            updated_at: database.fn.now(),
         })
         .returning(['id', 'layout_json', 'scene_version', 'updated_at']);
 
@@ -290,10 +291,11 @@ export async function getTwinLocations(orgId, filters = {}, db) {
     return query;
 }
 
-export async function getTwinLocationById(orgId, locationId, db) {
-    return dbOrKnex(db)('warehouse_locations')
+export async function getTwinLocationById(orgId, locationId, db, options = {}) {
+    const query = dbOrKnex(db)('warehouse_locations')
         .where({ org_id: orgId, id: locationId })
         .first();
+    return options.forUpdate ? query.forUpdate() : query;
 }
 
 export async function createTwinLocation(orgId, data, db) {
@@ -472,10 +474,11 @@ export async function getInventoryObjects(orgId, filters = {}, db) {
     return query;
 }
 
-export async function getInventoryObjectById(orgId, objectId, db) {
-    return dbOrKnex(db)('inventory_objects')
+export async function getInventoryObjectById(orgId, objectId, db, options = {}) {
+    const query = dbOrKnex(db)('inventory_objects')
         .where({ org_id: orgId, id: objectId })
         .first();
+    return options.forUpdate ? query.forUpdate() : query;
 }
 
 export async function getInventoryObjectByCode(orgId, objectCode, db) {
@@ -599,8 +602,8 @@ export async function findQrEntity(orgId, entityType, entityId, db) {
         .first();
 }
 
-export async function getActiveLocationBindingByObjectId(orgId, objectId, db) {
-    return dbOrKnex(db)('location_bindings')
+export async function getActiveLocationBindingByObjectId(orgId, objectId, db, options = {}) {
+    const query = dbOrKnex(db)('location_bindings')
         .where({
             org_id: orgId,
             object_id: objectId,
@@ -608,6 +611,7 @@ export async function getActiveLocationBindingByObjectId(orgId, objectId, db) {
         .whereNull('unbound_at')
         .orderBy('bound_at', 'desc')
         .first();
+    return options.forUpdate ? query.forUpdate() : query;
 }
 
 export async function createLocationBinding(orgId, data, db) {

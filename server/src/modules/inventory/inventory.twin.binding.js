@@ -4,10 +4,18 @@ import * as twinRepo from './inventory.twin.repository.js';
 const OBJECT_ENTITY_TYPES = new Set(['inventory_object', 'object']);
 const LOCATION_ENTITY_TYPES = new Set(['location', 'storage_location', 'warehouse_location']);
 
+function bindingError(message, code = 'INVENTORY_TWIN_BINDING_INVALID', status = 400) {
+    const error = new Error(message);
+    error.status = status;
+    error.code = code;
+    error.expose = true;
+    return error;
+}
+
 function normalizeString(value, fieldName) {
     const nextValue = String(value || '').trim();
     if (!nextValue) {
-        throw new Error(`${fieldName} is required`);
+        throw bindingError(`${fieldName} is required`);
     }
     return nextValue;
 }
@@ -15,7 +23,7 @@ function normalizeString(value, fieldName) {
 function normalizeInteger(value, fieldName) {
     const nextValue = Number(value);
     if (!Number.isFinite(nextValue) || nextValue <= 0) {
-        throw new Error(`${fieldName} is required`);
+        throw bindingError(`${fieldName} is required`);
     }
     return Math.round(nextValue);
 }
@@ -50,11 +58,11 @@ function deriveLocationStatus(currentStatus, usedCapacity, capacity) {
 
 function ensureBindingEntity(entity, expectedTypes, fieldName) {
     if (!entity) {
-        throw new Error(`${fieldName} not found`);
+        throw bindingError(`${fieldName} not found`, 'INVENTORY_TWIN_BINDING_ENTITY_NOT_FOUND', 404);
     }
 
     if (!expectedTypes.has(entity.entity_type)) {
-        throw new Error(`${fieldName} has invalid entity type`);
+        throw bindingError(`${fieldName} has invalid entity type`);
     }
 
     return entity;
@@ -62,13 +70,17 @@ function ensureBindingEntity(entity, expectedTypes, fieldName) {
 
 function ensureLocationAcceptsObject(location, object) {
     if (location.status === 'locked') {
-        throw new Error('Location is locked');
+        throw bindingError('Location is locked', 'INVENTORY_TWIN_LOCATION_LOCKED', 409);
     }
 
     const objectWarehouseId = Number(object.current_warehouse_id || object.currentWarehouseId || 0);
     const locationWarehouseId = Number(location.warehouse_id || location.warehouseId || 0);
     if (objectWarehouseId > 0 && locationWarehouseId > 0 && objectWarehouseId !== locationWarehouseId) {
-        throw new Error('Cross-warehouse binding is not allowed in phase 1');
+        throw bindingError(
+            'Cross-warehouse binding is not allowed in phase 1',
+            'INVENTORY_TWIN_CROSS_WAREHOUSE_FORBIDDEN',
+            409
+        );
     }
 
     const locationDimensions = parseJsonb(location.dimensions_mm);
@@ -79,13 +91,21 @@ function ensureLocationAcceptsObject(location, object) {
             || Number(objectDimensions.depthMm || 0) > Number(locationDimensions.depthMm || 0)
             || Number(objectDimensions.heightMm || 0) > Number(locationDimensions.heightMm || 0)
         ) {
-            throw new Error('Object dimensions exceed location capacity');
+            throw bindingError(
+                'Object dimensions exceed location capacity',
+                'INVENTORY_TWIN_LOCATION_CAPACITY_EXCEEDED',
+                409
+            );
         }
     }
 
     if (location.max_weight_kg !== null && location.max_weight_kg !== undefined && object.weight_kg !== null && object.weight_kg !== undefined) {
         if (Number(object.weight_kg) > Number(location.max_weight_kg)) {
-            throw new Error('Object weight exceeds location capacity');
+            throw bindingError(
+                'Object weight exceeds location capacity',
+                'INVENTORY_TWIN_LOCATION_CAPACITY_EXCEEDED',
+                409
+            );
         }
     }
 }
@@ -105,16 +125,14 @@ async function resolveBindingResources(orgId, objectQr, locationQr, trx) {
     const objectId = normalizeInteger(objectEntity.entity_id, 'objectId');
     const locationId = normalizeInteger(locationEntity.entity_id, 'locationId');
 
-    const [object, location] = await Promise.all([
-        twinRepo.getInventoryObjectById(orgId, objectId, trx),
-        twinRepo.getTwinLocationById(orgId, locationId, trx),
-    ]);
+    const object = await twinRepo.getInventoryObjectById(orgId, objectId, trx, { forUpdate: true });
+    const location = await twinRepo.getTwinLocationById(orgId, locationId, trx, { forUpdate: true });
 
     if (!object) {
-        throw new Error('Inventory object not found');
+        throw bindingError('Inventory object not found', 'INVENTORY_TWIN_OBJECT_NOT_FOUND', 404);
     }
     if (!location) {
-        throw new Error('Location not found');
+        throw bindingError('Location not found', 'INVENTORY_TWIN_LOCATION_NOT_FOUND', 404);
     }
 
     return { objectEntity, locationEntity, object, location };
@@ -158,7 +176,12 @@ async function insertTransactionIfNeeded(trx, orgId, object, previousBinding, lo
 async function decrementPreviousLocationIfNeeded(trx, orgId, previousBinding) {
     if (!previousBinding) return null;
 
-    const previousLocation = await twinRepo.getTwinLocationById(orgId, previousBinding.location_id, trx);
+    const previousLocation = await twinRepo.getTwinLocationById(
+        orgId,
+        previousBinding.location_id,
+        trx,
+        { forUpdate: true }
+    );
     if (!previousLocation) return null;
 
     const usedCapacity = Math.max(0, Number(previousLocation.used_capacity || 0) - 1);
@@ -181,21 +204,38 @@ async function performBind(orgId, payload, action = 'scan') {
         const operatorId = payload.operatorId || null;
         const bindingMode = payload.bindingMode || action;
         const { object, location } = await resolveBindingResources(orgId, payload.objectQr, payload.locationQr, trx);
-        const previousBinding = await twinRepo.getActiveLocationBindingByObjectId(orgId, object.id, trx);
+        const previousBinding = await twinRepo.getActiveLocationBindingByObjectId(
+            orgId,
+            object.id,
+            trx,
+            { forUpdate: true }
+        );
 
         if (previousBinding && Number(previousBinding.location_id) === Number(location.id)) {
-            throw new Error('Object is already bound to this location');
+            throw bindingError(
+                'Object is already bound to this location',
+                'INVENTORY_TWIN_BINDING_CONFLICT',
+                409
+            );
         }
 
         ensureLocationAcceptsObject(location, object);
 
         if (!previousBinding && Number(location.capacity || 0) > 0 && Number(location.used_capacity || 0) >= Number(location.capacity || 0)) {
-            throw new Error('Location capacity exceeded');
+            throw bindingError(
+                'Location capacity exceeded',
+                'INVENTORY_TWIN_LOCATION_CAPACITY_EXCEEDED',
+                409
+            );
         }
 
         if (previousBinding) {
             if (Number(location.capacity || 0) > 0 && Number(location.used_capacity || 0) >= Number(location.capacity || 0)) {
-                throw new Error('Location capacity exceeded');
+                throw bindingError(
+                    'Location capacity exceeded',
+                    'INVENTORY_TWIN_LOCATION_CAPACITY_EXCEEDED',
+                    409
+                );
             }
 
             await twinRepo.closeActiveLocationBinding(orgId, object.id, {
@@ -278,17 +318,36 @@ export async function unbindBinding(orgId, payload) {
             OBJECT_ENTITY_TYPES,
             'objectQr'
         );
-        const object = await twinRepo.getInventoryObjectById(orgId, normalizeInteger(objectEntity.entity_id, 'objectId'), trx);
+        const object = await twinRepo.getInventoryObjectById(
+            orgId,
+            normalizeInteger(objectEntity.entity_id, 'objectId'),
+            trx,
+            { forUpdate: true }
+        );
         if (!object) {
-            throw new Error('Inventory object not found');
+            throw bindingError('Inventory object not found', 'INVENTORY_TWIN_OBJECT_NOT_FOUND', 404);
         }
 
-        const activeBinding = await twinRepo.getActiveLocationBindingByObjectId(orgId, object.id, trx);
+        const activeBinding = await twinRepo.getActiveLocationBindingByObjectId(
+            orgId,
+            object.id,
+            trx,
+            { forUpdate: true }
+        );
         if (!activeBinding) {
-            throw new Error('Object has no active binding');
+            throw bindingError(
+                'Object has no active binding',
+                'INVENTORY_TWIN_BINDING_NOT_FOUND',
+                404
+            );
         }
 
-        const previousLocation = await twinRepo.getTwinLocationById(orgId, activeBinding.location_id, trx);
+        const previousLocation = await twinRepo.getTwinLocationById(
+            orgId,
+            activeBinding.location_id,
+            trx,
+            { forUpdate: true }
+        );
         await twinRepo.closeActiveLocationBinding(orgId, object.id, {
             releasedBy: operatorId,
             releaseReason: payload.reason || 'manual_unbind',

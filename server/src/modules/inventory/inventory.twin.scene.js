@@ -16,7 +16,11 @@ function compactEvent(event) {
 export async function getTwinScenePayload(orgId, warehouseId) {
     const warehouse = await repo.getTwinWarehouseById(orgId, warehouseId);
     if (!warehouse) {
-        throw new Error('Warehouse not found');
+        const error = new Error('Warehouse not found');
+        error.status = 404;
+        error.code = 'INVENTORY_TWIN_WAREHOUSE_NOT_FOUND';
+        error.expose = true;
+        throw error;
     }
 
     const [zones, racks, locations, objects, events] = await Promise.all([

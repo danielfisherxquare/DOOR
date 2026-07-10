@@ -176,6 +176,47 @@ test('scan binding creates one active binding, updates legacy location fields, a
         .orderBy('id', 'asc')
         .pluck('transaction_type');
     assert.deepEqual(transactionTypes, ['inbound', 'transfer', 'transfer']);
+
+    const [contendingLegacyUnit] = await knex('org_inventory_units').insert({
+        org_id: org.id,
+        batch_id: batch.id,
+        qr_code: 'LEG-UNIT-CONTENDER',
+        item_type: 'other',
+        status: 'in_stock',
+        current_holder_type: 'org',
+        current_holder_id: org.id,
+    }).returning('*');
+    await twinService.createInventoryObject(org.id, {
+        legacyUnitId: contendingLegacyUnit.id,
+        batchId: batch.id,
+        objectCode: 'OBJ-CONTENDER',
+        objectLevel: 'unit',
+        shapeType: 'box',
+        dimensionsMm: { widthMm: 500, depthMm: 500, heightMm: 500 },
+        status: 'in_stock',
+    });
+
+    const competingBindings = await Promise.allSettled([
+        twinService.scanBinding(org.id, {
+            objectQr: 'OBJ-001',
+            locationQr: 'LOC-A-01',
+        }),
+        twinService.scanBinding(org.id, {
+            objectQr: 'OBJ-CONTENDER',
+            locationQr: 'LOC-A-01',
+        }),
+    ]);
+    assert.equal(competingBindings.filter((result) => result.status === 'fulfilled').length, 1);
+    assert.equal(competingBindings.filter((result) => result.status === 'rejected').length, 1);
+
+    const locationAfterContention = await knex('warehouse_locations')
+        .where({ org_id: org.id, id: locationA.id })
+        .first();
+    assert.equal(locationAfterContention.used_capacity, 1);
+    const activeBindingsAfterContention = await knex('location_bindings')
+        .where({ org_id: org.id, location_id: locationA.id })
+        .whereNull('unbound_at');
+    assert.equal(activeBindingsAfterContention.length, 1);
 });
 
 test('phase 1 binding rejects cross-warehouse scan and move operations', async () => {

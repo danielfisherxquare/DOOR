@@ -40,6 +40,15 @@ test('inventory twin repository creates warehouses, rack templates, instances, l
     });
     assert.equal(layout.scene_version, 2);
 
+    const concurrentLayouts = await Promise.all([
+        twinService.saveTwinWarehouseLayout(orgA.id, warehouseA.id, { camera: 'front' }),
+        twinService.saveTwinWarehouseLayout(orgA.id, warehouseA.id, { camera: 'side' }),
+    ]);
+    assert.deepEqual(
+        concurrentLayouts.map((item) => item.scene_version).sort((left, right) => left - right),
+        [3, 4]
+    );
+
     const zone = await twinService.createWarehouseZone(orgA.id, {
         warehouseId: warehouseA.id,
         code: 'ZONE-A',

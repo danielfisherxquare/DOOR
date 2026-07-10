@@ -1,3 +1,4 @@
+import knex from '../../db/knex.js';
 import * as repo from './inventory.twin.repository.js';
 import * as bindingService from './inventory.twin.binding.js';
 import { getTwinScenePayload } from './inventory.twin.scene.js';
@@ -18,6 +19,14 @@ const DEFAULT_WEIGHT_BY_TYPE = {
     other: 1,
 };
 
+function twinError(message, code = 'INVENTORY_TWIN_INPUT_INVALID', status = 400) {
+    const error = new Error(message);
+    error.status = status;
+    error.code = code;
+    error.expose = true;
+    return error;
+}
+
 function isPlainObject(value) {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -25,14 +34,14 @@ function isPlainObject(value) {
 function normalizeString(value, fieldName, { required = false, fallback = undefined } = {}) {
     if (value === undefined) {
         if (required) {
-            throw new Error(`${fieldName} is required`);
+            throw twinError(`${fieldName} is required`);
         }
         return fallback;
     }
     const nextValue = String(value || '').trim();
     if (!nextValue) {
         if (required) {
-            throw new Error(`${fieldName} is required`);
+            throw twinError(`${fieldName} is required`);
         }
         return fallback ?? null;
     }
@@ -43,61 +52,61 @@ function normalizeBoolean(value, fallback = false) {
     if (value === undefined) return fallback;
     if (value === true || value === 'true' || value === 1 || value === '1') return true;
     if (value === false || value === 'false' || value === 0 || value === '0') return false;
-    throw new Error('value must be a boolean');
+    throw twinError('value must be a boolean');
 }
 
 function normalizeInteger(value, fieldName, { required = false, min = 0, fallback = undefined } = {}) {
     if (value === undefined) {
-        if (required) throw new Error(`${fieldName} is required`);
+        if (required) throw twinError(`${fieldName} is required`);
         return fallback;
     }
     const nextValue = Number(value);
     if (!Number.isInteger(nextValue) || nextValue < min) {
-        throw new Error(`${fieldName} must be an integer greater than or equal to ${min}`);
+        throw twinError(`${fieldName} must be an integer greater than or equal to ${min}`);
     }
     return nextValue;
 }
 
 function normalizeDecimal(value, fieldName, { required = false, min = -Infinity, fallback = undefined } = {}) {
     if (value === undefined) {
-        if (required) throw new Error(`${fieldName} is required`);
+        if (required) throw twinError(`${fieldName} is required`);
         return fallback;
     }
     const nextValue = Number(value);
     if (!Number.isFinite(nextValue) || nextValue < min) {
-        throw new Error(`${fieldName} must be a number greater than or equal to ${min}`);
+        throw twinError(`${fieldName} must be a number greater than or equal to ${min}`);
     }
     return nextValue;
 }
 
 function normalizeJsonObject(value, fieldName, { required = false, fallback = undefined } = {}) {
     if (value === undefined) {
-        if (required) throw new Error(`${fieldName} is required`);
+        if (required) throw twinError(`${fieldName} is required`);
         return fallback;
     }
     if (value === null) {
-        if (required) throw new Error(`${fieldName} is required`);
+        if (required) throw twinError(`${fieldName} is required`);
         return null;
     }
     if (!isPlainObject(value)) {
-        throw new Error(`${fieldName} must be an object`);
+        throw twinError(`${fieldName} must be an object`);
     }
     return value;
 }
 
 function normalizeDimensionsMm(value, fieldName, { required = false } = {}) {
     if (value === undefined) {
-        if (required) throw new Error(`${fieldName} is required`);
+        if (required) throw twinError(`${fieldName} is required`);
         return undefined;
     }
 
     if (value === null) {
-        if (required) throw new Error(`${fieldName} is required`);
+        if (required) throw twinError(`${fieldName} is required`);
         return null;
     }
 
     if (!isPlainObject(value)) {
-        throw new Error(`${fieldName} must be an object`);
+        throw twinError(`${fieldName} must be an object`);
     }
 
     const widthMm = normalizeDecimal(value.widthMm, `${fieldName}.widthMm`, { required: true, min: 0 });
@@ -109,17 +118,17 @@ function normalizeDimensionsMm(value, fieldName, { required = false } = {}) {
 
 function normalizePoint(value, fieldName, { required = false } = {}) {
     if (value === undefined) {
-        if (required) throw new Error(`${fieldName} is required`);
+        if (required) throw twinError(`${fieldName} is required`);
         return undefined;
     }
 
     if (value === null) {
-        if (required) throw new Error(`${fieldName} is required`);
+        if (required) throw twinError(`${fieldName} is required`);
         return null;
     }
 
     if (!isPlainObject(value)) {
-        throw new Error(`${fieldName} must be an object`);
+        throw twinError(`${fieldName} must be an object`);
     }
 
     return {
@@ -131,17 +140,17 @@ function normalizePoint(value, fieldName, { required = false } = {}) {
 
 function normalizeTransform(value, fieldName, { required = false } = {}) {
     if (value === undefined) {
-        if (required) throw new Error(`${fieldName} is required`);
+        if (required) throw twinError(`${fieldName} is required`);
         return undefined;
     }
 
     if (value === null) {
-        if (required) throw new Error(`${fieldName} is required`);
+        if (required) throw twinError(`${fieldName} is required`);
         return null;
     }
 
     if (!isPlainObject(value)) {
-        throw new Error(`${fieldName} must be an object`);
+        throw twinError(`${fieldName} must be an object`);
     }
 
     return {
@@ -158,7 +167,7 @@ function normalizeRotation(value, fieldName) {
     if (value === undefined) return undefined;
     if (value === null) return null;
     if (!isPlainObject(value)) {
-        throw new Error(`${fieldName} must be an object`);
+        throw twinError(`${fieldName} must be an object`);
     }
 
     return {
@@ -170,14 +179,14 @@ function normalizeRotation(value, fieldName) {
 
 function normalizeShapeType(value, fieldName, { required = false } = {}) {
     if (value === undefined) {
-        if (required) throw new Error(`${fieldName} is required`);
+        if (required) throw twinError(`${fieldName} is required`);
         return undefined;
     }
 
     const nextValue = normalizeString(value, fieldName, { required });
     if (nextValue === null || nextValue === undefined) return nextValue;
     if (!SHAPE_TYPES.has(nextValue)) {
-        throw new Error(`${fieldName} must be one of ${Array.from(SHAPE_TYPES).join(', ')}`);
+        throw twinError(`${fieldName} must be one of ${Array.from(SHAPE_TYPES).join(', ')}`);
     }
     return nextValue;
 }
@@ -186,7 +195,7 @@ function normalizeAllowedShapeTypes(value) {
     if (value === undefined) return undefined;
     if (value === null) return null;
     if (!Array.isArray(value)) {
-        throw new Error('allowedShapeTypes must be an array');
+        throw twinError('allowedShapeTypes must be an array');
     }
     return [...new Set(value.map((item) => normalizeShapeType(item, 'allowedShapeTypes item', { required: true })))];
 }
@@ -219,14 +228,14 @@ function normalizeMaybeDimensionsMm(value) {
 
 function normalizeObjectLevel(value, { required = false } = {}) {
     if (value === undefined) {
-        if (required) throw new Error('objectLevel is required');
+        if (required) throw twinError('objectLevel is required');
         return undefined;
     }
 
     const nextValue = normalizeString(value, 'objectLevel', { required });
     if (nextValue === null || nextValue === undefined) return nextValue;
     if (!OBJECT_LEVELS.has(nextValue)) {
-        throw new Error(`objectLevel must be one of ${Array.from(OBJECT_LEVELS).join(', ')}`);
+        throw twinError(`objectLevel must be one of ${Array.from(OBJECT_LEVELS).join(', ')}`);
     }
     return nextValue;
 }
@@ -235,7 +244,7 @@ function normalizeOccupancyMode(value) {
     if (value === undefined) return undefined;
     const nextValue = normalizeString(value, 'occupancyMode', { required: true });
     if (!LOCATION_OCCUPANCY_MODES.has(nextValue)) {
-        throw new Error(`occupancyMode must be one of ${Array.from(LOCATION_OCCUPANCY_MODES).join(', ')}`);
+        throw twinError(`occupancyMode must be one of ${Array.from(LOCATION_OCCUPANCY_MODES).join(', ')}`);
     }
     return nextValue;
 }
@@ -320,7 +329,7 @@ function normalizeLocationPayload(data, { partial = false } = {}) {
     if (data.capacity !== undefined || !partial) payload.capacity = normalizeInteger(data.capacity, 'capacity', { min: 0, fallback: 1 });
     if (data.usedCapacity !== undefined) payload.usedCapacity = normalizeInteger(data.usedCapacity, 'usedCapacity', { min: 0, fallback: 0 });
     if (data.itemTypes !== undefined) {
-        if (!Array.isArray(data.itemTypes)) throw new Error('itemTypes must be an array');
+        if (!Array.isArray(data.itemTypes)) throw twinError('itemTypes must be an array');
         payload.itemTypes = data.itemTypes.map((item) => normalizeString(item, 'itemTypes item', { required: true }));
     }
     if (data.status !== undefined) payload.status = normalizeString(data.status, 'status', { required: true });
@@ -392,27 +401,31 @@ export const twinValidation = {
     normalizeWarehousePayload,
 };
 
-async function upsertQrEntity(orgId, data) {
+async function upsertQrEntity(orgId, data, repository = repo) {
     const db = data.db;
     const entityType = data.entityType;
     const entityId = String(data.entityId);
-    const existing = await repo.findQrEntity(orgId, entityType, entityId, db);
+    const existing = await repository.findQrEntity(orgId, entityType, entityId, db);
     if (existing) {
-        return repo.updateQrEntity(orgId, existing.id, { ...data, entityId }, db);
+        return repository.updateQrEntity(orgId, existing.id, { ...data, entityId }, db);
     }
 
-    const existingByCode = await repo.findQrEntityByCode(orgId, data.qrCode, db);
+    const existingByCode = await repository.findQrEntityByCode(orgId, data.qrCode, db);
     if (existingByCode) {
         if (existingByCode.entity_type !== entityType || String(existingByCode.entity_id) !== entityId) {
-            throw new Error(`QR code ${data.qrCode} already registered to another entity`);
+            throw twinError(
+                `QR code ${data.qrCode} already registered to another entity`,
+                'INVENTORY_TWIN_QR_CONFLICT',
+                409
+            );
         }
-        return repo.updateQrEntity(orgId, existingByCode.id, { ...data, entityId }, db);
+        return repository.updateQrEntity(orgId, existingByCode.id, { ...data, entityId }, db);
     }
 
-    return repo.createQrEntity(orgId, { ...data, entityId }, db);
+    return repository.createQrEntity(orgId, { ...data, entityId }, db);
 }
 
-async function ensureLocationQrEntity(orgId, location, db) {
+async function ensureLocationQrEntity(orgId, location, db, repository = repo) {
     if (!location?.id) return null;
     const warehouseId = location.warehouse_id ?? location.warehouseId;
     const code = location.code;
@@ -430,10 +443,10 @@ async function ensureLocationQrEntity(orgId, location, db) {
             code,
         },
         db,
-    });
+    }, repository);
 }
 
-async function ensureInventoryObjectQrEntity(orgId, object, db) {
+async function ensureInventoryObjectQrEntity(orgId, object, db, repository = repo) {
     if (!object?.id) return null;
     const qrCode = object.object_code ?? object.objectCode;
     if (!qrCode) return null;
@@ -451,7 +464,7 @@ async function ensureInventoryObjectQrEntity(orgId, object, db) {
             locationId: object.current_location_id ?? object.currentLocationId ?? null,
         },
         db,
-    });
+    }, repository);
 }
 
 function inferShapeTypeFromLegacyUnit(unit, spec = {}) {
@@ -483,6 +496,88 @@ function inferInventoryObjectStatus(unit) {
     return legacyStatus;
 }
 
+function normalizeBatchLocationRows(data) {
+    const warehouseId = normalizeInteger(data.warehouseId, 'warehouseId', { required: true, min: 1 });
+    if (!Array.isArray(data.slots) || data.slots.length === 0) {
+        throw twinError('slots is required');
+    }
+
+    return data.slots.map((slot, index) => {
+        const code = buildLocationCode(slot, index);
+        return normalizeLocationPayload({
+            warehouseId,
+            code,
+            zone: slot.zone ?? data.zone,
+            aisle: slot.aisle ?? data.aisle ?? String(index + 1).padStart(2, '0'),
+            shelf: slot.shelf ?? data.shelf ?? '01',
+            position: slot.position ?? data.position ?? String(index + 1).padStart(2, '0'),
+            qrCode: slot.qrCode || buildLocationQrCode(warehouseId, code),
+            capacity: slot.capacity ?? data.capacity ?? 1,
+            itemTypes: slot.itemTypes ?? data.itemTypes,
+            status: slot.status ?? data.status ?? 'empty',
+            transform: slot.transform ?? data.transform,
+            dimensionsMm: slot.dimensionsMm ?? data.dimensionsMm,
+            maxWeightKg: slot.maxWeightKg ?? data.maxWeightKg,
+            occupancyMode: slot.occupancyMode ?? data.occupancyMode ?? 'count',
+            rackInstanceCode: slot.rackInstanceCode ?? data.rackInstanceCode,
+            slotPath: slot.slotPath ?? `slot-${index + 1}`,
+        });
+    });
+}
+
+export function createTwinMutationWorkflow({ database = knex, repository = repo } = {}) {
+    return {
+        createTwinLocation(orgId, data) {
+            const input = normalizeLocationPayload(data);
+            return database.transaction(async (trx) => {
+                const location = await repository.createTwinLocation(orgId, input, trx);
+                await ensureLocationQrEntity(orgId, location, trx, repository);
+                return location;
+            });
+        },
+
+        updateTwinLocation(orgId, locationId, data) {
+            const input = normalizeLocationPayload(data, { partial: true });
+            return database.transaction(async (trx) => {
+                const location = await repository.updateTwinLocation(orgId, locationId, input, trx);
+                await ensureLocationQrEntity(orgId, location, trx, repository);
+                return location;
+            });
+        },
+
+        batchGenerateLocations(orgId, data) {
+            const rows = normalizeBatchLocationRows(data);
+            return database.transaction(async (trx) => {
+                const locations = await repository.batchCreateTwinLocations(orgId, rows, trx);
+                for (const location of locations) {
+                    await ensureLocationQrEntity(orgId, location, trx, repository);
+                }
+                return locations;
+            });
+        },
+
+        createInventoryObject(orgId, data) {
+            const input = normalizeInventoryObjectPayload(data);
+            return database.transaction(async (trx) => {
+                const object = await repository.createInventoryObject(orgId, input, trx);
+                await ensureInventoryObjectQrEntity(orgId, object, trx, repository);
+                return object;
+            });
+        },
+
+        updateInventoryObject(orgId, objectId, data) {
+            const input = normalizeInventoryObjectPayload(data, { partial: true });
+            return database.transaction(async (trx) => {
+                const object = await repository.updateInventoryObject(orgId, objectId, input, trx);
+                await ensureInventoryObjectQrEntity(orgId, object, trx, repository);
+                return object;
+            });
+        },
+    };
+}
+
+const twinMutationWorkflow = createTwinMutationWorkflow();
+
 export async function getTwinWarehouses(orgId) {
     return repo.getTwinWarehouses(orgId);
 }
@@ -504,12 +599,11 @@ export async function getTwinWarehouseLayout(orgId, warehouseId) {
 }
 
 export async function saveTwinWarehouseLayout(orgId, warehouseId, layoutJson) {
-    const warehouse = await repo.getTwinWarehouseById(orgId, warehouseId);
+    const warehouse = await repo.saveTwinWarehouseLayout(orgId, warehouseId, layoutJson ?? null);
     if (!warehouse) {
-        throw new Error('Warehouse not found');
+        throw twinError('Warehouse not found', 'INVENTORY_TWIN_WAREHOUSE_NOT_FOUND', 404);
     }
-
-    return repo.saveTwinWarehouseLayout(orgId, warehouseId, layoutJson ?? null, Number(warehouse.scene_version || 0) + 1);
+    return warehouse;
 }
 
 export async function getWarehouseZones(orgId, filters = {}) {
@@ -517,8 +611,8 @@ export async function getWarehouseZones(orgId, filters = {}) {
 }
 
 export async function createWarehouseZone(orgId, data) {
-    if (!data.warehouseId) throw new Error('warehouseId is required');
-    if (!data.boundsMm) throw new Error('boundsMm is required');
+    if (!data.warehouseId) throw twinError('warehouseId is required');
+    if (!data.boundsMm) throw twinError('boundsMm is required');
 
     return repo.createWarehouseZone(orgId, {
         warehouseId: normalizeInteger(data.warehouseId, 'warehouseId', { required: true, min: 1 }),
@@ -573,49 +667,15 @@ export async function getTwinLocations(orgId, filters = {}) {
 }
 
 export async function createTwinLocation(orgId, data) {
-    const location = await repo.createTwinLocation(orgId, normalizeLocationPayload(data));
-    await ensureLocationQrEntity(orgId, location);
-    return location;
+    return twinMutationWorkflow.createTwinLocation(orgId, data);
 }
 
 export async function updateTwinLocation(orgId, locationId, data) {
-    const location = await repo.updateTwinLocation(orgId, locationId, normalizeLocationPayload(data, { partial: true }));
-    await ensureLocationQrEntity(orgId, location);
-    return location;
+    return twinMutationWorkflow.updateTwinLocation(orgId, locationId, data);
 }
 
 export async function batchGenerateLocations(orgId, data) {
-    const warehouseId = normalizeInteger(data.warehouseId, 'warehouseId', { required: true, min: 1 });
-    if (!Array.isArray(data.slots) || data.slots.length === 0) {
-        throw new Error('slots is required');
-    }
-
-    const rows = data.slots.map((slot, index) => {
-        const code = buildLocationCode(slot, index);
-        return normalizeLocationPayload({
-            warehouseId,
-            code,
-            zone: slot.zone ?? data.zone,
-            aisle: slot.aisle ?? data.aisle ?? String(index + 1).padStart(2, '0'),
-            shelf: slot.shelf ?? data.shelf ?? '01',
-            position: slot.position ?? data.position ?? String(index + 1).padStart(2, '0'),
-            qrCode: slot.qrCode || buildLocationQrCode(warehouseId, code),
-            capacity: slot.capacity ?? data.capacity ?? 1,
-            usedCapacity: slot.usedCapacity ?? 0,
-            itemTypes: slot.itemTypes ?? data.itemTypes,
-            status: slot.status ?? data.status ?? 'empty',
-            transform: slot.transform ?? data.transform,
-            dimensionsMm: slot.dimensionsMm ?? data.dimensionsMm,
-            maxWeightKg: slot.maxWeightKg ?? data.maxWeightKg,
-            occupancyMode: slot.occupancyMode ?? data.occupancyMode ?? 'count',
-            rackInstanceCode: slot.rackInstanceCode ?? data.rackInstanceCode,
-            slotPath: slot.slotPath ?? `slot-${index + 1}`,
-        });
-    });
-
-    const locations = await repo.batchCreateTwinLocations(orgId, rows);
-    await Promise.all(locations.map((location) => ensureLocationQrEntity(orgId, location)));
-    return locations;
+    return twinMutationWorkflow.batchGenerateLocations(orgId, data);
 }
 
 export async function getItemShapeTemplates(orgId) {
@@ -641,15 +701,11 @@ export async function getInventoryObjects(orgId, filters = {}) {
 }
 
 export async function createInventoryObject(orgId, data) {
-    const object = await repo.createInventoryObject(orgId, normalizeInventoryObjectPayload(data));
-    await ensureInventoryObjectQrEntity(orgId, object);
-    return object;
+    return twinMutationWorkflow.createInventoryObject(orgId, data);
 }
 
 export async function updateInventoryObject(orgId, objectId, data) {
-    const object = await repo.updateInventoryObject(orgId, objectId, normalizeInventoryObjectPayload(data, { partial: true }));
-    await ensureInventoryObjectQrEntity(orgId, object);
-    return object;
+    return twinMutationWorkflow.updateInventoryObject(orgId, objectId, data);
 }
 
 export async function syncLegacyUnitsToTwinObjects(orgId, legacyUnits, options = {}, db) {
@@ -769,7 +825,7 @@ export async function getTwinScene(orgId, warehouseId) {
 export function previewLocationQrCodes(warehouseId, codes = []) {
     const normalizedWarehouseId = normalizeInteger(warehouseId, 'warehouseId', { required: true, min: 1 });
     if (!Array.isArray(codes)) {
-        throw new Error('codes must be an array');
+        throw twinError('codes must be an array');
     }
 
     return codes.map((code) => {
