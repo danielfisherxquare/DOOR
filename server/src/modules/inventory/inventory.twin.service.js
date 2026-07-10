@@ -41,7 +41,9 @@ function normalizeString(value, fieldName, { required = false, fallback = undefi
 
 function normalizeBoolean(value, fallback = false) {
     if (value === undefined) return fallback;
-    return Boolean(value);
+    if (value === true || value === 'true' || value === 1 || value === '1') return true;
+    if (value === false || value === 'false' || value === 0 || value === '0') return false;
+    throw new Error('value must be a boolean');
 }
 
 function normalizeInteger(value, fieldName, { required = false, min = 0, fallback = undefined } = {}) {
@@ -50,24 +52,22 @@ function normalizeInteger(value, fieldName, { required = false, min = 0, fallbac
         return fallback;
     }
     const nextValue = Number(value);
-    if (!Number.isFinite(nextValue)) {
-        if (required) throw new Error(`${fieldName} must be a number`);
-        return fallback;
+    if (!Number.isInteger(nextValue) || nextValue < min) {
+        throw new Error(`${fieldName} must be an integer greater than or equal to ${min}`);
     }
-    return Math.max(min, Math.round(nextValue));
+    return nextValue;
 }
 
-function normalizeDecimal(value, fieldName, { required = false, min = 0, fallback = undefined } = {}) {
+function normalizeDecimal(value, fieldName, { required = false, min = -Infinity, fallback = undefined } = {}) {
     if (value === undefined) {
         if (required) throw new Error(`${fieldName} is required`);
         return fallback;
     }
     const nextValue = Number(value);
-    if (!Number.isFinite(nextValue)) {
-        if (required) throw new Error(`${fieldName} must be a number`);
-        return fallback;
+    if (!Number.isFinite(nextValue) || nextValue < min) {
+        throw new Error(`${fieldName} must be a number greater than or equal to ${min}`);
     }
-    return Math.max(min, nextValue);
+    return nextValue;
 }
 
 function normalizeJsonObject(value, fieldName, { required = false, fallback = undefined } = {}) {
@@ -388,6 +388,8 @@ function normalizeQrEntityPayload(data) {
 export const twinValidation = {
     buildLocationCode,
     buildLocationQrCode,
+    normalizeLocationPayload,
+    normalizeWarehousePayload,
 };
 
 async function upsertQrEntity(orgId, data) {
