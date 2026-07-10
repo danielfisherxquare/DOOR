@@ -171,8 +171,8 @@ const numericFields = new Set(['is_locked']);
 /**
  * 检查是否存在快照
  */
-export async function hasSnapshot(orgId, raceId, type) {
-    const row = await knex('pipeline_snapshots')
+export async function hasSnapshot(orgId, raceId, type, database = knex) {
+    const row = await database('pipeline_snapshots')
         .where({ org_id: orgId, race_id: raceId, snapshot_type: type })
         .first('id');
     return !!row;

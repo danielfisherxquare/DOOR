@@ -216,4 +216,22 @@ describe('lottery v2 service', () => {
         const latest = await getLatestPreview(orgId, raceId);
         assert.equal(latest.status, 'stale');
     });
+
+    it('requires rollback before creating another preview after finalize', async () => {
+        await createPreview(orgId, raceId);
+        await finalizeLatestPreview(orgId, raceId);
+
+        await assert.rejects(
+            () => createPreview(orgId, raceId),
+            (error) => {
+                assert.equal(error.status, 409);
+                assert.equal(error.code, 'LOTTERY_V2_ALREADY_FINALIZED');
+                return true;
+            },
+        );
+
+        await rollbackLatest(orgId, raceId);
+        const nextPreview = await createPreview(orgId, raceId);
+        assert.equal(nextPreview.status, 'ready');
+    });
 });

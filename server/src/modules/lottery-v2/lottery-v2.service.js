@@ -1,11 +1,27 @@
 import { createHash } from 'node:crypto';
 import knex from '../../db/knex.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
+import {
+    assertNoActivePipelineExecution,
+    assertNoFinalizedLotteryV2,
+    assertNoLotteryV1Snapshot,
+    lockLotteryRace,
+} from '../lottery/lottery-execution.repository.js';
 
 const DIRECT_STATUSES = new Set(['直通名额', '直通', '强制保签']);
 const BLOCKING_LOTTERY_STATUSES = new Set(['通道错误', '精英资质存疑', '模糊剔除', '强制剔除', '不予通过']);
 const SPECIAL_CATEGORIES = new Set(['Elite', 'Permanent', 'Pacer', 'Medic', 'Sponsor']);
 const BATCH_SIZE = 1000;
+
+async function lockLotteryMutation(orgId, raceId, trx) {
+    await lockLotteryRace(orgId, raceId, trx);
+    await assertNoActivePipelineExecution(
+        orgId,
+        raceId,
+        ['lottery', 'rollback_lottery'],
+        trx,
+    );
+}
 
 const DEFAULT_CONFIG = {
     apparelScopeMode: 'gender_size',
@@ -236,25 +252,29 @@ export async function getConfig(orgId, raceId, trx = knex) {
     return fromDbConfig(row);
 }
 
-export async function saveConfig(orgId, raceId, data) {
-    const row = toDbConfig(data, orgId, raceId);
-    const [saved] = await knex('lottery_v2_configs')
-        .insert(row)
-        .onConflict(['org_id', 'race_id'])
-        .merge({
-            apparel_scope_mode: row.apparel_scope_mode,
-            size_match_policy: row.size_match_policy,
-            performance_ratio: row.performance_ratio,
-            gender_ratio: row.gender_ratio,
-            region_dimension: row.region_dimension,
-            region_ratios: row.region_ratios,
-            seed: row.seed,
-            fallback_strategy: row.fallback_strategy,
-            updated_at: knex.fn.now(),
-        })
-        .returning('*');
-    await markReadySnapshotsStale(orgId, raceId);
-    return fromDbConfig(saved);
+export async function saveConfig(orgId, raceId, data, database = knex) {
+    return database.transaction(async (trx) => {
+        await lockLotteryMutation(orgId, raceId, trx);
+        await assertNoLotteryV1Snapshot(orgId, raceId, trx);
+        const row = toDbConfig(data, orgId, raceId);
+        const [saved] = await trx('lottery_v2_configs')
+            .insert(row)
+            .onConflict(['org_id', 'race_id'])
+            .merge({
+                apparel_scope_mode: row.apparel_scope_mode,
+                size_match_policy: row.size_match_policy,
+                performance_ratio: row.performance_ratio,
+                gender_ratio: row.gender_ratio,
+                region_dimension: row.region_dimension,
+                region_ratios: row.region_ratios,
+                seed: row.seed,
+                fallback_strategy: row.fallback_strategy,
+                updated_at: trx.fn.now(),
+            })
+            .returning('*');
+        await markReadySnapshotsStale(orgId, raceId, trx);
+        return fromDbConfig(saved);
+    });
 }
 
 async function readBaseData(orgId, raceId, trx = knex) {
@@ -589,6 +609,9 @@ function buildSummary({ winners, losers, waitlist, directReservations, quotaBrea
 
 export async function createPreview(orgId, raceId) {
     return knex.transaction(async (trx) => {
+        await lockLotteryMutation(orgId, raceId, trx);
+        await assertNoLotteryV1Snapshot(orgId, raceId, trx);
+        await assertNoFinalizedLotteryV2(orgId, raceId, trx);
         const { config, capacities, limits, lists, records } = await readBaseData(orgId, raceId, trx);
         const configHash = stableHash(config);
         const sourceFingerprint = buildSourceFingerprint({ capacities, limits, lists, records });
@@ -703,6 +726,9 @@ export async function finalizeLatestPreview(orgId, raceId) {
     let staleSnapshotId = null;
     try {
         return await knex.transaction(async (trx) => {
+            await lockLotteryMutation(orgId, raceId, trx);
+            await assertNoLotteryV1Snapshot(orgId, raceId, trx);
+            await assertNoFinalizedLotteryV2(orgId, raceId, trx);
             const snapshotRow = await trx('lottery_v2_snapshots')
                 .where({ org_id: orgId, race_id: raceId })
                 .orderBy('created_at', 'desc')
@@ -929,6 +955,7 @@ export async function getResults(orgId, raceId) {
 
 export async function rollbackLatest(orgId, raceId) {
     return knex.transaction(async (trx) => {
+        await lockLotteryMutation(orgId, raceId, trx);
         const snapshotRow = await trx('lottery_v2_snapshots')
             .where({ org_id: orgId, race_id: raceId, status: 'finalized' })
             .orderBy('finalized_at', 'desc')

@@ -1,6 +1,11 @@
 import { registerHandler } from '../jobs/job.handlers.js';
 import * as snapshotRepo from '../pipeline/snapshot.repository.js';
 import { isFullEvent, isHalfEvent, normalizeEvent } from '../../utils/event-normalizer.js';
+import {
+    assertNoActivePipelineExecution,
+    assertNoFinalizedLotteryV2,
+    lockLotteryRace,
+} from './lottery-execution.repository.js';
 
 const BATCH_SIZE = 1000;
 const DIRECT_STATUSES = ['直通名额', '直通', '强制保签'];
@@ -116,36 +121,39 @@ registerHandler('lottery:finalize', async (job, { knex, heartbeat }) => {
 
     await heartbeat(2, '检查并发锁');
 
-    const running = await knex('pipeline_executions')
-        .where({ org_id: orgId, race_id: raceId, execution_type: 'lottery', status: 'running' })
-        .first();
-    if (running) {
-        throw Object.assign(
-            new Error(`存在正在执行的 lottery 任务 (id=${running.id})`),
-            { code: 'CONCURRENT_EXECUTION' },
-        );
-    }
-
-    const hasSnapshot = await snapshotRepo.hasSnapshot(orgId, raceId, 'pre_lottery');
-    if (hasSnapshot) {
-        throw Object.assign(
-            new Error('已存在抽签快照，请先回滚当前抽签结果再重新执行'),
-            { code: 'SNAPSHOT_EXISTS', status: 409, expose: true },
-        );
-    }
-
-    const [exec] = await knex('pipeline_executions')
-        .insert({
-            org_id: orgId,
-            race_id: raceId,
-            execution_type: 'lottery',
-            status: 'running',
-        })
-        .returning('id');
-    const execId = typeof exec === 'object' ? exec.id : exec;
+    let execId = null;
+    let executionStarted = false;
 
     try {
         const resultSummary = await knex.transaction(async (trx) => {
+            await lockLotteryRace(orgId, raceId, trx);
+            await assertNoActivePipelineExecution(
+                orgId,
+                raceId,
+                ['lottery', 'rollback_lottery'],
+                trx,
+            );
+            await assertNoFinalizedLotteryV2(orgId, raceId, trx);
+
+            const hasSnapshot = await snapshotRepo.hasSnapshot(orgId, raceId, 'pre_lottery', trx);
+            if (hasSnapshot) {
+                throw Object.assign(
+                    new Error('已存在抽签快照，请先回滚当前抽签结果再重新执行'),
+                    { code: 'SNAPSHOT_EXISTS', status: 409, expose: true },
+                );
+            }
+
+            const [exec] = await trx('pipeline_executions')
+                .insert({
+                    org_id: orgId,
+                    race_id: raceId,
+                    execution_type: 'lottery',
+                    status: 'running',
+                })
+                .returning('id');
+            execId = typeof exec === 'object' ? exec.id : exec;
+            executionStarted = true;
+
             await heartbeat(5, '创建 pre_lottery 快照');
 
             const snapshotResult = await snapshotRepo.createSnapshot(orgId, raceId, 'pre_lottery', {
@@ -475,7 +483,7 @@ registerHandler('lottery:finalize', async (job, { knex, heartbeat }) => {
 
             const lockedTotal = Object.values(lockedByEvent).reduce((sum, value) => sum + Number(value || 0), 0);
 
-            return {
+            const resultSummary = {
                 totalCandidates: candidates.length,
                 winners: winnerIds.length,
                 losers: loserIds.length,
@@ -492,25 +500,36 @@ registerHandler('lottery:finalize', async (job, { knex, heartbeat }) => {
                 inventoryDeducted: Object.values(consumedBySize).reduce((sum, value) => sum + Number(value || 0), 0),
                 deductReport,
             };
-        });
 
-        await knex('pipeline_executions')
-            .where({ id: execId })
-            .update({
-                status: 'succeeded',
-                result: resultSummary,
-                completed_at: new Date(),
-            });
+            await trx('pipeline_executions')
+                .where({ id: execId, org_id: orgId, race_id: raceId })
+                .update({
+                    status: 'succeeded',
+                    result: resultSummary,
+                    completed_at: new Date(),
+                });
+
+            return resultSummary;
+        });
 
         return resultSummary;
     } catch (err) {
-        await knex('pipeline_executions')
-            .where({ id: execId })
-            .update({
-                status: 'failed',
-                error: err.message,
-                completed_at: new Date(),
-            });
+        if (executionStarted) {
+            try {
+                await knex('pipeline_executions')
+                    .insert({
+                        org_id: orgId,
+                        race_id: raceId,
+                        execution_type: 'lottery',
+                        status: 'failed',
+                        result: {},
+                        error: err.message,
+                        completed_at: new Date(),
+                    });
+            } catch (statusError) {
+                console.error('[lottery:finalize] Failed to persist execution failure:', statusError);
+            }
+        }
         throw err;
     }
 });

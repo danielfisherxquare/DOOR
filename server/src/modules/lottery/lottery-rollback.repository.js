@@ -6,6 +6,10 @@
 import knex from '../../db/knex.js';
 import * as snapshotRepo from '../pipeline/snapshot.repository.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
+import {
+    assertNoActivePipelineExecution,
+    lockLotteryRace,
+} from './lottery-execution.repository.js';
 
 const BATCH_SIZE = 1000;
 
@@ -34,22 +38,6 @@ async function decrementInventoryWithFallback(trx, orgId, raceId, rawEvent, norm
 }
 
 /**
- * 检查是否有同类型执行正在 running
- * @throws {Error} 若有 running 任务
- */
-async function guardConcurrent(trx, orgId, raceId, executionType) {
-    const running = await trx('pipeline_executions')
-        .where({ org_id: orgId, race_id: raceId, execution_type: executionType, status: 'running' })
-        .first();
-    if (running) {
-        throw Object.assign(
-            new Error(`存在正在执行的 ${executionType} 任务 (id=${running.id}), 请等待完成`),
-            { code: 'CONCURRENT_EXECUTION', statusCode: 409 }
-        );
-    }
-}
-
-/**
  * 回滚抽签 — 事务
  *
  * 1. 防重检查
@@ -61,8 +49,13 @@ async function guardConcurrent(trx, orgId, raceId, executionType) {
  */
 export async function rollbackLottery(orgId, raceId) {
     return knex.transaction(async (trx) => {
-        // 防重
-        await guardConcurrent(trx, orgId, raceId, 'rollback_lottery');
+        await lockLotteryRace(orgId, raceId, trx);
+        await assertNoActivePipelineExecution(
+            orgId,
+            raceId,
+            ['lottery', 'rollback_lottery'],
+            trx,
+        );
 
         // 检查快照存在
         const snapshot = await trx('pipeline_snapshots')
@@ -168,11 +161,6 @@ export async function rollbackLottery(orgId, raceId) {
 
         } catch (err) {
             console.error('[rollbackLottery] Error:', err.message, err.stack);
-            try {
-                await knex('pipeline_executions')
-                    .where({ id: execId })
-                    .update({ status: 'failed', error: err.message, completed_at: new Date() });
-            } catch (_) { /* ignore */ }
             throw err;
         }
     });
@@ -188,8 +176,13 @@ export async function rollbackLottery(orgId, raceId) {
  */
 export async function rollbackBib(orgId, raceId) {
     return knex.transaction(async (trx) => {
-        // 防重
-        await guardConcurrent(trx, orgId, raceId, 'rollback_bib');
+        await lockLotteryRace(orgId, raceId, trx);
+        await assertNoActivePipelineExecution(
+            orgId,
+            raceId,
+            ['bib_numbering', 'rollback_bib'],
+            trx,
+        );
 
         // 检查快照存在
         const snapshot = await trx('pipeline_snapshots')
@@ -238,11 +231,6 @@ export async function rollbackBib(orgId, raceId) {
 
         } catch (err) {
             console.error('[rollbackBib] Error:', err.message, err.stack);
-            try {
-                await knex('pipeline_executions')
-                    .where({ id: execId })
-                    .update({ status: 'failed', error: err.message, completed_at: new Date() });
-            } catch (_) { /* ignore */ }
             throw err;
         }
     });
