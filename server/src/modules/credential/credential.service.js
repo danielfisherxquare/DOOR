@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import knex from '../../db/knex.js';
 import { resolveRaceAccess } from '../races/race-access.service.js';
+import { encryptCredentialRecipientId } from './credential-pii.js';
 import * as repo from './credential.repository.js';
 
 const REQUEST_STATUS = {
@@ -809,7 +810,11 @@ export async function issueCredential(authContext, rawRaceId, rawCredentialId, d
             race_id: raceId,
             issued_to_user_id: authContext.userId,
             issued_to_person_name: data.recipientName,
-            issued_to_org_name: data.recipientIdCard || null,
+            issued_to_org_name: null,
+            issued_to_id_number: encryptCredentialRecipientId(data.recipientIdCard, {
+                orgId: access.operatorOrgId,
+                raceId,
+            }),
             issued_by_user_id: authContext.userId,
             issue_source: 'manual',
             issued_at: trx.fn.now(),
