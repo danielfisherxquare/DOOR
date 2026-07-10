@@ -65,8 +65,8 @@ export default function AuditPipelinePanel({ raceId, raceDate, onDataChanged }) 
 
     setLoadingStats(true)
     try {
-      const result = await auditApi.getPrepStats(Number(raceId))
-      setStats(result || { byEvent: {}, total: 0 })
+      const response = await auditApi.getPrepStats(Number(raceId))
+      setStats(response.data || { byEvent: {}, total: 0 })
     } catch (err) {
       setMessage(`加载统计失败：${err.message}`)
       setMessageTone('danger')
@@ -84,7 +84,8 @@ export default function AuditPipelinePanel({ raceId, raceDate, onDataChanged }) 
     if (!raceId) return
 
     try {
-      const result = await auditApi.resetAudit(Number(raceId))
+      const response = await auditApi.resetAudit(Number(raceId))
+      const result = response.data
       setCurrentStepIndex(-1)
       setStepResults({})
       await loadStats()
@@ -121,7 +122,8 @@ export default function AuditPipelinePanel({ raceId, raceDate, onDataChanged }) 
     setRunningStepKey(step.key)
     setMessage('')
     try {
-      const result = await step.action(raceId, raceDate)
+      const response = await step.action(raceId, raceDate)
+      const result = response.data
       setStepResults((prev) => ({ ...prev, [step.key]: result }))
       await loadStats()
       onDataChanged?.()

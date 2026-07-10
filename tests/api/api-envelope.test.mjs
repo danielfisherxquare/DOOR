@@ -12,3 +12,11 @@ test('pipeline API returns the canonical response envelope without guessing', as
   assert.match(source, /request\.get/)
   assert.match(source, /request\.post/)
 })
+
+test('audit API reads canonical envelopes explicitly', async () => {
+  const source = await readFile(new URL('src/api/audit.js', rootUrl), 'utf8')
+
+  assert.doesNotMatch(source, /unwrapData/)
+  assert.doesNotMatch(source, /\.then\(/)
+  assert.match(source, /response\.data/)
+})

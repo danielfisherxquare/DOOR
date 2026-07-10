@@ -1,5 +1,4 @@
 import request from '../utils/request'
-import { unwrapData } from '../utils/apiResponse'
 import { resolveSurfacePrefix } from '../utils/surfaceApi'
 
 /**
@@ -46,8 +45,8 @@ async function pollJobResult(jobId, options = {}) {
     const startTime = Date.now()
 
     while (true) {
-        const resp = await request.get(`${getJobsBasePath()}/${jobId}`)
-        const job = unwrapData(resp)
+        const response = await request.get(`${getJobsBasePath()}/${jobId}`)
+        const job = response.data
 
         if (!job) throw new Error('Job 不存在')
 
@@ -59,7 +58,7 @@ async function pollJobResult(jobId, options = {}) {
         })
 
         if (job.status === 'succeeded') {
-            return job.result || {}
+            return { success: true, data: job.result || {} }
         }
         if (job.status === 'failed') {
             throw new Error(job.error?.message || `审核步骤失败: ${jobId}`)
@@ -78,11 +77,11 @@ async function pollJobResult(jobId, options = {}) {
 export const auditApi = {
     // ── 统计 ──────────────────────────────────────────────────
     getPrepStats: (raceId) =>
-        request.get(`${getBasePath()}/prep-stats/${raceId}`).then(unwrapData),
+        request.get(`${getBasePath()}/prep-stats/${raceId}`),
 
     // ── 重置 ──────────────────────────────────────────────────
     resetAudit: (raceId) =>
-        request.post(`${getBasePath()}/reset/${raceId}`).then(unwrapData),
+        request.post(`${getBasePath()}/reset/${raceId}`),
 
     // ── 5 步审核（含 Job 轮询封装）──────────────────────────
     /**
@@ -91,11 +90,11 @@ export const auditApi = {
      * @param {number} raceId
      * @param {object} payload - 额外参数（如 raceDate）
      * @param {object} options - { onProgress }
-     * @returns {Promise<{ affected: number, remaining: number }>}
+     * @returns {Promise<{ success: true, data: { affected: number, remaining: number } }>}
      */
     runAuditStep: async (stepName, raceId, payload = {}, options = {}) => {
-        const resp = await request.post(`${getBasePath()}/step/${stepName}/${raceId}`, payload)
-        const { jobId } = unwrapData(resp)
+        const response = await request.post(`${getBasePath()}/step/${stepName}/${raceId}`, payload)
+        const { jobId } = response.data
         return pollJobResult(jobId, options)
     },
 
