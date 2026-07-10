@@ -51,8 +51,9 @@ export default function CapacityPlanner({ raceId, raceDetail, preview, onUpdated
     let alive = true
 
     lotteryApi.getRaceCapacity(Number(raceId))
-      .then((capacities) => {
+      .then((response) => {
         if (!alive) return
+        const capacities = Array.isArray(response?.data) ? response.data : []
         setRows(hydrateRows(capacities, raceDetail))
       })
       .catch(() => {
@@ -109,7 +110,8 @@ export default function CapacityPlanner({ raceId, raceDetail, preview, onUpdated
         lotteryModeDefault: raceMode,
       })
 
-      const existing = await lotteryApi.getRaceCapacity(Number(raceId))
+      const existingResponse = await lotteryApi.getRaceCapacity(Number(raceId))
+      const existing = Array.isArray(existingResponse?.data) ? existingResponse.data : []
       const existingMap = new Map((existing || []).map((item) => [item.event, item]))
 
       for (const stale of existing || []) {

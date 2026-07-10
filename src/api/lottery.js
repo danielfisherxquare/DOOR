@@ -1,5 +1,4 @@
 import request from '../utils/request'
-import { unwrapData } from '../utils/apiResponse'
 import { resolveSurfacePrefix } from '../utils/surfaceApi'
 
 const JOB_POLL_INTERVAL = 1000
@@ -34,7 +33,7 @@ async function pollJobResult(jobId, options = {}) {
 
     while (true) {
         const response = await request.get(`${getJobsBasePath()}/${jobId}`)
-        const job = unwrapData(response)
+        const job = response.data
 
         if (!job) {
             throw new Error('抽签任务不存在')
@@ -47,7 +46,7 @@ async function pollJobResult(jobId, options = {}) {
         })
 
         if (job.status === 'succeeded') {
-            return job.result || {}
+            return { success: true, data: job.result || {} }
         }
 
         if (job.status === 'failed') {
@@ -70,105 +69,105 @@ async function pollJobResult(jobId, options = {}) {
 export const lotteryApi = {
     // ── race_capacity ────────────────────────────────────────
     getRaceCapacity: (raceId) =>
-        request.get(`${getBasePath()}/configs/${raceId}`).then(unwrapData),
+        request.get(`${getBasePath()}/configs/${raceId}`),
 
     saveRaceCapacity: (raceId, data) =>
-        request.post(`${getBasePath()}/configs/${raceId}`, data).then(unwrapData),
+        request.post(`${getBasePath()}/configs/${raceId}`, data),
 
     deleteRaceCapacity: (id) =>
-        request.delete(`${getBasePath()}/configs/entry/${id}`).then(unwrapData),
+        request.delete(`${getBasePath()}/configs/entry/${id}`),
 
     // ── lottery_lists ────────────────────────────────────────
     getLotteryLists: (raceId, listType) =>
-        request.get(`${getBasePath()}/lists/${raceId}`, { params: { listType } }).then(unwrapData),
+        request.get(`${getBasePath()}/lists/${raceId}`, { params: { listType } }),
 
     saveLotteryLists: (entries) =>
-        request.post(`${getBasePath()}/lists`, { entries }).then(unwrapData),
+        request.post(`${getBasePath()}/lists`, { entries }),
 
     deleteLotteryList: (id) =>
-        request.delete(`${getBasePath()}/lists/entry/${id}`).then(unwrapData),
+        request.delete(`${getBasePath()}/lists/entry/${id}`),
 
     clearLotteryLists: (raceId, listType) =>
-        request.delete(`${getBasePath()}/lists/${raceId}`, { params: { listType } }).then(unwrapData),
+        request.delete(`${getBasePath()}/lists/${raceId}`, { params: { listType } }),
 
     updateLotteryList: (id, data) =>
-        request.put(`${getBasePath()}/lists/entry/${id}`, data).then(unwrapData),
+        request.put(`${getBasePath()}/lists/entry/${id}`, data),
 
     bulkAddLotteryLists: (entries) =>
-        request.post(`${getBasePath()}/lists/bulk-add`, { entries }).then(unwrapData),
+        request.post(`${getBasePath()}/lists/bulk-add`, { entries }),
 
     bulkPutLotteryLists: (entries) =>
-        request.post(`${getBasePath()}/lists/bulk-put`, { entries }).then(unwrapData),
+        request.post(`${getBasePath()}/lists/bulk-put`, { entries }),
 
     bulkDeleteLotteryLists: (ids) =>
-        request.post(`${getBasePath()}/lists/bulk-delete`, { ids }).then(unwrapData),
+        request.post(`${getBasePath()}/lists/bulk-delete`, { ids }),
 
     getLotteryListConflicts: (raceId) =>
-        request.get(`${getBasePath()}/lists/conflicts/${raceId}`).then(unwrapData),
+        request.get(`${getBasePath()}/lists/conflicts/${raceId}`),
 
     // ── lottery_rules ────────────────────────────────────────
     getLotteryRules: (raceId) =>
-        request.get(`${getBasePath()}/rules/${raceId}`).then(unwrapData),
+        request.get(`${getBasePath()}/rules/${raceId}`),
 
     saveLotteryRule: (data) =>
-        request.post(`${getBasePath()}/rules`, data).then(unwrapData),
+        request.post(`${getBasePath()}/rules`, data),
 
     // ── lottery_weights ──────────────────────────────────────
     getLotteryWeights: (raceId) =>
-        request.get(`${getBasePath()}/weights/${raceId}`).then(unwrapData),
+        request.get(`${getBasePath()}/weights/${raceId}`),
 
     saveLotteryWeight: (data) =>
-        request.post(`${getBasePath()}/weights`, data).then(unwrapData),
+        request.post(`${getBasePath()}/weights`, data),
 
     deleteLotteryWeight: (id) =>
-        request.delete(`${getBasePath()}/weights/${id}`).then(unwrapData),
+        request.delete(`${getBasePath()}/weights/${id}`),
 
     clearAllLotteryWeights: (raceId) =>
-        request.delete(`${getBasePath()}/weights/all/${raceId}`).then(unwrapData),
+        request.delete(`${getBasePath()}/weights/all/${raceId}`),
 
     // ── Phase 6: 抽签执行 / 结果 / 快照 / 回滚 ─────────────
     finalizeLottery: async (raceId, options = {}) => {
         const response = await request.post(`${getBasePath()}/finalize/${raceId}`)
-        const { jobId } = unwrapData(response)
+        const { jobId } = response.data
         return pollJobResult(jobId, options)
     },
 
     getLotteryResults: (raceId) =>
-        request.get(`${getBasePath()}/results/${raceId}`).then(unwrapData),
+        request.get(`${getBasePath()}/results/${raceId}`),
 
     hasSnapshot: (raceId) =>
-        request.get(`${getBasePath()}/has-snapshot/${raceId}`).then((response) => Boolean(unwrapData(response)?.hasSnapshot)),
+        request.get(`${getBasePath()}/has-snapshot/${raceId}`),
 
     rollbackLottery: (raceId) =>
-        request.post(`${getBasePath()}/rollback/${raceId}`).then(unwrapData),
+        request.post(`${getBasePath()}/rollback/${raceId}`),
 
     // ── Lottery V2 Beta ─────────────────────────────────────
     getLotteryV2Config: (raceId) =>
-        request.get(`${getV2BasePath()}/config/${raceId}`).then(unwrapData),
+        request.get(`${getV2BasePath()}/config/${raceId}`),
 
     saveLotteryV2Config: (raceId, data) =>
-        request.put(`${getV2BasePath()}/config/${raceId}`, data).then(unwrapData),
+        request.put(`${getV2BasePath()}/config/${raceId}`, data),
 
     previewLotteryV2: async (raceId, options = {}) => {
         const response = await request.post(`${getV2BasePath()}/preview/${raceId}`)
-        const { jobId } = unwrapData(response)
+        const { jobId } = response.data
         return pollJobResult(jobId, options)
     },
 
     getLotteryV2Preview: (raceId) =>
-        request.get(`${getV2BasePath()}/preview/${raceId}`).then(unwrapData),
+        request.get(`${getV2BasePath()}/preview/${raceId}`),
 
     finalizeLotteryV2: async (raceId, options = {}) => {
         const response = await request.post(`${getV2BasePath()}/finalize/${raceId}`)
-        const { jobId } = unwrapData(response)
+        const { jobId } = response.data
         return pollJobResult(jobId, options)
     },
 
     getLotteryV2Results: (raceId) =>
-        request.get(`${getV2BasePath()}/results/${raceId}`).then(unwrapData),
+        request.get(`${getV2BasePath()}/results/${raceId}`),
 
     rollbackLotteryV2: (raceId) =>
-        request.post(`${getV2BasePath()}/rollback/${raceId}`).then(unwrapData),
+        request.post(`${getV2BasePath()}/rollback/${raceId}`),
 }
 
 export default lotteryApi

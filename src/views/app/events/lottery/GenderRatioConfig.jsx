@@ -25,8 +25,9 @@ export default function GenderRatioConfig({ raceId, event, targetCount = 0 }) {
     let alive = true
 
     lotteryApi.getLotteryWeights(Number(raceId))
-      .then((items) => {
+      .then((response) => {
         if (!alive) return
+        const items = Array.isArray(response?.data) ? response.data : []
         const existing = (items || []).find((item) => (
           item.weightType === 'gender' && item.targetGroup === targetGroup
         ))

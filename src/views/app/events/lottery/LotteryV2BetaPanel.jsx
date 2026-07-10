@@ -110,16 +110,16 @@ export default function LotteryV2BetaPanel({ raceId, onUpdated }) {
   const loadAll = async () => {
     setLoading(true)
     try {
-      const [cfg, latestPreview, latestResults] = await Promise.all([
-        lotteryApi.getLotteryV2Config(Number(raceId)).catch(() => null),
-        lotteryApi.getLotteryV2Preview(Number(raceId)).catch(() => null),
-        lotteryApi.getLotteryV2Results(Number(raceId)).catch(() => null),
+      const [configResponse, previewResponse, resultsResponse] = await Promise.all([
+        lotteryApi.getLotteryV2Config(Number(raceId)).catch(() => ({ data: null })),
+        lotteryApi.getLotteryV2Preview(Number(raceId)).catch(() => ({ data: null })),
+        lotteryApi.getLotteryV2Results(Number(raceId)).catch(() => ({ data: null })),
       ])
-      const normalizedConfig = normalizeConfig(cfg)
+      const normalizedConfig = normalizeConfig(configResponse.data)
       setConfig(normalizedConfig)
       setRegionRatiosText(formatRatioMap(normalizedConfig.regionRatios))
-      setPreview(normalizePreview(latestPreview))
-      setResults(normalizeResults(latestResults))
+      setPreview(normalizePreview(previewResponse.data))
+      setResults(normalizeResults(resultsResponse.data))
     } catch (error) {
       setMessage(`加载 V2 面板失败：${error.message}`)
       setMessageTone('danger')

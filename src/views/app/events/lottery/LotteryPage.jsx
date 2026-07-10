@@ -5,7 +5,6 @@ import racesApi from '../../../../api/races'
 import useAuthStore from '../../../../stores/authStore'
 import useRaceContextStore from '../../../../stores/raceContextStore'
 import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
-import { unwrapData } from '../../../../utils/apiResponse'
 import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../../../utils/surfaceContext'
 import {
   AppH5ContextState,
@@ -51,7 +50,7 @@ export default function LotteryPage() {
         racesApi.getById(Number(raceId)),
         pipelineApi.getPreview(Number(raceId)),
       ])
-      setRaceDetail(unwrapData(raceResponse) || null)
+      setRaceDetail(raceResponse?.data || null)
       setPreview(previewResponse?.data || null)
       if (announce) {
         setMessage('抽签工作流数据已刷新。')

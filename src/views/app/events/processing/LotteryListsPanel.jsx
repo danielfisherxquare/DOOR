@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import lotteryApi from '../../../../api/lottery'
 import racesApi from '../../../../api/races'
 import recordsApi, { fetchAllRecords } from '../../../../api/records'
-import { unwrapData } from '../../../../utils/apiResponse'
 import { isWildcard, buildResolvedEntries, applyStatusesForEntries } from '../../../../utils/listMatching'
 import { parseListExcel } from '../../../../utils/excelProcessor'
 import {
@@ -46,9 +45,9 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
         raceDetail ? Promise.resolve({ data: raceDetail }) : racesApi.getById(Number(raceId)).catch(() => null),
       ])
 
-      setListEntries(unwrapData(listsResponse) || [])
-      setRecordTotal(Number(unwrapData(statsResponse)?.totalRows || 0))
-      setConflictRule(unwrapData(raceResponse)?.conflictRule || raceDetail?.conflictRule || 'strict')
+      setListEntries(Array.isArray(listsResponse?.data) ? listsResponse.data : [])
+      setRecordTotal(Number(statsResponse?.data?.totalRows || 0))
+      setConflictRule(raceResponse?.data?.conflictRule || raceDetail?.conflictRule || 'strict')
     } catch (err) {
       setMessage(`加载黑白名单失败：${err.message}`)
       setMessageTone('danger')
@@ -70,7 +69,8 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
     setMatching(true)
     try {
       const effectiveRule = ruleOverride || conflictRule
-      const currentEntries = unwrapData(await lotteryApi.getLotteryLists(Number(raceId))) || []
+      const currentResponse = await lotteryApi.getLotteryLists(Number(raceId))
+      const currentEntries = Array.isArray(currentResponse?.data) ? currentResponse.data : []
 
       if (currentEntries.length === 0) {
         setListEntries([])
@@ -131,7 +131,8 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
 
   const handleCheckConflicts = useCallback(async () => {
     try {
-      const conflicts = unwrapData(await lotteryApi.getLotteryListConflicts(Number(raceId))) || []
+      const conflictsResponse = await lotteryApi.getLotteryListConflicts(Number(raceId))
+      const conflicts = Array.isArray(conflictsResponse?.data) ? conflictsResponse.data : []
       if (!conflicts.length) {
         setMessage('未发现黑白名单冲突。')
         setMessageTone('success')

@@ -35,3 +35,11 @@ test('import APIs return canonical envelopes without local unwrap helpers', asyn
     assert.doesNotMatch(source, /\.then\(/)
   }
 })
+
+test('lottery API returns canonical envelopes across HTTP and job polling', async () => {
+  const source = await readFile(new URL('src/api/lottery.js', rootUrl), 'utf8')
+
+  assert.doesNotMatch(source, /unwrapData/)
+  assert.doesNotMatch(source, /\.then\(/)
+  assert.match(source, /response\.data/)
+})

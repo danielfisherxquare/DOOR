@@ -70,13 +70,13 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
 
     Promise.all([
       pipelineApi.getClothingLimits(Number(raceId)).catch(() => ({ data: [] })),
-      lotteryApi.getLotteryResults(Number(raceId)).catch(() => null),
-      lotteryApi.hasSnapshot(Number(raceId)).catch(() => false),
-    ]).then(([limitsResponse, results, snapshot]) => {
+      lotteryApi.getLotteryResults(Number(raceId)).catch(() => ({ data: null })),
+      lotteryApi.hasSnapshot(Number(raceId)).catch(() => ({ data: { hasSnapshot: false } })),
+    ]).then(([limitsResponse, resultsResponse, snapshotResponse]) => {
       if (!alive) return
       setInventory(Array.isArray(limitsResponse?.data) ? limitsResponse.data : [])
-      setResult(normalizeResult(results))
-      setHasSnapshot(Boolean(snapshot))
+      setResult(normalizeResult(resultsResponse?.data))
+      setHasSnapshot(Boolean(snapshotResponse?.data?.hasSnapshot))
     }).catch((error) => {
       if (!alive) return
       setMessage(`加载最终执行面板失败：${error.message}`)
@@ -111,14 +111,14 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
   const eventSummaryList = buildEventSummaryList(raceDetail, result)
 
   const refresh = async () => {
-    const [limits, results, snapshot] = await Promise.all([
+    const [limitsResponse, resultsResponse, snapshotResponse] = await Promise.all([
       pipelineApi.getClothingLimits(Number(raceId)).catch(() => ({ data: [] })),
-      lotteryApi.getLotteryResults(Number(raceId)).catch(() => null),
-      lotteryApi.hasSnapshot(Number(raceId)).catch(() => false),
+      lotteryApi.getLotteryResults(Number(raceId)).catch(() => ({ data: null })),
+      lotteryApi.hasSnapshot(Number(raceId)).catch(() => ({ data: { hasSnapshot: false } })),
     ])
-    setInventory(Array.isArray(limits?.data) ? limits.data : [])
-    setResult(normalizeResult(results))
-    setHasSnapshot(Boolean(snapshot))
+    setInventory(Array.isArray(limitsResponse?.data) ? limitsResponse.data : [])
+    setResult(normalizeResult(resultsResponse?.data))
+    setHasSnapshot(Boolean(snapshotResponse?.data?.hasSnapshot))
   }
 
   const handleExecute = async () => {
@@ -135,7 +135,7 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
     setExecuting(true)
     setMessage('')
     try {
-      const finalResult = await lotteryApi.finalizeLottery(Number(raceId), {
+      const finalResponse = await lotteryApi.finalizeLottery(Number(raceId), {
         onProgress: (progress) => {
           if (progress?.message) {
             setMessage(`执行中：${progress.message}`)
@@ -143,7 +143,7 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
           }
         },
       })
-      setResult(normalizeResult(finalResult))
+      setResult(normalizeResult(finalResponse.data))
       setMessage('最终执行完成，结果面已刷新。')
       setMessageTone('success')
       await refresh()
