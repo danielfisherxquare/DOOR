@@ -1,77 +1,17 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import {
   buildAdminHref,
   getAdminNavGroups,
   getAdminRouteMeta,
 } from './adminConfig'
-import { AdminEmptyState, AdminSurface } from './AdminWorkbench'
 import WorkspaceContextDisplay from '../../features/workspace/WorkspaceContextDisplay'
 import useSurfaceWorkspace from '../../features/workspace/useSurfaceWorkspace'
-import ModuleProtectedRoute from '../ModuleProtectedRoute'
 import useSidebarMotion from '../shared/useSidebarMotion'
+import AdminSurfaceRoutes from '../../routes/adminRoutes'
 import '../app/app-layout.css'
 import '../../styles/admin-extras.css'
-
-import AdminDashboard from '../../views/admin/AdminDashboard'
-import BibTrackingPage from '../../views/admin/BibTrackingPage'
-import DatabaseBackupPage from '../../views/admin/DatabaseBackupPage'
-import OrgCreatePage from '../../views/admin/OrgCreatePage'
-import OrgDetailPage from '../../views/admin/OrgDetailPage'
-import OrgListPage from '../../views/admin/OrgListPage'
-import RaceManagementPage from '../../views/admin/RaceManagementPage'
-import TeamListPage from '../../views/admin/TeamListPage'
-import IdentityAccessCenterPage from '../../views/admin/IdentityAccessCenterPage'
-import AdminReimbursementPage from '../../views/admin/finance/AdminReimbursementPage'
-import ColorSchemePage from '../../views/admin/branding/ColorSchemePage'
-
-const InterviewList = lazy(() => import('../../views/interview/InterviewList'))
-const InterviewCompare = lazy(() => import('../../views/interview/InterviewCompare'))
-const InterviewForm = lazy(() => import('../../views/interview/InterviewForm'))
-const DesignRequestWorkspace = lazy(() => import('../../views/design-requests/DesignRequestWorkspace'))
-const CredentialCenterPage = lazy(() => import('../../views/admin/credential/CredentialCenterPage'))
-const CredentialSelectRacePage = lazy(() => import('../../views/admin/credential/CredentialSelectRacePage'))
-const CredentialZonePage = lazy(() => import('../../views/admin/credential/CredentialZonePage'))
-const CredentialRolePage = lazy(() => import('../../views/admin/credential/CredentialRolePage'))
-const CredentialStylePage = lazy(() => import('../../views/admin/credential/CredentialStylePage'))
-const CredentialApplicationPage = lazy(() => import('../../views/admin/credential/CredentialApplicationPage'))
-const CredentialReviewPage = lazy(() => import('../../views/admin/credential/CredentialReviewPage'))
-const CredentialIssuePage = lazy(() => import('../../views/admin/credential/CredentialIssuePage'))
-
-function AdminRouteLoader() {
-  return (
-    <div className="workspace-main__route-loader">
-      <div className="route-loader__content">
-        <div className="route-loader__spinner" aria-hidden="true" />
-        <span>载入当前工作区…</span>
-      </div>
-    </div>
-  )
-}
-
-function AdminDeprecatedRoute({
-  title = '入口已下线',
-  description = '该页面不再作为管理层独立工作台。请从当前入口导航或启动台进入新的归属入口。',
-} = {}) {
-  return (
-    <AdminSurface title="入口已下线" subtitle={description}>
-      <AdminEmptyState
-        title={title}
-        description={description}
-      />
-    </AdminSurface>
-  )
-}
-
-function LegacyIdentityRoute() {
-  return (
-    <AdminDeprecatedRoute
-      title="请改用身份中心"
-      description="组织与授权相关能力已经统一收敛到身份中心。请从侧边栏进入身份中心，再切换到对应治理视图。"
-    />
-  )
-}
 
 export default function AdminLayout() {
   const { user, logout } = useAuthStore()
@@ -161,11 +101,6 @@ export default function AdminLayout() {
   const groupTitle = currentGroup?.label || '后台'
   const groupCaption = currentGroup?.caption || '当前工作区'
   const currentContext = { selectedOrgId, selectedRaceId }
-  const requireAdminModule = useCallback((moduleId, element) => (
-    <ModuleProtectedRoute surface="admin" moduleId={moduleId}>
-      {element}
-    </ModuleProtectedRoute>
-  ), [])
   const isNavItemActive = useCallback((item) => {
     return item.path === ''
       ? location.pathname === '/admin'
@@ -349,60 +284,7 @@ export default function AdminLayout() {
         )}
 
         <section className="workspace-main__content">
-          <Routes>
-            <Route index element={requireAdminModule('dashboard', <AdminDashboard />)} />
-            <Route path="orgs" element={requireAdminModule('orgs', <OrgListPage />)} />
-            <Route path="orgs/new" element={requireAdminModule('orgs', <OrgCreatePage />)} />
-            <Route path="orgs/:orgId" element={requireAdminModule('orgs', <OrgDetailPage />)} />
-            <Route path="identity-center" element={requireAdminModule('identity-center', <IdentityAccessCenterPage />)} />
-            <Route path="members" element={requireAdminModule('team', <Navigate to={buildAdminHref('/team', currentContext)} replace />)} />
-            <Route path="members/new" element={requireAdminModule('team', <Navigate to={buildAdminHref('/team', currentContext)} replace />)} />
-            <Route path="team" element={requireAdminModule('team', <TeamListPage />)} />
-            <Route path="races" element={requireAdminModule('races', <RaceManagementPage />)} />
-            <Route path="design-requests" element={requireAdminModule('design-requests', <Suspense fallback={<AdminRouteLoader />}><DesignRequestWorkspace surface="admin" mode="manager" /></Suspense>)} />
-            <Route path="import" element={<AdminDeprecatedRoute description="导入、记录处理、抽签、号码布和服装作业已从后台移出。请从启动台进入应用层继续处理赛事业务。" />} />
-            <Route path="records" element={<AdminDeprecatedRoute description="记录处理已从后台移出。请从启动台进入应用层继续处理赛事业务。" />} />
-            <Route path="processing" element={<AdminDeprecatedRoute description="赛事处理中心已从后台移出。请从启动台进入应用层继续处理赛事业务。" />} />
-            <Route path="lottery" element={<AdminDeprecatedRoute description="抽签作业已从后台移出。请从启动台进入应用层继续处理赛事业务。" />} />
-            <Route path="bib" element={<AdminDeprecatedRoute description="号码布编排作业已从后台移出。请从启动台进入应用层继续处理赛事业务。" />} />
-            <Route path="clothing" element={<AdminDeprecatedRoute description="服装配置作业已从后台移出。请从启动台进入应用层继续处理赛事业务。" />} />
-            <Route path="db-backups" element={requireAdminModule('backups', <DatabaseBackupPage />)} />
-            <Route path="bib-tracking" element={requireAdminModule('bib-tracking', <BibTrackingPage />)} />
-
-            <Route path="interview" element={requireAdminModule('hr', <Suspense fallback={<AdminRouteLoader />}><InterviewForm /></Suspense>)} />
-            <Route path="interview/records" element={requireAdminModule('hr', <Suspense fallback={<AdminRouteLoader />}><InterviewList /></Suspense>)} />
-            <Route path="interview/compare" element={requireAdminModule('hr', <Suspense fallback={<AdminRouteLoader />}><InterviewCompare /></Suspense>)} />
-
-            <Route path="credential-center" element={requireAdminModule('credentials', <Suspense fallback={<AdminRouteLoader />}><CredentialCenterPage /></Suspense>)} />
-            <Route path="credential" element={requireAdminModule('credentials', <Navigate to={buildAdminHref('/credential-center', currentContext)} replace />)} />
-            <Route path="credential/select-race" element={requireAdminModule('credentials', <Suspense fallback={<AdminRouteLoader />}><CredentialSelectRacePage /></Suspense>)} />
-            <Route path="credential/zones" element={requireAdminModule('credentials', <Navigate to={buildAdminHref('/credential/access-areas', currentContext)} replace />)} />
-            <Route path="credential/roles" element={requireAdminModule('credentials', <Navigate to={buildAdminHref('/credential/categories', currentContext)} replace />)} />
-            <Route path="credential/access-areas" element={requireAdminModule('credentials', <Suspense fallback={<AdminRouteLoader />}><CredentialZonePage /></Suspense>)} />
-            <Route path="credential/categories" element={requireAdminModule('credentials', <Suspense fallback={<AdminRouteLoader />}><CredentialRolePage /></Suspense>)} />
-            <Route path="credential/styles" element={requireAdminModule('credentials', <Suspense fallback={<AdminRouteLoader />}><CredentialStylePage /></Suspense>)} />
-            <Route path="credential/applications" element={requireAdminModule('credentials', <Navigate to={buildAdminHref('/credential/requests', currentContext)} replace />)} />
-            <Route path="credential/requests" element={requireAdminModule('credentials', <Suspense fallback={<AdminRouteLoader />}><CredentialApplicationPage /></Suspense>)} />
-            <Route path="credential/review" element={requireAdminModule('credentials', <Suspense fallback={<AdminRouteLoader />}><CredentialReviewPage /></Suspense>)} />
-            <Route path="credential/issue" element={requireAdminModule('credentials', <Suspense fallback={<AdminRouteLoader />}><CredentialIssuePage /></Suspense>)} />
-
-            <Route path="app-manager" element={requireAdminModule('dashboard', <Navigate to={buildAdminHref('', currentContext)} replace />)} />
-            <Route path="reimbursements" element={requireAdminModule('finance', <AdminReimbursementPage />)} />
-            <Route path="branding/colors" element={requireAdminModule('branding', <ColorSchemePage />)} />
-
-            <Route path="inventory" element={requireAdminModule('inventory', <AdminDeprecatedRoute description="后台仓储治理页还未迁入新入口；一线入库、出库、绑定和盘点请从启动台进入执行层。" />)} />
-            <Route path="inventory/inbound" element={requireAdminModule('inventory', <AdminDeprecatedRoute description="入库动作已归入执行层。请从启动台进入执行层仓库入口。" />)} />
-            <Route path="inventory/outbound" element={requireAdminModule('inventory', <AdminDeprecatedRoute description="出库动作已归入执行层。请从启动台进入执行层仓库入口。" />)} />
-            <Route path="inventory/space" element={requireAdminModule('inventory', <AdminDeprecatedRoute description="仓库空间治理页还未迁入新入口；当前不再从后台跳转到应用层。" />)} />
-            <Route path="inventory/control" element={requireAdminModule('inventory', <AdminDeprecatedRoute description="盘点与异常处理已归入执行层。请从启动台进入执行层仓库入口。" />)} />
-            <Route path="inventory/analytics" element={requireAdminModule('inventory', <AdminDeprecatedRoute description="仓储复盘报表还未迁入新入口；当前不再从后台跳转到应用层。" />)} />
-            <Route path="inventory/twin/designer" element={requireAdminModule('inventory', <Navigate to={`/asset-designer${location.search}`} replace />)} />
-            <Route path="users" element={requireAdminModule('identity-center', <LegacyIdentityRoute />)} />
-            <Route path="module-permissions" element={requireAdminModule('identity-center', <LegacyIdentityRoute />)} />
-            <Route path="race-permissions" element={requireAdminModule('identity-center', <LegacyIdentityRoute />)} />
-            <Route path="org-race-permissions" element={requireAdminModule('identity-center', <LegacyIdentityRoute />)} />
-            <Route path="*" element={<AdminDeprecatedRoute />} />
-          </Routes>
+          <AdminSurfaceRoutes currentContext={currentContext} locationSearch={location.search} />
         </section>
       </main>
       {mobileDrawerOpen && (
