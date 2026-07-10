@@ -42,15 +42,44 @@ export function operationLog({ module, businessType, titleFactory }) {
   };
 }
 
-function sanitizeParams(req) {
-  const params = {
-    query: req.query,
-    body: req.body,
+const SENSITIVE_KEY_PATTERN =
+  /(?:password|passwd|secret|token|api[_-]?key|authorization|cookie|credential|private[_-]?key|encryption[_-]?key)/i;
+
+function sanitizeValue(value, key, depth, seen) {
+  if (SENSITIVE_KEY_PATTERN.test(key)) return '***';
+  if (value === null || value === undefined || typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    return value.length > 2000 ? `${value.slice(0, 2000)}…` : value;
+  }
+  if (typeof value !== 'object') return String(value);
+  if (Buffer.isBuffer(value)) return `[binary ${value.length} bytes]`;
+  if (depth >= 6) return '[max depth]';
+  if (seen.has(value)) return '[circular]';
+
+  seen.add(value);
+  let sanitized;
+  if (Array.isArray(value)) {
+    sanitized = value.slice(0, 50).map((item) => sanitizeValue(item, '', depth + 1, seen));
+  } else {
+    sanitized = Object.fromEntries(
+      Object.entries(value)
+        .slice(0, 100)
+        .map(([childKey, childValue]) => [
+          childKey,
+          sanitizeValue(childValue, childKey, depth + 1, seen),
+        ])
+    );
+  }
+  seen.delete(value);
+  return sanitized;
+}
+
+export function sanitizeParams(req) {
+  const seen = new WeakSet();
+  return {
+    query: sanitizeValue(req.query || {}, 'query', 0, seen),
+    body: sanitizeValue(req.body || {}, 'body', 0, seen),
   };
-  // Remove sensitive fields
-  if (params.body?.password) params.body.password = '***';
-  if (params.body?.newPassword) params.body.newPassword = '***';
-  if (params.body?.confirmPassword) params.body.confirmPassword = '***';
-  if (params.body?.oldPassword) params.body.oldPassword = '***';
-  return params;
 }

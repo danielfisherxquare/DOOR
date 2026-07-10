@@ -1,10 +1,7 @@
 {
   "directDatabaseImports": [
-    "src/modules/calendar/calendar.controller.js",
     "src/modules/column-mappings/column-mapping.routes.js",
     "src/modules/dictionary/dictionary.routes.js",
-    "src/modules/health/health.routes.js",
-    "src/modules/operation-log/operation-log.routes.js",
     "src/modules/pipeline/pipeline-config.routes.js",
     "src/modules/projects/projects.controller.js",
     "src/modules/races/race.routes.js",
