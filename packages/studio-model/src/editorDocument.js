@@ -1,165 +1,38 @@
+import {
+  asArray,
+  asNumber,
+  asString,
+  cloneValue,
+  createId,
+  distance2D,
+  normalizeCurvePoint,
+  normalizeVector3,
+  pointKey,
+  roundCoord,
+  toPoint,
+} from './value.js'
+import {
+  localPointToWorld,
+  planeDefinitionFromOptions,
+  planeIsGroundLike,
+  worldPointToLocal,
+} from './planeGeometry.js'
+import {
+  boundsFromFootprint,
+  buildWallFootprint,
+  polygonArea,
+  validatePolygon,
+} from './polygonGeometry.js'
+import { normalizeTerrainMeshRecord } from './terrainMesh.js'
+
+export { localPointToWorld, worldPointToLocal }
+
 const DEFAULT_WAREHOUSE_DIMENSIONS_MM = { width_mm: 24000, depth_mm: 18000, height_mm: 9000 }
 const DEFAULT_CURVE_TOLERANCE = 0.08
 const DEFAULT_MAX_OSM_BUILDING_MAJOR_METERS = 240
 const DEFAULT_MAX_OSM_BUILDING_AREA_SQM = 20000
 const DEFAULT_MAX_OSM_RIBBON_MAJOR_METERS = 120
 const DEFAULT_MAX_OSM_RIBBON_ASPECT_RATIO = 12
-
-const cloneValue = (value) => {
-  if (value === null || value === undefined) return value
-  if (typeof structuredClone === 'function') return structuredClone(value)
-  return JSON.parse(JSON.stringify(value))
-}
-
-const asArray = (value) => (Array.isArray(value) ? value : [])
-const asString = (value, fallback = '') => (typeof value === 'string' && value.trim() ? value.trim() : fallback)
-const asNumber = (value, fallback = 0) => {
-  const nextValue = Number(value)
-  return Number.isFinite(nextValue) ? nextValue : fallback
-}
-const asOptionalNumber = (value, fallback = Number.NaN) => {
-  if (value === null || value === undefined || value === '') return fallback
-  return asNumber(value, fallback)
-}
-const roundCoord = (value) => Math.round(asNumber(value, 0) * 1000) / 1000
-const pointKey = (x, z, y = 0) => `${roundCoord(x)}:${roundCoord(y)}:${roundCoord(z)}`
-const toPoint = (value, fallback = [0, 0]) => (Array.isArray(value) ? [roundCoord(value[0]), roundCoord(value[1])] : fallback)
-
-function createId(prefix = 'doc') {
-  if (typeof globalThis.crypto?.randomUUID === 'function') return `${prefix}-${globalThis.crypto.randomUUID()}`
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function normalizeVector3(value, fallback = [0, 0, 0]) {
-  const items = asArray(value)
-  return [roundCoord(items[0] ?? fallback[0]), roundCoord(items[1] ?? fallback[1]), roundCoord(items[2] ?? fallback[2])]
-}
-
-function distance2D(left, right) {
-  return Math.hypot(left[0] - right[0], left[1] - right[1])
-}
-
-function normalizeCurvePoint(value, fallback = [0, 0]) {
-  return toPoint(value, fallback)
-}
-
-function dot3(left, right) {
-  return asNumber(left?.[0], 0) * asNumber(right?.[0], 0)
-    + asNumber(left?.[1], 0) * asNumber(right?.[1], 0)
-    + asNumber(left?.[2], 0) * asNumber(right?.[2], 0)
-}
-
-function sub3(left, right) {
-  return [
-    asNumber(left?.[0], 0) - asNumber(right?.[0], 0),
-    asNumber(left?.[1], 0) - asNumber(right?.[1], 0),
-    asNumber(left?.[2], 0) - asNumber(right?.[2], 0),
-  ]
-}
-
-function addScaled3(origin, xAxis, x, yAxis, y, normal = [0, 1, 0], offset = 0) {
-  return [
-    roundCoord(asNumber(origin?.[0], 0) + asNumber(xAxis?.[0], 0) * x + asNumber(yAxis?.[0], 0) * y + asNumber(normal?.[0], 0) * offset),
-    roundCoord(asNumber(origin?.[1], 0) + asNumber(xAxis?.[1], 0) * x + asNumber(yAxis?.[1], 0) * y + asNumber(normal?.[1], 0) * offset),
-    roundCoord(asNumber(origin?.[2], 0) + asNumber(xAxis?.[2], 0) * x + asNumber(yAxis?.[2], 0) * y + asNumber(normal?.[2], 0) * offset),
-  ]
-}
-
-function planeIsGroundLike(plane) {
-  const normal = normalizeVector3(plane?.normal, [0, 1, 0])
-  const xAxis = normalizeVector3(plane?.xAxis, [1, 0, 0])
-  const yAxis = normalizeVector3(plane?.yAxis, [0, 0, 1])
-  return Math.abs(normal[0]) < 0.001
-    && Math.abs(normal[1] - 1) < 0.001
-    && Math.abs(normal[2]) < 0.001
-    && Math.abs(xAxis[0] - 1) < 0.001
-    && Math.abs(xAxis[1]) < 0.001
-    && Math.abs(xAxis[2]) < 0.001
-    && Math.abs(yAxis[0]) < 0.001
-    && Math.abs(yAxis[1]) < 0.001
-    && Math.abs(yAxis[2] - 1) < 0.001
-}
-
-export function localPointToWorld(plane, point, offset = 0) {
-  return addScaled3(
-    normalizeVector3(plane?.origin, [0, 0, 0]),
-    normalizeVector3(plane?.xAxis, [1, 0, 0]),
-    asNumber(point?.[0], 0),
-    normalizeVector3(plane?.yAxis, [0, 0, 1]),
-    asNumber(point?.[1], 0),
-    normalizeVector3(plane?.normal, [0, 1, 0]),
-    offset,
-  )
-}
-
-export function worldPointToLocal(plane, worldPoint) {
-  const origin = normalizeVector3(plane?.origin, [0, 0, 0])
-  const relative = sub3(worldPoint, origin)
-  return [
-    roundCoord(dot3(relative, normalizeVector3(plane?.xAxis, [1, 0, 0]))),
-    roundCoord(dot3(relative, normalizeVector3(plane?.yAxis, [0, 0, 1]))),
-  ]
-}
-
-function planeDefinitionFromOptions(options = {}) {
-  if (options.plane && typeof options.plane === 'object') {
-    return {
-      id: asString(options.plane.id, ''),
-      kind: asString(options.plane.kind, 'custom'),
-      name: asString(options.plane.name, 'Sketch Plane'),
-      origin: normalizeVector3(options.plane.origin, [0, asNumber(options.plane.elevation, 0), 0]),
-      normal: normalizeVector3(options.plane.normal, [0, 1, 0]),
-      xAxis: normalizeVector3(options.plane.xAxis, [1, 0, 0]),
-      yAxis: normalizeVector3(options.plane.yAxis, [0, 0, 1]),
-    }
-  }
-
-  const planeId = asString(options.planeId, '')
-  const elevation = asNumber(options.planeElevation, 0)
-  if (!planeId && elevation === 0) return null
-
-  return {
-    id: planeId,
-    kind: 'custom',
-    name: planeId ? 'Sketch Plane' : 'Elevated Plane',
-    origin: [0, elevation, 0],
-    normal: [0, 1, 0],
-    xAxis: [1, 0, 0],
-    yAxis: [0, 0, 1],
-  }
-}
-
-function polygonArea(points) {
-  let area = 0
-  for (let index = 0; index < points.length; index += 1) {
-    const current = points[index]
-    const next = points[(index + 1) % points.length]
-    area += current[0] * next[1] - next[0] * current[1]
-  }
-  return Math.abs(area) / 2
-}
-
-function boundsFromFootprint(points) {
-  if (!points.length) return { width: 0, depth: 0 }
-  let minX = Number.POSITIVE_INFINITY
-  let maxX = Number.NEGATIVE_INFINITY
-  let minZ = Number.POSITIVE_INFINITY
-  let maxZ = Number.NEGATIVE_INFINITY
-  points.forEach((point) => {
-    minX = Math.min(minX, asNumber(point?.[0], 0))
-    maxX = Math.max(maxX, asNumber(point?.[0], 0))
-    minZ = Math.min(minZ, asNumber(point?.[1], 0))
-    maxZ = Math.max(maxZ, asNumber(point?.[1], 0))
-  })
-  return {
-    minX,
-    maxX,
-    minZ,
-    maxZ,
-    width: Math.max(maxX - minX, 0),
-    depth: Math.max(maxZ - minZ, 0),
-  }
-}
 
 function isUsableLegacyOsmFootprint(points) {
   if (points.length < 3) return false
@@ -171,54 +44,6 @@ function isUsableLegacyOsmFootprint(points) {
   if (area > DEFAULT_MAX_OSM_BUILDING_AREA_SQM) return false
   if (major > DEFAULT_MAX_OSM_RIBBON_MAJOR_METERS && major / minor > DEFAULT_MAX_OSM_RIBBON_ASPECT_RATIO) return false
   return true
-}
-
-function segmentsIntersect(a1, a2, b1, b2) {
-  const cross = (p1, p2, p3) => (p2[0] - p1[0]) * (p3[1] - p1[1]) - (p2[1] - p1[1]) * (p3[0] - p1[0])
-  const onSegment = (p1, p2, p3) => (
-    Math.min(p1[0], p2[0]) <= p3[0] && p3[0] <= Math.max(p1[0], p2[0])
-    && Math.min(p1[1], p2[1]) <= p3[1] && p3[1] <= Math.max(p1[1], p2[1])
-  )
-  const d1 = cross(a1, a2, b1)
-  const d2 = cross(a1, a2, b2)
-  const d3 = cross(b1, b2, a1)
-  const d4 = cross(b1, b2, a2)
-  if (d1 === 0 && onSegment(a1, a2, b1)) return true
-  if (d2 === 0 && onSegment(a1, a2, b2)) return true
-  if (d3 === 0 && onSegment(b1, b2, a1)) return true
-  if (d4 === 0 && onSegment(b1, b2, a2)) return true
-  return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0))
-}
-
-function validatePolygon(points) {
-  if (points.length < 3) return { valid: false, reason: '至少需要三个顶点' }
-  for (let left = 0; left < points.length; left += 1) {
-    for (let right = left + 1; right < points.length; right += 1) {
-      const neighbour = Math.abs(left - right) <= 1 || (left === 0 && right === points.length - 1)
-      if (neighbour) continue
-      if (segmentsIntersect(points[left], points[(left + 1) % points.length], points[right], points[(right + 1) % points.length])) {
-        return { valid: false, reason: '轮廓存在自相交' }
-      }
-    }
-  }
-  if (polygonArea(points) < 0.01) return { valid: false, reason: '轮廓面积过小' }
-  return { valid: true, reason: null }
-}
-
-function buildWallFootprint(start, end, thickness) {
-  const dx = end[0] - start[0]
-  const dz = end[1] - start[1]
-  const length = Math.hypot(dx, dz)
-  if (length < 0.001) return null
-  const half = Math.max(thickness, 0.1) / 2
-  const ox = (-dz / length) * half
-  const oz = (dx / length) * half
-  return [
-    [start[0] + ox, start[1] + oz],
-    [end[0] + ox, end[1] + oz],
-    [end[0] - ox, end[1] - oz],
-    [start[0] - ox, start[1] - oz],
-  ]
 }
 
 function defaultPlane() {
@@ -302,104 +127,6 @@ function legacyFootprintLocalPoints(solid, originWgs84 = null) {
     points.pop()
   }
   return points
-}
-
-function inferTerrainGrid(rawVertices, mesh) {
-  const vertexCount = rawVertices.length
-  const explicitRows = Math.max(Math.floor(asNumber(mesh?.rows ?? mesh?.metadata?.rows, 0)), 0)
-  const explicitCols = Math.max(Math.floor(asNumber(mesh?.cols ?? mesh?.metadata?.cols, 0)), 0)
-  if (explicitRows >= 2 && explicitCols >= 2 && explicitRows * explicitCols === vertexCount) {
-    return { rows: explicitRows, cols: explicitCols }
-  }
-
-  const squareSize = Math.sqrt(vertexCount)
-  if (Number.isInteger(squareSize) && squareSize >= 2) {
-    return { rows: squareSize, cols: squareSize }
-  }
-
-  return { rows: explicitRows, cols: explicitCols }
-}
-
-function terrainBounds(mesh) {
-  const bounds = mesh?.boundsMeters || mesh?.metadata?.boundsMeters || {}
-  const width = Math.max(asNumber(bounds.width, asNumber(bounds.maxX, 0) - asNumber(bounds.minX, 0)), 1)
-  const depth = Math.max(asNumber(bounds.depth, asNumber(bounds.maxZ, 0) - asNumber(bounds.minZ, 0)), 1)
-  return {
-    minX: asNumber(bounds.minX, -width / 2),
-    maxX: asNumber(bounds.maxX, width / 2),
-    minZ: asNumber(bounds.minZ, -depth / 2),
-    maxZ: asNumber(bounds.maxZ, depth / 2),
-    width,
-    depth,
-  }
-}
-
-function normalizeTerrainMeshVertices(mesh) {
-  const rawVertices = asArray(mesh?.vertices)
-  if (!rawVertices.length) return []
-  if (rawVertices.every((item) => typeof item === 'number' || typeof item === 'string')) {
-    return rawVertices.map((item) => asNumber(item, 0))
-  }
-
-  const { rows, cols } = inferTerrainGrid(rawVertices, mesh)
-  const bounds = terrainBounds(mesh)
-  const stepX = (bounds.maxX - bounds.minX) / Math.max(cols - 1, 1)
-  const stepZ = (bounds.maxZ - bounds.minZ) / Math.max(rows - 1, 1)
-
-  const vertices = []
-  rawVertices.forEach((rawVertex, index) => {
-    const tuple = Array.isArray(rawVertex) ? rawVertex : null
-    const xValue = tuple ? tuple[0] : rawVertex?.x
-    const yValue = tuple ? tuple[1] : rawVertex?.y ?? rawVertex?.height
-    const zValue = tuple ? tuple[2] : rawVertex?.z
-    let x = asOptionalNumber(xValue, Number.NaN)
-    const y = asOptionalNumber(yValue, 0)
-    let z = asOptionalNumber(zValue, Number.NaN)
-
-    if ((!Number.isFinite(x) || !Number.isFinite(z)) && rows >= 2 && cols >= 2) {
-      const row = Math.floor(index / cols)
-      const col = index % cols
-      x = bounds.minX + stepX * col
-      z = bounds.minZ + stepZ * row
-    }
-
-    vertices.push(roundCoord(x), roundCoord(y), roundCoord(z))
-  })
-  return vertices.filter((item) => Number.isFinite(item))
-}
-
-function normalizeTerrainMeshIndices(indices) {
-  const normalized = []
-  asArray(indices).forEach((item) => {
-    if (Array.isArray(item)) {
-      item.forEach((part) => normalized.push(Math.max(0, Math.floor(asNumber(part, 0)))))
-      return
-    }
-    normalized.push(Math.max(0, Math.floor(asNumber(item, 0))))
-  })
-  return normalized
-}
-
-function normalizeTerrainMeshRecord(mesh, index) {
-  const rawVertices = asArray(mesh?.vertices)
-  const grid = inferTerrainGrid(rawVertices, mesh)
-  const metadata = {
-    ...(mesh?.metadata || {}),
-    source: mesh?.metadata?.source || mesh?.source || null,
-    boundsMeters: mesh?.metadata?.boundsMeters || mesh?.boundsMeters || null,
-    rows: mesh?.metadata?.rows || mesh?.rows || grid.rows || null,
-    cols: mesh?.metadata?.cols || mesh?.cols || grid.cols || null,
-    elevationOffsetMeters: mesh?.metadata?.elevationOffsetMeters ?? mesh?.elevationOffsetMeters ?? null,
-  }
-  return {
-    id: asString(mesh?.id, `terrain-mesh:${index + 1}`),
-    kind: asString(mesh?.kind, 'terrain-grid'),
-    name: asString(mesh?.name, `地形网格 ${index + 1}`),
-    color: asString(mesh?.color, '#d9e4d0'),
-    vertices: normalizeTerrainMeshVertices(mesh),
-    indices: normalizeTerrainMeshIndices(mesh?.indices),
-    metadata: cloneValue(metadata),
-  }
 }
 
 function upgradeLegacyFootprintDocument(value) {
