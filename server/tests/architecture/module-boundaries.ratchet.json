@@ -1,6 +1,4 @@
 {
-  "directDatabaseImports": [
-    "src/modules/races/race.routes.js"
-  ],
+  "directDatabaseImports": [],
   "rawRequestPersistenceCalls": []
 }

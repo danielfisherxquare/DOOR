@@ -10,6 +10,10 @@ export async function create(orgId, data) {
     return raceMapper.fromDbRow(inserted);
 }
 
+export function findOrganizationById(orgId) {
+    return knex('organizations').where({ id: orgId }).first('id');
+}
+
 export async function findAllAllowed(orgId, userId, role, options = {}) {
     let query = knex('races').orderBy('created_at', 'desc');
     const filterOrgId = options.orgId ?? null;
@@ -41,7 +45,7 @@ export async function findAllAllowed(orgId, userId, role, options = {}) {
         query = query.whereRaw('1 = 0');
     }
 
-    const rows = await query.distinct('races.*');
+    const rows = await query.distinct('races.*').limit(1_000);
     return rows.map(raceMapper.fromDbRow);
 }
 
@@ -69,12 +73,18 @@ export async function update(orgId, raceId, data) {
 }
 
 export async function remove(orgId, raceId) {
-    const recordQuery = knex('records').where({ race_id: raceId });
-    if (orgId) recordQuery.andWhere({ org_id: orgId });
-    await recordQuery.delete();
+    return knex.transaction(async (trx) => {
+        const raceQuery = trx('races').where({ id: raceId });
+        if (orgId) raceQuery.andWhere({ org_id: orgId });
+        const race = await raceQuery.clone().select('id').forUpdate().first();
+        if (!race) return false;
 
-    const raceQuery = knex('races').where({ id: raceId });
-    if (orgId) raceQuery.andWhere({ org_id: orgId });
-    const deleted = await raceQuery.delete();
-    return deleted > 0;
+        const recordQuery = trx('records').where({ race_id: raceId });
+        if (orgId) recordQuery.andWhere({ org_id: orgId });
+        await recordQuery.delete();
+
+        const deleteQuery = trx('races').where({ id: raceId });
+        if (orgId) deleteQuery.andWhere({ org_id: orgId });
+        return await deleteQuery.delete() > 0;
+    });
 }

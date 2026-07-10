@@ -2,15 +2,18 @@
  * Race Routes - race CRUD API and bib tracking
  */
 import { Router } from 'express';
-import * as raceRepo from './race.repository.js';
 import { authorize } from '../../middleware/authorize.js';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
-import knex from '../../db/knex.js';
-import { normalizeEvent } from '../../utils/event-normalizer.js';
 import bibTrackingRoutes from './bib-tracking/bib-tracking.routes.js';
 import raceDashboardRoutes from './race-dashboard/race-dashboard.routes.js';
 import raceStaffRoutes from './race-staff.routes.js';
 import { operationLog } from '../../middleware/operation-log.js';
+import {
+    parseRaceCreatePayload,
+    parseRaceListFilters,
+    parseRaceUpdatePayload,
+} from './race.schema.js';
+import { raceService } from './race.service.js';
 
 const router = Router();
 const requireRaceAdmin = authorize({
@@ -26,108 +29,6 @@ router.use('/dashboard', raceDashboardRoutes);
 
 // Mount race staff assignment routes before /:raceId catch-all routes.
 router.use('/:raceId/staff-assignments', requireRaceAccess('raceId'), raceStaffRoutes);
-
-function normalizeOrgId(value) {
-    if (value === undefined || value === null || value === '') return null;
-    if (Array.isArray(value)) {
-        throw Object.assign(new Error('orgId must be a single value'), { status: 400, expose: true });
-    }
-    const normalized = String(value).trim();
-    if (!normalized) return null;
-    return normalized;
-}
-
-function normalizeEvents(events) {
-    if (events === undefined) return undefined;
-    if (events === null) return [];
-    if (!Array.isArray(events)) {
-        throw Object.assign(new Error('events must be an array'), { status: 400, expose: true });
-    }
-
-    return events.map((item, index) => {
-        if (!item || typeof item !== 'object' || Array.isArray(item)) {
-            throw Object.assign(new Error(`events[${index}] must be an object`), { status: 400, expose: true });
-        }
-
-        const name = normalizeEvent(item.name);
-        if (!name) {
-            throw Object.assign(new Error(`events[${index}].name is required`), { status: 400, expose: true });
-        }
-
-        const targetRaw = item.targetCount ?? 0;
-        const targetCount = Number(targetRaw);
-        if (!Number.isFinite(targetCount) || targetCount < 0) {
-            throw Object.assign(new Error(`events[${index}].targetCount must be a non-negative number`), { status: 400, expose: true });
-        }
-
-        return {
-            name,
-            targetCount: Math.floor(targetCount),
-        };
-    });
-}
-
-function validateCreatePayload(body) {
-    const payload = {};
-
-    const name = typeof body.name === 'string' ? body.name.trim() : '';
-    if (!name) {
-        throw Object.assign(new Error('Race name is required'), { status: 400, expose: true });
-    }
-    payload.name = name;
-
-    const date = typeof body.date === 'string' ? body.date.trim() : '';
-    if (!date) {
-        throw Object.assign(new Error('Race date is required'), { status: 400, expose: true });
-    }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-        throw Object.assign(new Error('Race date must be in YYYY-MM-DD format'), { status: 400, expose: true });
-    }
-    payload.date = date;
-
-    if (body.conflictRule !== undefined && !['strict', 'permissive'].includes(body.conflictRule)) {
-        throw Object.assign(new Error('conflictRule must be strict or permissive'), { status: 400, expose: true });
-    }
-
-    if (body.events !== undefined) {
-        payload.events = normalizeEvents(body.events);
-    }
-
-    return payload;
-}
-
-function validateUpdatePayload(body) {
-    const payload = {};
-
-    if (body.name !== undefined) {
-        const name = typeof body.name === 'string' ? body.name.trim() : '';
-        if (!name) {
-            throw Object.assign(new Error('Race name is required'), { status: 400, expose: true });
-        }
-        payload.name = name;
-    }
-
-    if (body.date !== undefined) {
-        const date = typeof body.date === 'string' ? body.date.trim() : '';
-        if (!date) {
-            throw Object.assign(new Error('Race date cannot be empty'), { status: 400, expose: true });
-        }
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-            throw Object.assign(new Error('Race date must be in YYYY-MM-DD format'), { status: 400, expose: true });
-        }
-        payload.date = date;
-    }
-
-    if (body.conflictRule !== undefined && !['strict', 'permissive'].includes(body.conflictRule)) {
-        throw Object.assign(new Error('conflictRule must be strict or permissive'), { status: 400, expose: true });
-    }
-
-    if (body.events !== undefined) {
-        payload.events = normalizeEvents(body.events);
-    }
-
-    return payload;
-}
 
 /**
  * @swagger
@@ -183,31 +84,10 @@ function validateUpdatePayload(body) {
 // POST /api/races - create race (org_admin, super_admin)
 router.post('/', operationLog({ module: 'races', businessType: 'INSERT', titleFactory: (req) => '创建赛事: ' + (req.body?.name || '') }), requireRaceAdmin, async (req, res, next) => {
     try {
-        const normalized = validateCreatePayload(req.body ?? {});
-
-        let orgId = req.authContext.orgId || null;
-        if (req.authContext.role === 'super_admin') {
-            orgId = normalizeOrgId(req.body.orgId);
-            if (!orgId) {
-                return res.status(400).json({ success: false, message: 'super_admin creating a race requires orgId' });
-            }
-        }
-
-        if (!orgId) {
-            return res.status(400).json({ success: false, message: 'Missing valid organization context, cannot create race' });
-        }
-
-        const org = await knex('organizations').where({ id: orgId }).first('id');
-        if (!org) {
-            return res.status(404).json({ success: false, message: 'Target organization not found' });
-        }
-
-        const payload = {
-            ...req.body,
-            ...normalized,
-        };
-
-        const race = await raceRepo.create(orgId, payload);
+        const race = await raceService.createRace(
+            req.authContext,
+            parseRaceCreatePayload(req.body),
+        );
         res.status(201).json({ success: true, data: race });
     } catch (err) {
         next(err);
@@ -245,9 +125,10 @@ router.post('/', operationLog({ module: 'races', businessType: 'INSERT', titleFa
 // GET /api/races - list current user's allowed races
 router.get('/', async (req, res, next) => {
     try {
-        const { orgId, userId, role } = req.authContext;
-        const scopedOrgId = role === 'super_admin' ? normalizeOrgId(req.query.orgId) : null;
-        const races = await raceRepo.findAllAllowed(orgId, userId, role, { orgId: scopedOrgId });
+        const races = await raceService.listRaces(
+            req.authContext,
+            parseRaceListFilters(req.query),
+        );
         res.json({ success: true, data: races });
     } catch (err) {
         next(err);
@@ -279,7 +160,10 @@ router.get('/', async (req, res, next) => {
 // GET /api/races/:raceId - get one race
 router.get('/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const race = await raceRepo.findById(req.raceAccess.operatorOrgId, req.params.raceId);
+        const race = await raceService.getRace(
+            req.raceAccess.operatorOrgId,
+            req.raceAccess.raceId,
+        );
         if (!race) {
             return res.status(404).json({ success: false, message: 'Race not found' });
         }
@@ -344,13 +228,11 @@ router.get('/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
 // PUT /api/races/:raceId - update race
 router.put('/:raceId', operationLog({ module: 'races', businessType: 'UPDATE', titleFactory: (req) => '更新赛事: ' + (req.params?.raceId || '') }), requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const normalized = validateUpdatePayload(req.body ?? {});
-        const payload = {
-            ...req.body,
-            ...normalized,
-        };
-
-        const race = await raceRepo.update(req.raceAccess.operatorOrgId, req.params.raceId, payload);
+        const race = await raceService.updateRace(
+            req.raceAccess.operatorOrgId,
+            req.raceAccess.raceId,
+            parseRaceUpdatePayload(req.body),
+        );
         if (!race) {
             return res.status(404).json({ success: false, message: 'Race not found' });
         }
@@ -385,7 +267,10 @@ router.put('/:raceId', operationLog({ module: 'races', businessType: 'UPDATE', t
 // DELETE /api/races/:raceId - delete race (cascades records)
 router.delete('/:raceId', operationLog({ module: 'races', businessType: 'DELETE', titleFactory: (req) => '删除赛事: ' + (req.params?.raceId || '') }), requireRaceAccess('raceId'), async (req, res, next) => {
     try {
-        const deleted = await raceRepo.remove(req.raceAccess.operatorOrgId, req.params.raceId);
+        const deleted = await raceService.removeRace(
+            req.raceAccess.operatorOrgId,
+            req.raceAccess.raceId,
+        );
         if (!deleted) {
             return res.status(404).json({ success: false, message: 'Race not found' });
         }

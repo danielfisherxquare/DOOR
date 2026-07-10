@@ -44,7 +44,7 @@ function pickStricterAccessLevel(left, right) {
 
 export function normalizeRaceId(rawRaceId) {
     const raceId = Number(rawRaceId);
-    if (!Number.isFinite(raceId) || raceId <= 0) {
+    if (!Number.isSafeInteger(raceId) || raceId <= 0) {
         throw badRequest('Invalid raceId');
     }
     return raceId;
