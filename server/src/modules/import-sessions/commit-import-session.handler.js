@@ -13,8 +13,8 @@
 import { registerHandler } from '../jobs/job.handlers.js';
 import { importSessionRepository } from '../import-sessions/import-session.repository.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
-import { recordMapper } from '../../db/mappers/records.js';
-import { idNumberBlindIndex, normalizeIdNumber } from '../../utils/crypto.js';
+import { recordMapper as defaultRecordMapper } from '../../db/mappers/records.js';
+import { idNumberBlindIndex } from '../../utils/crypto.js';
 
 // ── 辅助函数 ─────────────────────────────────────────────
 
@@ -32,6 +32,13 @@ function isSpecialCategory(category) {
 
 function canInsertWhenNotFound(incomingCategory) {
     return ['Mass', 'Elite', 'Sponsor'].includes(incomingCategory);
+}
+
+function assertCommitted(session) {
+    if (session) return;
+    const error = new Error('Import session could not be marked committed');
+    error.code = 'IMPORT_SESSION_COMMIT_CONFLICT';
+    throw error;
 }
 
 function resolveCategoryMerge(existingCategoryRaw, incomingCategoryRaw) {
@@ -54,73 +61,13 @@ function resolveCategoryMerge(existingCategoryRaw, incomingCategoryRaw) {
 }
 
 /**
- * 将清洗后的 camelCase 行映射为 records 表的 snake_case 列
- */
-function mapRowToDbRecord(row, orgId, raceId, now) {
-    return {
-        org_id: orgId,
-        race_id: raceId,
-        name: row.name || '',
-        name_pinyin: row.namePinyin || '',
-        phone: row.phone || '',
-        country: row.country || '',
-        id_type: row.idType || '',
-        id_number: row.idNumber || '',
-        gender: row.gender || '',
-        age: row.age || '',
-        birthday: row.birthday || '',
-        event: normalizeEvent(row.event),
-        source: row.source || '',
-        clothing_size: row.clothingSize || '',
-        province: row.province || '',
-        city: row.city || '',
-        district: row.district || '',
-        address: row.address || '',
-        email: row.email || '',
-        emergency_name: row.emergencyName || '',
-        emergency_phone: row.emergencyPhone || '',
-        blood_type: row.bloodType || '',
-        order_group_id: row.orderGroupId || '',
-        payment_status: row.paymentStatus || '',
-        mark: row.mark || '',
-        bag_window_no: row.bagWindowNo || '',
-        bag_no: row.bagNo || '',
-        expo_window_no: row.expoWindowNo || '',
-        bib_number: row.bibNumber || '',
-        bib_color: row.bibColor || '',
-        _source: row._source || '',
-        _imported_at: now,
-        duplicate_sources: row.duplicateSources || '',
-        runner_category: row.runnerCategory || null,
-        lottery_status: row.lotteryStatus || null,
-        duplicate_count: row.duplicateCount || 0,
-        audit_status: 'pending',
-    };
-}
-
-/**
  * 去重检查（从 sqliteService.cjs 移植）
  * 按 id_number_hash 对比 DB 已有记录（加密安全）
  */
-async function checkDuplicates(knex, incoming, orgId, raceId) {
+export function buildDuplicatePlan(incoming, existingRows) {
     if (!incoming || incoming.length === 0) {
         return { newRecords: [], duplicates: [], internalUpdateCount: 0, rejectedRecords: [] };
     }
-
-    // 1. 计算所有有证件号的 hash 值
-    const hashToRecord = new Map();
-    for (const inc of incoming) {
-        if (!inc.idNumber) continue;
-        const normalized = normalizeIdNumber(inc.idNumber);
-        const hash = idNumberBlindIndex(inc.idNumber);
-        hashToRecord.set(hash, { ...inc, _normalizedIdNumber: normalized, _hash: hash });
-    }
-
-    // 2. 获取该赛事下所有有证件号的已有记录（使用 hash 列）
-    const existingRows = await knex('records')
-        .select('id', 'id_number_hash', 'duplicate_count', 'mark', 'source', 'event', 'duplicate_sources', 'runner_category')
-        .where({ org_id: orgId, race_id: raceId })
-        .whereNotNull('id_number_hash');
 
     const existingMap = new Map();
     for (const row of existingRows) {
@@ -133,12 +80,29 @@ async function checkDuplicates(knex, incoming, orgId, raceId) {
     const duplicates = [];
     const rejectedRecords = [];
     const incomingHashSet = new Set();
+    const newRecordByHash = new Map();
+    let internalUpdateCount = 0;
 
     for (const inc of incoming) {
         if (!inc.idNumber) {
+            const normalizedCat = normalizeCategory(inc.runnerCategory);
+            if (!normalizedCat || !canInsertWhenNotFound(normalizedCat)) {
+                rejectedRecords.push({
+                    idNumber: '',
+                    name: inc.name || '',
+                    incomingCategory: String(inc.runnerCategory || ''),
+                    reason: normalizedCat ? 'requires_mass_registration' : 'invalid_category',
+                });
+                continue;
+            }
             // 无证件号也需要初始化 duplicateCount 和 duplicateSources
             const initSources = JSON.stringify([{ platform: inc.source || '', event: inc.event || '' }]);
-            newRecords.push({ ...inc, duplicateCount: 1, duplicateSources: initSources });
+            newRecords.push({
+                ...inc,
+                runnerCategory: normalizedCat,
+                duplicateCount: 1,
+                duplicateSources: initSources,
+            });
             continue;
         }
 
@@ -219,7 +183,7 @@ async function checkDuplicates(knex, incoming, orgId, raceId) {
 
         } else if (incomingHashSet.has(hash)) {
             // ── 批次内部重复 ──
-            const firstInstance = newRecords.find(r => r.idNumber === inc.idNumber);
+            const firstInstance = newRecordByHash.get(hash);
             if (firstInstance) {
                 firstInstance.duplicateCount = (firstInstance.duplicateCount || 1) + 1;
                 const src = inc.source || '未知来源';
@@ -232,6 +196,7 @@ async function checkDuplicates(knex, incoming, orgId, raceId) {
                 sources.push({ platform: inc.source || '', event: inc.event || '' });
                 firstInstance.duplicateSources = JSON.stringify(sources);
             }
+            internalUpdateCount++;
 
         } else {
             // ── 全新记录 ──
@@ -255,45 +220,41 @@ async function checkDuplicates(knex, incoming, orgId, raceId) {
                 continue;
             }
 
-            incomingHashSet.add(hash);
             const initSources = JSON.stringify([{ platform: inc.source || '', event: inc.event || '' }]);
-            newRecords.push({ ...inc, runnerCategory: normalizedCat, duplicateCount: 1, duplicateSources: initSources });
+            const newRecord = { ...inc, runnerCategory: normalizedCat, duplicateCount: 1, duplicateSources: initSources };
+            incomingHashSet.add(hash);
+            newRecordByHash.set(hash, newRecord);
+            newRecords.push(newRecord);
         }
     }
-
-    const validIncoming = incoming.filter(i => i.idNumber);
-    const internalUpdateCount = validIncoming.length - duplicates.length - newRecords.length - rejectedRecords.length;
 
     return { newRecords, duplicates, internalUpdateCount, rejectedRecords };
 }
 
-// ── 注册 Handler ─────────────────────────────────────────
-
-registerHandler('commit-import-session', async (job, { knex, heartbeat }) => {
-    const { sessionId, raceId: rawRaceId, category = 'Mass' } = job.payload;
+async function executeCommitImportSession({ job, repository, recordMapper, logger, heartbeat, trx }) {
+    const { sessionId, raceId: rawRaceId, category: rawCategory = 'Mass' } = job.payload;
     const raceId = Number(rawRaceId);
     const orgId = job.orgId;
+    const category = rawCategory === 'Emergency' ? 'Medic' : rawCategory;
 
     if (!raceId || !Number.isFinite(raceId)) {
         throw new Error('Invalid raceId in payload');
     }
+    if (!['Mass', 'Elite', 'Permanent', 'Pacer', 'Medic', 'Sponsor', 'Performance'].includes(category)) {
+        const error = new Error('Invalid category in payload');
+        error.code = 'IMPORT_CATEGORY_INVALID';
+        throw error;
+    }
 
+    await repository.lockRaceScope(orgId, raceId, trx);
+    await repository.lockOpenSession(orgId, sessionId, trx);
     await heartbeat(5, '读取导入会话数据');
 
     // 1. 从 chunks 读取全部行
-    const chunks = await knex('import_session_chunks')
-        .where({ session_id: sessionId })
-        .orderBy('seq', 'asc');
-
-    const allRows = [];
-    for (const c of chunks) {
-        let data = c.rows_data;
-        if (typeof data === 'string') data = JSON.parse(data);
-        if (Array.isArray(data)) allRows.push(...data);
-    }
+    const allRows = await repository.listAllRows(orgId, sessionId, trx);
 
     if (allRows.length === 0) {
-        await importSessionRepository.markCommitted(orgId, sessionId);
+        assertCommitted(await repository.markCommitted(orgId, sessionId, trx));
         return { addedCount: 0, updatedCount: 0, internalCount: 0, rejectedCount: 0 };
     }
 
@@ -317,7 +278,8 @@ registerHandler('commit-import-session', async (job, { knex, heartbeat }) => {
     await heartbeat(25, '去重检查');
 
     // 3. 去重
-    const { newRecords, duplicates, internalUpdateCount, rejectedRecords } = await checkDuplicates(knex, rawRecords, orgId, raceId);
+    const existingRows = await repository.listRecordDuplicateCandidates(orgId, raceId, trx);
+    const { newRecords, duplicates, internalUpdateCount, rejectedRecords } = buildDuplicatePlan(rawRecords, existingRows);
 
     // 非 Mass/Performance 的新增记录追加首次报名标记
     if (!isMass && !isPerformance) {
@@ -380,7 +342,7 @@ registerHandler('commit-import-session', async (job, { knex, heartbeat }) => {
 
         for (let i = 0; i < dbRecords.length; i += BATCH_SIZE) {
             const batch = dbRecords.slice(i, i + BATCH_SIZE);
-            await knex('records').insert(batch);
+            await repository.insertRecords(batch, trx);
             addedCount += batch.length;
 
             const progress = 40 + Math.round((i / dbRecords.length) * 30);
@@ -440,7 +402,12 @@ registerHandler('commit-import-session', async (job, { knex, heartbeat }) => {
             if (data.runner_category !== undefined) updateRow.runner_category = data.runner_category;
             updateRow.updated_at = now;
 
-            await knex('records').where({ id }).update(updateRow);
+            const updated = await repository.updateRecord(orgId, raceId, id, updateRow, trx);
+            if (updated !== 1) {
+                const error = new Error(`Record ${id} was not updated inside the import scope`);
+                error.code = 'IMPORT_RECORD_SCOPE_MISMATCH';
+                throw error;
+            }
             updatedCount++;
 
             if (i % 100 === 0) {
@@ -453,7 +420,8 @@ registerHandler('commit-import-session', async (job, { knex, heartbeat }) => {
     await heartbeat(97, '标记会话为 committed');
 
     // 6. 标记 session
-    await importSessionRepository.markCommitted(orgId, sessionId);
+    const committedSession = await repository.markCommitted(orgId, sessionId, trx);
+    assertCommitted(committedSession);
 
     const result = {
         addedCount,
@@ -462,7 +430,24 @@ registerHandler('commit-import-session', async (job, { knex, heartbeat }) => {
         rejectedCount: rejectedRecords.length,
     };
 
-    console.log(`[commit-import-session] ✅ 完成: 新增=${addedCount}, 更新=${updatedCount}, 内部重复=${result.internalCount}, 拒绝=${result.rejectedCount}`);
+    logger.info(`[commit-import-session] complete: added=${addedCount}, updated=${updatedCount}, internal=${result.internalCount}, rejected=${result.rejectedCount}`);
 
     return result;
-});
+}
+
+export function createCommitImportSessionHandler({
+    repository = importSessionRepository,
+    recordMapper = defaultRecordMapper,
+    logger = console,
+} = {}) {
+    return (job, { knex: database, heartbeat }) => database.transaction((trx) => executeCommitImportSession({
+        job,
+        repository,
+        recordMapper,
+        logger,
+        heartbeat,
+        trx,
+    }));
+}
+
+registerHandler('commit-import-session', createCommitImportSessionHandler());

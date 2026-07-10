@@ -5,7 +5,6 @@
     "src/modules/column-mappings/column-mapping.routes.js",
     "src/modules/dictionary/dictionary.routes.js",
     "src/modules/health/health.routes.js",
-    "src/modules/import-sessions/import-session.routes.js",
     "src/modules/inventory/inventory.routes.js",
     "src/modules/lottery/lottery.routes.js",
     "src/modules/operation-log/operation-log.routes.js",
