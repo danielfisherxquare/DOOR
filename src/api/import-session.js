@@ -1,41 +1,29 @@
 import request from '../utils/request'
-import { resolveSurfacePrefix } from '../utils/surfaceApi'
 
-function getBasePath() {
-  return resolveSurfacePrefix({
-    admin: '/admin/import-sessions',
-    app: '/app/import-sessions',
-  }, 'app')
-}
-
-function getJobsBasePath() {
-  return resolveSurfacePrefix({
-    admin: '/admin/jobs',
-    app: '/app/jobs',
-  }, 'app')
-}
+const BASE_PATH = '/app/import-sessions'
+const JOBS_BASE_PATH = '/app/jobs'
 
 export const importSessionApi = {
   create: (raceId) => {
     const params = raceId ? { raceId } : {}
-    return request.post(getBasePath(), params)
+    return request.post(BASE_PATH, params)
   },
 
-  get: (sessionId) => request.get(`${getBasePath()}/${sessionId}`),
+  get: (sessionId) => request.get(`${BASE_PATH}/${sessionId}`),
 
-  setSummary: (sessionId, summary) => request.put(`${getBasePath()}/${sessionId}/summary`, summary),
+  setSummary: (sessionId, summary) => request.put(`${BASE_PATH}/${sessionId}/summary`, summary),
 
-  appendChunk: (sessionId, rows) => request.post(`${getBasePath()}/${sessionId}/chunks`, rows),
+  appendChunk: (sessionId, rows) => request.post(`${BASE_PATH}/${sessionId}/chunks`, rows),
 
   getChunk: (sessionId, offset, limit) =>
-    request.get(`${getBasePath()}/${sessionId}/chunks`, { params: { offset, limit } }),
+    request.get(`${BASE_PATH}/${sessionId}/chunks`, { params: { offset, limit } }),
 
-  clear: (sessionId) => request.delete(`${getBasePath()}/${sessionId}`),
+  clear: (sessionId) => request.delete(`${BASE_PATH}/${sessionId}`),
 
   commit: (sessionId, raceId, category) =>
-    request.post(`${getBasePath()}/${sessionId}/commit`, { raceId, category }),
+    request.post(`${BASE_PATH}/${sessionId}/commit`, { raceId, category }),
 
-  getJobStatus: (jobId) => request.get(`${getJobsBasePath()}/${jobId}`),
+  getJobStatus: (jobId) => request.get(`${JOBS_BASE_PATH}/${jobId}`),
 }
 
 export default importSessionApi

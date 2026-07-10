@@ -1,15 +1,9 @@
 import request from '../utils/request'
-import { resolveSurfacePrefix } from '../utils/surfaceApi'
 
-function getBasePath() {
-  return resolveSurfacePrefix({
-    admin: '/admin/records',
-    app: '/app/records',
-  }, 'app')
-}
+const BASE_PATH = '/app/records'
 
 /**
- * 记录 API — 应用层 /api/app/records，后台层 /api/admin/records。
+ * 记录 API — 应用层 /api/app/records。
  */
 export const recordsApi = {
     /**
@@ -23,7 +17,7 @@ export const recordsApi = {
      * @param {object} [params.sort] - 排序 { field, direction }
      * @returns {Promise<{ success: boolean, data: { records: Array, total: number } }>}
      */
-    query: (params) => request.post(`${getBasePath()}/query`, params),
+    query: (params) => request.post(`${BASE_PATH}/query`, params),
 
     /**
      * 数据分析统计
@@ -33,7 +27,7 @@ export const recordsApi = {
      * @param {Array} [params.filters] - 筛选条件
      * @returns {Promise<{ success: boolean, data: object }>}
      */
-    analysis: (params) => request.post(`${getBasePath()}/analysis`, params),
+    analysis: (params) => request.post(`${BASE_PATH}/analysis`, params),
 
     /**
      * 获取字段唯一值（用于下拉筛选）
@@ -43,7 +37,7 @@ export const recordsApi = {
      * @param {number} [params.limit=500] - 最大数量
      * @returns {Promise<{ success: boolean, data: Array<string> }>}
      */
-    uniqueValues: (params) => request.post(`${getBasePath()}/unique-values`, params),
+    uniqueValues: (params) => request.post(`${BASE_PATH}/unique-values`, params),
 
     /**
      * 首页快速统计
@@ -52,34 +46,34 @@ export const recordsApi = {
      * @returns {Promise<{ success: boolean, data: object }>}
      */
     quickStats: (raceId, statuses = '') =>
-        request.get(`${getBasePath()}/quick-stats/${raceId}`, {
+        request.get(`${BASE_PATH}/quick-stats/${raceId}`, {
             params: statuses ? { statuses } : {},
         }),
 
     /**
      * 更新单条记录
      */
-    update: (recordId, data) => request.put(`${getBasePath()}/${recordId}`, data),
+    update: (recordId, data) => request.put(`${BASE_PATH}/${recordId}`, data),
 
     /**
      * 批量更新记录
      */
-    bulkUpdate: (updates) => request.post(`${getBasePath()}/bulk-update`, { updates }),
+    bulkUpdate: (updates) => request.post(`${BASE_PATH}/bulk-update`, { updates }),
 
     /**
      * 清空赛事数据
      */
-    clearByRace: (raceId) => request.delete(`${getBasePath()}/race/${raceId}`),
+    clearByRace: (raceId) => request.delete(`${BASE_PATH}/race/${raceId}`),
 
     /**
      * 流式导出(NDJSON)
      */
-    export: (raceId) => request.get(`${getBasePath()}/export/${raceId}`),
+    export: (raceId) => request.get(`${BASE_PATH}/export/${raceId}`),
 
     /**
      * 校验成绩导入
      */
-    importVerification: (raceId, results) => request.post(`${getBasePath()}/import-verification/${raceId}`, results),
+    importVerification: (raceId, results) => request.post(`${BASE_PATH}/import-verification/${raceId}`, results),
 }
 
 /**

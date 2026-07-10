@@ -1,40 +1,28 @@
 import request from '../utils/request'
-import { resolveSurfacePrefix } from '../utils/surfaceApi'
 
-function getBasePath() {
-    return resolveSurfacePrefix({
-        admin: '/admin/pipeline',
-        app: '/app/pipeline',
-    }, 'app')
-}
-
-function getClothingBasePath() {
-    return resolveSurfacePrefix({
-        admin: '/admin/clothing',
-        app: '/app/clothing',
-    }, 'app')
-}
+const BASE_PATH = '/app/pipeline'
+const CLOTHING_BASE_PATH = '/app/clothing'
 
 /**
- * 出发区 + 成绩规则 API — 应用层 /api/app/pipeline，后台层 /api/admin/pipeline。
+ * 出发区 + 成绩规则 API — 应用层 /api/app/pipeline。
  */
 export const pipelineApi = {
     // ── start_zones ──────────────────────────────────────────
     getStartZones: (raceId) =>
-        request.get(`${getBasePath()}/start-zones/${raceId}`),
+        request.get(`${BASE_PATH}/start-zones/${raceId}`),
 
     saveStartZone: (data) =>
-        request.post(`${getBasePath()}/start-zones`, data),
+        request.post(`${BASE_PATH}/start-zones`, data),
 
     deleteStartZone: (id) =>
-        request.delete(`${getBasePath()}/start-zones/${id}`),
+        request.delete(`${BASE_PATH}/start-zones/${id}`),
 
     // ── performance_rules ────────────────────────────────────
     getPerformanceRules: (raceId) =>
-        request.get(`${getBasePath()}/performance-rules/${raceId}`),
+        request.get(`${BASE_PATH}/performance-rules/${raceId}`),
 
     savePerformanceRule: (data) =>
-        request.post(`${getBasePath()}/performance-rules`, data),
+        request.post(`${BASE_PATH}/performance-rules`, data),
 
     // ── filter execution ──────────────────────────────────────
     /**
@@ -43,13 +31,13 @@ export const pipelineApi = {
      * @returns {Promise<{ success: true, data: { qualifiedCount, unqualifiedCount, noTimeCount } }>}
      */
     filterPerformance: (raceId) =>
-        request.post(`${getBasePath()}/filter-performance/${raceId}`),
+        request.post(`${BASE_PATH}/filter-performance/${raceId}`),
 
     getPreview: (raceId) =>
-        request.get(`${getBasePath()}/preview/${raceId}`),
+        request.get(`${BASE_PATH}/preview/${raceId}`),
 
     getClothingLimits: (raceId) =>
-        request.get(`${getClothingBasePath()}/limits/${raceId}`),
+        request.get(`${CLOTHING_BASE_PATH}/limits/${raceId}`),
 }
 
 export default pipelineApi

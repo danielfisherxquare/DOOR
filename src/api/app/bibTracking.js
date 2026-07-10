@@ -1,21 +1,14 @@
 import request from '../../utils/request'
-import { resolveSurfacePrefix } from '../../utils/surfaceApi'
 
-function getBasePath() {
-  return resolveSurfacePrefix({
-    admin: '/admin/bibs',
-    app: '/app/bibs',
-    ops: '/ops/bibs',
-  }, 'app')
-}
+const BASE_PATH = '/app/bibs'
 
 const bibTrackingApi = {
-  resolveScan: (qrToken) => request.post(`${getBasePath()}/scan/resolve`, { qrToken }),
-  pickup: (qrToken) => request.post(`${getBasePath()}/scan/pickup`, { qrToken }),
-  listItems: (raceId, params) => request.get(`${getBasePath()}/items/${raceId}`, { params }),
-  getStats: (raceId) => request.get(`${getBasePath()}/stats/${raceId}`),
-  getItemDetail: (raceId, itemId) => request.get(`${getBasePath()}/items/${raceId}/${itemId}`),
-  rollbackStatus: (raceId, itemId, payload) => request.post(`${getBasePath()}/items/${raceId}/${itemId}/rollback`, payload),
+  resolveScan: (qrToken) => request.post(`${BASE_PATH}/scan/resolve`, { qrToken }),
+  pickup: (qrToken) => request.post(`${BASE_PATH}/scan/pickup`, { qrToken }),
+  listItems: (raceId, params) => request.get(`${BASE_PATH}/items/${raceId}`, { params }),
+  getStats: (raceId) => request.get(`${BASE_PATH}/stats/${raceId}`),
+  getItemDetail: (raceId, itemId) => request.get(`${BASE_PATH}/items/${raceId}/${itemId}`),
+  rollbackStatus: (raceId, itemId, payload) => request.post(`${BASE_PATH}/items/${raceId}/${itemId}/rollback`, payload),
 }
 
 export default bibTrackingApi

@@ -40,4 +40,25 @@ describe('API path ownership', () => {
     assert.doesNotMatch(dashboardSource, /request\.get\(`?\/races/)
     assert.match(appSource, /app\.use\('\/api\/app\/races\/dashboard'/)
   })
+
+  it('keeps event-workflow APIs on explicit app-owned routes', async () => {
+    const appOwnedApis = [
+      'src/api/audit.js',
+      'src/api/bib.js',
+      'src/api/clothing.js',
+      'src/api/column-mappings.js',
+      'src/api/import-session.js',
+      'src/api/lottery.js',
+      'src/api/pipeline.js',
+      'src/api/records.js',
+      'src/api/app/bibTracking.js',
+    ]
+
+    for (const relativePath of appOwnedApis) {
+      const apiSource = await source(relativePath)
+
+      assert.doesNotMatch(apiSource, /surfaceApi|window\.location/, relativePath)
+      assert.match(apiSource, /['"]\/app\//, relativePath)
+    }
+  })
 })

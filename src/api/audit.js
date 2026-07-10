@@ -1,5 +1,4 @@
 import request from '../utils/request'
-import { resolveSurfacePrefix } from '../utils/surfaceApi'
 
 /**
  * 审核 API — 对应后端 /api/audit
@@ -10,26 +9,8 @@ import { resolveSurfacePrefix } from '../utils/surfaceApi'
 
 const JOB_POLL_INTERVAL = 1000  // 1 秒
 const JOB_POLL_TIMEOUT = 120000 // 2 分钟
-
-function getBasePath() {
-    return resolveSurfacePrefix(
-        {
-            admin: '/admin/audit',
-            app: '/app/audit',
-        },
-        'app'
-    )
-}
-
-function getJobsBasePath() {
-    return resolveSurfacePrefix(
-        {
-            admin: '/admin/jobs',
-            app: '/app/jobs',
-        },
-        'app'
-    )
-}
+const BASE_PATH = '/app/audit'
+const JOBS_BASE_PATH = '/app/jobs'
 
 /**
  * 轮询 Job 结果
@@ -45,7 +26,7 @@ async function pollJobResult(jobId, options = {}) {
     const startTime = Date.now()
 
     while (true) {
-        const response = await request.get(`${getJobsBasePath()}/${jobId}`)
+        const response = await request.get(`${JOBS_BASE_PATH}/${jobId}`)
         const job = response.data
 
         if (!job) throw new Error('Job 不存在')
@@ -77,11 +58,11 @@ async function pollJobResult(jobId, options = {}) {
 export const auditApi = {
     // ── 统计 ──────────────────────────────────────────────────
     getPrepStats: (raceId) =>
-        request.get(`${getBasePath()}/prep-stats/${raceId}`),
+        request.get(`${BASE_PATH}/prep-stats/${raceId}`),
 
     // ── 重置 ──────────────────────────────────────────────────
     resetAudit: (raceId) =>
-        request.post(`${getBasePath()}/reset/${raceId}`),
+        request.post(`${BASE_PATH}/reset/${raceId}`),
 
     // ── 5 步审核（含 Job 轮询封装）──────────────────────────
     /**
@@ -93,7 +74,7 @@ export const auditApi = {
      * @returns {Promise<{ success: true, data: { affected: number, remaining: number } }>}
      */
     runAuditStep: async (stepName, raceId, payload = {}, options = {}) => {
-        const response = await request.post(`${getBasePath()}/step/${stepName}/${raceId}`, payload)
+        const response = await request.post(`${BASE_PATH}/step/${stepName}/${raceId}`, payload)
         const { jobId } = response.data
         return pollJobResult(jobId, options)
     },
