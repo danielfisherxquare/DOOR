@@ -57,14 +57,14 @@ export async function saveLimit(orgId, data) {
  * @param {string} size
  * @param {number} delta - 澧炲噺閲忥紙姝ｆ暟鎵ｅ噺锛岃礋鏁板洖閫€锛? * @returns {{ matched: boolean, overstock: boolean }}
  */
-export async function incrementUsed(orgId, raceId, event, gender, size, delta = 1) {
-    const updated = await knex('clothing_limits')
+export async function incrementUsed(orgId, raceId, event, gender, size, delta = 1, database = knex) {
+    const updated = await database('clothing_limits')
         .where({ org_id: orgId, race_id: raceId, event, gender, size })
         .increment('used_count', delta);
 
     if (updated > 0) {
         // 妫€鏌ユ槸鍚﹁秴鎵?
-        const row = await knex('clothing_limits')
+        const row = await database('clothing_limits')
             .where({ org_id: orgId, race_id: raceId, event, gender, size })
             .first();
         const overstock = row && row.used_count > row.total_inventory;
@@ -78,7 +78,14 @@ export async function incrementUsed(orgId, raceId, event, gender, size, delta = 
  *
  * @returns {{ matched: boolean, matchedKey: string|null, overstock: boolean }}
  */
-export async function reserveClothingForRunner(orgId, raceId, eventKey, genderKey, sizeKey) {
+export async function reserveClothingForRunner(
+    orgId,
+    raceId,
+    eventKey,
+    genderKey,
+    sizeKey,
+    database = knex,
+) {
     const eventCandidates = [...new Set([
         eventKey || 'ALL',
         normalizeEvent(eventKey || '') || eventKey || 'ALL',
@@ -99,7 +106,7 @@ export async function reserveClothingForRunner(orgId, raceId, eventKey, genderKe
     );
 
     for (const k of tryKeys) {
-        const result = await incrementUsed(orgId, raceId, k.event, k.gender, sizeKey);
+        const result = await incrementUsed(orgId, raceId, k.event, k.gender, sizeKey, 1, database);
         if (result.matched) {
             return {
                 matched: true,

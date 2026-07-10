@@ -58,11 +58,39 @@ function parseDateOnly(value) {
     return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
 }
 
+export async function runAtomicAuditStep({
+    job,
+    context,
+    handler,
+    repository = auditRepo,
+}) {
+    const { knex: database, heartbeat } = context;
+    const { raceId, runId } = job.payload;
+
+    try {
+        return await database.transaction(async (trx) => {
+            await repository.lockRaceScope(job.orgId, raceId, trx);
+            return handler(job, { knex: trx, heartbeat });
+        });
+    } catch (error) {
+        try {
+            await repository.failRun(job.orgId, raceId, runId, error, database);
+        } catch (failRunError) {
+            error.auditRunFailure = failRunError;
+        }
+        throw error;
+    }
+}
+
+function registerAtomicAuditHandler(type, handler) {
+    registerHandler(type, (job, context) => runAtomicAuditStep({ job, context, handler }));
+}
+
 // ═══════════════════════════════════════════════════════════════════════
 //  Step 1: 年龄检查 (underage)
 // ═══════════════════════════════════════════════════════════════════════
 
-registerHandler('audit:underage', async (job, { knex, heartbeat }) => {
+registerAtomicAuditHandler('audit:underage', async (job, { knex, heartbeat }) => {
     const { raceId, runId, raceDate } = job.payload;
     const orgId = job.orgId;
 
@@ -151,7 +179,7 @@ registerHandler('audit:underage', async (job, { knex, heartbeat }) => {
         .first();
 
     const result = { affected: underageIds.length, remaining: Number(cnt) };
-    await auditRepo.completeRun(runId, result.affected, result.remaining);
+    await auditRepo.completeRun(orgId, raceId, runId, result.affected, result.remaining, knex);
 
     console.log(`[audit:underage] ✅ 未成年剔除: ${result.affected}, 剩余: ${result.remaining}`);
     return result;
@@ -161,7 +189,7 @@ registerHandler('audit:underage', async (job, { knex, heartbeat }) => {
 //  Step 2: 黑名单碰撞 (blacklist)
 // ═══════════════════════════════════════════════════════════════════════
 
-registerHandler('audit:blacklist', async (job, { knex, heartbeat }) => {
+registerAtomicAuditHandler('audit:blacklist', async (job, { knex, heartbeat }) => {
     const { raceId, runId } = job.payload;
     const orgId = job.orgId;
 
@@ -256,17 +284,21 @@ registerHandler('audit:blacklist', async (job, { knex, heartbeat }) => {
         });
 
         // 批量处理 pending 记录
-        let offset = 0;
+        let lastId = 0;
+        let processed = 0;
         const BATCH_READ_SIZE = 5000;
 
         while (true) {
             const records = await knex('records')
                 .where({ org_id: orgId, race_id: raceId, audit_status: 'pending' })
+                .andWhere('id', '>', lastId)
                 .select('id', 'id_number', 'id_number_hash')
-                .limit(BATCH_READ_SIZE)
-                .offset(offset);
+                .orderBy('id', 'asc')
+                .limit(BATCH_READ_SIZE);
 
             if (records.length === 0) break;
+            lastId = Number(records[records.length - 1].id);
+            processed += records.length;
 
             const idsToReject = [];
 
@@ -309,11 +341,9 @@ registerHandler('audit:blacklist', async (job, { knex, heartbeat }) => {
                 totalAffected += idsToReject.length;
             }
 
-            offset += BATCH_READ_SIZE;
-
             // 进度更新
-            const progress = 50 + Math.min(Math.round((offset / 100000) * 30), 30);
-            await heartbeat(progress, `模糊匹配已处理 ${offset} 条记录`);
+            const progress = 50 + Math.min(Math.round((processed / 100000) * 30), 30);
+            await heartbeat(progress, `模糊匹配已处理 ${processed} 条记录`);
         }
     }
 
@@ -324,7 +354,7 @@ registerHandler('audit:blacklist', async (job, { knex, heartbeat }) => {
         .first();
 
     const result = { affected: totalAffected, remaining: Number(cnt) };
-    await auditRepo.completeRun(runId, result.affected, result.remaining);
+    await auditRepo.completeRun(orgId, raceId, runId, result.affected, result.remaining, knex);
 
     console.log(`[audit:blacklist] ✅ mode=${race?.conflict_rule}, 碰撞: ${result.affected}, 剩余: ${result.remaining}`);
     return result;
@@ -334,7 +364,7 @@ registerHandler('audit:blacklist', async (job, { knex, heartbeat }) => {
 //  Step 3: 精英伪造检查 (fake_elite)
 // ═══════════════════════════════════════════════════════════════════════
 
-registerHandler('audit:fake_elite', async (job, { knex, heartbeat }) => {
+registerAtomicAuditHandler('audit:fake_elite', async (job, { knex, heartbeat }) => {
     const { raceId, runId } = job.payload;
     const orgId = job.orgId;
 
@@ -384,7 +414,7 @@ registerHandler('audit:fake_elite', async (job, { knex, heartbeat }) => {
         .first();
 
     const result = { affected: fakeIds.length, remaining: Number(cnt) };
-    await auditRepo.completeRun(runId, result.affected, result.remaining);
+    await auditRepo.completeRun(orgId, raceId, runId, result.affected, result.remaining, knex);
 
     console.log(`[audit:fake_elite] ✅ 资质存疑: ${result.affected}, 剩余: ${result.remaining}`);
     return result;
@@ -394,7 +424,7 @@ registerHandler('audit:fake_elite', async (job, { knex, heartbeat }) => {
 //  Step 4: 直通锁定 (direct_lock)
 // ═══════════════════════════════════════════════════════════════════════
 
-registerHandler('audit:direct_lock', async (job, { knex, heartbeat }) => {
+registerAtomicAuditHandler('audit:direct_lock', async (job, { knex, heartbeat }) => {
     const { raceId, runId } = job.payload;
     const orgId = job.orgId;
 
@@ -457,7 +487,7 @@ registerHandler('audit:direct_lock', async (job, { knex, heartbeat }) => {
         if (!sizeKey) continue; // 无衣服尺码则跳过
 
         const result = await clothingRepo.reserveClothingForRunner(
-            orgId, raceId, eventKey, genderKey, sizeKey);
+            orgId, raceId, eventKey, genderKey, sizeKey, knex);
 
         if (result.overstock) {
             overstockWarnings.push({
@@ -483,7 +513,7 @@ registerHandler('audit:direct_lock', async (job, { knex, heartbeat }) => {
         remaining: Number(cnt),
         overstockWarnings: overstockWarnings.length,
     };
-    await auditRepo.completeRun(runId, result.affected, result.remaining);
+    await auditRepo.completeRun(orgId, raceId, runId, result.affected, result.remaining, knex);
 
     console.log(`[audit:direct_lock] ✅ 直通锁定: ${result.affected}, 超扣: ${overstockWarnings.length}, 剩余: ${result.remaining}`);
     return result;
@@ -493,7 +523,7 @@ registerHandler('audit:direct_lock', async (job, { knex, heartbeat }) => {
 //  Step 5: 大众池标记 (mass_pool)
 // ═══════════════════════════════════════════════════════════════════════
 
-registerHandler('audit:mass_pool', async (job, { knex, heartbeat }) => {
+registerAtomicAuditHandler('audit:mass_pool', async (job, { knex, heartbeat }) => {
     const { raceId, runId } = job.payload;
     const orgId = job.orgId;
 
@@ -522,7 +552,7 @@ registerHandler('audit:mass_pool', async (job, { knex, heartbeat }) => {
         .first();
 
     const result = { affected: Number(passUnlocked), remaining: 0 };
-    await auditRepo.completeRun(runId, result.affected, result.remaining);
+    await auditRepo.completeRun(orgId, raceId, runId, result.affected, result.remaining, knex);
 
     console.log(`[audit:mass_pool] ✅ 大众池: ${result.affected} 人参与抽签`);
     return result;

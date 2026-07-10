@@ -8,15 +8,23 @@ const TABLE = 'jobs';
  * 若同 org_id + type + idempotency_key 已有 queued/running 的 Job，则返回旧 Job；
  * 若已有 failed Job，则重置为 queued 支持原业务动作重试。
  */
-export async function enqueue(orgId, type, payload, idempotencyKey, createdBy, raceId = null) {
+export async function enqueue(
+    orgId,
+    type,
+    payload,
+    idempotencyKey,
+    createdBy,
+    raceId = null,
+    database = knex,
+) {
     // 先查是否已有同 key Job。表上有唯一约束，failed Job 也会占用 key。
-    const existing = await knex(TABLE)
+    const existing = await database(TABLE)
         .where({ org_id: orgId, type, idempotency_key: idempotencyKey })
         .first();
 
     if (existing) {
         if (existing.status === 'failed') {
-            const [row] = await knex(TABLE)
+            const [row] = await database(TABLE)
                 .where({ id: existing.id, status: 'failed' })
                 .update({
                     race_id: raceId,
@@ -41,7 +49,7 @@ export async function enqueue(orgId, type, payload, idempotencyKey, createdBy, r
         return fromDbRow(existing);
     }
 
-    const [row] = await knex(TABLE)
+    const [row] = await database(TABLE)
         .insert({
             org_id: orgId,
             race_id: raceId,
