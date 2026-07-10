@@ -12,6 +12,35 @@ import {
 } from '../../db/mappers/lottery.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
 
+function scopeOrg(query, orgId) {
+    if (orgId) query.where({ org_id: orgId });
+    return query;
+}
+
+async function findScope(table, orgId, id) {
+    const row = await scopeOrg(knex(table).where({ id }), orgId).first('id', 'race_id');
+    return row ? { id: Number(row.id), raceId: Number(row.race_id) } : null;
+}
+
+export function findCapacityScope(orgId, id) {
+    return findScope('race_capacity', orgId, id);
+}
+
+export function findListScope(orgId, id) {
+    return findScope('lottery_lists', orgId, id);
+}
+
+export async function findListScopes(orgId, ids) {
+    if (!Array.isArray(ids) || ids.length === 0) return [];
+    const rows = await scopeOrg(knex('lottery_lists').whereIn('id', ids), orgId)
+        .select('id', 'race_id');
+    return rows.map((row) => ({ id: Number(row.id), raceId: Number(row.race_id) }));
+}
+
+export function findWeightScope(orgId, id) {
+    return findScope('lottery_weights', orgId, id);
+}
+
 function parseExecutionResult(result) {
     if (!result) return null;
     if (typeof result === 'object') return result;
@@ -180,13 +209,6 @@ export async function saveLists(orgId, entries) {
     const rows = entries.map(e => lotteryListMapper.toDbInsert(e, orgId));
     const upsertedRows = await upsertLotteryLists(rows, '*');
     return upsertedRows.map(lotteryListMapper.fromDbRow);
-    const results = await knex('lottery_lists')
-        .insert(rows)
-        // 🔐 使用 id_number_hash 进行冲突检测（加密字段无法直接比较）
-        .onConflict(['org_id', 'race_id', 'list_type', 'id_number_hash'])
-        .merge()
-        .returning('*');
-    return results.map(lotteryListMapper.fromDbRow);
 }
 
 export async function deleteList(orgId, id) {
@@ -211,13 +233,6 @@ export async function bulkPutLists(orgId, entries) {
     const rows = entries.map(e => lotteryListMapper.toDbInsert(e, orgId));
     const upsertedRows = await upsertLotteryLists(rows, 'id');
     return { upserted: upsertedRows.length };
-    const results = await knex('lottery_lists')
-        .insert(rows)
-        // 🔐 使用 id_number_hash 进行冲突检测（加密字段无法直接比较）
-        .onConflict(['org_id', 'race_id', 'list_type', 'id_number_hash'])
-        .merge()
-        .returning('id');
-    return { upserted: results.length };
 }
 
 export async function bulkDeleteLists(orgId, ids) {
