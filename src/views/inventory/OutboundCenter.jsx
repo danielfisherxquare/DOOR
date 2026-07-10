@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { workbenchApi } from '../../services/inventoryApi'
+import { appInventoryApi } from '../../services/inventoryApi'
 import { showError } from '../../utils/toast'
 import WarehouseWorkbenchShell from '../../components/inventory/workbench/WarehouseWorkbenchShell'
 import WarehouseMetricStrip from '../../components/inventory/workbench/WarehouseMetricStrip'
@@ -18,7 +18,7 @@ const TABS = [
  * 纯内容组件：只负责内层 tab 切换和内容渲染
  * 供 OPS WarehouseWorkbench 的子模块直接使用，不带任何 Shell
  */
-export function OutboundContent({ activeTab = 'pickup', onTabChange }) {
+export function OutboundContent({ activeTab = 'pickup', onTabChange, inventoryApi = appInventoryApi }) {
     const tabs = TABS.map((tab) => (
         <button
             key={tab.key}
@@ -30,7 +30,7 @@ export function OutboundContent({ activeTab = 'pickup', onTabChange }) {
         </button>
     ))
 
-    let mainContent = <ScanPickup />
+    let mainContent = <ScanPickup inventoryApi={inventoryApi} />
     if (activeTab === 'transfer') {
         mainContent = (
             <section className="warehouse-panel">
@@ -52,6 +52,7 @@ export function OutboundContent({ activeTab = 'pickup', onTabChange }) {
 }
 
 export default function OutboundCenter() {
+    const workbenchApi = appInventoryApi.workbench
     const [searchParams, setSearchParams] = useSearchParams()
     const selectedOrgId = searchParams.get('orgId')
     const activeTab = searchParams.get('tab') || 'pickup'

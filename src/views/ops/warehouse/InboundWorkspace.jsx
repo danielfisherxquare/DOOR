@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { InboundContent } from '../../../features/inventory/execute/InboundContent'
+import { opsInventoryApi } from '../../../services/inventoryApi'
 
 /**
  * OPS 入库作业子模块
@@ -16,5 +17,5 @@ export default function InboundWorkspace() {
         setSearchParams(nextParams)
     }, [searchParams, setSearchParams])
 
-    return <InboundContent activeTab={activeTab} onTabChange={handleTabChange} />
+    return <InboundContent activeTab={activeTab} onTabChange={handleTabChange} inventoryApi={opsInventoryApi} />
 }

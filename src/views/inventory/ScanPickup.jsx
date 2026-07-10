@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { BrowserQRCodeReader } from '@zxing/browser'
-import { unitApi } from '../../services/inventoryApi'
+import { appInventoryApi } from '../../services/inventoryApi'
 import { showSuccess, showError, showWarning, showInfo } from '../../utils/toast'
 import StatusPill from '../../components/inventory/StatusPill'
 
@@ -42,7 +42,8 @@ function getCameraErrorMessage(err) {
     return `无法打开摄像头：${msg || name || '未知错误'}`
 }
 
-function ScanPickup() {
+function ScanPickup({ inventoryApi = appInventoryApi }) {
+    const unitApi = inventoryApi.unit
     const [searchParams] = useSearchParams()
     const selectedOrgId = searchParams.get('orgId')
     const videoRef = useRef(null)

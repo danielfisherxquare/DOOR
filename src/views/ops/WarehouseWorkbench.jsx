@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { workbenchApi } from '../../services/inventoryApi'
+import { opsInventoryApi } from '../../services/inventoryApi'
 import { showError } from '../../utils/toast'
 import WarehouseTaskQueue from '../../components/inventory/workbench/WarehouseTaskQueue'
 import WarehouseExceptionPanel from '../../components/inventory/workbench/WarehouseExceptionPanel'
@@ -16,6 +16,8 @@ const AREA_TABS = [
     { key: 'binding', label: '库位绑定' },
     { key: 'count', label: '盘点作业' },
 ]
+
+const workbenchApi = opsInventoryApi.workbench
 
 export default function WarehouseWorkbench() {
     const location = useLocation()

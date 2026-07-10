@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { workbenchApi } from '../../services/inventoryApi'
+import { appInventoryApi } from '../../services/inventoryApi'
 import { showError } from '../../utils/toast'
 import WarehouseWorkbenchShell from '../../components/inventory/workbench/WarehouseWorkbenchShell'
 import WarehouseMetricStrip from '../../components/inventory/workbench/WarehouseMetricStrip'
@@ -21,7 +21,7 @@ const TABS = [
  * 纯内容组件：只负责内层 tab 切换和内容渲染
  * 供 OPS WarehouseWorkbench 的子模块直接使用，不带任何 Shell
  */
-export function InboundContent({ activeTab = 'batch', onTabChange }) {
+export function InboundContent({ activeTab = 'batch', onTabChange, inventoryApi = appInventoryApi }) {
     const tabs = TABS.map((tab) => (
         <button
             key={tab.key}
@@ -33,9 +33,9 @@ export function InboundContent({ activeTab = 'batch', onTabChange }) {
         </button>
     ))
 
-    let mainContent = <BatchInbound />
-    if (activeTab === 'pre') mainContent = <PreInboundManager />
-    if (activeTab === 'labels') mainContent = <QRCodePrinter />
+    let mainContent = <BatchInbound inventoryApi={inventoryApi} />
+    if (activeTab === 'pre') mainContent = <PreInboundManager inventoryApi={inventoryApi} />
+    if (activeTab === 'labels') mainContent = <QRCodePrinter inventoryApi={inventoryApi} />
 
     return (
         <div className="warehouse-inbound-content">
@@ -46,6 +46,7 @@ export function InboundContent({ activeTab = 'batch', onTabChange }) {
 }
 
 export default function InboundCenter() {
+    const workbenchApi = appInventoryApi.workbench
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const selectedOrgId = searchParams.get('orgId')

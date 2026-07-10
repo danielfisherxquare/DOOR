@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { batchApi, unitApi, warehouseApi } from '../../services/inventoryApi'
+import { appInventoryApi } from '../../services/inventoryApi'
 import { showSuccess, showError } from '../../utils/toast'
 import { useInventorySurface } from './useInventorySurface'
 
@@ -15,7 +15,8 @@ function buildInitialItems(searchParams) {
     ]
 }
 
-function BatchInbound() {
+function BatchInbound({ inventoryApi = appInventoryApi }) {
+    const { batch: batchApi, unit: unitApi, warehouse: warehouseApi } = inventoryApi
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const selectedOrgId = searchParams.get('orgId')

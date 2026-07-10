@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { preInboundApi } from '../../services/inventoryApi'
+import { appInventoryApi } from '../../services/inventoryApi'
 import { showError, showSuccess } from '../../utils/toast'
 import './PreInboundManager.css'
 import { useInventorySurface } from './useInventorySurface'
@@ -103,7 +103,8 @@ function EditModal({ editingItem, formData, saving, setFormData, onClose, onSubm
     )
 }
 
-export default function PreInboundManager() {
+export default function PreInboundManager({ inventoryApi = appInventoryApi }) {
+    const preInboundApi = inventoryApi.preInbound
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const selectedOrgId = searchParams.get('orgId')

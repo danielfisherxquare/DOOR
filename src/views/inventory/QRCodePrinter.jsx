@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { batchApi, twinApi, unitApi } from '../../services/inventoryApi'
+import { appInventoryApi } from '../../services/inventoryApi'
 import { showError, showSuccess, showWarning } from '../../utils/toast'
 import { useInventorySurface } from './useInventorySurface'
 
@@ -62,7 +62,8 @@ function buildLegacyMeta(unit) {
     return `${spec.size || ''} ${spec.gender === 'M' ? '男' : spec.gender === 'F' ? '女' : ''}`.trim()
 }
 
-export default function QRCodePrinter() {
+export default function QRCodePrinter({ inventoryApi = appInventoryApi }) {
+    const { batch: batchApi, twin: twinApi, unit: unitApi } = inventoryApi
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const selectedOrgId = searchParams.get('orgId')

@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ControlContent } from '../../../features/inventory/execute/ControlContent'
+import { opsInventoryApi } from '../../../services/inventoryApi'
 
 /**
  * OPS 盘点作业子模块
@@ -16,5 +17,5 @@ export default function CountWorkspace({ onReload }) {
         setSearchParams(nextParams)
     }, [searchParams, setSearchParams])
 
-    return <ControlContent activeTab={activeTab} onTabChange={handleTabChange} onReload={onReload} />
+    return <ControlContent activeTab={activeTab} onTabChange={handleTabChange} onReload={onReload} inventoryApi={opsInventoryApi} />
 }

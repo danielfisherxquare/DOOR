@@ -99,4 +99,24 @@ describe('API path ownership', () => {
       assert.match(viewSource, /(?:fetch|save|delete)Interview(?:s)?\([^)]*surface/, relativePath)
     }
   })
+
+  it('injects an explicit inventory client into the ops workbench', async () => {
+    const inventoryApiSource = await source('src/services/inventoryApi.js')
+    const opsWorkbenchSource = await source('src/views/ops/WarehouseWorkbench.jsx')
+
+    assert.doesNotMatch(inventoryApiSource, /surfaceApi|useAuthStore|window\.location/)
+    assert.match(inventoryApiSource, /createInventoryApi/)
+    assert.match(inventoryApiSource, /opsInventoryApi/)
+    assert.match(opsWorkbenchSource, /opsInventoryApi/)
+
+    for (const relativePath of [
+      'src/views/ops/warehouse/InboundWorkspace.jsx',
+      'src/views/ops/warehouse/OutboundWorkspace.jsx',
+      'src/views/ops/warehouse/BindingWorkspace.jsx',
+      'src/views/ops/warehouse/CountWorkspace.jsx',
+    ]) {
+      const workspaceSource = await source(relativePath)
+      assert.match(workspaceSource, /opsInventoryApi/, relativePath)
+    }
+  })
 })

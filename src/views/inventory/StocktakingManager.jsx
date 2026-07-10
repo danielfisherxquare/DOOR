@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { stocktakingApi, warehouseApi } from '../../services/inventoryApi'
+import { appInventoryApi } from '../../services/inventoryApi'
 import { showError, showSuccess } from '../../utils/toast'
 import StatusPill from '../../components/inventory/StatusPill'
 import { useInventorySurface } from './useInventorySurface'
@@ -11,7 +11,8 @@ const INITIAL_PLAN = {
     warehouseId: '',
 }
 
-export default function StocktakingManager({ onChange }) {
+export default function StocktakingManager({ onChange, inventoryApi = appInventoryApi }) {
+    const { stocktaking: stocktakingApi, warehouse: warehouseApi } = inventoryApi
     const [searchParams, setSearchParams] = useSearchParams()
     const selectedOrgId = searchParams.get('orgId')
     const selectedPlanId = searchParams.get('planId') || ''

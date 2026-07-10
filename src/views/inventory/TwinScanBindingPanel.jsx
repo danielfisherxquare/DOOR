@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { twinApi } from '../../services/inventoryApi'
+import { appInventoryApi } from '../../services/inventoryApi'
 import { showError, showSuccess } from '../../utils/toast'
 import { buildInventorySurfaceHref, useInventorySurface } from './useInventorySurface'
 
@@ -77,7 +77,8 @@ function nextViewerPath(surface, searchParams, warehouseId, locationId, objectQr
     return buildInventorySurfaceHref(surface, '/inventory/space', { params: Object.fromEntries(params.entries()) })
 }
 
-export default function TwinScanBindingPanel({ mode = 'space' }) {
+export default function TwinScanBindingPanel({ mode = 'space', inventoryApi = appInventoryApi }) {
+    const twinApi = inventoryApi.twin
     const navigate = useNavigate()
     const [searchParams, setSearchParams] = useSearchParams()
     const selectedOrgId = searchParams.get('orgId')

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { alertApi } from '../../services/inventoryApi'
+import { appInventoryApi } from '../../services/inventoryApi'
 import { showError, showSuccess } from '../../utils/toast'
 
 const FILTERS = [
@@ -21,7 +21,8 @@ const severityClassMap = {
     warning: 'warehouse-pill--warning',
 }
 
-export default function AlertCenter({ onChange }) {
+export default function AlertCenter({ onChange, inventoryApi = appInventoryApi }) {
+    const alertApi = inventoryApi.alert
     const [searchParams] = useSearchParams()
     const selectedOrgId = searchParams.get('orgId')
     const highlightedAlertId = searchParams.get('alertId')
