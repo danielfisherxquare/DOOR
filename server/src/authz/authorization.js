@@ -1,14 +1,14 @@
-import {
-  getRoleDefaultModules,
-  hasAllModuleAccess,
-  hasCapability,
-  hasSurfaceAccess,
-} from '../utils/capability-policy.js'
+import { hasCapability } from '../utils/capability-policy.js'
 import { authz as defaultAuthz, createAuthzService } from './authz.service.js'
-import { moduleObjectId, surfaceObjectId } from './object-ids.js'
+import {
+  moduleObjectId,
+  organizationObjectId,
+  platformObjectId,
+  raceObjectId,
+  surfaceObjectId,
+} from './object-ids.js'
 import { loadAuthzRows } from './profile.service.js'
 import { projectAuthzTuples } from './tuple-projector.js'
-import { hasExplicitModuleGrant } from './module-grants.js'
 
 function authorizationError(status, code, message, details) {
   const error = new Error(message)
@@ -40,6 +40,9 @@ function assertAction(actual, expected, resourceKind) {
 }
 
 function relationScope(workspace = {}) {
+  if (workspace.scopeType === 'platform') {
+    return { platformId: workspace.platformId || 'root' }
+  }
   const scopeType = workspace.scopeType === 'race' ? 'race' : 'org'
   if (scopeType === 'race') {
     if (!workspace.raceId) {
@@ -51,6 +54,36 @@ function relationScope(workspace = {}) {
     throw authorizationError(400, 'WORKSPACE_CONTEXT_REQUIRED', '缺少机构上下文')
   }
   return { orgId: workspace.orgId }
+}
+
+function domainRelationRequest(action, resourceKind, workspace) {
+  const relations = {
+    platform: { manage: 'can_manage' },
+    organization: { view: 'can_view', manage: 'can_manage' },
+    race: { view: 'can_view', operate: 'can_operate', manage: 'can_manage' },
+  }
+  const relation = relations[resourceKind]?.[action]
+  if (!relation) {
+    throw authorizationError(
+      400,
+      'AUTHORIZATION_ACTION_INVALID',
+      `资源 ${resourceKind} 不支持授权动作 ${action}`,
+    )
+  }
+
+  if (resourceKind === 'platform') {
+    return { relation, object: platformObjectId(workspace.platformId || 'root') }
+  }
+  if (resourceKind === 'organization') {
+    if (!workspace.orgId) {
+      throw authorizationError(400, 'WORKSPACE_CONTEXT_REQUIRED', '缺少机构上下文')
+    }
+    return { relation, object: organizationObjectId(workspace.orgId) }
+  }
+  if (!workspace.raceId) {
+    throw authorizationError(400, 'WORKSPACE_CONTEXT_REQUIRED', '缺少赛事上下文')
+  }
+  return { relation, object: raceObjectId(workspace.raceId) }
 }
 
 function relationRequest(action, resource, workspace) {
@@ -81,23 +114,8 @@ function assertAuthenticated(authContext) {
   }
 }
 
-async function assertLegacyModule(authContext, resource, checkExplicitModuleAccess) {
-  const { role, userId } = authContext
-  const strictSurfaceModules = Boolean(resource.strictSurfaceModules)
-  if (hasAllModuleAccess(role, { strictSurfaceModules })) return
-
-  const fullModuleId = `${resource.surface}:${resource.moduleId}`
-  const roleDefaultModules = getRoleDefaultModules(role)
-  if (roleDefaultModules === 'all' || roleDefaultModules.includes(fullModuleId)) return
-
-  if (await checkExplicitModuleAccess(userId, fullModuleId)) return
-
-  throw authorizationError(403, 'MODULE_DENIED', '无权访问该模块')
-}
-
 export function createAuthorization({
   resolveRelationService = resolveDefaultRelationService,
-  checkUserModuleAccess: checkExplicitModuleAccess = hasExplicitModuleGrant,
 } = {}) {
   async function assertAll(authContext, decisions = []) {
     let relationServicePromise = null
@@ -141,27 +159,18 @@ export function createAuthorization({
         continue
       }
 
-      if (resource.kind === 'surface' && resource.policy === 'legacy-role') {
-        assertAction(action, 'enter', resource.kind)
-        if (!hasSurfaceAccess(authContext.role, resource.surface)) {
-          throw authorizationError(
-            403,
-            'SURFACE_DENIED',
-            `当前角色无权访问 ${resource.surface} 入口`,
-          )
-        }
-        continue
-      }
-
-      if (resource.kind === 'module' && resource.policy === 'legacy-role-or-grant') {
-        assertAction(action, 'open', resource.kind)
-        await assertLegacyModule(authContext, resource, checkExplicitModuleAccess)
-        continue
-      }
-
       if (resource.kind === 'surface' || resource.kind === 'module') {
         const relationService = await getRelationService()
         await relationService.assert(authContext, relationRequest(action, resource, workspace))
+        continue
+      }
+
+      if (resource.kind === 'platform' || resource.kind === 'organization' || resource.kind === 'race') {
+        const relationService = await getRelationService()
+        await relationService.assert(
+          authContext,
+          domainRelationRequest(action, resource.kind, workspace),
+        )
         continue
       }
 

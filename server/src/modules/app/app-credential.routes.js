@@ -1,10 +1,18 @@
 import { Router } from 'express';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import * as service from '../credential/credential.service.js';
 import credentialWorkbenchRoutes from '../credential/credential.routes.js';
 
 const router = Router();
+const operateSelf = authorize({
+    action: 'use',
+    resource: { kind: 'capability', scope: 'self', name: 'operate' },
+});
+const viewSelf = authorize({
+    action: 'use',
+    resource: { kind: 'capability', scope: 'self', name: 'view' },
+});
 
 const buildRequestContext = (req) => ({
     ...req.authContext,
@@ -13,7 +21,7 @@ const buildRequestContext = (req) => ({
 
 router.post(
     '/requests/:raceId',
-    requirePermission({ capability: { scope: 'self', name: 'operate' } }),
+    operateSelf,
     requireRaceAccess('raceId'),
     async (req, res, next) => {
         try {
@@ -29,7 +37,7 @@ router.post(
 
 router.get(
     '/requests/:raceId/:requestId',
-    requirePermission({ capability: { scope: 'self', name: 'view' } }),
+    viewSelf,
     requireRaceAccess('raceId'),
     async (req, res, next) => {
         try {
@@ -45,7 +53,7 @@ router.get(
 
 router.get(
     '/credentials/:raceId/:credentialId',
-    requirePermission({ capability: { scope: 'self', name: 'view' } }),
+    viewSelf,
     requireRaceAccess('raceId'),
     async (req, res, next) => {
         try {
@@ -59,7 +67,7 @@ router.get(
     },
 );
 
-router.post('/scan/resolve', requirePermission({ capability: { scope: 'self', name: 'view' } }), async (req, res, next) => {
+router.post('/scan/resolve', viewSelf, async (req, res, next) => {
     try {
         res.json({
             success: true,

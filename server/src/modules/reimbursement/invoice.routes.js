@@ -16,13 +16,16 @@ import {
     uploadAndProcessPayment,
     uploadMiddleware,
 } from './invoice.controller.js';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import { requireReimbursementAccess } from '../../middleware/require-reimbursement-access.js';
 
 const router = express.Router();
 
 // 应用认证和访问控制中间件
-router.use(requirePermission({ surface: 'app', capability: { scope: 'self', name: 'operate' } }));
+router.use(authorize({
+    action: 'use',
+    resource: { kind: 'capability', scope: 'self', name: 'operate' },
+}));
 
 // ==================== 处理队列和统计 ====================
 

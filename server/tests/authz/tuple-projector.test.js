@@ -58,6 +58,9 @@ describe('authz tuple projector', () => {
     const set = tupleSet(tuples);
 
     assert.equal(set.has('user:u-super|admin|platform:root'), true);
+    assert.equal(set.has('user:u-super|granted|surface:platform-root/admin'), true);
+    assert.equal(set.has('surface:platform-root/admin|parent_surface|module:platform-root/admin/orgs'), true);
+    assert.equal(set.has('user:u-super|granted|module:platform-root/admin/orgs'), true);
     assert.equal(set.has('platform:root|parent_platform|organization:org-1'), true);
     assert.equal(set.has('organization:org-1#platform_admin|granted|surface:org-1/admin'), true);
     assert.equal(set.has('user:u-super|granted|module:org-1/app/home'), true);
@@ -119,5 +122,29 @@ describe('authz tuple projector', () => {
     assert.equal(set.has('user:u-designer|granted|surface:org-1/app'), true);
     assert.equal(set.has('surface:org-1/app|parent_surface|module:org-1/app/design-requests'), true);
     assert.equal(set.has('user:u-designer|granted|module:org-1/app/design-requests'), true);
+  });
+
+  it('projects organization-scoped ops grants into races the user can access', () => {
+    const tuples = projectAuthzTuples({
+      organizations: [{ id: 'org-1' }],
+      users: [{ id: 'u-operator', org_id: 'org-1', role: 'user' }],
+      races: [
+        { id: 1001, org_id: 'org-1' },
+        { id: 1002, org_id: 'org-1' },
+      ],
+      userRacePermissions: [
+        { user_id: 'u-operator', org_id: 'org-1', race_id: 1001, access_level: 'viewer' },
+      ],
+      orgRacePermissions: [],
+      userModuleAccess: [
+        { user_id: 'u-operator', org_id: 'org-1', module_id: 'ops:warehouse' },
+      ],
+    });
+    const set = tupleSet(tuples);
+
+    assert.equal(set.has('user:u-operator|granted|surface:race-1001/ops'), true);
+    assert.equal(set.has('user:u-operator|granted|module:race-1001/ops/warehouse'), true);
+    assert.equal(set.has('user:u-operator|granted|module:race-1002/ops/warehouse'), false);
+    assert.equal(set.has('user:u-operator|granted|module:org-1/ops/warehouse'), false);
   });
 });

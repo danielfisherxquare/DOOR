@@ -51,6 +51,7 @@ describe('legacy authentication context removal', () => {
       'require-capability.js',
       'require-module-access.js',
       'require-org-access.js',
+      'require-permission.js',
       'require-roles.js',
       'require-surface-access.js',
     ]

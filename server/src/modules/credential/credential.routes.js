@@ -1,10 +1,14 @@
 import { Router } from 'express';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import { operationLog } from '../../middleware/operation-log.js';
 import * as service from './credential.service.js';
 
 const router = Router();
+const requireCredentialAdmin = authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['org_admin', 'super_admin'] },
+});
 
 const buildRequestContext = (req) => ({
     ...req.authContext,
@@ -115,7 +119,7 @@ router.delete('/style-templates/:raceId/:templateId', requireRaceAccess('raceId'
     }
 });
 
-router.get('/requests/:raceId', requirePermission({ roles: ['org_admin', 'super_admin'] }), requireRaceAccess('raceId'), async (req, res, next) => {
+router.get('/requests/:raceId', requireCredentialAdmin, requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         res.json({ success: true, data: await service.getRequests(buildRequestContext(req), req.params.raceId, { status: req.query.status }) });
     } catch (err) {
@@ -139,7 +143,7 @@ router.post('/requests/:raceId', requireRaceAccess('raceId'), async (req, res, n
     }
 });
 
-router.post('/requests/:raceId/:requestId/review', operationLog({ module: 'credential', businessType: 'UPDATE', titleFactory: (req) => '审核证件申请: ' + (req.params?.requestId || '') }), requirePermission({ roles: ['org_admin', 'super_admin'] }), requireRaceAccess('raceId'), async (req, res, next) => {
+router.post('/requests/:raceId/:requestId/review', operationLog({ module: 'credential', businessType: 'UPDATE', titleFactory: (req) => '审核证件申请: ' + (req.params?.requestId || '') }), requireCredentialAdmin, requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         res.json({ success: true, data: await service.reviewRequest(buildRequestContext(req), req.params.raceId, req.params.requestId, req.body) });
     } catch (err) {
@@ -147,7 +151,7 @@ router.post('/requests/:raceId/:requestId/review', operationLog({ module: 'crede
     }
 });
 
-router.get('/credentials/:raceId', requirePermission({ roles: ['org_admin', 'super_admin'] }), requireRaceAccess('raceId'), async (req, res, next) => {
+router.get('/credentials/:raceId', requireCredentialAdmin, requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         res.json({ success: true, data: await service.getCredentials(buildRequestContext(req), req.params.raceId, { status: req.query.status }) });
     } catch (err) {
@@ -171,7 +175,7 @@ router.post('/scan/resolve', async (req, res, next) => {
     }
 });
 
-router.post('/credentials/:raceId/:credentialId/void', operationLog({ module: 'credential', businessType: 'UPDATE', titleFactory: (req) => '作废证件: ' + (req.params?.credentialId || '') }), requirePermission({ roles: ['org_admin', 'super_admin'] }), requireRaceAccess('raceId'), async (req, res, next) => {
+router.post('/credentials/:raceId/:credentialId/void', operationLog({ module: 'credential', businessType: 'UPDATE', titleFactory: (req) => '作废证件: ' + (req.params?.credentialId || '') }), requireCredentialAdmin, requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         res.json({ success: true, data: await service.voidCredential(buildRequestContext(req), req.params.raceId, req.params.credentialId, req.body) });
     } catch (err) {
@@ -187,7 +191,7 @@ router.post('/credentials/:raceId/:credentialId/issue', operationLog({ module: '
     }
 });
 
-router.post('/credentials/:raceId/:credentialId/reissue', operationLog({ module: 'credential', businessType: 'UPDATE', titleFactory: (req) => '补办证件: ' + (req.params?.credentialId || '') }), requirePermission({ roles: ['org_admin', 'super_admin'] }), requireRaceAccess('raceId'), async (req, res, next) => {
+router.post('/credentials/:raceId/:credentialId/reissue', operationLog({ module: 'credential', businessType: 'UPDATE', titleFactory: (req) => '补办证件: ' + (req.params?.credentialId || '') }), requireCredentialAdmin, requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         res.json({ success: true, data: await service.reissueCredential(buildRequestContext(req), req.params.raceId, req.params.credentialId, req.body) });
     } catch (err) {
@@ -195,7 +199,7 @@ router.post('/credentials/:raceId/:credentialId/reissue', operationLog({ module:
     }
 });
 
-router.get('/stats/:raceId', requirePermission({ roles: ['org_admin', 'super_admin'] }), requireRaceAccess('raceId'), async (req, res, next) => {
+router.get('/stats/:raceId', requireCredentialAdmin, requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         res.json({ success: true, data: await service.getCredentialStats(buildRequestContext(req), req.params.raceId) });
     } catch (err) {

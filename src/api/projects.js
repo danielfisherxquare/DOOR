@@ -1,20 +1,22 @@
 import request from '../utils/request'
 
+const BASE_PATH = '/app/projects'
+
 const projectsApi = {
-  getAll: (params) => request.get('/admin/projects', { params }),
-  getById: (id) => request.get(`/admin/projects/${id}`),
-  create: (data) => request.post('/admin/projects', data),
-  update: (id, data) => request.put(`/admin/projects/${id}`, data),
-  remove: (id) => request.delete(`/admin/projects/${id}`),
+  getAll: (params) => request.get(BASE_PATH, { params }),
+  getById: (id) => request.get(`${BASE_PATH}/${id}`),
+  create: (data) => request.post(BASE_PATH, data),
+  update: (id, data) => request.put(`${BASE_PATH}/${id}`, data),
+  remove: (id) => request.delete(`${BASE_PATH}/${id}`),
 
-  getTasks: (projectId) => request.get(`/admin/projects/${projectId}/tasks`),
-  createTask: (projectId, data) => request.post(`/admin/projects/${projectId}/tasks`, data),
-  updateTask: (projectId, taskId, data) => request.put(`/admin/projects/${projectId}/tasks/${taskId}`, data),
-  removeTask: (projectId, taskId) => request.delete(`/admin/projects/${projectId}/tasks/${taskId}`),
+  getTasks: (projectId) => request.get(`${BASE_PATH}/${projectId}/tasks`),
+  createTask: (projectId, data) => request.post(`${BASE_PATH}/${projectId}/tasks`, data),
+  updateTask: (projectId, taskId, data) => request.put(`${BASE_PATH}/${projectId}/tasks/${taskId}`, data),
+  removeTask: (projectId, taskId) => request.delete(`${BASE_PATH}/${projectId}/tasks/${taskId}`),
 
-  getTeamCandidates: (projectId, keyword = '') => request.get(`/admin/projects/${projectId}/team-candidates`, { params: { keyword } }),
-  getTaskAssignees: (projectId, taskId) => request.get(`/admin/projects/${projectId}/tasks/${taskId}/assignees`),
-  setTaskAssignees: (projectId, taskId, assignees) => request.put(`/admin/projects/${projectId}/tasks/${taskId}/assignees`, { assignees }),
+  getTeamCandidates: (projectId, keyword = '') => request.get(`${BASE_PATH}/${projectId}/team-candidates`, { params: { keyword } }),
+  getTaskAssignees: (projectId, taskId) => request.get(`${BASE_PATH}/${projectId}/tasks/${taskId}/assignees`),
+  setTaskAssignees: (projectId, taskId, assignees) => request.put(`${BASE_PATH}/${projectId}/tasks/${taskId}/assignees`, { assignees }),
 }
 
 export default projectsApi

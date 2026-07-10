@@ -18,6 +18,7 @@ describe('authz object ids', () => {
     assert.equal(raceObjectId(1001), 'race:1001');
     assert.equal(surfaceObjectId({ orgId: 'org-1', surface: 'admin' }), 'surface:org-1/admin');
     assert.equal(surfaceObjectId({ raceId: 1001, surface: 'ops' }), 'surface:race-1001/ops');
+    assert.equal(surfaceObjectId({ platformId: 'root', surface: 'admin' }), 'surface:platform-root/admin');
     assert.equal(
       moduleObjectId({ orgId: 'org-1', surface: 'app', moduleId: 'design-requests' }),
       'module:org-1/app/design-requests',
@@ -25,6 +26,10 @@ describe('authz object ids', () => {
     assert.equal(
       moduleObjectId({ raceId: 1001, surface: 'ops', moduleId: 'scan' }),
       'module:race-1001/ops/scan',
+    );
+    assert.equal(
+      moduleObjectId({ platformId: 'root', surface: 'admin', moduleId: 'orgs' }),
+      'module:platform-root/admin/orgs',
     );
   });
 

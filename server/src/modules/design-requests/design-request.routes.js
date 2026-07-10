@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import * as service from './design-request.service.js';
 import * as importService from './design-collaboration-import.service.js';
@@ -10,6 +10,10 @@ const upload = multer({
     limits: {
         fileSize: 10 * 1024 * 1024,
     },
+});
+const requireDesignAdmin = authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['org_admin', 'super_admin'] },
 });
 
 function buildRequestContext(req, surface) {
@@ -54,7 +58,7 @@ export function createDesignRequestRoutes(surface) {
         }
     });
 
-    router.post('/templates', requirePermission({ roles: ['org_admin', 'super_admin'] }), async (req, res, next) => {
+    router.post('/templates', requireDesignAdmin, async (req, res, next) => {
         try {
             res.status(201).json({
                 success: true,
@@ -65,7 +69,7 @@ export function createDesignRequestRoutes(surface) {
         }
     });
 
-    router.post('/templates/from-request/:requestId', requirePermission({ roles: ['org_admin', 'super_admin'] }), async (req, res, next) => {
+    router.post('/templates/from-request/:requestId', requireDesignAdmin, async (req, res, next) => {
         try {
             res.status(201).json({
                 success: true,
@@ -202,7 +206,7 @@ export function createDesignRequestRoutes(surface) {
         }
     });
 
-    router.post('/requests/:requestId/review', requirePermission({ roles: ['org_admin', 'super_admin'] }), async (req, res, next) => {
+    router.post('/requests/:requestId/review', requireDesignAdmin, async (req, res, next) => {
         try {
             res.json({
                 success: true,
@@ -224,7 +228,7 @@ export function createDesignRequestRoutes(surface) {
         }
     });
 
-    router.post('/requests/:requestId/progress', requirePermission({ roles: ['org_admin', 'super_admin'] }), async (req, res, next) => {
+    router.post('/requests/:requestId/progress', requireDesignAdmin, async (req, res, next) => {
         try {
             res.json({
                 success: true,

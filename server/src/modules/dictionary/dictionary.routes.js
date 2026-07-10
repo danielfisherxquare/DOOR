@@ -1,12 +1,8 @@
 import express from 'express';
 import knex from '../../db/knex.js';
-import { requirePermission } from '../../middleware/require-permission.js';
 
 const router = express.Router();
 const adminRouter = express.Router();
-
-// ── Admin routes ──────────────────────────────────────────────
-adminRouter.use(requirePermission({ surface: 'admin' }));
 
 // GET /api/admin/dict/type/list - list all dict types
 adminRouter.get('/type/list', async (req, res, next) => {

@@ -10,8 +10,22 @@ function firstValue(...values) {
 function resolveWorkspace(req, scopeType) {
   return {
     scopeType,
-    orgId: firstValue(req.query?.orgId, req.body?.orgId, req.params?.orgId, req.authContext?.orgId),
-    raceId: firstValue(req.query?.raceId, req.body?.raceId, req.params?.raceId),
+    orgId: firstValue(
+      req.query?.orgId,
+      req.body?.orgId,
+      req.body?.org_id,
+      req.params?.orgId,
+      req.headers?.['x-arcspro-org-id'],
+      req.authContext?.orgId,
+    ),
+    raceId: firstValue(
+      req.query?.raceId,
+      req.body?.raceId,
+      req.body?.primaryRaceId,
+      Array.isArray(req.body?.raceIds) ? req.body.raceIds[0] : null,
+      req.params?.raceId,
+      req.headers?.['x-arcspro-race-id'],
+    ),
   }
 }
 
@@ -27,7 +41,7 @@ export function createAuthorize({ authorization = defaultAuthorization } = {}) {
         const decisions = checkDefinitions.map((check) => ({
           action: check.action,
           resource: resolveValue(check.resource, req),
-          workspace: resolveWorkspace(req, check.scope || scope),
+          workspace: resolveWorkspace(req, resolveValue(check.scope || scope, req)),
         }))
 
         await authorization.assertAll(req.authContext, decisions)

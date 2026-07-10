@@ -1,10 +1,13 @@
 import { Router } from 'express';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import * as identityCenterService from './identity-center.service.js';
 
 const router = Router();
 
-router.use(requirePermission({ roles: ['org_admin', 'super_admin'] }));
+router.use(authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['org_admin', 'super_admin'] },
+}));
 
 router.get('/summary', async (req, res, next) => {
     try {

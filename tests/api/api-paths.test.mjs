@@ -60,6 +60,15 @@ describe('API path ownership', () => {
     assert.match(appSource, /app\.use\('\/api\/app\/races\/dashboard'/)
   })
 
+  it('keeps app project planning on an app-owned backend route', async () => {
+    const projectsSource = await source('src/api/projects.js')
+    const appSource = await source('server/src/app.js')
+
+    assert.match(projectsSource, /['"`]\/app\/projects/)
+    assert.doesNotMatch(projectsSource, /['"`]\/admin\/projects/)
+    assert.match(appSource, /app\.use\('\/api\/app\/projects', appModule\('events'\)/)
+  })
+
   it('keeps event-workflow APIs on explicit app-owned routes', async () => {
     const appOwnedApis = [
       'src/api/audit.js',

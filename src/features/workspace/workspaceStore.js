@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { createWorkspaceSession, getWorkspacePathKey, parseWorkspaceSession } from './workspaceSession'
+import { configureRequestContextAdapter } from '../../auth/request-context-adapter'
 
 const STORAGE_KEY = 'workspace-session'
 
@@ -43,5 +44,9 @@ const useWorkspaceStore = create(
     },
   ),
 )
+
+configureRequestContextAdapter({
+  getWorkspaceContext: () => useWorkspaceStore.getState().session,
+})
 
 export default useWorkspaceStore

@@ -3,7 +3,7 @@
  */
 import { Router } from 'express';
 import * as raceRepo from './race.repository.js';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import knex from '../../db/knex.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
@@ -13,6 +13,10 @@ import raceStaffRoutes from './race-staff.routes.js';
 import { operationLog } from '../../middleware/operation-log.js';
 
 const router = Router();
+const requireRaceAdmin = authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['org_admin', 'super_admin'] },
+});
 
 // Mount bib-tracking routes under /bibs
 router.use('/bibs', bibTrackingRoutes);
@@ -177,7 +181,7 @@ function validateUpdatePayload(body) {
  *         description: 目标组织不存在
  */
 // POST /api/races - create race (org_admin, super_admin)
-router.post('/', operationLog({ module: 'races', businessType: 'INSERT', titleFactory: (req) => '创建赛事: ' + (req.body?.name || '') }), requirePermission({ roles: ['org_admin', 'super_admin'] }), async (req, res, next) => {
+router.post('/', operationLog({ module: 'races', businessType: 'INSERT', titleFactory: (req) => '创建赛事: ' + (req.body?.name || '') }), requireRaceAdmin, async (req, res, next) => {
     try {
         const normalized = validateCreatePayload(req.body ?? {});
 

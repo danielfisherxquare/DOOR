@@ -4,11 +4,15 @@
 import { Router } from 'express';
 import * as authService from './auth.service.js';
 import { requireAuth } from '../../middleware/require-auth.js';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import { loginLimiter, registerLimiter } from '../../middleware/rate-limiter.js';
 import { operationLog } from '../../middleware/operation-log.js';
 
 const router = Router();
+const requireAccountAdmin = authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['org_admin', 'super_admin'] },
+});
 
 /**
  * @swagger
@@ -312,7 +316,7 @@ router.post('/change-password', requireAuth, async (req, res, next) => {
 });
 
 // POST /api/auth/set-password — 管理员为用户重置密码（需要 org_admin/super_admin）
-router.post('/set-password', requireAuth, requirePermission({ roles: ['org_admin', 'super_admin'] }), async (req, res, next) => {
+router.post('/set-password', requireAuth, requireAccountAdmin, async (req, res, next) => {
     try {
         const { targetUserId, newPassword } = req.body;
         if (!targetUserId || !newPassword) {
@@ -329,7 +333,7 @@ router.post('/set-password', requireAuth, requirePermission({ roles: ['org_admin
 });
 
 // POST /api/auth/race-permissions — 获取或设置特定用户的赛事权限
-router.post('/race-permissions', requireAuth, requirePermission({ roles: ['org_admin', 'super_admin'] }), async (req, res, next) => {
+router.post('/race-permissions', requireAuth, requireAccountAdmin, async (req, res, next) => {
     try {
         const { targetUserId, raceId, role } = req.body;
         if (!targetUserId || !raceId) {

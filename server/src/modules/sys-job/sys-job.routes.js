@@ -1,11 +1,14 @@
 import express from 'express';
 import knex from '../../db/knex.js';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import { scheduler } from '../../services/scheduler.js';
 
 const router = express.Router();
 
-router.use(requirePermission({ surface: 'admin', roles: ['super_admin'] }));
+router.use(authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['super_admin'] },
+}));
 
 // GET /api/admin/sys-job/list — list all jobs
 router.get('/list', async (req, res, next) => {

@@ -6,7 +6,6 @@ import request from 'supertest'
 import { createAuthorization } from '../../src/authz/authorization.js'
 import { createAuthorize } from '../../src/middleware/authorize.js'
 import { errorHandler } from '../../src/middleware/error-handler.js'
-import { createRequirePermission } from '../../src/middleware/require-permission.js'
 
 describe('authorization adapter', () => {
   it('maps organization surface and module decisions to relation checks', async () => {
@@ -61,56 +60,76 @@ describe('authorization adapter', () => {
     assert.deepEqual(calls, [{ relation: 'can_open', object: 'module:race-1001/ops/scan' }])
   })
 
-  it('preserves legacy role, capability, surface, and explicit module checks behind one seam', async () => {
-    const checkedModules = []
+  it('maps platform workspaces and domain resources to relation checks', async () => {
+    const calls = []
     const authorization = createAuthorization({
-      checkUserModuleAccess: async (userId, moduleId) => {
-        checkedModules.push([userId, moduleId])
-        return moduleId === 'app:reimbursements'
-      },
+      resolveRelationService: async () => ({
+        async assert(_authContext, relationRequest) {
+          calls.push(relationRequest)
+        },
+      }),
     })
+
+    await authorization.assertAll({ userId: 'u-super', role: 'super_admin' }, [
+      {
+        action: 'open',
+        resource: { kind: 'module', surface: 'admin', moduleId: 'orgs' },
+        workspace: { scopeType: 'platform' },
+      },
+      {
+        action: 'manage',
+        resource: { kind: 'platform' },
+        workspace: { scopeType: 'platform' },
+      },
+      {
+        action: 'manage',
+        resource: { kind: 'organization' },
+        workspace: { scopeType: 'org', orgId: 'org-1' },
+      },
+      {
+        action: 'operate',
+        resource: { kind: 'race' },
+        workspace: { scopeType: 'race', raceId: '1001' },
+      },
+    ])
+
+    assert.deepEqual(calls, [
+      { relation: 'can_open', object: 'module:platform-root/admin/orgs' },
+      { relation: 'can_manage', object: 'platform:root' },
+      { relation: 'can_manage', object: 'organization:org-1' },
+      { relation: 'can_operate', object: 'race:1001' },
+    ])
+  })
+
+  it('centralizes session, role, and capability checks behind one seam', async () => {
+    const authorization = createAuthorization()
     const authContext = {
       userId: 'u-race-admin',
       role: 'race_admin',
     }
 
     await authorization.assert(authContext, 'authenticate', { kind: 'session' })
-    await authorization.assert(authContext, 'enter', {
-      kind: 'surface',
-      surface: 'ops',
-      policy: 'legacy-role',
-    })
     await authorization.assert(authContext, 'assume', {
       kind: 'role',
       roles: ['race_admin', 'org_admin'],
-    })
-    await authorization.assert(authContext, 'open', {
-      kind: 'module',
-      surface: 'app',
-      moduleId: 'reimbursements',
-      policy: 'legacy-role-or-grant',
     })
     await authorization.assert(authContext, 'use', {
       kind: 'capability',
       scope: 'self',
       name: 'operate',
     })
-
-    assert.deepEqual(checkedModules, [['u-race-admin', 'app:reimbursements']])
   })
 
   it('returns stable denial codes from the adapter boundary', async () => {
-    const authorization = createAuthorization({ checkUserModuleAccess: async () => false })
+    const authorization = createAuthorization()
 
     await assert.rejects(
       () =>
-        authorization.assert({ userId: 'u-user', role: 'user' }, 'open', {
-          kind: 'module',
-          surface: 'admin',
-          moduleId: 'finance',
-          policy: 'legacy-role-or-grant',
+        authorization.assert({ userId: 'u-user', role: 'user' }, 'assume', {
+          kind: 'role',
+          roles: ['org_admin'],
         }),
-      (error) => error.status === 403 && error.code === 'MODULE_DENIED',
+      (error) => error.status === 403 && error.code === 'ROLE_DENIED',
     )
   })
 })
@@ -162,57 +181,74 @@ describe('authorize middleware', () => {
     })
   })
 
-  it('routes legacy permission declarations through the authorization adapter', async () => {
+  it('resolves a dynamic platform-or-organization scope from the request', async () => {
     const calls = []
-    const authorization = {
-      async assertAll(authContext, decisions) {
-        calls.push({ authContext, decisions })
+    const authorize = createAuthorize({
+      authorization: {
+        async assertAll(_authContext, decisions) {
+          calls.push(decisions)
+        },
       },
-    }
-    const requirePermission = createRequirePermission({ authorization })
+    })
     const app = express()
     app.use((req, _res, next) => {
-      req.authContext = { userId: 'u-1', role: 'org_admin', orgId: 'org-1' }
+      req.authContext = { userId: 'u-super', role: 'super_admin', orgId: null }
       next()
     })
     app.get(
-      '/legacy',
-      requirePermission({
-        surface: 'admin',
-        roles: ['org_admin'],
-        module: { surface: 'admin', moduleId: 'finance' },
-        capability: { scope: 'org', name: 'view' },
+      '/admin/orgs',
+      authorize({
+        scope: (req) => (req.query.orgId ? 'org' : 'platform'),
+        action: 'open',
+        resource: { kind: 'module', surface: 'admin', moduleId: 'orgs' },
       }),
       (_req, res) => res.json({ success: true }),
     )
 
-    const response = await request(app).get('/legacy')
+    assert.equal((await request(app).get('/admin/orgs')).status, 200)
+    assert.equal((await request(app).get('/admin/orgs?orgId=org-1')).status, 200)
+    assert.deepEqual(calls.map(([decision]) => decision.workspace), [
+      { scopeType: 'platform', orgId: null, raceId: null },
+      { scopeType: 'org', orgId: 'org-1', raceId: null },
+    ])
+  })
+
+  it('resolves race workspace context from explicit transport fields before route matching', async () => {
+    const calls = []
+    const authorize = createAuthorize({
+      authorization: {
+        async assertAll(_authContext, decisions) {
+          calls.push(decisions)
+        },
+      },
+    })
+    const app = express()
+    app.use((req, _res, next) => {
+      req.authContext = { userId: 'u-ops', role: 'race_admin', orgId: 'org-1' }
+      next()
+    })
+    app.use(
+      '/ops/warehouse',
+      authorize({
+        scope: 'race',
+        action: 'open',
+        resource: { kind: 'module', surface: 'ops', moduleId: 'warehouse' },
+      }),
+      (_req, res) => res.json({ success: true }),
+    )
+
+    const response = await request(app)
+      .get('/ops/warehouse/workbench/overview')
+      .set('X-ArcSpro-Scope-Type', 'race')
+      .set('X-ArcSpro-Org-Id', 'org-1')
+      .set('X-ArcSpro-Race-Id', 'race-9')
 
     assert.equal(response.status, 200)
-    assert.deepEqual(
-      calls[0].decisions.map(({ action, resource }) => ({ action, resource })),
-      [
-        { action: 'authenticate', resource: { kind: 'session' } },
-        {
-          action: 'enter',
-          resource: { kind: 'surface', surface: 'admin', policy: 'legacy-role' },
-        },
-        { action: 'assume', resource: { kind: 'role', roles: ['org_admin'] } },
-        {
-          action: 'open',
-          resource: {
-            kind: 'module',
-            surface: 'admin',
-            moduleId: 'finance',
-            policy: 'legacy-role-or-grant',
-            strictSurfaceModules: false,
-          },
-        },
-        {
-          action: 'use',
-          resource: { kind: 'capability', scope: 'org', name: 'view' },
-        },
-      ],
-    )
+    assert.deepEqual(calls[0][0].workspace, {
+      scopeType: 'race',
+      orgId: 'org-1',
+      raceId: 'race-9',
+    })
   })
+
 })

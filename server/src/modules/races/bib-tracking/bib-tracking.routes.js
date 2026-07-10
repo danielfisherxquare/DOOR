@@ -1,10 +1,14 @@
 import { Router } from 'express';
 import { requireRaceAccess } from '../../../middleware/require-race-access.js';
-import { requirePermission } from '../../../middleware/require-permission.js';
+import { authorize } from '../../../middleware/authorize.js';
 import { scanPickupLimiter, scanResolveLimiter } from '../../../middleware/rate-limiter.js';
 import * as service from './bib-tracking.service.js';
 
 const router = Router();
+const requireBibAdmin = authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['org_admin', 'super_admin'] },
+});
 const buildRequestContext = (req) => ({ ...req.authContext, requestId: req.id || null });
 
 router.post('/register/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
@@ -36,7 +40,7 @@ router.post('/scan/pickup', scanPickupLimiter, async (req, res, next) => {
 
 router.get(
     '/items/:raceId/:itemId',
-    requirePermission({ roles: ['org_admin', 'super_admin'] }),
+    requireBibAdmin,
     requireRaceAccess('raceId'),
     async (req, res, next) => {
         try {
@@ -50,7 +54,7 @@ router.get(
 
 router.post(
     '/items/:raceId/:itemId/rollback',
-    requirePermission({ roles: ['org_admin', 'super_admin'] }),
+    requireBibAdmin,
     requireRaceAccess('raceId'),
     async (req, res, next) => {
         try {
@@ -62,7 +66,7 @@ router.post(
     },
 );
 
-router.get('/items/:raceId', requirePermission({ roles: ['org_admin', 'super_admin'] }), requireRaceAccess('raceId'), async (req, res, next) => {
+router.get('/items/:raceId', requireBibAdmin, requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await service.listTrackingItems(buildRequestContext(req), req.params.raceId, req.query);
         res.json({ success: true, data });
@@ -71,7 +75,7 @@ router.get('/items/:raceId', requirePermission({ roles: ['org_admin', 'super_adm
     }
 });
 
-router.get('/stats/:raceId', requirePermission({ roles: ['org_admin', 'super_admin'] }), requireRaceAccess('raceId'), async (req, res, next) => {
+router.get('/stats/:raceId', requireBibAdmin, requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await service.getTrackingStats(buildRequestContext(req), req.params.raceId);
         res.json({ success: true, data });

@@ -110,6 +110,30 @@ describe('authz profile service', () => {
     assert.equal(profile.modules.includes('admin:identity-center'), false);
   });
 
+  it('returns an explicitly granted ops module only inside an accessible race', async () => {
+    const profile = await buildAuthzProfileFromRows({
+      authContext: { userId: 'u-warehouse', orgId: 'org-1', role: 'user' },
+      requestedOrgId: 'org-1',
+      requestedRaceId: '1001',
+      rows: {
+        organizations: [{ id: 'org-1', name: '中奥资源' }],
+        users: [{ id: 'u-warehouse', org_id: 'org-1', role: 'user' }],
+        races: [{ id: 1001, org_id: 'org-1', name: '测试赛事' }],
+        userRacePermissions: [
+          { user_id: 'u-warehouse', org_id: 'org-1', race_id: 1001, access_level: 'viewer' },
+        ],
+        orgRacePermissions: [],
+        userModuleAccess: [
+          { user_id: 'u-warehouse', org_id: 'org-1', module_id: 'ops:warehouse' },
+        ],
+      },
+    });
+
+    assert.equal(profile.surfaces.includes('ops'), true);
+    assert.equal(profile.modules.includes('ops:warehouse'), true);
+    assert.equal(profile.modules.includes('ops:credentials'), false);
+  });
+
   it('denies a requested organization outside the user context', async () => {
     await assert.rejects(
       () => buildAuthzProfileFromRows({

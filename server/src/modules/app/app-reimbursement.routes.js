@@ -41,13 +41,16 @@ import {
     discardPreviewFile,
     exportWithImages,
 } from '../reimbursement/preview.controller.js';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import { requireReimbursementAccess } from '../../middleware/require-reimbursement-access.js';
 import invoiceRoutes from '../reimbursement/invoice.routes.js';
 
 const router = express.Router();
 
-router.use(requirePermission({ surface: 'app', capability: { scope: 'self', name: 'operate' } }));
+router.use(authorize({
+  action: 'use',
+  resource: { kind: 'capability', scope: 'self', name: 'operate' },
+}));
 
 // ==================== 发票可视化处理路由 ====================
 router.use('/invoices', invoiceRoutes);

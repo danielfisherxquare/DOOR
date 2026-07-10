@@ -4,7 +4,6 @@ import knex from './db/knex.js';
 import { requestId } from './middleware/request-id.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { requireAuth } from './middleware/require-auth.js';
-import { requirePermission } from './middleware/require-permission.js';
 import { requireAuthz } from './middleware/require-authz.js';
 import healthRoutes from './modules/health/health.routes.js';
 import jobRoutes from './modules/jobs/job.routes.js';
@@ -113,68 +112,80 @@ app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
 
 app.use(requireAuth);
 
-const appEventsPermission = requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'events' } });
+const organizationOrPlatformScope = (req) => (
+  req.query?.orgId
+  || req.body?.orgId
+  || req.body?.org_id
+  || req.headers?.['x-arcspro-org-id']
+  || req.authContext?.orgId
+    ? 'org'
+    : 'platform'
+);
+const appModule = (moduleId) => requireAuthz({ surface: 'app', moduleId, scope: organizationOrPlatformScope });
+const opsModule = (moduleId) => requireAuthz({ surface: 'ops', moduleId, scope: 'race' });
+const adminModule = (moduleId) => requireAuthz({ surface: 'admin', moduleId, scope: organizationOrPlatformScope });
 
-app.use('/api/app/jobs', requirePermission({ surface: 'app' }), jobRoutes);
-app.use('/api/app/races/dashboard', appEventsPermission, raceDashboardRoutes);
-app.use('/api/app/records', appEventsPermission, recordRoutes);
-app.use('/api/app/column-mappings', appEventsPermission, columnMappingRoutes);
-app.use('/api/app/import-sessions', appEventsPermission, importSessionRoutes);
-app.use('/api/app/lottery', appEventsPermission, lotteryRoutes);
-app.use('/api/app/lottery-v2', appEventsPermission, lotteryV2Routes);
-app.use('/api/app/audit', appEventsPermission, auditRoutes);
-app.use('/api/app/clothing', appEventsPermission, clothingRoutes);
-app.use('/api/app/pipeline', appEventsPermission, pipelineRoutes);
-app.use('/api/app/bib', appEventsPermission, bibRoutes);
-app.use('/api/app/bibs', appEventsPermission, bibTrackingRoutes);
-app.use('/api/app/reimbursements', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'reimbursements' } }), appReimbursementRoutes);
-app.use('/api/app/credentials', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'credentials' } }), appCredentialRoutes);
-app.use('/api/app/3d-studio', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: '3d-studio' } }), appThreeStudioRoutes);
-app.use('/api/app/interviews', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'interview' } }), interviewRoutes);
-app.use('/api/app/warehouse', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'inventory' } }), inventoryRoutes);
-app.use('/api/app/design-requests', requireAuthz({ surface: 'app', moduleId: 'design-requests' }), createDesignRequestRoutes('app'));
-app.use('/api/app/approvals', requirePermission({ surface: 'app' }), approvalRoutes);
+app.use('/api/app/jobs', appModule('events'), jobRoutes);
+app.use('/api/app/races/dashboard', appModule('events'), raceDashboardRoutes);
+app.use('/api/app/records', appModule('events'), recordRoutes);
+app.use('/api/app/column-mappings', appModule('events'), columnMappingRoutes);
+app.use('/api/app/import-sessions', appModule('events'), importSessionRoutes);
+app.use('/api/app/lottery', appModule('events'), lotteryRoutes);
+app.use('/api/app/lottery-v2', appModule('events'), lotteryV2Routes);
+app.use('/api/app/audit', appModule('events'), auditRoutes);
+app.use('/api/app/clothing', appModule('events'), clothingRoutes);
+app.use('/api/app/pipeline', appModule('events'), pipelineRoutes);
+app.use('/api/app/bib', appModule('events'), bibRoutes);
+app.use('/api/app/bibs', appModule('events'), bibTrackingRoutes);
+app.use('/api/app/projects', appModule('events'), projectsRoutes);
+app.use('/api/app/reimbursements', appModule('reimbursements'), appReimbursementRoutes);
+app.use('/api/app/credentials', appModule('credentials'), appCredentialRoutes);
+app.use('/api/app/3d-studio', appModule('3d-studio'), appThreeStudioRoutes);
+app.use('/api/app/interviews', appModule('interview'), interviewRoutes);
+app.use('/api/app/warehouse', appModule('inventory'), inventoryRoutes);
+app.use('/api/app/design-requests', appModule('design-requests'), createDesignRequestRoutes('app'));
+app.use('/api/app/approvals', appModule('design-requests'), approvalRoutes);
 
-app.use('/api/ops/warehouse', requirePermission({ surface: 'ops', module: { surface: 'ops', moduleId: 'warehouse' } }), inventoryRoutes);
-app.use('/api/ops/credentials', requirePermission({ surface: 'ops', module: { surface: 'ops', moduleId: 'credentials' } }), credentialRoutes);
-app.use('/api/ops/bibs', requirePermission({ surface: 'ops' }), bibTrackingRoutes);
-app.use('/api/ops/design-requests', requireAuthz({ surface: 'ops', moduleId: 'design-requests' }), createDesignRequestRoutes('ops'));
+app.use('/api/ops/warehouse', opsModule('warehouse'), inventoryRoutes);
+app.use('/api/ops/credentials', opsModule('credentials'), credentialRoutes);
+app.use('/api/ops/bibs', opsModule('bib-pickup'), bibTrackingRoutes);
+app.use('/api/ops/design-requests', opsModule('design-requests'), createDesignRequestRoutes('ops'));
 
-app.use('/api/admin/jobs', requirePermission({ surface: 'admin' }), jobRoutes);
-app.use('/api/admin/design-requests', requireAuthz({ surface: 'admin', moduleId: 'design-requests' }), createDesignRequestRoutes('admin'));
-app.use('/api/admin/approvals', requirePermission({ surface: 'admin' }), approvalRoutes);
-app.use('/api/admin/races', requirePermission({ surface: 'admin' }), raceRoutes);
-app.use('/api/admin/records', requirePermission({ surface: 'admin' }), recordRoutes);
-app.use('/api/admin/column-mappings', requirePermission({ surface: 'admin' }), columnMappingRoutes);
-app.use('/api/admin/import-sessions', requirePermission({ surface: 'admin' }), importSessionRoutes);
-app.use('/api/admin/lottery', requirePermission({ surface: 'admin' }), lotteryRoutes);
-app.use('/api/admin/lottery-v2', requirePermission({ surface: 'admin' }), lotteryV2Routes);
-app.use('/api/admin/audit', requirePermission({ surface: 'admin' }), auditRoutes);
-app.use('/api/admin/clothing', requirePermission({ surface: 'admin' }), clothingRoutes);
-app.use('/api/admin/pipeline', requirePermission({ surface: 'admin' }), pipelineRoutes);
-app.use('/api/admin/bib', requirePermission({ surface: 'admin' }), bibRoutes);
-app.use('/api/admin/bibs', requirePermission({ surface: 'admin' }), bibTrackingRoutes);
-app.use('/api/admin/assessment', requirePermission({ surface: 'admin' }), assessmentAdminRoutes);
-app.use('/api/admin/system', requirePermission({ surface: 'admin' }), systemBackupRoutes);
-app.use('/api/admin/reimbursements', requirePermission({ surface: 'admin' }), adminReimbursementRoutes);
-app.use('/api/admin/org', requirePermission({ surface: 'admin' }), orgRoutes);
+app.use('/api/admin/jobs', adminModule('system'), jobRoutes);
+app.use('/api/admin/design-requests', adminModule('design-requests'), createDesignRequestRoutes('admin'));
+app.use('/api/admin/approvals', adminModule('design-requests'), approvalRoutes);
+app.use('/api/admin/races', adminModule('races'), raceRoutes);
+app.use('/api/admin/records', adminModule('races'), recordRoutes);
+app.use('/api/admin/column-mappings', adminModule('races'), columnMappingRoutes);
+app.use('/api/admin/import-sessions', adminModule('races'), importSessionRoutes);
+app.use('/api/admin/lottery', adminModule('races'), lotteryRoutes);
+app.use('/api/admin/lottery-v2', adminModule('races'), lotteryV2Routes);
+app.use('/api/admin/audit', adminModule('races'), auditRoutes);
+app.use('/api/admin/clothing', adminModule('races'), clothingRoutes);
+app.use('/api/admin/pipeline', adminModule('races'), pipelineRoutes);
+app.use('/api/admin/bib', adminModule('races'), bibRoutes);
+app.use('/api/admin/bibs', adminModule('bib-tracking'), bibTrackingRoutes);
+app.use('/api/admin/assessment', adminModule('hr'), assessmentAdminRoutes);
+app.use('/api/admin/system', adminModule('backups'), systemBackupRoutes);
+app.use('/api/admin/reimbursements', adminModule('finance'), adminReimbursementRoutes);
+app.use('/api/admin/org', adminModule('members'), orgRoutes);
 // Team routes are also accessible under /api/admin/org for frontend compatibility
-app.use('/api/admin/org', requirePermission({ surface: 'admin' }), teamRoutes);
-app.use('/api/admin/team', requirePermission({ surface: 'admin' }), teamRoutes);
-app.use('/api/admin/projects', requirePermission({ surface: 'admin' }), projectsRoutes);
-app.use('/api/admin/calendar', requirePermission({ surface: 'admin' }), calendarRoutes);
-app.use('/api/admin/interviews', requirePermission({ surface: 'admin' }), interviewRoutes);
-app.use('/api/admin/warehouse', requirePermission({ surface: 'admin', module: { surface: 'admin', moduleId: 'inventory' } }), inventoryRoutes);
-app.use('/api/admin/ocr', requirePermission({ surface: 'admin', module: { surface: 'admin', moduleId: 'finance' } }), ocrRoutes);
-app.use('/api/admin/credentials', requirePermission({ surface: 'admin', module: { surface: 'admin', moduleId: 'credentials' } }), credentialRoutes);
-app.use('/api/admin/identity-center', requireAuthz({ surface: 'admin', moduleId: 'identity-center' }), identityCenterRoutes);
+app.use('/api/admin/org', adminModule('team'), teamRoutes);
+app.use('/api/admin/team', adminModule('team'), teamRoutes);
+app.use('/api/admin/projects', adminModule('races'), projectsRoutes);
+app.use('/api/admin/calendar', adminModule('races'), calendarRoutes);
+app.use('/api/admin/interviews', adminModule('hr'), interviewRoutes);
+app.use('/api/admin/warehouse', adminModule('inventory'), inventoryRoutes);
+app.use('/api/admin/ocr', adminModule('finance'), ocrRoutes);
+app.use('/api/admin/credentials', adminModule('credentials'), credentialRoutes);
+app.use('/api/admin/identity-center', adminModule('identity-center'), identityCenterRoutes);
 app.use('/api/authz', authzRoutes);
 app.use('/api/profile', profileRoutes);
-app.use('/api/admin/color-schemes', requirePermission({ surface: 'admin' }), colorSchemeRoutes);
-app.use('/api/admin/dict', requirePermission({ surface: 'admin' }), dictAdminRoutes);
-app.use('/api/admin/operation-logs', requirePermission({ surface: 'admin' }), operationLogRoutes);
-app.use('/api/admin/sys-job', requirePermission({ surface: 'admin' }), sysJobRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin/color-schemes', adminModule('branding'), colorSchemeRoutes);
+app.use('/api/admin/dict', adminModule('system'), dictAdminRoutes);
+app.use('/api/admin/operation-logs', adminModule('audit'), operationLogRoutes);
+app.use('/api/admin/sys-job', adminModule('system'), sysJobRoutes);
+app.use('/api/admin', adminModule('orgs'), adminRoutes);
 
 // Deny-by-default: any /api/* route not explicitly mounted returns 404
 app.use('/api/*', (_req, res) => {

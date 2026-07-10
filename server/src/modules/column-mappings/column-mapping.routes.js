@@ -1,14 +1,17 @@
 import { Router } from 'express';
 import knex from '../../db/knex.js';
 import * as repo from './column-mapping.repository.js';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 
 const router = Router();
 
 const READ_SCOPES = new Set(['effective', 'user', 'org']);
 const WRITE_SCOPES = new Set(['user', 'org']);
 
-router.use(requirePermission({ roles: ['org_admin', 'super_admin', 'race_admin'] }));
+router.use(authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['org_admin', 'super_admin', 'race_admin'] },
+}));
 
 function badRequest(message) {
     return Object.assign(new Error(message), { status: 400, expose: true });

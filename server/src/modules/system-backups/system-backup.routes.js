@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import { operationLog } from '../../middleware/operation-log.js';
 import {
   createBackup,
@@ -19,7 +19,10 @@ import {
 
 const router = Router();
 
-router.use(requirePermission({ roles: ['super_admin'] }));
+router.use(authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['super_admin'] },
+}));
 
 router.get('/backups', async (_req, res, next) => {
   try {
@@ -175,4 +178,3 @@ router.get('/encryption-status', async (_req, res, next) => {
 });
 
 export default router;
-

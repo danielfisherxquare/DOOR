@@ -1,7 +1,7 @@
 import express from 'express';
 import fs from 'fs/promises';
 import path from 'path';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import * as studioService from '../inventory/inventory.studio.service.js';
 import * as assetService from '../inventory/inventory.asset.service.js';
 import * as spatialService from '../inventory/inventory.spatial.service.js';
@@ -91,7 +91,10 @@ function rewriteTilesetJsonUris(tilesetJson, req, zoneId) {
     return cloned;
 }
 
-router.use(requirePermission({ surface: 'app', capability: { scope: 'inventory', name: '3d_studio' } }));
+router.use(authorize({
+    action: 'use',
+    resource: { kind: 'capability', scope: 'inventory', name: '3d_studio' },
+}));
 
 router.get('/projects', async (req, res, next) => {
     try {

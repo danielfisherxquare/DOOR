@@ -1,13 +1,16 @@
 import { Router } from 'express';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import { importSessionRepository } from './import-session.repository.js';
 import * as jobRepository from '../jobs/job.repository.js';
 import knex from '../../db/knex.js';
 
 const router = Router();
 
-router.use(requirePermission({ roles: ['org_admin', 'super_admin', 'race_admin'] }));
+router.use(authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['org_admin', 'super_admin', 'race_admin'] },
+}));
 
 function badRequest(message) {
     return Object.assign(new Error(message), { status: 400, expose: true });

@@ -1,11 +1,7 @@
 import express from 'express';
 import knex from '../../db/knex.js';
-import { requirePermission } from '../../middleware/require-permission.js';
 
 const router = express.Router();
-
-// All operation log routes require admin surface
-router.use(requirePermission({ surface: 'admin' }));
 
 // GET /api/admin/operation-logs - paginated list
 router.get('/', async (req, res, next) => {

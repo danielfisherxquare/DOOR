@@ -1,10 +1,13 @@
 import { Router } from 'express';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import * as service from './assessment.service.js';
 
 const router = Router();
 
-router.use(requirePermission({ roles: ['super_admin'] }));
+router.use(authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['super_admin'] },
+}));
 
 router.get('/campaigns', async (_req, res, next) => {
     try {

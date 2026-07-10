@@ -13,14 +13,17 @@ function normalizeSurface(surface) {
   return normalized;
 }
 
-function scopeKey({ orgId, raceId } = {}) {
+function scopeKey({ platformId, orgId, raceId } = {}) {
+  if (platformId !== undefined && platformId !== null && platformId !== '') {
+    return `platform-${normalizeRequiredId(platformId, 'platformId')}`;
+  }
   if (raceId !== undefined && raceId !== null && raceId !== '') {
     return `race-${normalizeRequiredId(raceId, 'raceId')}`;
   }
   if (orgId !== undefined && orgId !== null && orgId !== '') {
     return normalizeRequiredId(orgId, 'orgId');
   }
-  throw new Error('orgId or raceId is required');
+  throw new Error('platformId, orgId, or raceId is required');
 }
 
 export function userObjectId(userId) {
@@ -39,12 +42,12 @@ export function platformObjectId(platformId = 'root') {
   return `platform:${normalizeRequiredId(platformId, 'platformId')}`;
 }
 
-export function surfaceObjectId({ orgId, raceId, surface } = {}) {
-  return `surface:${scopeKey({ orgId, raceId })}/${normalizeSurface(surface)}`;
+export function surfaceObjectId({ platformId, orgId, raceId, surface } = {}) {
+  return `surface:${scopeKey({ platformId, orgId, raceId })}/${normalizeSurface(surface)}`;
 }
 
-export function moduleObjectId({ orgId, raceId, surface, moduleId } = {}) {
-  return `module:${scopeKey({ orgId, raceId })}/${normalizeSurface(surface)}/${normalizeRequiredId(moduleId, 'moduleId')}`;
+export function moduleObjectId({ platformId, orgId, raceId, surface, moduleId } = {}) {
+  return `module:${scopeKey({ platformId, orgId, raceId })}/${normalizeSurface(surface)}/${normalizeRequiredId(moduleId, 'moduleId')}`;
 }
 
 export function tupleUserObjectId(userIdOrObjectId) {

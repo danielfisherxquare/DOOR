@@ -3,7 +3,7 @@
  * 所有端点限 super_admin 角色
  */
 import { Router } from 'express';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 import * as adminService from './admin.service.js';
 import multer from 'multer';
 import path from 'path';
@@ -34,7 +34,10 @@ const upload = multer({
 const router = Router();
 
 // 全部端点限制 super_admin
-router.use(requirePermission({ roles: ['super_admin'] }));
+router.use(authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['super_admin'] },
+}));
 
 // ── 机构管理 ─────────────────────────────────────────
 

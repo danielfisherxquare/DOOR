@@ -6,17 +6,21 @@ import {
     exportProjectExcel,
 } from '../reimbursement/reimbursement.controller.js';
 import { requireReimbursementAccess } from '../../middleware/require-reimbursement-access.js';
-import { requirePermission } from '../../middleware/require-permission.js';
+import { authorize } from '../../middleware/authorize.js';
 
 const router = express.Router();
 
-router.use(requirePermission({ surface: 'admin' }));
-
 // GET /admin/reimbursements/org/:orgId - 获取机构所有项目
-router.get('/org/:orgId', requirePermission({ capability: { scope: 'org', name: 'view' } }), requireReimbursementAccess({ accessLevel: 'org_admin' }), getOrgProjects);
+router.get('/org/:orgId', authorize({
+    action: 'use',
+    resource: { kind: 'capability', scope: 'org', name: 'view' },
+}), requireReimbursementAccess({ accessLevel: 'org_admin' }), getOrgProjects);
 
 // GET /admin/reimbursements/all - 获取全部项目（超管）
-router.get('/all', requirePermission({ capability: { scope: 'platform', name: 'view' } }), requireReimbursementAccess({ accessLevel: 'super_admin' }), getAllProjects);
+router.get('/all', authorize({
+    action: 'use',
+    resource: { kind: 'capability', scope: 'platform', name: 'view' },
+}), requireReimbursementAccess({ accessLevel: 'super_admin' }), getAllProjects);
 
 // GET /admin/reimbursements/projects/:id/records - 获取项目记录明细
 router.get('/projects/:id/records', requireReimbursementAccess({ accessLevel: 'org_admin' }), getProjectRecords);

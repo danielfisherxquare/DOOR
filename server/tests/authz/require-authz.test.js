@@ -19,6 +19,9 @@ function testApp({ authz, authContext = { userId: 'u-1', orgId: 'org-1', role: '
   app.get('/ops/design-requests', requireAuthz({ surface: 'ops', moduleId: 'design-requests', scope: 'race' }), (_req, res) => {
     res.json({ success: true });
   });
+  app.get('/admin/orgs', requireAuthz({ surface: 'admin', moduleId: 'orgs', scope: 'platform' }), (_req, res) => {
+    res.json({ success: true });
+  });
   app.use(errorHandler);
   return app;
 }
@@ -61,6 +64,27 @@ describe('requireAuthz middleware', () => {
     assert.deepEqual(calls, [
       { relation: 'can_enter', object: 'surface:race-1001/ops' },
       { relation: 'can_open', object: 'module:race-1001/ops/design-requests' },
+    ]);
+  });
+
+  it('uses platform scope for platform administration modules', async () => {
+    const calls = [];
+    const app = testApp({
+      authContext: { userId: 'u-super', orgId: null, role: 'super_admin' },
+      authz: {
+        async assert(_authContext, request) {
+          calls.push(request);
+          return true;
+        },
+      },
+    });
+
+    const response = await request(app).get('/admin/orgs');
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(calls, [
+      { relation: 'can_enter', object: 'surface:platform-root/admin' },
+      { relation: 'can_open', object: 'module:platform-root/admin/orgs' },
     ]);
   });
 

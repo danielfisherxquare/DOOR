@@ -22,6 +22,10 @@ const PLATFORM_ADMIN_GOVERNANCE_MODULES = [
   ...ALL_MODULES.admin.map((item) => item.id),
 ];
 
+const PLATFORM_ADMIN_MODULES = Object.values(ALL_MODULES)
+  .flat()
+  .map((item) => item.id);
+
 const PLATFORM_ADMIN_ORG_MODULES = [
   ...ALL_MODULES.app.map((item) => item.id),
   ...PLATFORM_ADMIN_GOVERNANCE_MODULES,
@@ -73,10 +77,10 @@ function relationForRaceAccess(accessLevel) {
   return accessLevel === 'editor' ? 'manager' : 'viewer';
 }
 
-function grantSurfaceAndModule(tuples, { user, orgId, raceId, surface, moduleId }) {
-  const scope = surface === 'ops' && raceId
-    ? { raceId }
-    : { orgId };
+function grantSurfaceAndModule(tuples, { user, platformId, orgId, raceId, surface, moduleId }) {
+  const scope = platformId
+    ? { platformId }
+    : (surface === 'ops' && raceId ? { raceId } : { orgId });
   const surfaceObject = surfaceObjectId({ ...scope, surface });
   const moduleObject = moduleObjectId({ ...scope, surface, moduleId });
 
@@ -85,11 +89,12 @@ function grantSurfaceAndModule(tuples, { user, orgId, raceId, surface, moduleId 
   tuples.add(user, 'granted', moduleObject);
 }
 
-function grantModuleId(tuples, { user, orgId, raceId, moduleId }) {
+function grantModuleId(tuples, { user, platformId, orgId, raceId, moduleId }) {
   const parsed = parseModuleId(moduleId);
   if (!parsed) return;
   grantSurfaceAndModule(tuples, {
     user,
+    platformId,
     orgId,
     raceId,
     surface: parsed.surface,
@@ -115,6 +120,11 @@ export function projectAuthzTuples({
   const tuples = createTupleCollector();
   const organizationIds = organizations.map((org) => normalizeId(org.id)).filter(Boolean);
   const racesByOrgId = new Map();
+  const usersById = new Map(
+    users
+      .map((user) => [normalizeId(user.id || user.user_id || user.userId), user])
+      .filter(([userId]) => userId),
+  );
 
   for (const orgId of organizationIds) {
     tuples.add(PLATFORM_OBJECT, 'parent_platform', organizationObjectId(orgId));
@@ -151,6 +161,9 @@ export function projectAuthzTuples({
 
     if (role === 'super_admin') {
       tuples.add(userObject, 'admin', PLATFORM_OBJECT);
+      for (const moduleId of PLATFORM_ADMIN_MODULES) {
+        grantModuleId(tuples, { user: userObject, platformId: 'root', moduleId });
+      }
       const targetOrgs = organizationIds.length > 0 ? organizationIds : [orgId].filter(Boolean);
       for (const targetOrgId of targetOrgs) {
         tuples.add(`${organizationObjectId(targetOrgId)}#platform_admin`, 'granted', surfaceObjectId({ orgId: targetOrgId, surface: 'app' }));
@@ -217,10 +230,40 @@ export function projectAuthzTuples({
     const orgId = normalizeId(access.org_id || access.orgId);
     const moduleId = access.module_id || access.moduleId;
     if (!userId || !orgId || !moduleId) continue;
+    const parsedModule = parseModuleId(moduleId);
+    if (!parsedModule) continue;
+
+    if (parsedModule.surface === 'ops') {
+      const explicitRaceId = normalizeRaceId(access.race_id || access.raceId);
+      const raceIds = new Set(explicitRaceId ? [explicitRaceId] : raceIdsForUser(userId, userRacePermissions));
+      const user = usersById.get(userId);
+
+      if (!explicitRaceId && user?.role === 'org_admin') {
+        for (const raceId of racesByOrgId.get(orgId) || []) raceIds.add(raceId);
+      }
+      if (!explicitRaceId && normalizeId(user?.org_id || user?.orgId) === orgId) {
+        for (const permission of orgRacePermissions) {
+          if (normalizeId(permission.org_id || permission.orgId) === orgId) {
+            const raceId = normalizeRaceId(permission.race_id || permission.raceId);
+            if (raceId) raceIds.add(raceId);
+          }
+        }
+      }
+
+      for (const raceId of raceIds) {
+        grantModuleId(tuples, {
+          user: userObjectId(userId),
+          orgId,
+          raceId,
+          moduleId,
+        });
+      }
+      continue;
+    }
+
     grantModuleId(tuples, {
       user: userObjectId(userId),
       orgId,
-      raceId: normalizeRaceId(access.race_id || access.raceId),
       moduleId,
     });
   }
