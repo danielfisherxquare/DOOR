@@ -349,7 +349,9 @@ export async function saveOrgRaceMatrix(authContext, requestedOrgId, permissions
             throw badRequest(`无效赛事 ID: ${item.raceId}`);
         }
         const accessLevel = normalizeAccessLevel(item.accessLevel);
-        if (!accessLevel) continue;
+        if (!accessLevel) {
+            throw badRequest(`赛事 ${raceId} 的 accessLevel 无效`);
+        }
         normalized.push({ raceId, accessLevel });
     }
 
