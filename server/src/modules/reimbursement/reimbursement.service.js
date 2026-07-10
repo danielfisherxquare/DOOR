@@ -10,6 +10,10 @@ import knex from '../../db/knex.js';
 import { generateThumbnail } from './invoice.storage.js';
 import { renderPdfToImageBuffers } from './ocr.service.js';
 import { attachOcrReview } from './ocr.review.js';
+import {
+  decryptReimbursementLlmConfig,
+  encryptReimbursementLlmConfig,
+} from './reimbursement-llm-secret.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIRECT_PAYMENT_STORAGE_DIR = path.join(__dirname, '../../../storage/reimbursement-payments');
@@ -1107,7 +1111,14 @@ export async function getUserSettings(userId) {
     .where({ user_id: userId })
     .first();
 
-  return settings || {
+  if (settings) {
+    return {
+      ...settings,
+      llm_config: decryptReimbursementLlmConfig(settings.llm_config, userId),
+    };
+  }
+
+  return {
     user_id: userId,
     default_reporter: '',
     watch_directory_path: '',
@@ -1124,6 +1135,12 @@ export async function getUserSettings(userId) {
  * 更新用户设置
  */
 export async function updateUserSettings(userId, settings) {
+  const storedSettings = {
+    ...settings,
+    ...(Object.prototype.hasOwnProperty.call(settings, 'llm_config')
+      ? { llm_config: encryptReimbursementLlmConfig(settings.llm_config, userId) }
+      : {}),
+  };
   const existing = await knex('reimbursement_user_settings')
     .where({ user_id: userId })
     .first();
@@ -1132,14 +1149,14 @@ export async function updateUserSettings(userId, settings) {
     await knex('reimbursement_user_settings')
       .where({ user_id: userId })
       .update({
-        ...settings,
+        ...storedSettings,
         updated_at: knex.fn.now(),
       });
   } else {
     await knex('reimbursement_user_settings')
       .insert({
         user_id: userId,
-        ...settings,
+        ...storedSettings,
       });
   }
 

@@ -12,6 +12,10 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import sharp from 'sharp';
+import {
+    assertSafeOcrBaseUrl,
+    createSafeOcrHttpsAgent,
+} from '../ocr/ocr-url-policy.js';
 import { fileURLToPath } from 'url';
 import { promisify } from 'util';
 
@@ -666,6 +670,8 @@ const callVisionLLM = async (
                 'Content-Type': 'application/json',
             },
             timeout: 600000,
+            httpsAgent: createSafeOcrHttpsAgent(),
+            proxy: false,
         });
 
         const durationMs = Date.now() - startedAt;
@@ -737,6 +743,7 @@ const callVisionLLM = async (
  * @returns {Promise<Object>}
  */
 export async function processInvoice({ fileBuffer, mimeType, filename, config }) {
+    config = { ...config, baseUrl: await assertSafeOcrBaseUrl(config?.baseUrl) };
     if (isPdfUpload({ mimeType, filename })) {
         const imageBuffers = await renderPdfToImageBuffers(fileBuffer);
         return processMultiPageInvoice({ imageBuffers, config, filename });
@@ -775,6 +782,7 @@ export async function processInvoice({ fileBuffer, mimeType, filename, config })
  * @returns {Promise<Object>}
  */
 export async function processPayment({ fileBuffer, mimeType, filename, config }) {
+    config = { ...config, baseUrl: await assertSafeOcrBaseUrl(config?.baseUrl) };
     if (isPdfUpload({ mimeType, filename })) {
         const imageBuffers = await renderPdfToImageBuffers(fileBuffer);
         return processMultiPagePayment({ imageBuffers, config });

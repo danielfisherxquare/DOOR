@@ -37,7 +37,7 @@ function mockVisionResponses(responses) {
 }
 
 const TEST_CONFIG = {
-    baseUrl: 'https://example.test/v1',
+    baseUrl: 'https://8.8.8.8/v1',
     apiKey: 'test-key',
     modelName: 'vision-test',
 };
@@ -64,6 +64,8 @@ describe('reimbursement OCR model calls', () => {
         assert.equal(result.success, true);
         assert.equal(result.data.amount, 128.5);
         assert.equal(calls.length, 1);
+        assert.equal(calls[0].options.proxy, false);
+        assert.ok(calls[0].options.httpsAgent);
     });
 
     it('uses the railway retry only when the first pass hints at a railway invoice', async () => {

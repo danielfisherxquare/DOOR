@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { createRequire } from 'module';
+import { assertSafeOcrBaseUrl, createSafeOcrHttpsAgent } from './ocr-url-policy.js';
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
 
@@ -9,6 +10,8 @@ const pdfParse = require('pdf-parse');
 function createLlmClient(baseUrl, apiKey) {
     return axios.create({
         baseURL: baseUrl,
+        httpsAgent: createSafeOcrHttpsAgent(),
+        proxy: false,
         headers: {
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json'
@@ -106,7 +109,7 @@ export async function extractFromInvoice({ fileBuffer, mimeType, filename, provi
 
 请仔细识别，只输出纯粹的 JSON 格式数据。`;
 
-    const client = createLlmClient(baseUrl, apiKey);
+    const client = createLlmClient(await assertSafeOcrBaseUrl(baseUrl), apiKey);
     const isPdf = mimeType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf');
 
     return askVlm(client, prompt, fileBuffer, mimeType, isPdf, modelName);
@@ -124,7 +127,7 @@ export async function extractFromPayment({ fileBuffer, mimeType, filename, provi
 
 请仔细识别，只输出纯粹的 JSON 格式数据。`;
 
-    const client = createLlmClient(baseUrl, apiKey);
+    const client = createLlmClient(await assertSafeOcrBaseUrl(baseUrl), apiKey);
     const isPdf = mimeType === 'application/pdf' || filename.toLowerCase().endsWith('.pdf');
 
     return askVlm(client, prompt, fileBuffer, mimeType, isPdf, modelName);

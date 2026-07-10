@@ -7,6 +7,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import request, { requestRaw, requestWithLongTimeout } from '../utils/request';
+import { maskPersistedReimbursementLlmConfig } from '../utils/reimbursementLlmConfig';
 
 const DEFAULT_LLM_CONFIG = {
   provider: 'qwen',
@@ -787,8 +788,13 @@ const useReimbursementStore = create(
     }),
     {
       name: 'reimbursement-storage',
+      version: 2,
+      migrate: (persistedState) => ({
+        ...(persistedState || {}),
+        llmConfig: maskPersistedReimbursementLlmConfig(persistedState?.llmConfig),
+      }),
       partialize: (state) => ({
-        llmConfig: state.llmConfig,
+        llmConfig: maskPersistedReimbursementLlmConfig(state.llmConfig),
         defaultReporter: state.defaultReporter,
         hasServerLlmConfig: state.hasServerLlmConfig,
       }),

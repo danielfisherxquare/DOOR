@@ -13,6 +13,10 @@ import { generateExportWorkbook } from './preview.service.js';
 import knex from '../../db/knex.js';
 import { env } from '../../config/env.js';
 import { attachOcrReview } from './ocr.review.js';
+import {
+  maskReimbursementLlmConfig,
+  sanitizeReimbursementLlmRequestConfig,
+} from './reimbursement-llm-secret.js';
 
 // 配置文件上传
 const upload = multer({
@@ -102,14 +106,14 @@ function readRequestConfig(req) {
   };
 
   if (!req.body?.config) {
-    return directConfig;
+    return sanitizeReimbursementLlmRequestConfig(directConfig);
   }
 
   try {
     const parsed = typeof req.body.config === 'string' ? JSON.parse(req.body.config) : req.body.config;
-    return { ...directConfig, ...(parsed || {}) };
+    return sanitizeReimbursementLlmRequestConfig({ ...directConfig, ...(parsed || {}) });
   } catch {
-    return directConfig;
+    return sanitizeReimbursementLlmRequestConfig(directConfig);
   }
 }
 
@@ -154,19 +158,18 @@ export function normalizeOcrError(error, label) {
   return normalized;
 }
 
-function toSettingsResponse(settings) {
+export function toSettingsResponse(settings) {
   const userConfig = settings?.llm_config || {};
   const serverConfig = getServerLlmConfig();
   const hasServerLlmConfig = Boolean(serverConfig.apiKey && serverConfig.baseUrl);
 
-  // 用户在前端配置的 apiKey 优先展示，不再被服务端配置强制覆盖
-  // 这样用户可以自行选择使用服务端默认模型或自定义模型（如硅基流动）
   const hasUserApiKey = Boolean(userConfig.apiKey?.trim());
+  const maskedUserConfig = maskReimbursementLlmConfig(userConfig);
   const mergedConfig = {
     ...DEFAULT_LLM_CONFIG,
     provider: hasUserApiKey ? (userConfig.provider || DEFAULT_LLM_CONFIG.provider) : (hasServerLlmConfig ? serverConfig.provider : (userConfig.provider || DEFAULT_LLM_CONFIG.provider)),
     baseUrl: hasUserApiKey ? (userConfig.baseUrl || DEFAULT_LLM_CONFIG.baseUrl) : (hasServerLlmConfig ? serverConfig.baseUrl : (userConfig.baseUrl || serverConfig.baseUrl || DEFAULT_LLM_CONFIG.baseUrl)),
-    apiKey: hasUserApiKey ? userConfig.apiKey : (hasServerLlmConfig ? '' : (userConfig.apiKey || '')),
+    apiKey: hasUserApiKey ? maskedUserConfig.apiKey : '',
     modelName: hasUserApiKey ? (userConfig.modelName || DEFAULT_LLM_CONFIG.modelName) : (hasServerLlmConfig ? serverConfig.modelName : (userConfig.modelName || serverConfig.modelName || DEFAULT_LLM_CONFIG.modelName)),
   };
 
@@ -175,6 +178,31 @@ function toSettingsResponse(settings) {
     watchDirectoryPath: settings?.watch_directory_path || '',
     llmConfig: mergedConfig,
     hasServerLlmConfig,
+    hasUserLlmConfig: hasUserApiKey,
+  };
+}
+
+export function buildSettingsUpdatePayload(body = {}, current = {}) {
+  const requestConfig = body.llmConfig ?? body.llm_config;
+  const submittedConfig = sanitizeReimbursementLlmRequestConfig(requestConfig);
+  const currentConfig = current.llm_config || DEFAULT_LLM_CONFIG;
+
+  return {
+    default_reporter:
+      body.defaultReporter ?? body.default_reporter ?? current.default_reporter ?? '',
+    watch_directory_path:
+      body.watchDirectoryPath ??
+      body.watch_directory_path ??
+      current.watch_directory_path ??
+      '',
+    llm_config: {
+      provider: submittedConfig.provider || currentConfig.provider || DEFAULT_LLM_CONFIG.provider,
+      baseUrl: submittedConfig.baseUrl || currentConfig.baseUrl || DEFAULT_LLM_CONFIG.baseUrl,
+      apiKey:
+        body.clearApiKey === true ? '' : submittedConfig.apiKey || currentConfig.apiKey || '',
+      modelName:
+        submittedConfig.modelName || currentConfig.modelName || DEFAULT_LLM_CONFIG.modelName,
+    },
   };
 }
 
@@ -668,21 +696,7 @@ export async function updateSettings(req, res, next) {
   try {
     const userId = req.authContext.userId;
     const current = await service.getUserSettings(userId);
-    const requestConfig = req.body?.llmConfig ?? req.body?.llm_config;
-    const nextConfig = requestConfig
-      ? {
-        provider: requestConfig.provider ?? current?.llm_config?.provider ?? DEFAULT_LLM_CONFIG.provider,
-        baseUrl: requestConfig.baseUrl ?? current?.llm_config?.baseUrl ?? DEFAULT_LLM_CONFIG.baseUrl,
-        apiKey: requestConfig.apiKey ?? current?.llm_config?.apiKey ?? '',
-        modelName: requestConfig.modelName ?? current?.llm_config?.modelName ?? DEFAULT_LLM_CONFIG.modelName,
-      }
-      : (current?.llm_config || DEFAULT_LLM_CONFIG);
-
-    const payload = {
-      default_reporter: req.body?.defaultReporter ?? req.body?.default_reporter ?? current?.default_reporter ?? '',
-      watch_directory_path: req.body?.watchDirectoryPath ?? req.body?.watch_directory_path ?? current?.watch_directory_path ?? '',
-      llm_config: nextConfig,
-    };
+    const payload = buildSettingsUpdatePayload(req.body, current);
 
     const settings = await service.updateUserSettings(userId, payload);
     res.json({ settings: toSettingsResponse(settings) });
