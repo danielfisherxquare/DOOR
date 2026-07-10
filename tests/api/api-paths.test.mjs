@@ -61,4 +61,20 @@ describe('API path ownership', () => {
       assert.match(apiSource, /['"]\/app\//, relativePath)
     }
   })
+
+  it('exposes explicit clients for APIs shared by admin and ops', async () => {
+    const bibTrackingSource = await source('src/api/bibTracking.js')
+    const credentialSource = await source('src/api/credential.js')
+
+    for (const apiSource of [bibTrackingSource, credentialSource]) {
+      assert.doesNotMatch(apiSource, /surfaceApi|window\.location/)
+      assert.match(apiSource, /admin:/)
+      assert.match(apiSource, /ops:/)
+    }
+
+    assert.match(bibTrackingSource, /adminBibTrackingApi/)
+    assert.match(bibTrackingSource, /opsBibTrackingApi/)
+    assert.match(credentialSource, /adminCredentialApi/)
+    assert.match(credentialSource, /opsCredentialApi/)
+  })
 })

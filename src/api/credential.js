@@ -1,43 +1,47 @@
 import request from '../utils/request'
-import { resolveSurfacePrefix } from '../utils/surfaceApi'
 
-function getBasePath() {
-    return resolveSurfacePrefix({
-        admin: '/admin/credentials',
-        ops: '/ops/credentials',
-        app: '/app/credentials',
-    }, 'admin')
+const BASE_PATHS = {
+    admin: '/admin/credentials',
+    app: '/app/credentials',
+    ops: '/ops/credentials',
 }
 
-const credentialApi = {
-    getAccessAreas: (raceId) => request.get(`${getBasePath()}/access-areas/${raceId}`),
-    createAccessArea: (raceId, data) => request.post(`${getBasePath()}/access-areas/${raceId}`, data),
-    updateAccessArea: (raceId, accessAreaId, data) => request.put(`${getBasePath()}/access-areas/${raceId}/${accessAreaId}`, data),
-    deleteAccessArea: (raceId, accessAreaId) => request.delete(`${getBasePath()}/access-areas/${raceId}/${accessAreaId}`),
+export function createCredentialApi(surface) {
+    const basePath = BASE_PATHS[surface]
+    if (!basePath) throw new Error(`Unsupported credential surface: ${surface}`)
 
-    getCategories: (raceId) => request.get(`${getBasePath()}/categories/${raceId}`),
-    createCategory: (raceId, data) => request.post(`${getBasePath()}/categories/${raceId}`, data),
-    updateCategory: (raceId, categoryId, data) => request.put(`${getBasePath()}/categories/${raceId}/${categoryId}`, data),
-    deleteCategory: (raceId, categoryId) => request.delete(`${getBasePath()}/categories/${raceId}/${categoryId}`),
+    return {
+        getAccessAreas: (raceId) => request.get(`${basePath}/access-areas/${raceId}`),
+        createAccessArea: (raceId, data) => request.post(`${basePath}/access-areas/${raceId}`, data),
+        updateAccessArea: (raceId, accessAreaId, data) => request.put(`${basePath}/access-areas/${raceId}/${accessAreaId}`, data),
+        deleteAccessArea: (raceId, accessAreaId) => request.delete(`${basePath}/access-areas/${raceId}/${accessAreaId}`),
 
-    getStyleTemplates: (raceId, options = {}) => request.get(`${getBasePath()}/style-templates/${raceId}`, { params: options }),
-    getStyleTemplate: (raceId, templateId) => request.get(`${getBasePath()}/style-templates/${raceId}/${templateId}`),
-    createStyleTemplate: (raceId, data) => request.post(`${getBasePath()}/style-templates/${raceId}`, data),
-    updateStyleTemplate: (raceId, templateId, data) => request.put(`${getBasePath()}/style-templates/${raceId}/${templateId}`, data),
-    deleteStyleTemplate: (raceId, templateId) => request.delete(`${getBasePath()}/style-templates/${raceId}/${templateId}`),
+        getCategories: (raceId) => request.get(`${basePath}/categories/${raceId}`),
+        createCategory: (raceId, data) => request.post(`${basePath}/categories/${raceId}`, data),
+        updateCategory: (raceId, categoryId, data) => request.put(`${basePath}/categories/${raceId}/${categoryId}`, data),
+        deleteCategory: (raceId, categoryId) => request.delete(`${basePath}/categories/${raceId}/${categoryId}`),
 
-    getRequests: (raceId, options = {}) => request.get(`${getBasePath()}/requests/${raceId}`, { params: options }),
-    getRequest: (raceId, requestId) => request.get(`${getBasePath()}/requests/${raceId}/${requestId}`),
-    createRequest: (raceId, data) => request.post(`${getBasePath()}/requests/${raceId}`, data),
-    reviewRequest: (raceId, requestId, data) => request.post(`${getBasePath()}/requests/${raceId}/${requestId}/review`, data),
+        getStyleTemplates: (raceId, options = {}) => request.get(`${basePath}/style-templates/${raceId}`, { params: options }),
+        getStyleTemplate: (raceId, templateId) => request.get(`${basePath}/style-templates/${raceId}/${templateId}`),
+        createStyleTemplate: (raceId, data) => request.post(`${basePath}/style-templates/${raceId}`, data),
+        updateStyleTemplate: (raceId, templateId, data) => request.put(`${basePath}/style-templates/${raceId}/${templateId}`, data),
+        deleteStyleTemplate: (raceId, templateId) => request.delete(`${basePath}/style-templates/${raceId}/${templateId}`),
 
-    getCredentials: (raceId, options = {}) => request.get(`${getBasePath()}/credentials/${raceId}`, { params: options }),
-    getCredential: (raceId, credentialId) => request.get(`${getBasePath()}/credentials/${raceId}/${credentialId}`),
-    resolveCredential: (qrPayload) => request.post(`${getBasePath()}/scan/resolve`, { qrPayload }),
-    voidCredential: (raceId, credentialId, data) => request.post(`${getBasePath()}/credentials/${raceId}/${credentialId}/void`, data),
-    issueCredential: (raceId, credentialId, data) => request.post(`${getBasePath()}/credentials/${raceId}/${credentialId}/issue`, data),
-    reissueCredential: (raceId, credentialId, data) => request.post(`${getBasePath()}/credentials/${raceId}/${credentialId}/reissue`, data),
-    getCredentialStats: (raceId) => request.get(`${getBasePath()}/stats/${raceId}`),
+        getRequests: (raceId, options = {}) => request.get(`${basePath}/requests/${raceId}`, { params: options }),
+        getRequest: (raceId, requestId) => request.get(`${basePath}/requests/${raceId}/${requestId}`),
+        createRequest: (raceId, data) => request.post(`${basePath}/requests/${raceId}`, data),
+        reviewRequest: (raceId, requestId, data) => request.post(`${basePath}/requests/${raceId}/${requestId}/review`, data),
+
+        getCredentials: (raceId, options = {}) => request.get(`${basePath}/credentials/${raceId}`, { params: options }),
+        getCredential: (raceId, credentialId) => request.get(`${basePath}/credentials/${raceId}/${credentialId}`),
+        resolveCredential: (qrPayload) => request.post(`${basePath}/scan/resolve`, { qrPayload }),
+        voidCredential: (raceId, credentialId, data) => request.post(`${basePath}/credentials/${raceId}/${credentialId}/void`, data),
+        issueCredential: (raceId, credentialId, data) => request.post(`${basePath}/credentials/${raceId}/${credentialId}/issue`, data),
+        reissueCredential: (raceId, credentialId, data) => request.post(`${basePath}/credentials/${raceId}/${credentialId}/reissue`, data),
+        getCredentialStats: (raceId) => request.get(`${basePath}/stats/${raceId}`),
+    }
 }
 
-export default credentialApi
+export const adminCredentialApi = createCredentialApi('admin')
+export const appCredentialApi = createCredentialApi('app')
+export const opsCredentialApi = createCredentialApi('ops')

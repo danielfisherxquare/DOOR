@@ -1,21 +1,23 @@
 import request from '../utils/request'
-import { resolveSurfacePrefix } from '../utils/surfaceApi'
 
-function getBasePath() {
-  return resolveSurfacePrefix({
-    admin: '/admin/bibs',
-    app: '/app/bibs',
-    ops: '/ops/bibs',
-  }, 'ops')
+const BASE_PATHS = {
+  admin: '/admin/bibs',
+  ops: '/ops/bibs',
 }
 
-const bibTrackingApi = {
-  resolveScan: (qrToken) => request.post(`${getBasePath()}/scan/resolve`, { qrToken }),
-  pickup: (qrToken) => request.post(`${getBasePath()}/scan/pickup`, { qrToken }),
-  listItems: (raceId, params) => request.get(`${getBasePath()}/items/${raceId}`, { params }),
-  getStats: (raceId) => request.get(`${getBasePath()}/stats/${raceId}`),
-  getItemDetail: (raceId, itemId) => request.get(`${getBasePath()}/items/${raceId}/${itemId}`),
-  rollbackStatus: (raceId, itemId, payload) => request.post(`${getBasePath()}/items/${raceId}/${itemId}/rollback`, payload),
+export function createBibTrackingApi(surface) {
+  const basePath = BASE_PATHS[surface]
+  if (!basePath) throw new Error(`Unsupported bib tracking surface: ${surface}`)
+
+  return {
+    resolveScan: (qrToken) => request.post(`${basePath}/scan/resolve`, { qrToken }),
+    pickup: (qrToken) => request.post(`${basePath}/scan/pickup`, { qrToken }),
+    listItems: (raceId, params) => request.get(`${basePath}/items/${raceId}`, { params }),
+    getStats: (raceId) => request.get(`${basePath}/stats/${raceId}`),
+    getItemDetail: (raceId, itemId) => request.get(`${basePath}/items/${raceId}/${itemId}`),
+    rollbackStatus: (raceId, itemId, payload) => request.post(`${basePath}/items/${raceId}/${itemId}/rollback`, payload),
+  }
 }
 
-export default bibTrackingApi
+export const adminBibTrackingApi = createBibTrackingApi('admin')
+export const opsBibTrackingApi = createBibTrackingApi('ops')

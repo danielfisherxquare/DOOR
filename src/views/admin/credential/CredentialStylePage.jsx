@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import credentialApi from '../../../api/credential'
+import { adminCredentialApi as credentialApi } from '../../../api/credential'
 import { useCredentialSurface } from './useCredentialSurface'
 
 const STATUS_OPTIONS = [

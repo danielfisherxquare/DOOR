@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import bibApi from '../../../../api/bib'
-import bibTrackingApi from '../../../../api/bibTracking'
+import bibTrackingApi from '../../../../api/app/bibTracking'
 import pipelineApi from '../../../../api/pipeline'
 import useAuthStore from '../../../../stores/authStore'
 import useRaceContextStore from '../../../../stores/raceContextStore'

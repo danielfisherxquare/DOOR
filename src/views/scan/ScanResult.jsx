@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import bibTrackingApi from '../../api/bibTracking'
-import credentialApi from '../../api/credential'
+import { opsBibTrackingApi as bibTrackingApi } from '../../api/bibTracking'
+import { opsCredentialApi as credentialApi } from '../../api/credential'
 import { CommandEmptyState, CommandNotice, CommandPanel, CommandStatusTag } from '../../components/command/CommandPrimitives'
 
 const BIB_STATUS_LABELS = {

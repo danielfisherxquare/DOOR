@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import bibTrackingApi from '../../api/bibTracking'
+import { adminBibTrackingApi as bibTrackingApi } from '../../api/bibTracking'
 import racesApi from '../../api/races'
 import useAuthStore from '../../stores/authStore'
 import {

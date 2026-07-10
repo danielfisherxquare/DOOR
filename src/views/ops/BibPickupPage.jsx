@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { BrowserQRCodeReader } from '@zxing/browser'
-import bibTrackingApi from '../../api/bibTracking'
+import { opsBibTrackingApi as bibTrackingApi } from '../../api/bibTracking'
 
 const BIB_STATUS_LABELS = {
   receipt_printed: '凭条已打印',
