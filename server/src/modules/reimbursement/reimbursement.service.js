@@ -14,6 +14,7 @@ import {
   decryptReimbursementLlmConfig,
   encryptReimbursementLlmConfig,
 } from './reimbursement-llm-secret.js';
+import { createPendingMatchWorkflow } from './reimbursement-pending-match.workflow.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIRECT_PAYMENT_STORAGE_DIR = path.join(__dirname, '../../../storage/reimbursement-payments');
@@ -23,8 +24,8 @@ async function ensureDir(dir) {
   await fs.promises.mkdir(dir, { recursive: true });
 }
 
-async function getNextRecordIndex(projectId) {
-  const maxIndex = await knex('reimbursement_records')
+async function getNextRecordIndex(projectId, database = knex) {
+  const maxIndex = await database('reimbursement_records')
     .where({ project_id: projectId })
     .max('index as max')
     .first();
@@ -32,16 +33,16 @@ async function getNextRecordIndex(projectId) {
   return (maxIndex?.max || 0) + 1;
 }
 
-async function attachPreviewPayment(recordId, previewFileId) {
+async function attachPreviewPayment(recordId, previewFileId, database = knex) {
   if (!previewFileId) return null;
 
-  const previewFile = await knex('reimbursement_preview_files')
+  const previewFile = await database('reimbursement_preview_files')
     .where({ id: previewFileId })
     .first();
 
   if (!previewFile) return null;
 
-  const existing = await knex('reimbursement_attachments')
+  const existing = await database('reimbursement_attachments')
     .where({
       record_id: recordId,
       original_path: previewFile.original_path,
@@ -50,7 +51,7 @@ async function attachPreviewPayment(recordId, previewFileId) {
     .first();
 
   if (!existing) {
-    await knex('reimbursement_attachments')
+    await database('reimbursement_attachments')
       .insert({
         record_id: recordId,
         file_name: previewFile.file_name,
@@ -63,12 +64,12 @@ async function attachPreviewPayment(recordId, previewFileId) {
       });
   }
 
-  await knex('reimbursement_preview_files')
+  await database('reimbursement_preview_files')
     .where({ id: previewFileId })
     .update({
       status: 'recognized',
-      recognized_at: knex.fn.now(),
-      updated_at: knex.fn.now(),
+      recognized_at: database.fn.now(),
+      updated_at: database.fn.now(),
     });
 
   return previewFile;
@@ -271,8 +272,8 @@ function buildReviewRecordData(documentType, ocrResult = {}) {
   return ocrResult || {};
 }
 
-export async function reorderProjectRecordIndexes(projectId) {
-  return knex.transaction(async (trx) => {
+export async function reorderProjectRecordIndexes(projectId, database = knex) {
+  const reorder = async (trx) => {
     const records = await trx('reimbursement_records')
       .where({ project_id: projectId })
       .select('id', 'index', 'category', 'sub_category', 'payment_date');
@@ -310,7 +311,9 @@ export async function reorderProjectRecordIndexes(projectId) {
       ...record,
       index: index + 1,
     }));
-  });
+  };
+
+  return database.isTransaction ? reorder(database) : database.transaction(reorder);
 }
 
 export function buildInvoiceRecordData(invoiceData = {}) {
@@ -540,11 +543,11 @@ export async function persistProcessedPaymentUpload(projectId, processedFileId, 
 /**
  * 将直传付款凭证挂到报销记录
  */
-export async function attachProcessedPayment(recordId, paymentFile = {}) {
+export async function attachProcessedPayment(recordId, paymentFile = {}, database = knex) {
   const processedFileId = paymentFile.processedFileId;
   if (!processedFileId) return null;
 
-  const processedFile = await knex('reimbursement_processed_files')
+  const processedFile = await database('reimbursement_processed_files')
     .where({ id: processedFileId })
     .first();
 
@@ -552,7 +555,7 @@ export async function attachProcessedPayment(recordId, paymentFile = {}) {
     return null;
   }
 
-  const existing = await knex('reimbursement_attachments')
+  const existing = await database('reimbursement_attachments')
     .where({
       record_id: recordId,
       original_path: processedFile.original_path,
@@ -565,7 +568,7 @@ export async function attachProcessedPayment(recordId, paymentFile = {}) {
   }
 
   const thumbnailData = await getFileBufferIfExists(processedFile.thumbnail_path);
-  const [attachment] = await knex('reimbursement_attachments')
+  const [attachment] = await database('reimbursement_attachments')
     .insert({
       record_id: recordId,
       file_name: paymentFile.fileName || processedFile.file_name,
@@ -732,23 +735,23 @@ export async function deleteProject(projectId) {
 /**
  * 更新项目统计
  */
-export async function updateProjectStats(projectId) {
-  const stats = await knex('reimbursement_records')
+export async function updateProjectStats(projectId, database = knex) {
+  const stats = await database('reimbursement_records')
     .where({ project_id: projectId })
     .select(
-      knex.raw('COUNT(*) as record_count'),
-      knex.raw('COALESCE(SUM(income), 0) as total_income'),
-      knex.raw('COALESCE(SUM(expense), 0) as total_expense')
+      database.raw('COUNT(*) as record_count'),
+      database.raw('COALESCE(SUM(income), 0) as total_income'),
+      database.raw('COALESCE(SUM(expense), 0) as total_expense')
     )
     .first();
 
-  await knex('reimbursement_projects')
+  await database('reimbursement_projects')
     .where({ id: projectId })
     .update({
       record_count: stats.record_count,
       total_income: stats.total_income,
       total_expense: stats.total_expense,
-      updated_at: knex.fn.now(),
+      updated_at: database.fn.now(),
     });
 }
 
@@ -1427,51 +1430,82 @@ export async function getPendingMatches(projectId) {
     .orderBy('created_at', 'desc');
 }
 
+const pendingMatchWorkflow = createPendingMatchWorkflow({
+  database: knex,
+  findMatchForUpdate: (trx, matchId) => trx('reimbursement_pending_matches')
+    .where({ id: matchId })
+    .forUpdate()
+    .first(),
+  findTargetRecordForUpdate: (trx, match, targetRecordId) => trx('reimbursement_records')
+    .where({ id: targetRecordId, project_id: match.project_id })
+    .forUpdate()
+    .first(),
+  createRejectedRecord: async (trx, match) => {
+    await trx('reimbursement_projects')
+      .where({ id: match.project_id })
+      .forUpdate()
+      .first('id');
+
+    const paymentData = match.payment_data || {};
+    const recordData = buildStandalonePaymentRecordData(
+      paymentData,
+      '由待匹配付款凭证独立生成'
+    );
+    const reviewedOcrMeta = attachDocumentReview(paymentData.ocrMeta, 'payment', recordData);
+    const [record] = await trx('reimbursement_records')
+      .insert({
+        project_id: match.project_id,
+        user_id: match.user_id,
+        index: await getNextRecordIndex(match.project_id, trx),
+        ...recordData,
+        preview_file_id: paymentData.previewFileId || null,
+        ocr_meta: reviewedOcrMeta,
+      })
+      .returning('*');
+    return record;
+  },
+  attachPaymentEvidence: async (trx, recordId, paymentData) => {
+    await attachPreviewPayment(recordId, paymentData.previewFileId, trx);
+    await attachProcessedPayment(recordId, paymentData, trx);
+  },
+  mergePaymentReview: async (trx, targetRecord, paymentData) => {
+    if (!paymentData.ocrMeta) return;
+    const reviewedOcrMeta = attachDocumentReview(
+      paymentData.ocrMeta,
+      'payment',
+      buildPaymentReviewRecordData(paymentData)
+    );
+    await trx('reimbursement_records')
+      .where({ id: targetRecord.id })
+      .update({
+        ocr_meta: mergeRecordOcrMeta(targetRecord.ocr_meta, 'payment', reviewedOcrMeta),
+        updated_at: trx.fn.now(),
+      });
+  },
+  markMatchResolved: async (trx, match, recordId, status) => {
+    const [updatedMatch] = await trx('reimbursement_pending_matches')
+      .where({ id: match.id, status: 'pending' })
+      .update({
+        status,
+        resolved_record_id: recordId,
+        resolved_at: trx.fn.now(),
+      })
+      .returning('*');
+    return updatedMatch;
+  },
+  refreshProject: async (trx, projectId) => {
+    await updateProjectStats(projectId, trx);
+    await reorderProjectRecordIndexes(projectId, trx);
+  },
+});
+
 /**
  * 解决待匹配项（关联到指定记录）
  * @param {string} matchId - 待匹配项ID
  * @param {string} targetRecordId - 目标记录ID
  */
 export async function resolvePendingMatch(matchId, targetRecordId) {
-  const existingMatch = await knex('reimbursement_pending_matches')
-    .where({ id: matchId })
-    .first();
-
-  if (!existingMatch) return null;
-
-  const targetRecord = await knex('reimbursement_records')
-    .where({ id: targetRecordId, project_id: existingMatch.project_id })
-    .first();
-
-  if (!targetRecord) return null;
-
-  const [match] = await knex('reimbursement_pending_matches')
-    .where({ id: matchId })
-    .update({
-      status: 'resolved',
-      resolved_record_id: targetRecordId,
-      resolved_at: knex.fn.now(),
-    })
-    .returning('*');
-
-  await attachPreviewPayment(targetRecordId, match?.payment_data?.previewFileId);
-  await attachProcessedPayment(targetRecordId, match?.payment_data);
-
-  if (match?.payment_data?.ocrMeta) {
-    const reviewedOcrMeta = attachDocumentReview(
-      match.payment_data.ocrMeta,
-      'payment',
-      buildPaymentReviewRecordData(match.payment_data)
-    );
-    await knex('reimbursement_records')
-      .where({ id: targetRecordId })
-      .update({
-        ocr_meta: mergeRecordOcrMeta(targetRecord.ocr_meta, 'payment', reviewedOcrMeta),
-        updated_at: knex.fn.now(),
-      });
-  }
-
-  return match;
+  return pendingMatchWorkflow.resolve(matchId, targetRecordId);
 }
 
 /**
@@ -1479,42 +1513,7 @@ export async function resolvePendingMatch(matchId, targetRecordId) {
  * @param {string} matchId - 待匹配项ID
  */
 export async function rejectPendingMatch(matchId) {
-  const match = await knex('reimbursement_pending_matches')
-    .where({ id: matchId })
-    .first();
-
-  if (!match) return null;
-
-  const paymentData = match.payment_data || {};
-  const recordData = buildStandalonePaymentRecordData(paymentData, '由待匹配付款凭证独立生成');
-  const reviewedOcrMeta = attachDocumentReview(paymentData.ocrMeta, 'payment', recordData);
-  const [record] = await knex('reimbursement_records')
-    .insert({
-      project_id: match.project_id,
-      user_id: match.user_id,
-      index: await getNextRecordIndex(match.project_id),
-      ...recordData,
-      preview_file_id: paymentData.previewFileId || null,
-      ocr_meta: reviewedOcrMeta,
-    })
-    .returning('*');
-
-  await attachPreviewPayment(record.id, paymentData.previewFileId);
-  await attachProcessedPayment(record.id, paymentData);
-
-  const [updatedMatch] = await knex('reimbursement_pending_matches')
-    .where({ id: matchId })
-    .update({
-      status: 'rejected',
-      resolved_record_id: record.id,
-      resolved_at: knex.fn.now(),
-    })
-    .returning('*');
-
-  await updateProjectStats(match.project_id);
-  await reorderProjectRecordIndexes(match.project_id);
-
-  return updatedMatch;
+  return pendingMatchWorkflow.reject(matchId);
 }
 
 // ==================== 付款凭证匹配逻辑 ====================
