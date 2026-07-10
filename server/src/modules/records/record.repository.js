@@ -12,7 +12,7 @@ import { isHalfEvent } from '../../utils/event-normalizer.js';
 import { recordMapper } from '../../db/mappers/records.js';
 import {
     idNumberBlindIndex,
-    normalizeIdNumber,
+    phoneBlindIndex,
 } from '../../utils/crypto.js';
 
 // super_admin 的 orgId 为 null，此时不加 org_id 过滤
@@ -49,6 +49,7 @@ const UNIQUE_VALUES_ALLOWED = new Set([
 
 // camelCase → snake_case 映射
 const FIELD_MAP = {
+    orgId: 'org_id', raceId: 'race_id',
     namePinyin: 'name_pinyin', idType: 'id_type', idNumber: 'id_number',
     clothingSize: 'clothing_size', emergencyName: 'emergency_name',
     emergencyPhone: 'emergency_phone', bloodType: 'blood_type',
@@ -57,10 +58,12 @@ const FIELD_MAP = {
     bagWindowNo: 'bag_window_no', bagNo: 'bag_no',
     expoWindowNo: 'expo_window_no', bibNumber: 'bib_number',
     bibColor: 'bib_color', _source: '_source', _importedAt: '_imported_at',
+    personalBestFull: 'personal_best_full', personalBestHalf: 'personal_best_half',
     runnerCategory: 'runner_category', auditStatus: 'audit_status',
     rejectReason: 'reject_reason', isLocked: 'is_locked',
     regionType: 'region_type', duplicateCount: 'duplicate_count',
     duplicateSources: 'duplicate_sources',
+    createdAt: 'created_at', updatedAt: 'updated_at',
 };
 
 function toSnake(field) {
@@ -84,7 +87,9 @@ function applyFilters(qb, filters) {
                         // 使用 blind index 进行精确匹配
                         const hash = col === 'id_number'
                             ? idNumberBlindIndex(f.value)
-                            : null; // phone 需要导入 phoneBlindIndex
+                            : col === 'phone'
+                                ? phoneBlindIndex(f.value)
+                                : null;
                         if (hash) qb.where(hashCol, hash);
                     }
                     break;
@@ -118,6 +123,9 @@ function applyFilters(qb, filters) {
                 break;
             case 'equals':
                 qb.where(col, f.value);
+                break;
+            case 'notEquals':
+                qb.whereNot(col, f.value);
                 break;
             case 'startsWith':
                 qb.whereILike(col, `${f.value}%`);
@@ -327,23 +335,39 @@ export async function count(orgId, raceId) {
 
 // ── 单条记录更新（写路径）──────────────────────────────
 
-export async function updateById(orgId, recordId, data) {
+export async function findRecordScope(orgId, recordId, db = knex) {
+    const query = db('records').where({ id: recordId });
+    if (orgId) query.andWhere({ org_id: orgId });
+    const row = await query.first('id', 'org_id', 'race_id');
+    return row ? { id: Number(row.id), orgId: row.org_id, raceId: Number(row.race_id) } : null;
+}
+
+export async function findRecordScopes(orgId, recordIds, db = knex) {
+    if (!Array.isArray(recordIds) || recordIds.length === 0) return [];
+    const query = db('records').whereIn('id', recordIds);
+    if (orgId) query.andWhere({ org_id: orgId });
+    const rows = await query.select('id', 'org_id', 'race_id');
+    return rows.map(row => ({
+        id: Number(row.id),
+        orgId: row.org_id,
+        raceId: Number(row.race_id),
+    }));
+}
+
+export async function updateById(orgId, recordId, data, db = knex) {
     // 先获取现有记录的 raceId（用于加密上下文）
-    const existing = await knex('records')
-        .where({ id: recordId })
-        .select('race_id')
-        .first();
+    const existing = await findRecordScope(orgId, recordId, db);
 
     if (!existing) return null;
 
-    const row = recordMapper.toDbUpdate(data, orgId, existing.race_id);
-    const query = knex('records').where({ id: recordId });
+    const row = recordMapper.toDbUpdate(data, orgId, existing.raceId);
+    const query = db('records').where({ id: recordId });
     if (orgId) query.andWhere({ org_id: orgId });
     const [updated] = await query.update(row).returning('*');
     return updated ? recordMapper.fromDbRow(updated) : null;
 }
 
-export async function bulkUpdate(orgId, updates) {
+export async function bulkUpdate(orgId, updates, db = knex) {
     if (!Array.isArray(updates) || updates.length === 0) {
         return { updated: 0 };
     }
@@ -359,78 +383,67 @@ export async function bulkUpdate(orgId, updates) {
     if (validItems.length === 0) return { updated: 0 };
 
     let updated = 0;
-    await knex.transaction(async (trx) => {
-        // ── 批量获取所有 race_id（1 次查询替代 N 次）──────────
-        const allIds = validItems.map(v => v.recordId);
-        const existingRows = await trx('records')
-            .whereIn('id', allIds)
-            .select('id', 'race_id');
+    const allIds = validItems.map(v => v.recordId);
+    const existingRows = await findRecordScopes(orgId, allIds, db);
+    const raceIdMap = new Map(existingRows.map(row => [row.id, row.raceId]));
 
-        const raceIdMap = new Map();
-        for (const row of existingRows) {
-            raceIdMap.set(row.id, row.race_id);
-        }
+    // ── 逐条 UPDATE（因每条加密数据不同，无法完全批量化）──
+    for (const { recordId, data } of validItems) {
+        const raceId = raceIdMap.get(recordId);
+        if (raceId === undefined) continue;
 
-        // ── 逐条 UPDATE（因每条加密数据不同，无法完全批量化）──
-        for (const { recordId, data } of validItems) {
-            const raceId = raceIdMap.get(recordId);
-            if (raceId === undefined) continue;
+        const row = recordMapper.toDbUpdate(data, orgId, raceId);
+        if (Object.keys(row).length === 0) continue;
 
-            const row = recordMapper.toDbUpdate(data, orgId, raceId);
-            if (Object.keys(row).length === 0) continue;
-
-            const q = trx('records').where({ id: recordId });
-            if (orgId) q.andWhere({ org_id: orgId });
-            const count = await q.update(row);
-            updated += count;
-        }
-    });
+        const q = db('records').where({ id: recordId });
+        if (orgId) q.andWhere({ org_id: orgId });
+        const count = await q.update(row);
+        updated += count;
+    }
 
     return { updated };
 }
 
 // ── 清空赛事数据 ──────────────────────────────────────
 
-export async function deleteByRaceId(orgId, raceId) {
-    return knex.transaction(async (trx) => {
-        // 1. 删除 Records
-        const recordsQuery = trx('records').where({ race_id: raceId });
-        if (orgId) recordsQuery.andWhere({ org_id: orgId });
-        const deletedRecordsCount = await recordsQuery.delete();
+export async function deleteByRaceId(orgId, raceId, db = knex) {
+    // 1. 删除 Records
+    const recordsQuery = db('records').where({ race_id: raceId });
+    if (orgId) recordsQuery.andWhere({ org_id: orgId });
+    const deletedRecordsCount = await recordsQuery.delete();
 
         // 2. 删除 快照 (预抽签、预排号)
-        const snapshotsQuery = trx('pipeline_snapshots').where({ race_id: raceId });
-        if (orgId) snapshotsQuery.andWhere({ org_id: orgId });
-        await snapshotsQuery.delete(); // DB cascade will delete items
+    const snapshotsQuery = db('pipeline_snapshots').where({ race_id: raceId });
+    if (orgId) snapshotsQuery.andWhere({ org_id: orgId });
+    await snapshotsQuery.delete(); // DB cascade will delete items
 
         // 3. 删除 抽签结果
-        const lotteryResultsQuery = trx('lottery_results').where({ race_id: raceId });
-        if (orgId) lotteryResultsQuery.andWhere({ org_id: orgId });
-        await lotteryResultsQuery.delete();
+    const lotteryResultsQuery = db('lottery_results').where({ race_id: raceId });
+    if (orgId) lotteryResultsQuery.andWhere({ org_id: orgId });
+    await lotteryResultsQuery.delete();
 
         // 4. 删除 排号结果
-        const bibAssignmentsQuery = trx('bib_assignments').where({ race_id: raceId });
-        if (orgId) bibAssignmentsQuery.andWhere({ org_id: orgId });
-        await bibAssignmentsQuery.delete();
+    const bibAssignmentsQuery = db('bib_assignments').where({ race_id: raceId });
+    if (orgId) bibAssignmentsQuery.andWhere({ org_id: orgId });
+    await bibAssignmentsQuery.delete();
 
         // 5. 删除 名单 (黑白名单等)
-        const lotteryListsQuery = trx('lottery_lists').where({ race_id: raceId });
-        if (orgId) lotteryListsQuery.andWhere({ org_id: orgId });
-        await lotteryListsQuery.delete();
+    const lotteryListsQuery = db('lottery_lists').where({ race_id: raceId });
+    if (orgId) lotteryListsQuery.andWhere({ org_id: orgId });
+    await lotteryListsQuery.delete();
 
         // 6. 重置 服装库存 (已用量归零，保留实际库存)
-        const clothingQuery = trx('clothing_limits').where({ race_id: raceId });
-        if (orgId) clothingQuery.andWhere({ org_id: orgId });
-        await clothingQuery.update({ used_count: 0 });
+    const clothingQuery = db('clothing_limits').where({ race_id: raceId });
+    if (orgId) clothingQuery.andWhere({ org_id: orgId });
+    await clothingQuery.update({ used_count: 0 });
 
-        return deletedRecordsCount;
-    });
+    return deletedRecordsCount;
 }
 
 // ── 流式导出（返回 Knex stream 用于 NDJSON）──────────
 
-export function streamByRaceId(orgId, raceId) {
-    const query = knex('records').where({ race_id: raceId });
+export function streamByRaceId(orgId, raceId, db = knex) {
+    const query = db('records').where({ race_id: raceId });
     if (orgId) query.andWhere({ org_id: orgId });
     return query.orderBy('id', 'asc').stream();
 }
@@ -481,7 +494,7 @@ export function buildPersonalBestCaseUpdateSql({ items, column, raceId, orgId })
  * @param {Array<{ idNumber: string, netTime: string, raceName?: string, raceDate?: string, event: string }>} results
  * @returns {Promise<{ updated: number }>}
  */
-export async function importVerificationResults(orgId, raceId, results) {
+export async function importVerificationResults(orgId, raceId, results, db = knex) {
     if (!results || results.length === 0) return { updated: 0 };
 
     const safeRaceId = Number(raceId);
@@ -529,30 +542,27 @@ export async function importVerificationResults(orgId, raceId, results) {
     let totalUpdated = 0;
     const BATCH = 500;
 
-    await knex.transaction(async (trx) => {
-        // ── 批量 CASE UPDATE（每 BATCH 条一次 SQL）────────
-        async function batchCaseUpdate(items, column) {
-            for (let i = 0; i < items.length; i += BATCH) {
-                const batch = items.slice(i, i + BATCH);
-                const { sql, params } = buildPersonalBestCaseUpdateSql({
-                    items: batch,
-                    column,
-                    raceId: safeRaceId,
-                    orgId,
-                });
-                const result = await trx.raw(sql, params);
+    // ── 批量 CASE UPDATE（每 BATCH 条一次 SQL）────────
+    async function batchCaseUpdate(items, column) {
+        for (let i = 0; i < items.length; i += BATCH) {
+            const batch = items.slice(i, i + BATCH);
+            const { sql, params } = buildPersonalBestCaseUpdateSql({
+                items: batch,
+                column,
+                raceId: safeRaceId,
+                orgId,
+            });
+            const result = await db.raw(sql, params);
 
-                totalUpdated += result.rowCount || 0;
-            }
+            totalUpdated += result.rowCount || 0;
         }
+    }
 
-        if (fullItems.length > 0) {
-            await batchCaseUpdate(fullItems, 'personal_best_full');
-        }
-        if (halfItems.length > 0) {
-            await batchCaseUpdate(halfItems, 'personal_best_half');
-        }
-    });
-
+    if (fullItems.length > 0) {
+        await batchCaseUpdate(fullItems, 'personal_best_full');
+    }
+    if (halfItems.length > 0) {
+        await batchCaseUpdate(halfItems, 'personal_best_half');
+    }
     return { updated: totalUpdated };
 }

@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import recordsApi from '../../../../api/records'
 import {
+  FILTERABLE_RECORD_FIELDS,
+  changeRecordFilterField,
+  getRecordFilterOperators,
+} from './recordFilters'
+import {
   AppH5DataCard,
   AppH5DataTable,
   AppH5EmptyState,
@@ -36,14 +41,6 @@ function getRecordStatusTone(status) {
   if (/(待|pending|未处理)/i.test(value)) return 'warning'
   return 'neutral'
 }
-
-const FILTER_OPERATORS = [
-  { value: 'equals', label: '等于' },
-  { value: 'contains', label: '包含' },
-  { value: 'startsWith', label: '开头为' },
-  { value: 'endsWith', label: '结尾为' },
-  { value: 'notEquals', label: '不等于' },
-]
 
 export default function RecordsOverviewPanel({
   raceId,
@@ -103,7 +100,7 @@ export default function RecordsOverviewPanel({
 
   useEffect(() => {
     if (records.length > 0) {
-      setAvailableFields(Object.keys(records[0]).filter((key) => !key.startsWith('_')))
+      setAvailableFields(Object.keys(records[0]).filter((key) => FILTERABLE_RECORD_FIELDS.has(key)))
       return
     }
     setAvailableFields([])
@@ -126,9 +123,10 @@ export default function RecordsOverviewPanel({
   }
 
   const updateFilter = (index, key, value) => {
-    setFilters((prev) => prev.map((item, currentIndex) => (
-      currentIndex === index ? { ...item, [key]: value } : item
-    )))
+    setFilters((prev) => prev.map((item, currentIndex) => {
+      if (currentIndex !== index) return item
+      return key === 'field' ? changeRecordFilterField(item, value) : { ...item, [key]: value }
+    }))
   }
 
   const removeFilter = (index) => {
@@ -236,7 +234,7 @@ export default function RecordsOverviewPanel({
               <input
                 type="text"
                 className="input"
-                placeholder="搜索姓名、证件号、手机号..."
+                placeholder="搜索姓名..."
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
                 onKeyDown={(event) => event.key === 'Enter' && handleSearch()}
@@ -277,7 +275,7 @@ export default function RecordsOverviewPanel({
                   value={filter.operator}
                   onChange={(event) => updateFilter(index, 'operator', event.target.value)}
                 >
-                  {FILTER_OPERATORS.map((operator) => (
+                  {getRecordFilterOperators(filter.field).map((operator) => (
                     <option key={operator.value} value={operator.value}>{operator.label}</option>
                   ))}
                 </select>

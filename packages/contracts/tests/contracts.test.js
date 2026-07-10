@@ -4,6 +4,9 @@ import { describe, it } from 'node:test'
 import {
   ApiError,
   ALL_MODULES,
+  RECORD_EXACT_FILTER_FIELDS,
+  RECORD_FILTER_FIELDS,
+  RECORD_SORT_FIELDS,
   SURFACES,
   WORKSPACE_SCOPE_TYPES,
   createErrorResponse,
@@ -97,5 +100,13 @@ describe('shared contracts', () => {
     assert.deepEqual(error.details, { retryable: true })
     assert.equal(error.requestId, 'req-8')
     assert.equal(error.cause, cause)
+  })
+
+  it('shares record filter and sort fields across server and frontend', () => {
+    assert.equal(RECORD_FILTER_FIELDS.includes('event'), true)
+    assert.equal(RECORD_FILTER_FIELDS.includes('orgId'), false)
+    assert.deepEqual(RECORD_EXACT_FILTER_FIELDS, ['phone', 'idNumber'])
+    assert.equal(RECORD_SORT_FIELDS.includes('createdAt'), true)
+    assert.equal(new Set(RECORD_SORT_FIELDS).size, RECORD_SORT_FIELDS.length)
   })
 })

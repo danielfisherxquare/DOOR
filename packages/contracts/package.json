@@ -7,7 +7,8 @@
     ".": "./src/index.js",
     "./api-error": "./src/api-error.js",
     "./response": "./src/response.js",
-    "./module-catalog": "./src/module-catalog.js"
+    "./module-catalog": "./src/module-catalog.js",
+    "./record-fields": "./src/record-fields.js"
   },
   "scripts": {
     "test": "node --test tests/contracts.test.js"
