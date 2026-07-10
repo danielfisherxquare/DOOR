@@ -87,10 +87,11 @@ export async function getBatches(orgId, filters = {}) {
     return query.orderBy('created_at', 'desc');
 }
 
-export async function getBatchById(orgId, batchId, db) {
-    return dbOrKnex(db)('org_inventory_batches')
+export async function getBatchById(orgId, batchId, db, options = {}) {
+    const query = dbOrKnex(db)('org_inventory_batches')
         .where({ org_id: orgId, id: batchId })
         .first();
+    return options.forUpdate ? query.forUpdate() : query;
 }
 
 export async function createBatch(orgId, data) {
@@ -110,11 +111,31 @@ export async function createBatch(orgId, data) {
 }
 
 export async function updateBatch(orgId, batchId, data, db) {
-    const [result] = await dbOrKnex(db)('org_inventory_batches')
+    const database = dbOrKnex(db);
+    const updates = {
+        ...(data.batchName !== undefined ? { batch_name: data.batchName } : {}),
+        ...(data.batchType !== undefined ? { batch_type: data.batchType } : {}),
+        ...(data.supplier !== undefined ? { supplier: data.supplier } : {}),
+        ...(data.purchaseDate !== undefined ? { purchase_date: data.purchaseDate } : {}),
+        ...(data.status !== undefined ? { status: data.status } : {}),
+    };
+    const [result] = await database('org_inventory_batches')
         .where({ org_id: orgId, id: batchId })
         .update({
-            ...data,
-            updated_at: dbOrKnex(db).fn.now()
+            ...updates,
+            updated_at: database.fn.now()
+        })
+        .returning('*');
+    return result;
+}
+
+export async function updateBatchQuantity(orgId, batchId, totalQuantity, db) {
+    const database = dbOrKnex(db);
+    const [result] = await database('org_inventory_batches')
+        .where({ org_id: orgId, id: batchId })
+        .update({
+            total_quantity: totalQuantity,
+            updated_at: database.fn.now(),
         })
         .returning('*');
     return result;
@@ -128,8 +149,8 @@ export async function deleteBatch(orgId, batchId) {
 
 // ==================== 物资单元管理 ====================
 
-export async function getUnits(orgId, filters = {}) {
-    const query = knex('org_inventory_units').where({ org_id: orgId });
+export async function getUnits(orgId, filters = {}, db, options = {}) {
+    const query = dbOrKnex(db)('org_inventory_units').where({ org_id: orgId });
 
     if (filters.batchId) {
         query.where('batch_id', filters.batchId);
@@ -144,13 +165,16 @@ export async function getUnits(orgId, filters = {}) {
         query.where('warehouse_id', filters.warehouseId);
     }
 
-    return query.orderBy('created_at', 'desc').limit(filters.limit || 100);
+    query.orderBy('created_at', 'desc').limit(filters.limit || 100);
+    if (options.forUpdate) query.forUpdate();
+    return query;
 }
 
-export async function getUnitByQR(orgId, qrCode) {
-    return knex('org_inventory_units')
+export async function getUnitByQR(orgId, qrCode, db, options = {}) {
+    const query = dbOrKnex(db)('org_inventory_units')
         .where({ org_id: orgId, qr_code: qrCode })
         .first();
+    return options.forUpdate ? query.forUpdate() : query;
 }
 
 export async function getUnitById(orgId, unitId) {
@@ -177,13 +201,14 @@ export async function createUnits(orgId, units, db) {
     return dbOrKnex(db)('org_inventory_units').insert(rows).returning('*');
 }
 
-export async function updateUnitStatus(orgId, unitId, status, extra = {}) {
-    return knex('org_inventory_units')
+export async function updateUnitStatus(orgId, unitId, status, extra = {}, db) {
+    const database = dbOrKnex(db);
+    return database('org_inventory_units')
         .where({ org_id: orgId, id: unitId })
         .update({
             status,
             ...extra,
-            updated_at: knex.fn.now()
+            updated_at: database.fn.now()
         });
 }
 
@@ -226,9 +251,17 @@ export async function createWarehouse(orgId, data) {
 }
 
 export async function updateWarehouse(orgId, warehouseId, data) {
+    const updates = {
+        ...(data.code !== undefined ? { code: data.code } : {}),
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.address !== undefined ? { address: data.address } : {}),
+        ...(data.contact !== undefined ? { contact: data.contact } : {}),
+        ...(data.isDefault !== undefined ? { is_default: data.isDefault } : {}),
+        ...(data.status !== undefined ? { status: data.status } : {}),
+    };
     const [result] = await knex('warehouses')
         .where({ org_id: orgId, id: warehouseId })
-        .update({ ...data, updated_at: knex.fn.now() })
+        .update({ ...updates, updated_at: knex.fn.now() })
         .returning('*');
     return result;
 }
@@ -296,6 +329,13 @@ export async function getRequests(orgId, raceId) {
         .orderBy('created_at', 'desc');
 }
 
+export async function getRequestById(orgId, requestId, db, options = {}) {
+    const query = dbOrKnex(db)('race_material_requests')
+        .where({ org_id: orgId, id: requestId })
+        .first();
+    return options.forUpdate ? query.forUpdate() : query;
+}
+
 export async function createRequest(orgId, data) {
     const [result] = await knex('race_material_requests')
         .insert({
@@ -324,8 +364,8 @@ export async function approveRequest(orgId, requestId, approvedQuantity, approve
     return result;
 }
 
-export async function allocateToRace(orgId, requestId, units) {
-    return knex.transaction(async (trx) => {
+export async function allocateToRace(orgId, requestId, raceId, units, db) {
+    const allocate = async (trx) => {
         // 更新申请状态
         await trx('race_material_requests')
             .where({ org_id: orgId, id: requestId })
@@ -338,22 +378,25 @@ export async function allocateToRace(orgId, requestId, units) {
         // 更新物资状态
         const unitIds = units.map(u => u.id);
         await trx('org_inventory_units')
+            .where({ org_id: orgId })
             .whereIn('id', unitIds)
             .update({
                 status: 'allocated',
                 current_holder_type: 'race',
+                current_holder_id: String(raceId),
                 allocated_at: trx.fn.now(),
                 updated_at: trx.fn.now()
             });
 
         return { success: true, allocated: units.length };
-    });
+    };
+    return db?.isTransaction ? allocate(db) : knex.transaction(allocate);
 }
 
 // ==================== 流转记录 ====================
 
-export async function createTransaction(orgId, data) {
-    const [result] = await knex('inventory_transactions')
+export async function createTransaction(orgId, data, db) {
+    const [result] = await dbOrKnex(db)('inventory_transactions')
         .insert({
             org_id: orgId,
             unit_id: data.unitId,

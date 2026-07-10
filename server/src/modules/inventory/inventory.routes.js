@@ -1,26 +1,32 @@
 import { Router } from 'express';
-import knex from '../../db/knex.js';
 import * as repo from './inventory.repository.js';
 import * as alertService from './inventory.alert.js';
 import * as stocktakingService from './inventory.stocktaking.js';
 import * as reportService from './inventory.report.js';
 import * as workbenchService from './inventory.workbench.js';
 import createInventoryTwinRouter from './inventory.twin.routes.js';
-import * as twinService from './inventory.twin.service.js';
+import {
+    parseBatchPayload,
+    parseBatchUnitPayload,
+    parseInventoryFilters,
+    parseInventoryNote,
+    parseLocationPayload,
+    parseMaterialRequestPayload,
+    parsePreInboundAdvance,
+    parsePreInboundPayload,
+    parseUnitStatusPayload,
+    parseUnitScanPayload,
+    parseWarehousePayload,
+    resolveInventoryOrgId,
+} from './inventory.schema.js';
+import { inventoryWorkflow } from './inventory.workflow.service.js';
 
 const router = Router();
 
 function resolveTargetOrgId(req) {
-    const paramOrgId = req.query.orgId || req.body?.orgId;
-
-    if (paramOrgId) {
-        if (req.authContext?.role !== 'super_admin') {
-            return null;
-        }
-        return paramOrgId;
-    }
-
-    return req.authContext?.orgId;
+    return resolveInventoryOrgId(req.authContext, {
+        orgId: req.query.orgId ?? req.body?.orgId,
+    });
 }
 
 function orgIdRequiredResponse(req, res) {
@@ -109,7 +115,8 @@ router.get('/pre-inbound/items', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await repo.getPreInboundItems(orgId, req.query);
+        const filters = parseInventoryFilters('preInbound', req.query);
+        const data = await repo.getPreInboundItems(orgId, filters);
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -138,7 +145,12 @@ router.post('/pre-inbound/items', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await repo.createPreInboundItem(orgId, req.body, req.authContext.userId);
+        const input = parsePreInboundPayload(req.body);
+        const data = await repo.createPreInboundItem(
+            orgId,
+            input,
+            req.authContext.userId
+        );
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -149,10 +161,11 @@ router.put('/pre-inbound/items/:id', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
+        const input = parsePreInboundPayload(req.body, { partial: true });
         const data = await repo.updatePreInboundItem(
             orgId,
             Number(req.params.id),
-            req.body,
+            input,
             req.authContext.userId
         );
         res.json({ success: true, data });
@@ -165,10 +178,11 @@ router.post('/pre-inbound/items/:id/notes', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
+        const note = parseInventoryNote(req.body);
         const data = await repo.addPreInboundNote(
             orgId,
             Number(req.params.id),
-            req.body.note,
+            note,
             req.authContext.userId
         );
         res.json({ success: true, data });
@@ -181,11 +195,12 @@ router.post('/pre-inbound/items/:id/advance', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
+        const input = parsePreInboundAdvance(req.body);
         const data = await repo.advancePreInboundStage(
             orgId,
             Number(req.params.id),
-            req.body.stage,
-            req.body.note,
+            input.stage,
+            input.note,
             req.authContext.userId
         );
         res.json({ success: true, data });
@@ -213,7 +228,8 @@ router.get('/batches', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await repo.getBatches(orgId, req.query);
+        const filters = parseInventoryFilters('batches', req.query);
+        const data = await repo.getBatches(orgId, filters);
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -239,8 +255,9 @@ router.post('/batches', async (req, res, next) => {
         const targetOrgId = resolveTargetOrgId(req);
         if (!targetOrgId) return orgIdRequiredResponse(req, res);
 
+        const input = parseBatchPayload(req.body);
         const data = await repo.createBatch(targetOrgId, {
-            ...req.body,
+            ...input,
             createdBy: req.authContext.userId,
         });
         res.json({ success: true, data });
@@ -253,7 +270,12 @@ router.put('/batches/:id', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await repo.updateBatch(orgId, Number(req.params.id), req.body);
+        const input = parseBatchPayload(req.body, { partial: true });
+        const data = await repo.updateBatch(
+            orgId,
+            Number(req.params.id),
+            input
+        );
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -275,7 +297,8 @@ router.get('/units', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await repo.getUnits(orgId, req.query);
+        const filters = parseInventoryFilters('units', req.query);
+        const data = await repo.getUnits(orgId, filters);
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -298,54 +321,12 @@ router.get('/units/:qr', async (req, res, next) => {
 
 router.post('/units/batch', async (req, res, next) => {
     try {
-        const { batchId, items } = req.body;
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-
-        const requestedWarehouseId = req.body.warehouseId ? Number(req.body.warehouseId) : null;
-        const result = await knex.transaction(async (trx) => {
-            const batch = await trx('org_inventory_batches')
-                .where({ org_id: orgId, id: batchId })
-                .forUpdate()
-                .first();
-
-            if (!batch) {
-                throw new Error('BATCH_NOT_FOUND');
-            }
-
-            const units = [];
-            const orgCode = orgId.substring(0, 4).toUpperCase();
-            const typeCode = getTypeCode(batch.batch_type);
-            const batchCode = batchId.toString().padStart(4, '0');
-            let seq = await repo.getMaxSequence(orgId, batchId, trx);
-
-            for (const item of items) {
-                for (let i = 0; i < item.quantity; i += 1) {
-                    seq += 1;
-                    const qrCode = `${orgCode}-${typeCode}-${batchCode}-${seq.toString().padStart(6, '0')}`;
-                    units.push({
-                        batchId,
-                        qrCode,
-                        itemType: item.itemType,
-                        itemCategory: item.itemCategory,
-                        itemSpec: item.itemSpec,
-                        warehouseId: item.warehouseId || requestedWarehouseId,
-                        locationId: item.locationId,
-                    });
-                }
-            }
-
-            const createdUnits = await repo.createUnits(orgId, units, trx);
-            await repo.updateBatch(orgId, batchId, {
-                total_quantity: batch.total_quantity + createdUnits.length,
-            }, trx);
-
-            const twinSync = await twinService.syncLegacyUnitsToTwinObjects(orgId, createdUnits, {
-                currentWarehouseId: requestedWarehouseId || undefined,
-                createdBy: req.authContext?.userId || null,
-            }, trx);
-
-            return { units: createdUnits, twinSync };
+        const result = await inventoryWorkflow.createBatchUnits({
+            orgId,
+            userId: req.authContext?.userId,
+            input: parseBatchUnitPayload(req.body),
         });
 
         res.json({
@@ -356,60 +337,20 @@ router.post('/units/batch', async (req, res, next) => {
             twinObjectsUpdated: result.twinSync.updated.length,
         });
     } catch (err) {
-        if (err.message === 'BATCH_NOT_FOUND') {
-            return res.status(400).json({ success: false, message: '批次不存在' });
-        }
         next(err);
     }
 });
 
 router.post('/units/scan', async (req, res, next) => {
     try {
-        const { qrCode, action, raceId, runnerId } = req.body;
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const userId = req.authContext.userId;
-        const normalizedRunnerId = String(runnerId || '').trim();
-
-        const unit = await repo.getUnitByQR(orgId, qrCode);
-        if (!unit) {
-            return res.status(404).json({ success: false, message: '物资不存在' });
-        }
-
-        let result;
-
-        if (action === 'pickup') {
-            if (unit.status !== 'allocated') {
-                return res.status(400).json({ success: false, message: '物资状态异常，无法领取' });
-            }
-            if (!normalizedRunnerId || normalizedRunnerId === 'current_runner_id') {
-                return res.status(400).json({ success: false, message: '请提供真实领取人 ID' });
-            }
-
-            await repo.updateUnitStatus(orgId, unit.id, 'picked', {
-                current_holder_type: 'runner',
-                current_holder_id: normalizedRunnerId,
-                picked_at: knex.fn.now(),
-                picked_by: userId,
-            });
-
-            await repo.createTransaction(orgId, {
-                unitId: unit.id,
-                transactionType: 'pickup',
-                fromHolderType: 'race',
-                fromHolderId: raceId,
-                toHolderType: 'runner',
-                toHolderId: normalizedRunnerId,
-                operatorId: userId,
-                remarks: '扫码领取',
-            });
-
-            result = { success: true, action: 'pickup', unit };
-        } else {
-            result = { success: true, unit };
-        }
-
-        res.json(result);
+        const result = await inventoryWorkflow.scanUnit({
+            orgId,
+            userId: req.authContext.userId,
+            input: parseUnitScanPayload(req.body),
+        });
+        res.json({ success: true, ...result });
     } catch (err) {
         next(err);
     }
@@ -419,7 +360,7 @@ router.put('/units/:id/status', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const { status, ...extra } = req.body;
+        const { status, extra } = parseUnitStatusPayload(req.body);
         await repo.updateUnitStatus(orgId, Number(req.params.id), status, extra);
         res.json({ success: true });
     } catch (err) {
@@ -442,7 +383,8 @@ router.post('/warehouses', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await repo.createWarehouse(orgId, req.body);
+        const input = parseWarehousePayload(req.body);
+        const data = await repo.createWarehouse(orgId, input);
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -453,7 +395,12 @@ router.put('/warehouses/:id', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await repo.updateWarehouse(orgId, Number(req.params.id), req.body);
+        const input = parseWarehousePayload(req.body, { partial: true });
+        const data = await repo.updateWarehouse(
+            orgId,
+            Number(req.params.id),
+            input
+        );
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -487,7 +434,8 @@ router.post('/locations', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await repo.createLocation(orgId, req.body);
+        const input = parseLocationPayload(req.body);
+        const data = await repo.createLocation(orgId, input);
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -522,7 +470,8 @@ router.post('/requests', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await repo.createRequest(orgId, req.body);
+        const input = parseMaterialRequestPayload(req.body);
+        const data = await repo.createRequest(orgId, input);
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -551,25 +500,10 @@ router.post('/requests/:id/allocate', async (req, res, next) => {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
 
-        const request = await knex('race_material_requests')
-            .where({ org_id: orgId, id: Number(req.params.id) })
-            .first();
-
-        if (!request || request.status !== 'approved') {
-            return res.status(400).json({ success: false, message: '申请未审批通过' });
-        }
-
-        const units = await repo.getUnits(orgId, {
-            itemType: request.item_type,
-            status: 'in_stock',
-            limit: request.approved_quantity,
+        const result = await inventoryWorkflow.allocateRequest({
+            orgId,
+            requestId: Number(req.params.id),
         });
-
-        if (units.length < request.approved_quantity) {
-            return res.status(400).json({ success: false, message: '库存不足' });
-        }
-
-        const result = await repo.allocateToRace(orgId, Number(req.params.id), units);
         res.json({ success: true, ...result });
     } catch (err) {
         next(err);
@@ -798,16 +732,5 @@ router.get('/reports/snapshot/:date', async (req, res, next) => {
         next(err);
     }
 });
-
-function getTypeCode(type) {
-    const codes = {
-        clothing: 'CLOTH',
-        medal: 'MEDAL',
-        bag: 'BAG',
-        bib: 'BIB',
-    };
-
-    return codes[type] || 'OTHER';
-}
 
 export default router;

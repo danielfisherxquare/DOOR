@@ -4,7 +4,6 @@
     "src/modules/column-mappings/column-mapping.routes.js",
     "src/modules/dictionary/dictionary.routes.js",
     "src/modules/health/health.routes.js",
-    "src/modules/inventory/inventory.routes.js",
     "src/modules/operation-log/operation-log.routes.js",
     "src/modules/pipeline/pipeline-config.routes.js",
     "src/modules/projects/projects.controller.js",
@@ -15,19 +14,6 @@
   "rawRequestPersistenceCalls": [
     "src/modules/clothing/clothing.routes.js:clothingRepo.saveLimit",
     "src/modules/clothing/clothing.routes.js:clothingRepo.saveLimits",
-    "src/modules/inventory/inventory.routes.js:repo.addPreInboundNote",
-    "src/modules/inventory/inventory.routes.js:repo.advancePreInboundStage",
-    "src/modules/inventory/inventory.routes.js:repo.createBatch",
-    "src/modules/inventory/inventory.routes.js:repo.createLocation",
-    "src/modules/inventory/inventory.routes.js:repo.createPreInboundItem",
-    "src/modules/inventory/inventory.routes.js:repo.createRequest",
-    "src/modules/inventory/inventory.routes.js:repo.createWarehouse",
-    "src/modules/inventory/inventory.routes.js:repo.getBatches",
-    "src/modules/inventory/inventory.routes.js:repo.getPreInboundItems",
-    "src/modules/inventory/inventory.routes.js:repo.getUnits",
-    "src/modules/inventory/inventory.routes.js:repo.updateBatch",
-    "src/modules/inventory/inventory.routes.js:repo.updatePreInboundItem",
-    "src/modules/inventory/inventory.routes.js:repo.updateWarehouse",
     "src/modules/pipeline/pipeline-config.routes.js:pipelineRepo.savePerformanceRule",
     "src/modules/pipeline/pipeline-config.routes.js:pipelineRepo.saveStartZone"
   ]
