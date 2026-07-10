@@ -8,6 +8,7 @@ test('terrain page delegates status presentation to focused components', async (
   const source = await readFile(new URL('src/views/app/terrain-model/TerrainModelPage.jsx', rootUrl), 'utf8')
   const lineCount = source.split('\n').length
 
-  assert.ok(lineCount <= 3850, `TerrainModelPage.jsx has ${lineCount} lines; expected no more than 3850`)
+  assert.ok(lineCount <= 3700, `TerrainModelPage.jsx has ${lineCount} lines; expected no more than 3700`)
   assert.match(source, /from '\.\/TerrainStatusPanels'/)
+  assert.match(source, /from '\.\/TerrainDeliveryPanel'/)
 })

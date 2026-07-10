@@ -1420,6 +1420,7 @@ test('recommendModelDimensionsForTrack treats long side as the total print size 
 test('TerrainModelPage shows generated relief, real-scale relief, and vertical exaggeration stats', () => {
   const source = [
     '../../src/views/app/terrain-model/TerrainModelPage.jsx',
+    '../../src/views/app/terrain-model/TerrainDeliveryPanel.jsx',
     '../../src/views/app/terrain-model/TerrainStatusPanels.jsx',
   ].map((path) => readFileSync(new URL(path, import.meta.url), 'utf8')).join('\n')
 
@@ -1874,6 +1875,7 @@ test('TerrainModelPage surfaces production readiness checks before export', () =
 test('TerrainModelPage groups dense terrain controls into workflow sections and a delivery panel', () => {
   const source = [
     '../../src/views/app/terrain-model/TerrainModelPage.jsx',
+    '../../src/views/app/terrain-model/TerrainDeliveryPanel.jsx',
     '../../src/views/app/terrain-model/TerrainStatusPanels.jsx',
   ].map((path) => readFileSync(new URL(path, import.meta.url), 'utf8')).join('\n')
 
@@ -1890,7 +1892,10 @@ test('TerrainModelPage groups dense terrain controls into workflow sections and 
 })
 
 test('TerrainModelPage surfaces Bambu print handoff slots in the delivery panel', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = [
+    '../../src/views/app/terrain-model/TerrainModelPage.jsx',
+    '../../src/views/app/terrain-model/TerrainDeliveryPanel.jsx',
+  ].map((path) => readFileSync(new URL(path, import.meta.url), 'utf8')).join('\n')
   const styles = readFileSync(new URL('../../src/views/app/terrain-model/terrain-model.css', import.meta.url), 'utf8')
 
   assert.match(source, /getBambuHandoffFromManifest/)
