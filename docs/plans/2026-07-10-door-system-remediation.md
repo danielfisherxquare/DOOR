@@ -1,8 +1,8 @@
-# DOOR System Remediation Implementation Plan
+# ArcSpro System Remediation Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Restore a reproducible, secure DOOR baseline, then incrementally converge authorization, API contracts, backend modules, frontend surfaces, and GIS/3D code into a verifiable modular monolith.
+**Goal:** Restore a reproducible, secure ArcSpro baseline, then incrementally converge authorization, API contracts, backend modules, frontend surfaces, and GIS/3D code into a verifiable modular monolith.
 
 **Architecture:** Keep one repository and one PostgreSQL database. Separate Web, API, Worker, shared contracts, shared studio models, and test support with npm workspaces only after the clean-install baseline is green. Migrate one vertical slice at a time; the backend remains the authorization authority.
 
@@ -28,7 +28,10 @@ base:   225027def0189cdbc4999638eff6efd3d6e52434
 
 frontend npm ci --ignore-scripts:
   FAIL ERESOLVE @pascal-app/core@0.3.2 -> three@^0.182
-  project -> three@^0.183.2
+  deeper registry check: @pascal-app/viewer@0.3.2 -> three@^0.183
+  first mutually compatible Pascal family: 0.6.x -> three@^0.184
+  next strict-resolution failure: react-leaflet@4.2.1 -> React 18 only
+  React 19-compatible map family: react-leaflet@5.x
 
 server npm ci --ignore-scripts:
   PASS
@@ -61,7 +64,10 @@ Expected: FAIL with the `@pascal-app/core@0.3.2` and `three@^0.182` peer conflic
 Create a test that reads `package.json` and asserts:
 
 ```js
-assert.match(pkg.dependencies.three, /^\^?0\.182(?:\.|$)/)
+assert.equal(pkg.dependencies['@pascal-app/core'], '^0.6.0')
+assert.equal(pkg.dependencies['@pascal-app/viewer'], '^0.6.0')
+assert.equal(pkg.dependencies.three, '^0.184.0')
+assert.equal(pkg.dependencies['react-leaflet'], '^5.0.0')
 assert.equal(pkg.devDependencies['@types/react'].startsWith('^19.'), true)
 assert.equal(pkg.devDependencies['@types/react-dom'].startsWith('^19.'), true)
 assert.ok(pkg.devDependencies.eslint)
@@ -89,16 +95,19 @@ Update `package.json`:
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "three": "^0.182.0"
+    "@pascal-app/core": "^0.6.0",
+    "@pascal-app/viewer": "^0.6.0",
+    "react-leaflet": "^5.0.0",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
-    "eslint": "^8.57.0",
-    "prettier": "^3.3.3",
-    "typescript": "^5.6.0"
+    "@typescript-eslint/eslint-plugin": "^8.63.0",
+    "@typescript-eslint/parser": "^8.63.0",
+    "eslint": "^9.39.1",
+    "prettier": "^3.9.5",
+    "typescript": "^5.9.3"
   }
 }
 ```
