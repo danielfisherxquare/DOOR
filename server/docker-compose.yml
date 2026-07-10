@@ -37,6 +37,11 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
       NODE_ENV: ${NODE_ENV:-development}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      AUTHZ_PROVIDER: ${AUTHZ_PROVIDER:-}
+      FGA_API_URL: ${FGA_API_URL:-}
+      FGA_STORE_ID: ${FGA_STORE_ID:-}
+      FGA_MODEL_ID: ${FGA_MODEL_ID:-}
+      FGA_API_TOKEN: ${FGA_API_TOKEN:-}
       # PII 加密密钥（key-guard 启动时验证一致性）
       PII_ACTIVE_KEY_VERSION: ${PII_ACTIVE_KEY_VERSION:-v1}
       PII_ENCRYPTION_KEY_V1: ${PII_ENCRYPTION_KEY_V1:-}
@@ -82,6 +87,11 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
       NODE_ENV: ${NODE_ENV:-development}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      AUTHZ_PROVIDER: ${AUTHZ_PROVIDER:-}
+      FGA_API_URL: ${FGA_API_URL:-}
+      FGA_STORE_ID: ${FGA_STORE_ID:-}
+      FGA_MODEL_ID: ${FGA_MODEL_ID:-}
+      FGA_API_TOKEN: ${FGA_API_TOKEN:-}
       # PII 加密密钥（名单导入 worker 会生成盲索引）
       PII_ACTIVE_KEY_VERSION: ${PII_ACTIVE_KEY_VERSION:-v1}
       PII_ENCRYPTION_KEY_V1: ${PII_ENCRYPTION_KEY_V1:-}

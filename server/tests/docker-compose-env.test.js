@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const serverRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const compose = readFileSync(resolve(serverRoot, 'docker-compose.yml'), 'utf8');
+const envExample = readFileSync(resolve(serverRoot, '.env.example'), 'utf8');
 
 function serviceBlock(serviceName) {
   const marker = `  ${serviceName}:\n`;
@@ -38,5 +39,23 @@ test('worker receives the same PII key environment as app', () => {
   for (const key of piiKeys) {
     assert.match(appEnv, new RegExp(`\\n      ${key}: \\$`), `app missing ${key}`);
     assert.match(workerEnv, new RegExp(`\\n      ${key}: \\$`), `worker missing ${key}`);
+  }
+});
+
+test('production OpenFGA configuration includes a pinned model id', () => {
+  const appEnv = environmentBlock('app');
+  const workerEnv = environmentBlock('worker');
+  const authzKeys = [
+    'AUTHZ_PROVIDER',
+    'FGA_API_URL',
+    'FGA_STORE_ID',
+    'FGA_MODEL_ID',
+    'FGA_API_TOKEN',
+  ];
+
+  for (const key of authzKeys) {
+    assert.match(appEnv, new RegExp(`\\n      ${key}: \\$`), `app missing ${key}`);
+    assert.match(workerEnv, new RegExp(`\\n      ${key}: \\$`), `worker missing ${key}`);
+    assert.match(envExample, new RegExp(`^${key}=`, 'm'), `.env.example missing ${key}`);
   }
 });

@@ -13,15 +13,15 @@ export function validateOpenFgaConfig(config = {}) {
   const missing = [];
   if (!config.apiUrl) missing.push('apiUrl');
   if (!config.storeId) missing.push('storeId');
+  if (!config.authorizationModelId) missing.push('authorizationModelId');
   if (missing.length > 0) {
     throw new Error(`OpenFGA config missing: ${missing.join(', ')}`);
   }
 }
 
 export function openFgaOptions(config = {}) {
-  return config.authorizationModelId
-    ? { authorizationModelId: config.authorizationModelId }
-    : {};
+  validateOpenFgaConfig(config);
+  return { authorizationModelId: config.authorizationModelId };
 }
 
 export function createOpenFgaClient(config = {}) {

@@ -30,7 +30,20 @@ describe('authz service', () => {
   it('requires OpenFGA configuration when provider is openfga', () => {
     assert.throws(
       () => createAuthzService({ provider: 'openfga', openfgaConfig: {} }),
-      /OpenFGA config missing: apiUrl, storeId/,
+      /OpenFGA config missing: apiUrl, storeId, authorizationModelId/,
+    );
+  });
+
+  it('refuses unpinned OpenFGA decisions', () => {
+    assert.throws(
+      () => createAuthzService({
+        provider: 'openfga',
+        openfgaConfig: {
+          apiUrl: 'http://127.0.0.1:8080',
+          storeId: 'store-1',
+        },
+      }),
+      /authorizationModelId/,
     );
   });
 
