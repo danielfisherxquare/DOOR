@@ -1,6 +1,5 @@
 import knex from '../../db/knex.js';
-import { bibConfigMapper, bibAssignmentMapper } from '../../db/mappers/bib.js';
-import * as snapshotRepo from '../pipeline/snapshot.repository.js';
+import { bibConfigMapper } from '../../db/mappers/bib.js';
 import { decryptField } from '../../utils/crypto.js';
 
 const BATCH_SIZE = 1000;
@@ -16,8 +15,43 @@ const BIB_ELIGIBLE_CONDITION = `(lottery_status IN (${BIB_ELIGIBLE_STATUS_LIST.m
 const NON_S_ZONE_CONDITION = "UPPER(TRIM(COALESCE(lottery_zone, ''))) <> 'S'";
 const EVENT_LABEL_SQL = `COALESCE(NULLIF(TRIM(event), ''), '${DEFAULT_EVENT_LABEL}')`;
 
-function recordsForRace(orgId, raceId) {
-    return knex('records').where({ org_id: orgId, race_id: raceId });
+function recordsForRace(orgId, raceId, database = knex) {
+    return database('records').where({ org_id: orgId, race_id: raceId });
+}
+
+export async function lockRaceScope(orgId, raceId, database) {
+    const row = await database('races')
+        .where({ id: raceId, org_id: orgId })
+        .forUpdate()
+        .first('id');
+    if (!row) {
+        throw Object.assign(new Error('赛事不存在或不可访问'), {
+            status: 404,
+            code: 'BIB_RACE_NOT_FOUND',
+            expose: true,
+        });
+    }
+    return { id: Number(row.id) };
+}
+
+export async function assertNoActiveExecution(orgId, raceId, database = knex) {
+    const running = await database('pipeline_executions')
+        .where({ org_id: orgId, race_id: raceId, status: 'running' })
+        .whereIn('execution_type', ['bib_numbering', 'rollback_bib'])
+        .first('id', 'execution_type');
+    if (running) {
+        throw Object.assign(
+            new Error(`存在正在执行的 ${running.execution_type} 任务 (id=${running.id})`),
+            { status: 409, code: 'CONCURRENT_EXECUTION', expose: true },
+        );
+    }
+}
+
+export async function findTemplateScope(authenticatedOrgId, templateId, database = knex) {
+    const query = database('bib_numbering_configs').where({ id: templateId });
+    if (authenticatedOrgId) query.andWhere({ org_id: authenticatedOrgId });
+    const row = await query.first('id', 'race_id');
+    return row ? { id: Number(row.id), raceId: Number(row.race_id) } : null;
 }
 
 export async function getOverview(orgId, raceId) {
@@ -79,9 +113,9 @@ export async function getTemplates(orgId, raceId) {
     return rows.map(bibConfigMapper.fromDbRow);
 }
 
-export async function upsertTemplate(orgId, data) {
+export async function upsertTemplate(orgId, data, database = knex) {
     const row = bibConfigMapper.toDbInsert(data, orgId);
-    const [result] = await knex('bib_numbering_configs')
+    const [result] = await database('bib_numbering_configs')
         .insert(row)
         .onConflict(['org_id', 'race_id', 'event'])
         .merge({
@@ -89,14 +123,14 @@ export async function upsertTemplate(orgId, data) {
             start_number: row.start_number,
             end_number: row.end_number,
             padding: row.padding,
-            updated_at: knex.fn.now(),
+            updated_at: database.fn.now(),
         })
         .returning('*');
     return bibConfigMapper.fromDbRow(result);
 }
 
-export async function deleteTemplate(orgId, templateId) {
-    return knex('bib_numbering_configs')
+export async function deleteTemplate(orgId, templateId, database = knex) {
+    return database('bib_numbering_configs')
         .where({ id: templateId, org_id: orgId })
         .del();
 }
@@ -168,71 +202,17 @@ export async function getExecutionDataset(orgId, raceId) {
     };
 }
 
-export async function createBibSnapshot(orgId, raceId) {
-    const running = await knex('pipeline_executions')
-        .where({ org_id: orgId, race_id: raceId, execution_type: 'bib_numbering', status: 'running' })
-        .first();
-    if (running) {
-        throw Object.assign(
-            new Error(`existing bib_numbering execution is running (id=${running.id})`),
-            { code: 'CONCURRENT_EXECUTION', statusCode: 409 },
-        );
-    }
-
-    return snapshotRepo.createSnapshot(orgId, raceId, 'pre_bib', {
-        createdBy: 'bib:snapshot',
-    });
+export async function lockAssignmentRecords(orgId, raceId, recordIds, database = knex) {
+    const rows = await database('records')
+        .where({ org_id: orgId, race_id: raceId })
+        .whereIn('id', recordIds)
+        .forUpdate()
+        .select('id');
+    return rows.map((row) => Number(row.id));
 }
 
-export async function hasBibSnapshot(orgId, raceId) {
-    return snapshotRepo.hasSnapshot(orgId, raceId, 'pre_bib');
-}
-
-/**
- * @param {string} orgId
- * @param {number} raceId
- * @param {Array<{recordId, bibNumber, bagWindowNo?, bagNo?, expoWindowNo?, bibColor?}>} assignments
- */
-export async function bulkAssign(orgId, raceId, assignments) {
-    if (!assignments.length) return { updated: 0 };
-
-    const normalizedAssignments = assignments.map((assignment) => ({
-        recordId: Number(assignment.recordId),
-        bibNumber: String(assignment.bibNumber || '').trim(),
-        bagWindowNo: String(assignment.bagWindowNo || '').trim(),
-        bagNo: String(assignment.bagNo || '').trim(),
-        expoWindowNo: String(assignment.expoWindowNo || '').trim(),
-        bibColor: String(assignment.bibColor || '').trim(),
-    })).filter((assignment) => Number.isFinite(assignment.recordId) && assignment.recordId > 0);
-    if (!normalizedAssignments.length) return { updated: 0 };
-
-    const duplicateBibMap = new Map();
-    for (const assignment of normalizedAssignments) {
-        if (!assignment.bibNumber) continue;
-        const owners = duplicateBibMap.get(assignment.bibNumber) || [];
-        owners.push(assignment.recordId);
-        duplicateBibMap.set(assignment.bibNumber, owners);
-    }
-    const duplicateBibEntry = Array.from(duplicateBibMap.entries()).find(([, owners]) => owners.length > 1);
-    if (duplicateBibEntry) {
-        const [bibNumber, owners] = duplicateBibEntry;
-        throw Object.assign(
-            new Error(`排号结果存在重复 bib 号: ${bibNumber}（records: ${owners.join(', ')}）`),
-            { status: 400, expose: true },
-        );
-    }
-
-    const running = await knex('pipeline_executions')
-        .where({ org_id: orgId, race_id: raceId, execution_type: 'bib_numbering', status: 'running' })
-        .first();
-    if (running) {
-        throw Object.assign(
-            new Error(`existing bib_numbering execution is running (id=${running.id})`),
-            { code: 'CONCURRENT_EXECUTION', statusCode: 409 },
-        );
-    }
-
-    const [exec] = await knex('pipeline_executions')
+export async function createExecution(orgId, raceId, database = knex) {
+    const [exec] = await database('pipeline_executions')
         .insert({
             org_id: orgId,
             race_id: raceId,
@@ -240,24 +220,21 @@ export async function bulkAssign(orgId, raceId, assignments) {
             status: 'running',
         })
         .returning('id');
-    const execId = typeof exec === 'object' ? exec.id : exec;
+    return typeof exec === 'object' ? exec.id : exec;
+}
 
-    try {
-        const updated = await knex.transaction(async (trx) => {
-            let updatedCount = 0;
+export async function applyAssignments(orgId, raceId, assignments, database = knex) {
+    let updatedCount = 0;
+    for (let i = 0; i < assignments.length; i += BATCH_SIZE) {
+        const batch = assignments.slice(i, i + BATCH_SIZE);
+        const recordIds = batch.map((assignment) => assignment.recordId);
+        const bibNumbers = batch.map((assignment) => assignment.bibNumber);
+        const bagWindowNos = batch.map((assignment) => assignment.bagWindowNo);
+        const bagNos = batch.map((assignment) => assignment.bagNo);
+        const expoWindowNos = batch.map((assignment) => assignment.expoWindowNo);
+        const bibColors = batch.map((assignment) => assignment.bibColor);
 
-            for (let i = 0; i < normalizedAssignments.length; i += BATCH_SIZE) {
-                const batch = normalizedAssignments.slice(i, i + BATCH_SIZE);
-
-                // Use UNNEST with parameterized arrays for safe bulk update
-                const recordIds = batch.map(a => a.recordId);
-                const bibNumbers = batch.map(a => a.bibNumber);
-                const bagWindowNos = batch.map(a => a.bagWindowNo);
-                const bagNos = batch.map(a => a.bagNo);
-                const expoWindowNos = batch.map(a => a.expoWindowNo);
-                const bibColors = batch.map(a => a.bibColor);
-
-                const result = await trx.raw(`
+        const result = await database.raw(`
                     UPDATE records AS r
                     SET bib_number = v.bib_number,
                         bag_window_no = v.bag_window_no,
@@ -276,75 +253,56 @@ export async function bulkAssign(orgId, raceId, assignments) {
                       AND r.org_id = ?
                       AND r.race_id = ?
                 `, [recordIds, bibNumbers, bagWindowNos, bagNos, expoWindowNos, bibColors, orgId, raceId]);
-
-                updatedCount += result.rowCount || batch.length;
-            }
-
-            for (let i = 0; i < normalizedAssignments.length; i += BATCH_SIZE) {
-                const recordIds = normalizedAssignments
-                    .slice(i, i + BATCH_SIZE)
-                    .map((assignment) => assignment.recordId);
-                await trx('bib_assignments')
-                    .where({ org_id: orgId, race_id: raceId })
-                    .whereIn('record_id', recordIds)
-                    .del();
-            }
-
-            for (let i = 0; i < normalizedAssignments.length; i += BATCH_SIZE) {
-                const batch = normalizedAssignments.slice(i, i + BATCH_SIZE)
-                    .filter((assignment) => assignment.bibNumber)
-                    .map((assignment) => ({
-                        org_id: orgId,
-                        race_id: raceId,
-                        record_id: assignment.recordId,
-                        bib_number: assignment.bibNumber,
-                    }));
-
-                if (batch.length > 0) {
-                    await trx('bib_assignments').insert(batch);
-                }
-            }
-
-            return updatedCount;
-        });
-
-        await knex('pipeline_executions')
-            .where({ id: execId })
-            .update({
-                status: 'succeeded',
-                result: JSON.stringify({ updated }),
-                completed_at: new Date(),
-            });
-
-        return { updated };
-    } catch (err) {
-        await knex('pipeline_executions')
-            .where({ id: execId })
-            .update({
-                status: 'failed',
-                error: err.message,
-                completed_at: new Date(),
-            });
-        throw err;
+        updatedCount += Number(result.rowCount ?? 0);
     }
+
+    for (let i = 0; i < assignments.length; i += BATCH_SIZE) {
+        const recordIds = assignments.slice(i, i + BATCH_SIZE).map((assignment) => assignment.recordId);
+        await database('bib_assignments')
+            .where({ org_id: orgId, race_id: raceId })
+            .whereIn('record_id', recordIds)
+            .del();
+    }
+
+    for (let i = 0; i < assignments.length; i += BATCH_SIZE) {
+        const batch = assignments.slice(i, i + BATCH_SIZE)
+            .filter((assignment) => assignment.bibNumber)
+            .map((assignment) => ({
+                org_id: orgId,
+                race_id: raceId,
+                record_id: assignment.recordId,
+                bib_number: assignment.bibNumber,
+            }));
+        if (batch.length > 0) await database('bib_assignments').insert(batch);
+    }
+
+    return updatedCount;
 }
 
-export async function clearBib(orgId, raceId) {
-    return knex.transaction(async (trx) => {
-        const updated = await trx('records')
-            .where({ org_id: orgId, race_id: raceId })
-            .update({
-                bib_number: null,
-                bag_window_no: null,
-                bag_no: null,
-                expo_window_no: null,
-                bib_color: null,
-            });
+export async function completeExecution(orgId, raceId, executionId, updated, database = knex) {
+    return database('pipeline_executions')
+        .where({ id: executionId, org_id: orgId, race_id: raceId })
+        .update({
+            status: 'succeeded',
+            result: JSON.stringify({ updated }),
+            completed_at: new Date(),
+        });
+}
 
-        const deleted = await trx('bib_assignments')
-            .where({ org_id: orgId, race_id: raceId })
-            .del();
+export async function clearBib(orgId, raceId, database = knex) {
+    const updated = await database('records')
+        .where({ org_id: orgId, race_id: raceId })
+        .update({
+            bib_number: null,
+            bag_window_no: null,
+            bag_no: null,
+            expo_window_no: null,
+            bib_color: null,
+        });
 
-        return { cleared: updated, assignmentsDeleted: deleted };
-    });
+    const deleted = await database('bib_assignments')
+        .where({ org_id: orgId, race_id: raceId })
+        .del();
+
+    return { cleared: updated, assignmentsDeleted: deleted };
 }

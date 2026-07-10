@@ -683,7 +683,7 @@ function BibExecution({ raceId, config, startZones, onReload, showMessage }) {
     }
   };
   const handleExecute = async () => {
-    if (!confirm("\u5F00\u59CB\u6267\u884C\u6392\u53F7\uFF1F\n\n\u26A0\uFE0F \u5C06\u81EA\u52A8\u521B\u5EFA\u6570\u636E\u5E93\u5FEB\u7167\uFF0C\u53EF\u56DE\u6EDA\u5230\u6267\u884C\u524D\u72B6\u6001\u3002\n\u6CE8\u610F\uFF1A\u5FEB\u7167\u8986\u76D6\u6574\u4E2A\u6570\u636E\u5E93\uFF0C\u56DE\u6EDA\u4F1A\u5F71\u54CD\u6240\u6709\u8D5B\u4E8B\u6570\u636E\u3002")) return;
+    if (!confirm("开始执行排号？\n\n⚠️ 将自动创建当前赛事排号字段快照，可回滚到执行前状态。\n快照仅覆盖当前赛事的号码布、存衣窗口、存衣号、博览会窗口和号码布颜色。")) return;
     setRunning(true);
     try {
       const cached = planCacheRef.current;

@@ -12,18 +12,12 @@
  */
 import knex from '../../db/knex.js';
 
-/** pre_lottery 快照保存的 records 字段 */
-const LOTTERY_SNAPSHOT_FIELDS = [
-    'audit_status',
-    'lottery_status',
-    'is_locked',
-    'bib_number',
-    'clothing_size',
-    'runner_category',
-];
+/** pre_lottery 只保存抽签执行实际写入的字段 */
+const LOTTERY_SNAPSHOT_FIELDS = ['lottery_status'];
 
-/** pre_bib 快照额外保存的排号相关字段 */
-const BIB_EXTRA_FIELDS = [
+/** pre_bib 只保存排号执行实际写入的字段 */
+const BIB_SNAPSHOT_FIELDS = [
+    'bib_number',
     'bag_window_no',
     'bag_no',
     'expo_window_no',
@@ -31,11 +25,8 @@ const BIB_EXTRA_FIELDS = [
 ];
 
 /** 根据快照类型决定需要保存哪些字段 */
-function getSnapshotFields(type) {
-    if (type === 'pre_bib') {
-        return [...LOTTERY_SNAPSHOT_FIELDS, ...BIB_EXTRA_FIELDS];
-    }
-    return LOTTERY_SNAPSHOT_FIELDS;
+export function getSnapshotFields(type) {
+    return [...(type === 'pre_bib' ? BIB_SNAPSHOT_FIELDS : LOTTERY_SNAPSHOT_FIELDS)];
 }
 
 /** 分批处理工具函数 — 防止 PG 65535 参数限制 */

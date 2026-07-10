@@ -1,6 +1,5 @@
 {
   "directDatabaseImports": [
-    "src/modules/bib/bib.routes.js",
     "src/modules/calendar/calendar.controller.js",
     "src/modules/column-mappings/column-mapping.routes.js",
     "src/modules/dictionary/dictionary.routes.js",
@@ -16,8 +15,6 @@
     "src/modules/sys-job/sys-job.routes.js"
   ],
   "rawRequestPersistenceCalls": [
-    "src/modules/bib/bib.routes.js:bibRepo.bulkAssign",
-    "src/modules/bib/bib.routes.js:bibRepo.upsertTemplate",
     "src/modules/clothing/clothing.routes.js:clothingRepo.saveLimit",
     "src/modules/clothing/clothing.routes.js:clothingRepo.saveLimits",
     "src/modules/inventory/inventory.routes.js:repo.addPreInboundNote",

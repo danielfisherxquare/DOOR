@@ -66,7 +66,7 @@ export async function rollbackLottery(orgId, raceId) {
         if (!snapshot) {
             throw Object.assign(
                 new Error('无法回滚：抽签快照不存在'),
-                { code: 'NO_SNAPSHOT', statusCode: 400 }
+                { code: 'NO_SNAPSHOT', status: 400, expose: true }
             );
         }
 
@@ -159,7 +159,7 @@ export async function rollbackLottery(orgId, raceId) {
                     completed_at: new Date(),
                 });
 
-            return { success: true, restoredRecords: winners.length };
+            return { restoredRecords: winners.length };
 
         } catch (err) {
             console.error('[rollbackLottery] Error:', err.message, err.stack);
@@ -194,7 +194,7 @@ export async function rollbackBib(orgId, raceId) {
         if (!snapshot) {
             throw Object.assign(
                 new Error('无法回滚：排号快照不存在'),
-                { code: 'NO_SNAPSHOT', statusCode: 400 }
+                { code: 'NO_SNAPSHOT', status: 400, expose: true }
             );
         }
 
@@ -230,7 +230,7 @@ export async function rollbackBib(orgId, raceId) {
                     completed_at: new Date(),
                 });
 
-            return { success: true, restoredCount };
+            return { restoredCount };
 
         } catch (err) {
             console.error('[rollbackBib] Error:', err.message, err.stack);
