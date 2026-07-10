@@ -22,6 +22,8 @@ const INVENTORY_UNIT_STATUSES = new Set([
   'lost',
 ])
 const INVENTORY_HOLDER_TYPES = new Set(['org', 'race', 'runner', 'external'])
+const STOCKTAKING_PLAN_TYPES = new Set(['full', 'partial', 'dynamic'])
+const STOCKTAKING_PLAN_STATUSES = new Set(['draft', 'in_progress', 'completed', 'cancelled'])
 
 function invalid(message, code = 'INVENTORY_INPUT_INVALID', status = 400) {
   const error = validationError(message, undefined, code)
@@ -321,4 +323,75 @@ export function parseUnitStatusPayload(value) {
       current_holder_id: nullableText(data.currentHolderId, 'currentHolderId', { max: 36 }),
     }),
   }
+}
+
+export function parseStocktakingPlanPayload(value) {
+  const data = pickFields(value, ['planName', 'planType', 'warehouseId', 'scope'])
+  const planType = text(data.planType, 'planType', { max: 20, optional: true }) || 'full'
+  if (!STOCKTAKING_PLAN_TYPES.has(planType)) invalid('planType 无效')
+
+  let scope
+  if (data.scope !== undefined && data.scope !== null) {
+    const rawScope = pickFields(data.scope, ['itemTypes', 'locations'], { label: 'scope' })
+    if (rawScope.itemTypes !== undefined && !Array.isArray(rawScope.itemTypes)) {
+      invalid('scope.itemTypes 必须是数组')
+    }
+    if (rawScope.locations !== undefined && !Array.isArray(rawScope.locations)) {
+      invalid('scope.locations 必须是数组')
+    }
+    scope = compact({
+      itemTypes: rawScope.itemTypes?.map((item) => text(item, 'scope.itemTypes', { max: 50 })),
+      locations: rawScope.locations?.map((item) => text(item, 'scope.locations', { max: 100 })),
+    })
+  }
+
+  return compact({
+    planName: text(data.planName, 'planName', { max: 100 }),
+    planType,
+    warehouseId: nullablePositiveInteger(data.warehouseId, 'warehouseId'),
+    scope,
+  })
+}
+
+export function parseStocktakingScanPayload(value) {
+  const data = pickFields(value, [
+    'planId',
+    'qrCode',
+    'actualLocation',
+    'actualStatus',
+    'actualQuantity',
+  ])
+  const actualStatus =
+    text(data.actualStatus, 'actualStatus', { max: 20, optional: true }) || 'in_stock'
+  if (!INVENTORY_UNIT_STATUSES.has(actualStatus)) invalid('actualStatus 无效')
+  return compact({
+    planId: positiveInteger(data.planId, 'planId'),
+    qrCode: text(data.qrCode, 'qrCode', { max: 100 }),
+    actualLocation: nullableText(data.actualLocation, 'actualLocation', { max: 100 }),
+    actualStatus,
+    actualQuantity:
+      data.actualQuantity === undefined || data.actualQuantity === null || data.actualQuantity === ''
+        ? 1
+        : positiveInteger(data.actualQuantity, 'actualQuantity'),
+  })
+}
+
+export function parseStocktakingFilters(kind, value = {}) {
+  const fields = kind === 'plans' ? ['status', 'planType', 'limit'] : ['isMatched']
+  const query = pickFields(value, fields, { label: '查询参数' })
+  if (kind === 'records') {
+    return compact({ isMatched: boolean(query.isMatched, 'isMatched', { optional: true }) })
+  }
+  if (kind !== 'plans') throw new TypeError(`Unknown stocktaking filter kind: ${kind}`)
+  const limit = positiveInteger(query.limit, 'limit', { optional: true })
+  if (limit !== undefined && limit > 500) invalid('limit 必须在 1-500 之间')
+  const status = text(query.status, 'status', { max: 20, optional: true })
+  if (status && !STOCKTAKING_PLAN_STATUSES.has(status)) invalid('status 无效')
+  const planType = text(query.planType, 'planType', { max: 20, optional: true })
+  if (planType && !STOCKTAKING_PLAN_TYPES.has(planType)) invalid('planType 无效')
+  return compact({
+    status,
+    planType,
+    limit,
+  })
 }

@@ -14,12 +14,16 @@ import {
     parseMaterialRequestPayload,
     parsePreInboundAdvance,
     parsePreInboundPayload,
+    parseStocktakingFilters,
+    parseStocktakingPlanPayload,
+    parseStocktakingScanPayload,
     parseUnitStatusPayload,
     parseUnitScanPayload,
     parseWarehousePayload,
     resolveInventoryOrgId,
 } from './inventory.schema.js';
 import { inventoryWorkflow } from './inventory.workflow.service.js';
+import { stocktakingWorkflow } from './inventory.stocktaking.workflow.service.js';
 
 const router = Router();
 
@@ -602,7 +606,8 @@ router.get('/stocktaking/plans', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await stocktakingService.getPlans(orgId, req.query);
+        const filters = parseStocktakingFilters('plans', req.query);
+        const data = await stocktakingService.getPlans(orgId, filters);
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -627,7 +632,8 @@ router.post('/stocktaking/plans', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await stocktakingService.createPlan(orgId, req.body, req.authContext.userId);
+        const input = parseStocktakingPlanPayload(req.body);
+        const data = await stocktakingService.createPlan(orgId, input, req.authContext.userId);
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -638,7 +644,7 @@ router.post('/stocktaking/plans/:id/start', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await stocktakingService.startPlan(orgId, Number(req.params.id));
+        const data = await stocktakingWorkflow.startPlan(orgId, Number(req.params.id));
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -649,7 +655,7 @@ router.post('/stocktaking/plans/:id/complete', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await stocktakingService.completePlan(orgId, Number(req.params.id));
+        const data = await stocktakingWorkflow.completePlan(orgId, Number(req.params.id));
         res.json({ success: true, data });
     } catch (err) {
         next(err);
@@ -660,10 +666,11 @@ router.post('/stocktaking/scan', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await stocktakingService.scanCount(
+        const input = parseStocktakingScanPayload(req.body);
+        const data = await stocktakingWorkflow.scanCount(
             orgId,
-            req.body.planId,
-            req.body,
+            input.planId,
+            input,
             req.authContext.userId
         );
         res.json({ success: true, data });
@@ -676,7 +683,8 @@ router.get('/stocktaking/records/:planId', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await stocktakingService.getRecords(orgId, Number(req.params.planId), req.query);
+        const filters = parseStocktakingFilters('records', req.query);
+        const data = await stocktakingService.getRecords(orgId, Number(req.params.planId), filters);
         res.json({ success: true, data });
     } catch (err) {
         next(err);
