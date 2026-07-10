@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
@@ -66,4 +66,9 @@ test('server test script performs one preflight before test discovery', async ()
   );
   assert.match(packageJson.scripts.test, /tests\/\*\.test\.js/);
   assert.match(packageJson.scripts.test, /tests\/\*\/\*\.test\.js/);
+  assert.match(packageJson.scripts['test:runtime'], /tenant-isolation\.runtime\.js/);
+  await assert.rejects(access(new URL('./tenant-isolation.test.js', import.meta.url)), {
+    code: 'ENOENT',
+  });
+  await assert.doesNotReject(access(new URL('./tenant-isolation.runtime.js', import.meta.url)));
 });

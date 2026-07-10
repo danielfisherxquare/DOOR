@@ -1,5 +1,5 @@
 /**
- * Phase 2 — 多租户隔离测试
+ * Phase 2 — 多租户隔离运行时测试（需要已启动的 API 和测试数据库）
  * 验证两个组织之间的数据严格隔离
  */
 import { describe, it, before, after } from 'node:test';
