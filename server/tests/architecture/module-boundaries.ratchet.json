@@ -9,9 +9,8 @@
     "src/modules/pipeline/pipeline-config.routes.js",
     "src/modules/projects/projects.controller.js",
     "src/modules/races/race.routes.js",
-    "src/modules/reimbursement/invoice.controller.js",
-    "src/modules/reimbursement/reimbursement.controller.js",
-    "src/modules/sys-job/sys-job.routes.js"
+    "src/modules/sys-job/sys-job.routes.js",
+    "src/modules/system-backups/system-backup.routes.js"
   ],
   "rawRequestPersistenceCalls": [
     "src/modules/clothing/clothing.routes.js:clothingRepo.saveLimit",

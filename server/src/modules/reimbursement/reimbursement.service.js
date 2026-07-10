@@ -1104,6 +1104,44 @@ export async function getRecordAttachments(recordId) {
     .where({ record_id: recordId });
 }
 
+export async function getAttachmentById(attachmentId) {
+  return knex('reimbursement_attachments').where({ id: attachmentId }).first();
+}
+
+export async function deleteAttachmentById(attachmentId) {
+  return knex('reimbursement_attachments').where({ id: attachmentId }).del();
+}
+
+export async function updateAttachmentById(attachmentId, updates) {
+  return knex('reimbursement_attachments')
+    .where({ id: attachmentId })
+    .update({
+      file_name: updates.fileName,
+      original_name: updates.originalName,
+      original_path: updates.originalPath,
+      file_size: updates.fileSize,
+      mime_type: updates.mimeType,
+      updated_at: knex.fn.now(),
+    });
+}
+
+export async function getProcessedFile(projectId, processedFileId) {
+  return knex('reimbursement_processed_files')
+    .where({ id: processedFileId, project_id: projectId })
+    .first();
+}
+
+export async function deleteProcessedFile(projectId, processedFileId) {
+  return knex('reimbursement_processed_files')
+    .where({ id: processedFileId, project_id: projectId })
+    .del();
+}
+
+export async function getProjectUserSettings(projectId) {
+  const project = await getProjectById(projectId);
+  return project ? getUserSettings(project.user_id) : null;
+}
+
 // ==================== 用户设置 ====================
 
 /**
@@ -1428,6 +1466,24 @@ export async function getPendingMatches(projectId) {
   return knex('reimbursement_pending_matches')
     .where({ project_id: projectId, status: 'pending' })
     .orderBy('created_at', 'desc');
+}
+
+export async function getPendingMatchesWithCandidates(projectId) {
+  const matches = await getPendingMatches(projectId);
+  const candidateIds = [
+    ...new Set(matches.flatMap((match) => match.candidate_ids || [])),
+  ];
+  const candidates = candidateIds.length > 0
+    ? await knex('reimbursement_records').whereIn('id', candidateIds)
+    : [];
+  const candidateMap = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+
+  return matches.map((match) => ({
+    ...match,
+    candidates: (match.candidate_ids || [])
+      .map((candidateId) => candidateMap.get(candidateId))
+      .filter(Boolean),
+  }));
 }
 
 const pendingMatchWorkflow = createPendingMatchWorkflow({

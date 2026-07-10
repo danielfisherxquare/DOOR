@@ -13,7 +13,6 @@ import * as storage from './invoice.storage.js';
 import * as reimbursementService from './reimbursement.service.js';
 import { resolveOcrConfig, normalizeOcrError } from './reimbursement.controller.js';
 import { processPayment } from './ocr.service.js';
-import knex from '../../db/knex.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STORAGE_DIR = path.join(__dirname, '../../../storage/invoices');
@@ -122,9 +121,7 @@ async function updateInvoiceOCR(req, res, next) {
             return res.status(400).json({ error: 'OCR 结果不能为空' });
         }
 
-        const invoice = await knex('reimbursement_processed_files')
-            .where({ id, project_id: projectId })
-            .first();
+        const invoice = await reimbursementService.getProcessedFile(projectId, id);
 
         if (!invoice) {
             return res.status(404).json({ error: '发票不存在' });
@@ -146,12 +143,9 @@ async function reprocessInvoice(req, res, next) {
 
     try {
         const { projectId, id } = req.params;
-        const { projectId: bodyProjectId } = req.body;
 
         // 获取原始文件
-        const record = await knex('reimbursement_processed_files')
-            .where({ id, project_id: bodyProjectId || projectId })
-            .first();
+        const record = await reimbursementService.getProcessedFile(projectId, id);
 
         if (!record) {
             return res.status(404).json({ error: '发票记录不存在' });
@@ -209,13 +203,9 @@ async function reprocessInvoice(req, res, next) {
         console.error('重新处理发票失败:', error);
 
         if (processingRecord) {
-            await knex('reimbursement_processed_files')
-                .where({ id: processingRecord.id })
-                .update({
-                    status: 'error',
-                    error_message: error.message,
-                    processed_at: knex.fn.now(),
-                });
+            await reimbursementService.updateProcessingStatus(processingRecord.id, 'error', {
+                errorMessage: error.message,
+            });
         }
 
         next(normalizeOcrError(error, '发票识别'));
@@ -230,13 +220,11 @@ async function deleteInvoice(req, res, next) {
     try {
         const { projectId, id } = req.params;
 
-        // 删除文件
+        const deleted = await reimbursementService.deleteProcessedFile(projectId, id);
+        if (!deleted) {
+            return res.status(404).json({ error: '发票不存在' });
+        }
         await storage.deleteInvoiceFiles(projectId, id);
-
-        // 删除数据库记录
-        await knex('reimbursement_processed_files')
-            .where({ id, project_id: projectId })
-            .del();
 
         res.json({ success: true });
     } catch (error) {
@@ -317,13 +305,9 @@ async function uploadAndProcessInvoice(req, res, next) {
         console.error('上传发票失败:', error);
 
         if (processingRecord) {
-            await knex('reimbursement_processed_files')
-                .where({ id: processingRecord.id })
-                .update({
-                    status: 'error',
-                    error_message: error.message,
-                    processed_at: knex.fn.now(),
-                });
+            await reimbursementService.updateProcessingStatus(processingRecord.id, 'error', {
+                errorMessage: error.message,
+            });
         }
 
         next(error);
@@ -402,13 +386,9 @@ async function uploadAndProcessPayment(req, res, next) {
         console.error('上传付款凭证失败:', error);
 
         if (processingRecord) {
-            await knex('reimbursement_processed_files')
-                .where({ id: processingRecord.id })
-                .update({
-                    status: 'error',
-                    error_message: error.message,
-                    processed_at: knex.fn.now(),
-                });
+            await reimbursementService.updateProcessingStatus(processingRecord.id, 'error', {
+                errorMessage: error.message,
+            });
         }
 
         next(error);

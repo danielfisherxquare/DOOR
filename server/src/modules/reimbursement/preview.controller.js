@@ -4,6 +4,7 @@
  */
 
 import * as previewService from './preview.service.js';
+import * as reimbursementService from './reimbursement.service.js';
 
 const DEFAULT_LLM_CONFIG = {
     provider: 'qwen',
@@ -186,10 +187,7 @@ export async function exportWithImages(req, res, next) {
         const { id: projectId } = req.params;
 
         // 获取项目名称
-        const knex = (await import('../../db/knex.js')).default;
-        const project = await knex('reimbursement_projects')
-            .where({ id: projectId })
-            .first();
+        const project = await reimbursementService.getProjectById(projectId);
 
         const projectName = project?.name || '报销单';
         const exportDate = new Date().toISOString().slice(0, 10);
@@ -214,18 +212,5 @@ export async function exportWithImages(req, res, next) {
  * 获取项目设置
  */
 async function getProjectSettings(projectId) {
-    const knex = (await import('../../db/knex.js')).default;
-
-    // 尝试从项目关联的用户设置中获取
-    const project = await knex('reimbursement_projects')
-        .where({ id: projectId })
-        .first();
-
-    if (!project) return null;
-
-    const settings = await knex('reimbursement_user_settings')
-        .where({ user_id: project.user_id })
-        .first();
-
-    return settings;
+    return reimbursementService.getProjectUserSettings(projectId);
 }

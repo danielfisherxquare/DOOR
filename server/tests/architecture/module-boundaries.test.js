@@ -115,7 +115,10 @@ describe('backend module boundaries', () => {
 
     for (const file of await listBoundaryFiles(modulesRoot)) {
       const source = await readFile(file, 'utf8')
-      if (/\bfrom\s+['"][^'"]*\/db\/knex\.js['"]/.test(source)) {
+      if (
+        /\bfrom\s+['"][^'"]*\/db\/knex\.js['"]/.test(source) ||
+        /\bimport\s*\(\s*['"][^'"]*\/db\/knex\.js['"]\s*\)/.test(source)
+      ) {
         violations.push(relativePath(file))
       }
     }

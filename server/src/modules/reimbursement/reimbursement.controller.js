@@ -10,13 +10,13 @@ import path from 'path';
 import { processInvoice, processPayment } from './ocr.service.js';
 import * as service from './reimbursement.service.js';
 import { generateExportWorkbook } from './preview.service.js';
-import knex from '../../db/knex.js';
 import { env } from '../../config/env.js';
 import { attachOcrReview } from './ocr.review.js';
 import {
   maskReimbursementLlmConfig,
   sanitizeReimbursementLlmRequestConfig,
 } from './reimbursement-llm-secret.js';
+import { replaceAttachmentFile } from './reimbursement-attachment.storage.js';
 
 // 配置文件上传
 const upload = multer({
@@ -881,23 +881,8 @@ export async function getProjectErrors(req, res, next) {
 export async function getProjectPendingMatches(req, res, next) {
   try {
     const { id: projectId } = req.params;
-    const matches = await service.getPendingMatches(projectId);
-
-    // 为每个待匹配项获取候选记录详情
-    const matchesWithCandidates = await Promise.all(
-      matches.map(async (match) => {
-        const candidateIds = match.candidate_ids || [];
-        const candidates = candidateIds.length > 0
-          ? await knex('reimbursement_records').whereIn('id', candidateIds)
-          : [];
-        return {
-          ...match,
-          candidates,
-        };
-      })
-    );
-
-    res.json({ matches: matchesWithCandidates });
+    const matches = await service.getPendingMatchesWithCandidates(projectId);
+    res.json({ matches });
   } catch (error) {
     next(error);
   }
@@ -958,15 +943,15 @@ export async function deleteAttachment(req, res, next) {
   try {
     const { id: attachmentId } = req.params;
 
-    const attachment = await knex('reimbursement_attachments')
-      .where({ id: attachmentId })
-      .first();
+    const attachment = await service.getAttachmentById(attachmentId);
 
     if (!attachment) {
       return res.status(404).json({ error: '附件不存在' });
     }
 
-    // 删除文件
+    await service.deleteAttachmentById(attachmentId);
+
+    // 数据库状态已删除，文件清理失败只会留下可回收孤儿文件。
     if (attachment.original_path) {
       try {
         await fs.promises.unlink(attachment.original_path);
@@ -974,11 +959,6 @@ export async function deleteAttachment(req, res, next) {
         console.error('删除附件文件失败:', err);
       }
     }
-
-    // 删除数据库记录
-    await knex('reimbursement_attachments')
-      .where({ id: attachmentId })
-      .del();
 
     res.json({ success: true });
   } catch (error) {
@@ -998,41 +978,17 @@ export async function replaceAttachment(req, res, next) {
       return res.status(400).json({ error: '未上传文件' });
     }
 
-    const attachment = await knex('reimbursement_attachments')
-      .where({ id: attachmentId })
-      .first();
+    const attachment = await service.getAttachmentById(attachmentId);
 
     if (!attachment) {
       return res.status(404).json({ error: '附件不存在' });
     }
 
-    // 更新文件
-    const newFileName = `${Date.now()}_${req.file.originalname}`;
-    const newPath = path.join(path.dirname(attachment.original_path || ''), newFileName);
-
-    // 保存新文件
-    await fs.promises.writeFile(newPath, req.file.buffer);
-
-    // 删除旧文件
-    if (attachment.original_path) {
-      try {
-        await fs.promises.unlink(attachment.original_path);
-      } catch (err) {
-        console.error('删除旧文件失败:', err);
-      }
-    }
-
-    // 更新数据库
-    await knex('reimbursement_attachments')
-      .where({ id: attachmentId })
-      .update({
-        file_name: newFileName,
-        original_name: req.file.originalname,
-        original_path: newPath,
-        file_size: req.file.size,
-        mime_type: req.file.mimetype,
-        updated_at: knex.fn.now(),
-      });
+    await replaceAttachmentFile({
+      attachment,
+      file: req.file,
+      updateRecord: (updates) => service.updateAttachmentById(attachmentId, updates),
+    });
 
     res.json({ success: true });
   } catch (error) {
@@ -1048,9 +1004,7 @@ export async function getAttachmentThumbnail(req, res, next) {
   try {
     const { id: attachmentId } = req.params;
 
-    const attachment = await knex('reimbursement_attachments')
-      .where({ id: attachmentId })
-      .first();
+    const attachment = await service.getAttachmentById(attachmentId);
 
     if (!attachment) {
       return res.status(404).json({ error: '附件不存在' });
@@ -1113,9 +1067,7 @@ export async function getAttachmentImage(req, res, next) {
   try {
     const { id: attachmentId } = req.params;
 
-    const attachment = await knex('reimbursement_attachments')
-      .where({ id: attachmentId })
-      .first();
+    const attachment = await service.getAttachmentById(attachmentId);
 
     if (!attachment) {
       return res.status(404).json({ error: '附件不存在' });
