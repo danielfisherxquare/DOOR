@@ -1,6 +1,3 @@
-// Layout
-export { default as LayoutShell } from './LayoutShell'
-
 // Sidebar
 export { default as Sidebar, SidebarBrand, SidebarNav, SidebarUserCard } from './Sidebar'
 
