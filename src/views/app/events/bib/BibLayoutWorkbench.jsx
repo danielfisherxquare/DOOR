@@ -179,8 +179,9 @@ export default function BibLayoutWorkbench({ raceId }) {
   useEffect(() => {
     let alive = true
     bibApi.getBibDataset(raceId)
-      .then((rows) => {
+      .then((response) => {
         if (!alive) return
+        const rows = Array.isArray(response?.data) ? response.data : []
         const mapped = (rows || []).map(mapDatasetRow)
         const withBib = mapped.filter((row) => row.bibNumber)
         setSampleRows(withBib.length > 0 ? withBib : mapped)

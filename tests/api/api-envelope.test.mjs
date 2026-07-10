@@ -20,3 +20,10 @@ test('audit API reads canonical envelopes explicitly', async () => {
   assert.doesNotMatch(source, /\.then\(/)
   assert.match(source, /response\.data/)
 })
+
+test('bib API returns canonical envelopes without chained unwrapping', async () => {
+  const source = await readFile(new URL('src/api/bib.js', rootUrl), 'utf8')
+
+  assert.doesNotMatch(source, /unwrapData/)
+  assert.doesNotMatch(source, /\.then\(/)
+})

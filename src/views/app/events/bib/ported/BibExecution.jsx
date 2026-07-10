@@ -628,8 +628,8 @@ function BibExecution({ raceId, config, startZones, onReload, showMessage }) {
   const eligibleStatuses = useMemo(() => Array.from(BIB_ELIGIBLE_STATUSES), []);
   const refreshSnapshotState = useCallback(async () => {
     try {
-      const available = await bibApi.hasBibSnapshot(raceId);
-      setHasSnapshot(Boolean(available));
+      const response = await bibApi.hasBibSnapshot(raceId);
+      setHasSnapshot(Boolean(response.data?.hasSnapshot));
     } catch (error) {
       console.error("\u67E5\u8BE2\u6392\u53F7\u5FEB\u7167\u5931\u8D25", error);
       setHasSnapshot(false);
@@ -648,7 +648,8 @@ function BibExecution({ raceId, config, startZones, onReload, showMessage }) {
     }
   }, [startZones]);
   const fetchAndBuildPlan = useCallback(async () => {
-    const dataset = normalizeExecutionDataset(await bibApi.getBibExecutionDataset(raceId));
+    const response = await bibApi.getBibExecutionDataset(raceId);
+    const dataset = normalizeExecutionDataset(response.data);
     const records = dataset.eligibleRecords.map(toDbRecordForBib);
     const nextIssues = buildExecutionDiagnostics(records, config, startZones);
     setIssues(nextIssues);
@@ -693,8 +694,8 @@ function BibExecution({ raceId, config, startZones, onReload, showMessage }) {
         return;
       }
       await bibApi.createBibSnapshot(raceId);
-      const snapshotReady = await bibApi.hasBibSnapshot(raceId);
-      if (!snapshotReady) {
+      const snapshotResponse = await bibApi.hasBibSnapshot(raceId);
+      if (!snapshotResponse.data?.hasSnapshot) {
         throw new Error("\u521B\u5EFA\u6392\u53F7\u5FEB\u7167\u5931\u8D25\uFF0C\u5DF2\u4E2D\u6B62\u6267\u884C");
       }
       if (plan.updates.length + plan.skippedUpdates.length > 0) {

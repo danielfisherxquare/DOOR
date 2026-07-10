@@ -315,21 +315,23 @@ export default function BibPage() {
       const localConfig = sanitizeConfig(parsedConfig)
 
       const [
-        overview,
+        overviewResponse,
         zonesResponse,
-        executionDataset,
+        executionDatasetResponse,
         trackingResponse,
-        templateRows,
+        templatesResponse,
       ] = await Promise.all([
         bibApi.getBibOverview(raceId),
         pipelineApi.getStartZones(raceId),
         bibApi.getBibExecutionDataset(raceId),
         bibTrackingApi.getStats(raceId).catch(() => ({ data: null })),
-        bibApi.getBibTemplates(raceId).catch(() => []),
+        bibApi.getBibTemplates(raceId).catch(() => ({ data: [] })),
       ])
 
       if (requestId !== loadRequestRef.current) return
 
+      const overview = overviewResponse?.data || {}
+      const executionDataset = executionDatasetResponse?.data || {}
       const trackingStats = trackingResponse?.data || trackingResponse || {}
       const byEvent = {}
       for (const item of overview?.eligibleByEvent || []) {
@@ -356,7 +358,7 @@ export default function BibPage() {
         bibNumber: String(record.bibNumber || ''),
       })))
 
-      setTemplates(Array.isArray(templateRows) ? templateRows : [])
+      setTemplates(Array.isArray(templatesResponse?.data) ? templatesResponse.data : [])
 
       const zoneList = Array.isArray(zonesResponse?.data) ? zonesResponse.data : []
       const mappedEligibleRecords = Array.isArray(executionDataset?.eligibleRecords)
