@@ -31,6 +31,8 @@ test('worker receives the same PII key environment as app', () => {
     'PII_ACTIVE_KEY_VERSION',
     'PII_ENCRYPTION_KEY_V1',
     'PII_HMAC_KEY_V1',
+    'PII_ENCRYPTION_KEY_V2',
+    'PII_HMAC_KEY_V2',
   ];
 
   for (const key of piiKeys) {
