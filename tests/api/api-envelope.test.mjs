@@ -27,3 +27,11 @@ test('bib API returns canonical envelopes without chained unwrapping', async () 
   assert.doesNotMatch(source, /unwrapData/)
   assert.doesNotMatch(source, /\.then\(/)
 })
+
+test('import APIs return canonical envelopes without local unwrap helpers', async () => {
+  for (const relativePath of ['src/api/column-mappings.js', 'src/api/import-session.js']) {
+    const source = await readFile(new URL(relativePath, rootUrl), 'utf8')
+    assert.doesNotMatch(source, /function unwrap/)
+    assert.doesNotMatch(source, /\.then\(/)
+  }
+})

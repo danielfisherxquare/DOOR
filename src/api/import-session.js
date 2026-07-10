@@ -15,31 +15,27 @@ function getJobsBasePath() {
   }, 'app')
 }
 
-function unwrap(response) {
-  return response?.data ?? response
-}
-
 export const importSessionApi = {
   create: (raceId) => {
     const params = raceId ? { raceId } : {}
-    return request.post(getBasePath(), params).then(unwrap)
+    return request.post(getBasePath(), params)
   },
 
-  get: (sessionId) => request.get(`${getBasePath()}/${sessionId}`).then(unwrap),
+  get: (sessionId) => request.get(`${getBasePath()}/${sessionId}`),
 
-  setSummary: (sessionId, summary) => request.put(`${getBasePath()}/${sessionId}/summary`, summary).then(unwrap),
+  setSummary: (sessionId, summary) => request.put(`${getBasePath()}/${sessionId}/summary`, summary),
 
-  appendChunk: (sessionId, rows) => request.post(`${getBasePath()}/${sessionId}/chunks`, rows).then(unwrap),
+  appendChunk: (sessionId, rows) => request.post(`${getBasePath()}/${sessionId}/chunks`, rows),
 
   getChunk: (sessionId, offset, limit) =>
-    request.get(`${getBasePath()}/${sessionId}/chunks`, { params: { offset, limit } }).then(unwrap),
+    request.get(`${getBasePath()}/${sessionId}/chunks`, { params: { offset, limit } }),
 
-  clear: (sessionId) => request.delete(`${getBasePath()}/${sessionId}`).then(unwrap),
+  clear: (sessionId) => request.delete(`${getBasePath()}/${sessionId}`),
 
   commit: (sessionId, raceId, category) =>
-    request.post(`${getBasePath()}/${sessionId}/commit`, { raceId, category }).then(unwrap),
+    request.post(`${getBasePath()}/${sessionId}/commit`, { raceId, category }),
 
-  getJobStatus: (jobId) => request.get(`${getJobsBasePath()}/${jobId}`).then(unwrap),
+  getJobStatus: (jobId) => request.get(`${getJobsBasePath()}/${jobId}`),
 }
 
 export default importSessionApi

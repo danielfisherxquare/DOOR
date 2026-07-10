@@ -84,10 +84,11 @@ export default function ImportPage() {
           if (role === 'super_admin' && !scopedOrgId) {
             throw new Error('super_admin 未锁定机构时跳过映射记忆读取')
           }
-          const effectiveMappings = await columnMappingsApi.getAll({
+          const response = await columnMappingsApi.getAll({
             scope: 'effective',
             orgId: scopedOrgId,
           })
+          const effectiveMappings = Array.isArray(response.data) ? response.data : []
           if (effectiveMappings.length > 0) {
             savedMappings = {}
             for (const mapping of effectiveMappings) {

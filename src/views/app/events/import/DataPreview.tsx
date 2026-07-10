@@ -57,8 +57,10 @@ export default function DataPreview({ raceId }: { raceId: string | null }) {
       importSessionApi.get(importSessionId),
       importSessionApi.getChunk(importSessionId, 0, PREVIEW_LIMIT),
     ])
-      .then(([info, rows]) => {
+      .then(([infoResponse, rowsResponse]) => {
         if (cancelled) return
+        const info = infoResponse.data
+        const rows = rowsResponse.data
         setPreviewRows(rows as MergedRow[])
         setTotalRows(info.totalRows || info.rawCount || rows.length)
         setImportSession(info.id, info.totalRows || info.rawCount || rows.length)
@@ -102,12 +104,14 @@ export default function DataPreview({ raceId }: { raceId: string | null }) {
     setJobMessage('正在提交...')
     setNotice('')
     try {
-      const { jobId } = await importSessionApi.commit(importSessionId, parsedRaceId, category)
+      const commitResponse = await importSessionApi.commit(importSessionId, parsedRaceId, category)
+      const { jobId } = commitResponse.data
 
       let finished = false
       while (!finished) {
         await new Promise((resolve) => setTimeout(resolve, 1000))
-        const job = await importSessionApi.getJobStatus(jobId) as JobStatusResponse
+        const jobResponse = await importSessionApi.getJobStatus(jobId)
+        const job = jobResponse.data as JobStatusResponse
         setJobProgress(job.progress || 0)
         setJobMessage(job.message || '')
 
@@ -148,7 +152,8 @@ export default function DataPreview({ raceId }: { raceId: string | null }) {
       const allRows: MergedRow[] = []
       let offset = 0
       while (true) {
-        const chunk = await importSessionApi.getChunk(importSessionId, offset, EXPORT_CHUNK_SIZE)
+        const chunkResponse = await importSessionApi.getChunk(importSessionId, offset, EXPORT_CHUNK_SIZE)
+        const chunk = chunkResponse.data as MergedRow[]
         if (!chunk.length) break
         allRows.push(...(chunk as MergedRow[]))
         offset += chunk.length

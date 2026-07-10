@@ -8,10 +8,6 @@ function getBasePath() {
   }, 'app')
 }
 
-function unwrap(response) {
-  return response?.data ?? response
-}
-
 /**
  * 列映射 API — 应用层 /api/app/column-mappings，后台层 /api/admin/column-mappings。
  */
@@ -24,7 +20,7 @@ export const columnMappingsApi = {
     if (options?.scope) params.set('scope', options.scope)
     if (options?.orgId) params.set('orgId', options.orgId)
     const suffix = params.toString() ? `?${params.toString()}` : ''
-    return request.get(`${getBasePath()}${suffix}`).then(unwrap)
+    return request.get(`${getBasePath()}${suffix}`)
   },
 
   /**
@@ -34,7 +30,7 @@ export const columnMappingsApi = {
     mappings,
     scope: options?.scope,
     orgId: options?.orgId,
-  }).then(unwrap),
+  }),
 
   /**
    * 批量删除映射
@@ -45,7 +41,7 @@ export const columnMappingsApi = {
       scope: options?.scope,
       orgId: options?.orgId,
     },
-  }).then(unwrap),
+  }),
 
   /**
    * 清空所有映射
@@ -55,7 +51,7 @@ export const columnMappingsApi = {
     if (options?.scope) params.set('scope', options.scope)
     if (options?.orgId) params.set('orgId', options.orgId)
     const suffix = params.toString() ? `?${params.toString()}` : ''
-    return request.delete(`${getBasePath()}/all${suffix}`).then(unwrap)
+    return request.delete(`${getBasePath()}/all${suffix}`)
   },
 }
 

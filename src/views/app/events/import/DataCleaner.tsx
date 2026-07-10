@@ -112,7 +112,8 @@ export default function DataCleaner({ raceId }: { raceId: string | null }) {
           throw new Error('请先选择赛事后再执行导入')
         }
 
-        const created = await importSessionApi.create(parsedRaceId)
+        const createResponse = await importSessionApi.create(parsedRaceId)
+        const created = createResponse.data
         if (disposed || runId !== runIdRef.current) {
           await importSessionApi.clear(created.id).catch(() => false)
           return
@@ -141,7 +142,8 @@ export default function DataCleaner({ raceId }: { raceId: string | null }) {
 
             appendQueue = appendQueue.then(async () => {
               if (!sessionId) return
-              const appendResult = await importSessionApi.appendChunk(sessionId, payload.rows)
+              const appendResponse = await importSessionApi.appendChunk(sessionId, payload.rows)
+              const appendResult = appendResponse.data
               if (appendResult?.totalRows) {
                 setImportSession(sessionId, appendResult.totalRows)
               }
