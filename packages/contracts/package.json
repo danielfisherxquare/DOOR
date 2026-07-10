@@ -1,0 +1,19 @@
+{
+  "name": "@arcspro/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./api-error": "./src/api-error.js",
+    "./response": "./src/response.js",
+    "./module-catalog": "./src/module-catalog.js"
+  },
+  "scripts": {
+    "test": "node --test tests/contracts.test.js"
+  },
+  "engines": {
+    "node": ">=20.19 <25",
+    "npm": ">=10 <12"
+  }
+}

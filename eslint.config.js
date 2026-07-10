@@ -21,7 +21,7 @@ export default [
     ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'server/**', 'public/**'],
   },
   {
-    files: ['src/**/*.{js,jsx}', 'tests/**/*.{js,mjs}'],
+    files: ['src/**/*.{js,jsx}', 'tests/**/*.{js,mjs}', 'packages/**/*.{js,mjs}'],
     languageOptions: {
       ecmaVersion: 'latest',
       globals: sharedGlobals,
