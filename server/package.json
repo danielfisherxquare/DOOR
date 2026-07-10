@@ -20,6 +20,7 @@
     "test:safety": "node ./tests/support/test-environment.mjs && node --import ./tests/support/test-environment.mjs --test tests/test-environment.test.js",
     "test:unit": "node ./tests/support/test-environment.mjs && node --import ./tests/support/test-environment.mjs --test tests/test-environment.test.js",
     "test:contracts": "node --test ../packages/contracts/tests/contracts.test.js",
+    "test:architecture": "node --test tests/architecture/*.test.js tests/http/*.test.js",
     "test:integration": "node ./tests/support/test-environment.mjs && node --import ./tests/support/test-environment.mjs --test --test-concurrency=1 tests/*.test.js tests/*/*.test.js",
     "load:bib-tracking": "node --env-file-if-exists=.env scripts/load-bib-tracking.mjs"
   },
