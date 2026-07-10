@@ -1,5 +1,6 @@
 import axios from 'axios'
-import useAuthStore from '../stores/authStore'
+import { ApiError, isApiErrorResponse } from '@arcspro/contracts'
+import { notifyAuthExpired, readAccessToken } from '../auth/auth-session-adapter.js'
 
 function remapApiPath(url) {
   if (typeof url !== 'string' || !url.startsWith('/')) return url
@@ -29,7 +30,8 @@ const request = axios.create({
 
 function isInvalidAuthResponse(error) {
   const status = error.response?.status
-  const message = error.response?.data?.message || error.response?.data?.error || ''
+  const responseData = error.response?.data
+  const message = responseData?.error?.message || responseData?.message || responseData?.error || ''
   return status === 401 || (
     status === 404 &&
     typeof message === 'string' &&
@@ -37,24 +39,44 @@ function isInvalidAuthResponse(error) {
   )
 }
 
-function forceLocalLogout() {
-  useAuthStore.setState({
-    user: null,
-    token: null,
-    refreshToken: null,
-    isAuthenticated: false,
-    error: null,
+function getRequestId(error) {
+  return error.response?.data?.requestId
+    || error.response?.headers?.['x-request-id']
+    || ''
+}
+
+function toApiError(error) {
+  const responseData = error.response?.data
+  const structuredError = isApiErrorResponse(responseData) ? responseData.error : null
+  const isHtmlError = typeof responseData === 'string' && responseData.trim().startsWith('<')
+  const legacyError = typeof responseData?.error === 'string' ? responseData.error : null
+  const status = Number.isInteger(error.response?.status) ? error.response.status : 0
+  const message =
+    structuredError?.message
+    || responseData?.message
+    || legacyError
+    || (isHtmlError ? 'API 返回了 HTML 错误页，请检查后端服务或 Nginx /api 反代配置' : null)
+    || error.message
+    || '请求失败'
+
+  return new ApiError(message, {
+    code: structuredError?.code || (status ? `HTTP_${status}` : 'NETWORK_ERROR'),
+    status,
+    details: structuredError?.details,
+    requestId: getRequestId(error),
+    cause: error,
   })
+}
 
-  try {
-    window.localStorage.removeItem('auth-storage')
-  } catch {
-    // ignore storage cleanup failures
+function handleRequestError(error) {
+  if (isInvalidAuthResponse(error)) {
+    notifyAuthExpired({
+      status: error.response?.status || 0,
+      requestId: getRequestId(error),
+    })
   }
 
-  if (window.location.pathname !== '/login') {
-    window.location.href = '/login'
-  }
+  return Promise.reject(toApiError(error))
 }
 
 // 用于 OCR 识别等长时间请求的 axios 实例（10 分钟超时）
@@ -63,30 +85,11 @@ export const requestWithLongTimeout = axios.create({
   timeout: 600000
 })
 
-/**
- * 获取认证 Token（从 request 默认头或 localStorage）
- */
-function getAuthToken() {
-  // 优先从 request 默认头获取
-  const storeToken = request.defaults?.headers?.common?.Authorization
-  if (storeToken) {
-    return String(storeToken).replace(/^Bearer\s+/i, '')
-  }
-
-  // 回退到 localStorage
-  try {
-    const persisted = JSON.parse(window.localStorage.getItem('auth-storage') || '{}')
-    return persisted?.state?.token || ''
-  } catch {
-    return ''
-  }
-}
-
 // 为长超时实例添加相同的请求拦截器和响应拦截器
 requestWithLongTimeout.interceptors.request.use(
   (config) => {
     config.url = remapApiPath(config.url)
-    const token = getAuthToken()
+    const token = readAccessToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -102,28 +105,13 @@ requestWithLongTimeout.interceptors.request.use(
 // 为长超时实例添加响应拦截器，处理 401 错误
 requestWithLongTimeout.interceptors.response.use(
   (response) => response.data,
-  (error) => {
-    if (isInvalidAuthResponse(error)) {
-      forceLocalLogout()
-    }
-
-    const responseData = error.response?.data
-    const isHtmlError = typeof responseData === 'string' && responseData.trim().startsWith('<')
-    const message =
-      responseData?.message ||
-      responseData?.error ||
-      (isHtmlError ? 'API 返回了 HTML 错误页，请检查后端服务或 Nginx /api 反代配置' : null) ||
-      error.message ||
-      '请求失败'
-
-    return Promise.reject(new Error(message))
-  }
+  handleRequestError,
 )
 
 request.interceptors.request.use(
   (config) => {
     config.url = remapApiPath(config.url)
-    const token = useAuthStore.getState().token
+    const token = readAccessToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -137,22 +125,7 @@ request.interceptors.request.use(
 
 request.interceptors.response.use(
   (response) => response.data,
-  (error) => {
-    if (isInvalidAuthResponse(error)) {
-      forceLocalLogout()
-    }
-
-    const responseData = error.response?.data
-    const isHtmlError = typeof responseData === 'string' && responseData.trim().startsWith('<')
-    const message =
-      responseData?.message ||
-      responseData?.error ||
-      (isHtmlError ? 'API 返回了 HTML 错误页，请检查后端服务或 Nginx /api 反代配置' : null) ||
-      error.message ||
-      '请求失败'
-
-    return Promise.reject(new Error(message))
-  }
+  handleRequestError,
 )
 
 export default request

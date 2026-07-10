@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import authApi from '../api/auth'
+import { configureAuthSessionAdapter } from '../auth/auth-session-adapter.js'
 import { parseWorkspaceSession } from '../features/workspace/workspaceSession'
 
 const WORKSPACE_SESSION_STORAGE_KEY = 'workspace-session'
@@ -365,5 +366,30 @@ const useAuthStore = create(
     },
   ),
 )
+
+configureAuthSessionAdapter({
+  getAccessToken: () => useAuthStore.getState().token || '',
+  onAuthExpired: () => {
+    useAuthStore.setState({
+      user: null,
+      token: null,
+      refreshToken: null,
+      isAuthenticated: false,
+      error: null,
+    })
+
+    if (typeof window === 'undefined') return
+
+    try {
+      window.localStorage.removeItem('auth-storage')
+    } catch {
+      // Storage cleanup is best-effort; the in-memory session is already cleared.
+    }
+
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
+  },
+})
 
 export default useAuthStore
