@@ -8,7 +8,7 @@ import * as studioService from './inventory.studio.service.js';
 import { normalizeStudioSnapshot } from './inventory.studio.snapshot.js';
 import { buildGlbFromBatchFile } from './inventory.spatial.export.js';
 import { buildGeometryBatchFromStudioScene } from './inventory.spatial.studio-export.js';
-import { createEmptyEditorDocument, normalizeEditorDocument } from '../../../../src/3d-studio/model/editorDocument.js';
+import { createEmptyEditorDocument, normalizeEditorDocument } from '@arcspro/studio-model/editor-document';
 import {
     EXPORT_COORDINATE_SYSTEMS,
     buildExportManifest,

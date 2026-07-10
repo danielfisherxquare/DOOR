@@ -25,6 +25,7 @@
     "load:bib-tracking": "node --env-file-if-exists=.env scripts/load-bib-tracking.mjs"
   },
   "dependencies": {
+    "@arcspro/studio-model": "0.1.0",
     "@napi-rs/canvas": "0.1.80",
     "@openfga/sdk": "^0.9.6",
     "axios": "^1.13.6",
