@@ -110,6 +110,30 @@ export function createInventoryWorkflow({
       })
     },
 
+    approveRequest({ orgId, requestId, approvedQuantity, approverId }) {
+      return database.transaction(async (trx) => {
+        const request = await repository.getRequestById(orgId, requestId, trx, {
+          forUpdate: true,
+        })
+        if (!request) {
+          throw workflowError('物资申请不存在', 'INVENTORY_REQUEST_NOT_FOUND', 404)
+        }
+        if (request.status !== 'pending') {
+          throw workflowError('只有待审批申请可以审批', 'INVENTORY_REQUEST_NOT_PENDING')
+        }
+        if (approvedQuantity > Number(request.requested_quantity)) {
+          throw workflowError('批准数量不能超过申请数量', 'INVENTORY_APPROVAL_QUANTITY_EXCEEDED')
+        }
+        return repository.approveRequest(
+          orgId,
+          requestId,
+          approvedQuantity,
+          approverId,
+          trx,
+        )
+      })
+    },
+
     allocateRequest({ orgId, requestId }) {
       return database.transaction(async (trx) => {
         const request = await repository.getRequestById(orgId, requestId, trx, {

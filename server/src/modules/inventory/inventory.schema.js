@@ -24,6 +24,10 @@ const INVENTORY_UNIT_STATUSES = new Set([
 const INVENTORY_HOLDER_TYPES = new Set(['org', 'race', 'runner', 'external'])
 const STOCKTAKING_PLAN_TYPES = new Set(['full', 'partial', 'dynamic'])
 const STOCKTAKING_PLAN_STATUSES = new Set(['draft', 'in_progress', 'completed', 'cancelled'])
+const ALERT_TYPES = new Set(['low_stock', 'expiring', 'slow_moving', 'abnormal_loss'])
+const ALERT_SEVERITIES = new Set(['info', 'warning', 'critical'])
+const ALERT_THRESHOLD_TYPES = new Set(['quantity', 'percentage', 'days'])
+const ALERT_NOTIFY_CHANNELS = new Set(['in_app', 'email', 'sms'])
 
 function invalid(message, code = 'INVENTORY_INPUT_INVALID', status = 400) {
   const error = validationError(message, undefined, code)
@@ -71,6 +75,13 @@ function nonNegativeInteger(value, label, { optional = false } = {}) {
   if ((value === undefined || value === null || value === '') && optional) return undefined
   const parsed = Number(value)
   if (!Number.isInteger(parsed) || parsed < 0) invalid(`${label} 必须是非负整数`)
+  return parsed
+}
+
+function nonNegativeNumber(value, label, { optional = false } = {}) {
+  if ((value === undefined || value === null || value === '') && optional) return undefined
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 0) invalid(`${label} 必须是非负数`)
   return parsed
 }
 
@@ -275,8 +286,8 @@ export function parseLocationPayload(value) {
     invalid('itemTypes 必须是数组')
   }
   return compact({
-    warehouseId: positiveInteger(data.warehouseId, 'warehouseId', { optional: true }),
-    code: text(data.code, 'code', { max: 100, optional: true }),
+    warehouseId: positiveInteger(data.warehouseId, 'warehouseId'),
+    code: text(data.code, 'code', { max: 50 }),
     zone: text(data.zone, 'zone', { max: 100, optional: true }),
     aisle: text(data.aisle, 'aisle', { max: 100, optional: true }),
     shelf: text(data.shelf, 'shelf', { max: 100, optional: true }),
@@ -394,4 +405,139 @@ export function parseStocktakingFilters(kind, value = {}) {
     planType,
     limit,
   })
+}
+
+export function parseAlertFilters(value = {}) {
+  const query = pickFields(value, ['isRead', 'isResolved', 'severity', 'limit'], {
+    label: '查询参数',
+  })
+  const severity = text(query.severity, 'severity', { max: 20, optional: true })
+  if (severity && !ALERT_SEVERITIES.has(severity)) invalid('severity 无效')
+  const requestedLimit = positiveInteger(query.limit, 'limit', { optional: true })
+  return compact({
+    isRead: boolean(query.isRead, 'isRead', { optional: true }),
+    isResolved: boolean(query.isResolved, 'isResolved', { optional: true }),
+    severity,
+    limit: requestedLimit === undefined ? undefined : Math.min(requestedLimit, 500),
+  })
+}
+
+export function parseAlertRulePayload(value, { partial = false } = {}) {
+  const data = pickFields(value, [
+    'ruleType',
+    'itemType',
+    'itemCategory',
+    'thresholdValue',
+    'thresholdType',
+    'notifyChannels',
+    'notifyUsers',
+    'isEnabled',
+  ])
+  const ruleType = text(data.ruleType, 'ruleType', { max: 20, optional: partial })
+  if (ruleType && !ALERT_TYPES.has(ruleType)) invalid('ruleType 无效')
+  const thresholdType = text(data.thresholdType, 'thresholdType', {
+    max: 20,
+    optional: partial,
+  })
+  if (thresholdType && !ALERT_THRESHOLD_TYPES.has(thresholdType)) invalid('thresholdType 无效')
+
+  function stringArray(raw, label, allowed) {
+    if (raw === undefined) return undefined
+    if (raw === null && label === 'notifyUsers') return null
+    if (!Array.isArray(raw) || raw.length > 100) invalid(`${label} 必须是最多 100 项的数组`)
+    const items = [...new Set(raw.map((item) => text(item, label, { max: 128 })))]
+    if (allowed && items.some((item) => !allowed.has(item))) invalid(`${label} 包含不支持的值`)
+    return items
+  }
+
+  return compact({
+    ruleType,
+    itemType: nullableText(data.itemType, 'itemType', { max: 50 }),
+    itemCategory: nullableText(data.itemCategory, 'itemCategory', { max: 50 }),
+    thresholdValue: nonNegativeNumber(data.thresholdValue, 'thresholdValue', { optional: partial }),
+    thresholdType,
+    notifyChannels: stringArray(data.notifyChannels, 'notifyChannels', ALERT_NOTIFY_CHANNELS),
+    notifyUsers: stringArray(data.notifyUsers, 'notifyUsers'),
+    isEnabled: boolean(data.isEnabled, 'isEnabled', { optional: true }),
+  })
+}
+
+function dateTime(value, label, { optional = false } = {}) {
+  const parsed = text(value, label, { max: 50, optional })
+  if (parsed === undefined) return undefined
+  if (Number.isNaN(new Date(parsed).getTime())) invalid(`${label} 不是有效日期`)
+  return parsed
+}
+
+export function parseTransactionFilters(value = {}) {
+  const query = pickFields(
+    value,
+    ['transactionType', 'unitId', 'startDate', 'endDate', 'limit'],
+    { label: '查询参数' },
+  )
+  const requestedLimit = positiveInteger(query.limit, 'limit', { optional: true })
+  return compact({
+    transactionType: text(query.transactionType, 'transactionType', {
+      max: 20,
+      optional: true,
+    }),
+    unitId: positiveInteger(query.unitId, 'unitId', { optional: true }),
+    startDate: dateTime(query.startDate, 'startDate', { optional: true }),
+    endDate: dateTime(query.endDate, 'endDate', { optional: true }),
+    limit: requestedLimit === undefined ? undefined : Math.min(requestedLimit, 500),
+  })
+}
+
+export function parseMaterialApprovalPayload(value) {
+  const data = pickFields(value, ['approvedQuantity'])
+  return { approvedQuantity: positiveInteger(data.approvedQuantity, 'approvedQuantity') }
+}
+
+export function parseInventoryId(value, label = 'id') {
+  return positiveInteger(value, label)
+}
+
+export function parseWorkbenchSpaceFilters(value = {}) {
+  const query = pickFields(value, ['warehouseId'], { label: '查询参数' })
+  return compact({ warehouseId: positiveInteger(query.warehouseId, 'warehouseId', { optional: true }) })
+}
+
+export function parseLocationRecommendation(value) {
+  const data = pickFields(value, ['warehouseId', 'itemType'])
+  return {
+    warehouseId: positiveInteger(data.warehouseId, 'warehouseId'),
+    itemType: text(data.itemType, 'itemType', { max: 50 }),
+  }
+}
+
+export function parseMaterialRequestFilters(value = {}) {
+  const query = pickFields(value, ['raceId'], { label: '查询参数' })
+  return compact({ raceId: positiveInteger(query.raceId, 'raceId', { optional: true }) })
+}
+
+export function parseTurnoverFilters(value = {}) {
+  const query = pickFields(value, ['startDate', 'endDate'], { label: '查询参数' })
+  return compact({
+    startDate: dateTime(query.startDate, 'startDate', { optional: true }),
+    endDate: dateTime(query.endDate, 'endDate', { optional: true }),
+  })
+}
+
+export function parseTrendDays(value) {
+  const days = positiveInteger(value, 'days', { optional: true }) || 7
+  if (days > 365) invalid('days 不能超过 365')
+  return days
+}
+
+export function parseSnapshotDate(value) {
+  const parsed = text(value, 'date', { max: 10 })
+  const date = new Date(`${parsed}T00:00:00Z`)
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(parsed) ||
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== parsed
+  ) {
+    invalid('date 必须是 YYYY-MM-DD 格式的有效日期')
+  }
+  return parsed
 }

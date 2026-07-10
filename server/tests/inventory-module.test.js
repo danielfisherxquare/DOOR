@@ -2,8 +2,13 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
+  parseAlertFilters,
+  parseAlertRulePayload,
   parseBatchPayload,
   parseBatchUnitPayload,
+  parseLocationPayload,
+  parseMaterialApprovalPayload,
+  parseTransactionFilters,
   parseUnitStatusPayload,
   parseUnitScanPayload,
   parseWarehousePayload,
@@ -87,6 +92,7 @@ describe('inventory schemas', () => {
       { batchName: 'Summer kit', batchType: 'clothing', supplier: null },
     )
     assert.throws(() => parseWarehousePayload({ name: 'Main' }), /code/)
+    assert.throws(() => parseLocationPayload({ warehouseId: 1 }), /code/)
     assert.deepEqual(
       parseWarehousePayload({ address: '', contact: null }, { partial: true }),
       { address: null, contact: null },
@@ -115,6 +121,54 @@ describe('inventory schemas', () => {
       },
     )
     assert.throws(() => parseUnitStatusPayload({ status: 'admin' }), /status/)
+  })
+
+  it('validates alert filters and rule updates without accepting database columns', () => {
+    assert.deepEqual(
+      parseAlertFilters({ isRead: 'false', isResolved: '1', severity: 'warning', limit: '25' }),
+      { isRead: false, isResolved: true, severity: 'warning', limit: 25 },
+    )
+    assert.deepEqual(
+      parseAlertRulePayload(
+        {
+          ruleType: 'low_stock',
+          thresholdValue: '10',
+          thresholdType: 'quantity',
+          notifyChannels: ['in_app'],
+          isEnabled: 'false',
+          org_id: 'forged',
+          created_at: 'forged',
+        },
+        { partial: true },
+      ),
+      {
+        ruleType: 'low_stock',
+        thresholdValue: 10,
+        thresholdType: 'quantity',
+        notifyChannels: ['in_app'],
+        isEnabled: false,
+      },
+    )
+    assert.throws(
+      () =>
+        parseAlertRulePayload({
+          ruleType: 'arbitrary_sql',
+          thresholdValue: 1,
+          thresholdType: 'quantity',
+        }),
+      /ruleType/,
+    )
+  })
+
+  it('bounds reporting filters and material approvals', () => {
+    assert.deepEqual(
+      parseTransactionFilters({ unitId: '8', transactionType: 'pickup', limit: '5000' }),
+      { unitId: 8, transactionType: 'pickup', limit: 500 },
+    )
+    assert.deepEqual(parseMaterialApprovalPayload({ approvedQuantity: '12', status: 'forged' }), {
+      approvedQuantity: 12,
+    })
+    assert.throws(() => parseMaterialApprovalPayload({ approvedQuantity: -1 }), /approvedQuantity/)
   })
 })
 
@@ -195,5 +249,36 @@ describe('inventory workflow atomicity', () => {
       allocated: 2,
     })
     assert.deepEqual(allocation, ['org-1', 11, 23, [{ id: 31 }, { id: 32 }], trx])
+  })
+
+  it('does not approve more material than the pending request', async () => {
+    const trx = { isTransaction: true }
+    let updated = false
+    const workflow = createInventoryWorkflow({
+      database: { transaction: (work) => work(trx) },
+      repository: {
+        getRequestById: async () => ({
+          id: 11,
+          status: 'pending',
+          requested_quantity: 5,
+        }),
+        approveRequest: async () => {
+          updated = true
+        },
+      },
+      twinService: {},
+    })
+
+    await assert.rejects(
+      () =>
+        workflow.approveRequest({
+          orgId: 'org-1',
+          requestId: 11,
+          approvedQuantity: 6,
+          approverId: 'user-1',
+        }),
+      /申请数量/,
+    )
+    assert.equal(updated, false)
   })
 })

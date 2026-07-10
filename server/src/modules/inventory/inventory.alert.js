@@ -2,7 +2,6 @@
  * Inventory Alert Service — 库存预警服务
  */
 import knex from '../../db/knex.js';
-import * as repo from './inventory.repository.js';
 
 // 预警类型
 const ALERT_TYPES = {
@@ -282,7 +281,7 @@ export async function createRule(orgId, data) {
             threshold_type: data.thresholdType,
             notify_channels: JSON.stringify(data.notifyChannels || ['in_app']),
             notify_users: data.notifyUsers ? JSON.stringify(data.notifyUsers) : null,
-            is_enabled: true
+            is_enabled: data.isEnabled ?? true
         })
         .returning('*');
     return result;
@@ -292,10 +291,24 @@ export async function createRule(orgId, data) {
  * 更新预警规则
  */
 export async function updateRule(orgId, ruleId, data) {
+    const updates = {
+        ...(data.ruleType !== undefined ? { rule_type: data.ruleType } : {}),
+        ...(data.itemType !== undefined ? { item_type: data.itemType } : {}),
+        ...(data.itemCategory !== undefined ? { item_category: data.itemCategory } : {}),
+        ...(data.thresholdValue !== undefined ? { threshold_value: data.thresholdValue } : {}),
+        ...(data.thresholdType !== undefined ? { threshold_type: data.thresholdType } : {}),
+        ...(data.notifyChannels !== undefined
+            ? { notify_channels: JSON.stringify(data.notifyChannels) }
+            : {}),
+        ...(data.notifyUsers !== undefined
+            ? { notify_users: data.notifyUsers === null ? null : JSON.stringify(data.notifyUsers) }
+            : {}),
+        ...(data.isEnabled !== undefined ? { is_enabled: data.isEnabled } : {}),
+    };
     const [result] = await knex('inventory_alert_rules')
         .where({ org_id: orgId, id: ruleId })
         .update({
-            ...data,
+            ...updates,
             updated_at: knex.fn.now()
         })
         .returning('*');

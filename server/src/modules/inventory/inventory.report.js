@@ -156,7 +156,11 @@ export async function traceUnit(orgId, unitId) {
         .first();
 
     if (!unit) {
-        throw new Error('物资不存在');
+        const error = new Error('物资不存在');
+        error.status = 404;
+        error.code = 'INVENTORY_UNIT_NOT_FOUND';
+        error.expose = true;
+        throw error;
     }
 
     // 获取流转历史
@@ -166,7 +170,7 @@ export async function traceUnit(orgId, unitId) {
 
     // 获取批次信息
     const batch = await knex('org_inventory_batches')
-        .where({ id: unit.batch_id })
+        .where({ org_id: orgId, id: unit.batch_id })
         .first();
 
     return {

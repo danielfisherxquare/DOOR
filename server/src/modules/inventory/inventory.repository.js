@@ -324,9 +324,9 @@ export async function findAvailableLocations(orgId, warehouseId, itemType) {
 // ==================== 赛事申请管理 ====================
 
 export async function getRequests(orgId, raceId) {
-    return knex('race_material_requests')
-        .where({ org_id: orgId, race_id: raceId })
-        .orderBy('created_at', 'desc');
+    const query = knex('race_material_requests').where({ org_id: orgId });
+    if (raceId) query.where('race_id', raceId);
+    return query.orderBy('created_at', 'desc');
 }
 
 export async function getRequestById(orgId, requestId, db, options = {}) {
@@ -350,15 +350,16 @@ export async function createRequest(orgId, data) {
     return result;
 }
 
-export async function approveRequest(orgId, requestId, approvedQuantity, approverId) {
-    const [result] = await knex('race_material_requests')
+export async function approveRequest(orgId, requestId, approvedQuantity, approverId, db) {
+    const database = dbOrKnex(db);
+    const [result] = await database('race_material_requests')
         .where({ org_id: orgId, id: requestId })
         .update({
             approved_quantity: approvedQuantity,
             status: 'approved',
             approved_by: approverId,
-            approved_at: knex.fn.now(),
-            updated_at: knex.fn.now()
+            approved_at: database.fn.now(),
+            updated_at: database.fn.now()
         })
         .returning('*');
     return result;
