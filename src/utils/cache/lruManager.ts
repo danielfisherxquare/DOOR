@@ -4,8 +4,13 @@
  */
 
 import { getDatabase, withStore, type AutoCacheTile } from '../db/database';
-import { deleteTileBlob, getCacheStats, checkStorageQuota } from './tileCacheApi';
-import { makeTileBlobKey } from './tileCacheApi';
+import {
+  cacheTileBlob,
+  deleteTileBlob,
+  getCacheStats,
+  getTileBlob,
+  makeTileBlobKey,
+} from './tileCacheApi';
 
 const DEFAULT_MAX_SIZE_MB = 100; // 默认最大缓存 100MB
 
@@ -253,7 +258,6 @@ export async function insertAutoCacheTile(
   const blobKey = makeTileBlobKey(sourceId, projection, z, x, y);
 
   // 1. 存储 Blob
-  const { cacheTileBlob } = await import('./tileCacheApi');
   await cacheTileBlob(blobKey, blob);
 
   // 2. 存储索引
@@ -304,6 +308,5 @@ export async function getAutoCacheTile(
   // 更新访问时间
   touchTile(sourceId, projection, z, x, y).catch(() => {});
 
-  const { getTileBlob } = await import('./tileCacheApi');
   return getTileBlob(record.blobKey);
 }
