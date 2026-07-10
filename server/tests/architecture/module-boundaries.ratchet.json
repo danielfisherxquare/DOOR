@@ -1,11 +1,9 @@
 {
   "directDatabaseImports": [
     "src/modules/column-mappings/column-mapping.routes.js",
-    "src/modules/dictionary/dictionary.routes.js",
     "src/modules/pipeline/pipeline-config.routes.js",
     "src/modules/projects/projects.controller.js",
     "src/modules/races/race.routes.js",
-    "src/modules/sys-job/sys-job.routes.js",
     "src/modules/system-backups/system-backup.routes.js"
   ],
   "rawRequestPersistenceCalls": [
