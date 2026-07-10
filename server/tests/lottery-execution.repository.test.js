@@ -3,14 +3,17 @@ import { describe, it } from 'node:test'
 
 import {
   assertNoActivePipelineExecution,
+  assertNoActiveLotteryJob,
   assertNoFinalizedLotteryV2,
   assertNoLotteryV1Snapshot,
+  findActiveLotteryJob,
   lockLotteryRace,
 } from '../src/modules/lottery/lottery-execution.repository.js'
 
 function createDatabase({
   race = { id: 7 },
   activeExecution = null,
+  activeJob = null,
   finalizedV2 = null,
   v1Snapshot = null,
 } = {}) {
@@ -34,6 +37,7 @@ function createDatabase({
         calls.push(['first', table, column])
         if (table === 'races') return Promise.resolve(race)
         if (table === 'pipeline_executions') return Promise.resolve(activeExecution)
+        if (table === 'jobs') return Promise.resolve(activeJob)
         if (table === 'lottery_v2_snapshots') return Promise.resolve(finalizedV2)
         if (table === 'pipeline_snapshots') return Promise.resolve(v1Snapshot)
         return Promise.resolve(null)
@@ -78,12 +82,7 @@ describe('lottery execution repository', () => {
     })
 
     await assert.rejects(
-      () => assertNoActivePipelineExecution(
-        'org-1',
-        7,
-        ['lottery', 'rollback_lottery'],
-        database,
-      ),
+      () => assertNoActivePipelineExecution('org-1', 7, ['lottery', 'rollback_lottery'], database),
       (error) => {
         assert.equal(error.status, 409)
         assert.equal(error.code, 'CONCURRENT_EXECUTION')
@@ -119,6 +118,40 @@ describe('lottery execution repository', () => {
         assert.equal(error.code, 'LOTTERY_V1_SNAPSHOT_EXISTS')
         return true
       },
+    )
+  })
+
+  it('finds queued and running jobs across both lottery versions', async () => {
+    const { calls, database } = createDatabase({
+      activeJob: { id: 'job-1', type: 'lottery-v2:preview', status: 'queued' },
+    })
+
+    assert.deepEqual(await findActiveLotteryJob('org-1', 7, database), {
+      id: 'job-1',
+      type: 'lottery-v2:preview',
+      status: 'queued',
+    })
+    assert.equal(
+      calls.some(
+        (call) =>
+          call[0] === 'whereIn' &&
+          call[1] === 'jobs' &&
+          call[2] === 'type' &&
+          call[3].includes('lottery:finalize') &&
+          call[3].includes('lottery-v2:finalize'),
+      ),
+      true,
+    )
+  })
+
+  it('blocks synchronous rollback while a lottery job is queued', async () => {
+    const { database } = createDatabase({
+      activeJob: { id: 'job-1', type: 'lottery-v2:finalize', status: 'queued' },
+    })
+
+    await assert.rejects(
+      () => assertNoActiveLotteryJob('org-1', 7, database),
+      (error) => error.status === 409 && error.code === 'LOTTERY_JOB_ACTIVE',
     )
   })
 })

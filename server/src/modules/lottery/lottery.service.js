@@ -1,5 +1,7 @@
+import knex from '../../db/knex.js'
 import * as jobRepository from '../jobs/job.repository.js'
 import * as snapshotRepository from '../pipeline/snapshot.repository.js'
+import * as executionRepository from './lottery-execution.repository.js'
 import * as lotteryRepository from './lottery.repository.js'
 import * as rollbackRepository from './lottery-rollback.repository.js'
 
@@ -19,7 +21,9 @@ export function createLotteryService({
   repository = lotteryRepository,
   jobs = jobRepository,
   snapshots = snapshotRepository,
+  executions = executionRepository,
   rollbacks = rollbackRepository,
+  database = knex,
   now = Date.now,
 } = {}) {
   async function requireScope(scope, code, message) {
@@ -91,15 +95,31 @@ export function createLotteryService({
     rollback: (input) => rollbacks.rollbackLottery(input.orgId, input.raceId),
 
     async enqueueFinalize({ orgId, raceId, userId }) {
-      const job = await jobs.enqueue(
-        orgId,
-        'lottery:finalize',
-        { raceId },
-        `lottery:finalize:${raceId}:${now()}`,
-        userId,
-        raceId,
-      )
-      return { jobId: job.id }
+      return database.transaction(async (trx) => {
+        await executions.lockLotteryRace(orgId, raceId, trx)
+        const active = await executions.findActiveLotteryJob(orgId, raceId, trx)
+        if (active) {
+          if (active.type === 'lottery:finalize') {
+            return { jobId: active.id, reused: true }
+          }
+          throw serviceError(409, 'LOTTERY_JOB_ACTIVE', '当前赛事已有抽签任务排队或执行中')
+        }
+        await executions.assertNoFinalizedLotteryV2(orgId, raceId, trx)
+        if (await snapshots.hasSnapshot(orgId, raceId, 'pre_lottery', trx)) {
+          throw serviceError(409, 'SNAPSHOT_EXISTS', '已存在抽签快照，请先回滚当前抽签结果')
+        }
+
+        const job = await jobs.enqueue(
+          orgId,
+          'lottery:finalize',
+          { raceId },
+          `lottery:finalize:${raceId}:${now()}`,
+          userId,
+          raceId,
+          trx,
+        )
+        return { jobId: job.id, reused: false }
+      })
     },
   }
 }

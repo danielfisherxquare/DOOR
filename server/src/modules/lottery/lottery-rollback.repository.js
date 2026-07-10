@@ -7,6 +7,7 @@ import knex from '../../db/knex.js';
 import * as snapshotRepo from '../pipeline/snapshot.repository.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
 import {
+    assertNoActiveLotteryJob,
     assertNoActivePipelineExecution,
     lockLotteryRace,
 } from './lottery-execution.repository.js';
@@ -50,6 +51,7 @@ async function decrementInventoryWithFallback(trx, orgId, raceId, rawEvent, norm
 export async function rollbackLottery(orgId, raceId) {
     return knex.transaction(async (trx) => {
         await lockLotteryRace(orgId, raceId, trx);
+        await assertNoActiveLotteryJob(orgId, raceId, trx);
         await assertNoActivePipelineExecution(
             orgId,
             raceId,
@@ -177,6 +179,7 @@ export async function rollbackLottery(orgId, raceId) {
 export async function rollbackBib(orgId, raceId) {
     return knex.transaction(async (trx) => {
         await lockLotteryRace(orgId, raceId, trx);
+        await assertNoActiveLotteryJob(orgId, raceId, trx);
         await assertNoActivePipelineExecution(
             orgId,
             raceId,

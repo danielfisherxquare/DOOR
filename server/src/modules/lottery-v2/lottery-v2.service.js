@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import knex from '../../db/knex.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
 import {
+    assertNoActiveLotteryJob,
     assertNoActivePipelineExecution,
     assertNoFinalizedLotteryV2,
     assertNoLotteryV1Snapshot,
@@ -956,6 +957,7 @@ export async function getResults(orgId, raceId) {
 export async function rollbackLatest(orgId, raceId) {
     return knex.transaction(async (trx) => {
         await lockLotteryMutation(orgId, raceId, trx);
+        await assertNoActiveLotteryJob(orgId, raceId, trx);
         const snapshotRow = await trx('lottery_v2_snapshots')
             .where({ org_id: orgId, race_id: raceId, status: 'finalized' })
             .orderBy('finalized_at', 'desc')

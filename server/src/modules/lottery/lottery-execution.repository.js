@@ -67,3 +67,22 @@ export async function assertNoLotteryV1Snapshot(orgId, raceId, database = knex) 
     )
   }
 }
+
+export async function findActiveLotteryJob(orgId, raceId, database = knex) {
+  return database('jobs')
+    .where({ org_id: orgId, race_id: raceId })
+    .whereIn('status', ['queued', 'running'])
+    .whereIn('type', ['lottery:finalize', 'lottery-v2:preview', 'lottery-v2:finalize'])
+    .first('id', 'type', 'status')
+}
+
+export async function assertNoActiveLotteryJob(orgId, raceId, database = knex) {
+  const active = await findActiveLotteryJob(orgId, raceId, database)
+  if (active) {
+    throw executionError(
+      409,
+      'LOTTERY_JOB_ACTIVE',
+      `抽签任务 ${active.type} (${active.id}) 正在排队或执行，暂不能回滚`,
+    )
+  }
+}

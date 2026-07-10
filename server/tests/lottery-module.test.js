@@ -89,4 +89,27 @@ describe('lottery service scope', () => {
     assert.equal(await service.resolveListRaceId({ role: 'org_admin', orgId: 'org-1' }, 91), 7)
     assert.deepEqual(calls, [['org-1', 91]])
   })
+
+  it('returns the active finalize job instead of enqueueing a duplicate', async () => {
+    const service = createLotteryService({
+      database: { transaction: (callback) => callback({ id: 'trx-v1' }) },
+      executions: {
+        async lockLotteryRace() {},
+        async findActiveLotteryJob() {
+          return { id: 'job-v1', type: 'lottery:finalize' }
+        },
+        async assertNoFinalizedLotteryV2() {},
+      },
+      jobs: {
+        async enqueue() {
+          assert.fail('duplicate finalize must not enqueue another job')
+        },
+      },
+    })
+
+    assert.deepEqual(
+      await service.enqueueFinalize({ orgId: 'org-1', raceId: 7, userId: 'user-1' }),
+      { jobId: 'job-v1', reused: true },
+    )
+  })
 })
