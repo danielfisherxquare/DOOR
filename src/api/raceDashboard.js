@@ -1,5 +1,7 @@
 import request from '../utils/request';
 
+const RACE_DASHBOARD_BASE_PATH = '/app/races/dashboard';
+
 /**
  * Race Dashboard API - aggregates data for race dashboard display
  */
@@ -9,7 +11,7 @@ export const raceDashboardApi = {
      * @param {string} raceId - Race ID
      * @param {boolean} masked - If true, sensitive data will be masked
      */
-    getOverview: (raceId, masked = false) => request.get(`/races/dashboard/${raceId}/overview`, {
+    getOverview: (raceId, masked = false) => request.get(`${RACE_DASHBOARD_BASE_PATH}/${raceId}/overview`, {
         params: masked ? { masked: true } : {},
     }),
 
@@ -17,25 +19,25 @@ export const raceDashboardApi = {
      * Get participant statistics only
      * @param {string} raceId - Race ID
      */
-    getParticipants: (raceId) => request.get(`/races/dashboard/${raceId}/participants`),
+    getParticipants: (raceId) => request.get(`${RACE_DASHBOARD_BASE_PATH}/${raceId}/participants`),
 
     /**
      * Get Bib tracking statistics only
      * @param {string} raceId - Race ID
      */
-    getBibStatus: (raceId) => request.get(`/races/dashboard/${raceId}/bib-status`),
+    getBibStatus: (raceId) => request.get(`${RACE_DASHBOARD_BASE_PATH}/${raceId}/bib-status`),
 
     /**
      * Get inventory statistics only
      * @param {string} raceId - Race ID
      */
-    getInventory: (raceId) => request.get(`/races/dashboard/${raceId}/inventory`),
+    getInventory: (raceId) => request.get(`${RACE_DASHBOARD_BASE_PATH}/${raceId}/inventory`),
 
     /**
      * Get credential statistics only
      * @param {string} raceId - Race ID
      */
-    getCredentials: (raceId) => request.get(`/races/dashboard/${raceId}/credentials`),
+    getCredentials: (raceId) => request.get(`${RACE_DASHBOARD_BASE_PATH}/${raceId}/credentials`),
 
     /**
      * Get recent activities
@@ -44,7 +46,7 @@ export const raceDashboardApi = {
      * @param {boolean} options.masked - If true, names will be masked
      * @param {number} options.limit - Max activities to return
      */
-    getActivities: (raceId, options = {}) => request.get(`/races/dashboard/${raceId}/activities`, {
+    getActivities: (raceId, options = {}) => request.get(`${RACE_DASHBOARD_BASE_PATH}/${raceId}/activities`, {
         params: options,
     }),
 };

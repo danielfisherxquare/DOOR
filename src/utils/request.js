@@ -2,27 +2,6 @@ import axios from 'axios'
 import { notifyAuthExpired, readAccessToken } from '../auth/auth-session-adapter.js'
 import { toApiError } from './apiResponse.js'
 
-function remapApiPath(url) {
-  if (typeof url !== 'string' || !url.startsWith('/')) return url
-
-  const replacements = [
-    [/^\/assessment\/public/, '/public/assessment'],
-    [/^\/tools/, '/public/tools'],
-    [/^\/interview/, '/admin/interviews'],
-    [/^\/projects/, '/admin/projects'],
-    [/^\/races/, '/admin/races'],
-    [/^\/org/, '/admin/org'],
-  ]
-
-  for (const [pattern, replacement] of replacements) {
-    if (pattern.test(url)) {
-      return url.replace(pattern, replacement)
-    }
-  }
-
-  return url
-}
-
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 30000
@@ -61,7 +40,6 @@ export const requestWithLongTimeout = axios.create({
 // 为长超时实例添加相同的请求拦截器和响应拦截器
 requestWithLongTimeout.interceptors.request.use(
   (config) => {
-    config.url = remapApiPath(config.url)
     const token = readAccessToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
@@ -83,7 +61,6 @@ requestWithLongTimeout.interceptors.response.use(
 
 request.interceptors.request.use(
   (config) => {
-    config.url = remapApiPath(config.url)
     const token = readAccessToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`

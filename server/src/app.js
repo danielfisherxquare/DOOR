@@ -10,6 +10,7 @@ import healthRoutes from './modules/health/health.routes.js';
 import jobRoutes from './modules/jobs/job.routes.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import raceRoutes from './modules/races/race.routes.js';
+import raceDashboardRoutes from './modules/races/race-dashboard/race-dashboard.routes.js';
 import recordRoutes from './modules/records/record.routes.js';
 import columnMappingRoutes from './modules/column-mappings/column-mapping.routes.js';
 import importSessionRoutes from './modules/import-sessions/import-session.routes.js';
@@ -115,6 +116,7 @@ app.use(requireAuth);
 const appEventsPermission = requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'events' } });
 
 app.use('/api/app/jobs', requirePermission({ surface: 'app' }), jobRoutes);
+app.use('/api/app/races/dashboard', appEventsPermission, raceDashboardRoutes);
 app.use('/api/app/records', appEventsPermission, recordRoutes);
 app.use('/api/app/column-mappings', appEventsPermission, columnMappingRoutes);
 app.use('/api/app/import-sessions', appEventsPermission, importSessionRoutes);
