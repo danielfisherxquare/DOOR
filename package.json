@@ -25,12 +25,12 @@
     "test:map": "node --test tests/map/map-utils.test.mjs tests/map/map-e2e.test.mjs",
     "test:map:unit": "node --test tests/map/map-utils.test.mjs tests/map/mapArchitecture.test.mjs",
     "test:map:e2e": "node --test tests/map/map-e2e.test.mjs",
-    "test:terrain-model": "node --test tests/terrain-model/terrainModel.test.mjs tests/terrain-model/terrainModelArchitecture.test.mjs",
+    "test:terrain-model": "node --test tests/terrain-model/terrainModel.test.mjs tests/terrain-model/terrainModelArchitecture.test.mjs tests/terrain-model/terrainModelPageArchitecture.test.mjs",
     "test:surfaces": "node --test tests/surfaceContext.test.js tests/workspaceSession.test.js tests/moduleAccess.test.js tests/surfaceBoundaries.test.js",
     "test:3d-studio": "node --test tests/3d-studio/editorDocument.test.js tests/3d-studio/focusZoneStudioScene.test.js tests/3d-studio/studioExport.test.js tests/3d-studio/studioModelArchitecture.test.mjs tests/3d-studio/studioModelParity.test.mjs",
     "test:reimbursement": "node tests/reimbursement/reimbursement-e2e.test.js",
     "test:reimbursement:headless": "cross-env HEADLESS=true node tests/reimbursement/reimbursement-e2e.test.js",
-    "test": "node --test packages/contracts/tests/contracts.test.js tests/api/*.test.mjs tests/auth/*.test.mjs tests/routes/*.test.mjs tests/tooling/*.test.mjs tests/security/*.test.mjs tests/surfaceContext.test.js tests/workspaceSession.test.js tests/moduleAccess.test.js tests/surfaceBoundaries.test.js tests/3d-studio/editorDocument.test.js tests/3d-studio/focusZoneStudioScene.test.js tests/3d-studio/studioExport.test.js tests/3d-studio/studioModelArchitecture.test.mjs tests/3d-studio/studioModelParity.test.mjs tests/terrain-model/terrainModel.test.mjs tests/terrain-model/terrainModelArchitecture.test.mjs tests/map/map-utils.test.mjs tests/map/mapArchitecture.test.mjs tests/branding/branding.test.mjs"
+    "test": "node --test packages/contracts/tests/contracts.test.js tests/api/*.test.mjs tests/auth/*.test.mjs tests/routes/*.test.mjs tests/tooling/*.test.mjs tests/security/*.test.mjs tests/surfaceContext.test.js tests/workspaceSession.test.js tests/moduleAccess.test.js tests/surfaceBoundaries.test.js tests/3d-studio/editorDocument.test.js tests/3d-studio/focusZoneStudioScene.test.js tests/3d-studio/studioExport.test.js tests/3d-studio/studioModelArchitecture.test.mjs tests/3d-studio/studioModelParity.test.mjs tests/terrain-model/terrainModel.test.mjs tests/terrain-model/terrainModelArchitecture.test.mjs tests/terrain-model/terrainModelPageArchitecture.test.mjs tests/map/map-utils.test.mjs tests/map/mapArchitecture.test.mjs tests/branding/branding.test.mjs"
   },
   "dependencies": {
     "@arcspro/contracts": "0.1.0",
