@@ -384,8 +384,9 @@ export default function StartZoneSimulator({ raceId, raceDetail, preview, onUpda
     let alive = true
 
     pipelineApi.getStartZones(Number(raceId))
-      .then((items) => {
+      .then((response) => {
         if (!alive) return
+        const items = Array.isArray(response?.data) ? response.data : []
         const normalizedZones = (items || []).map((zone) => ({
           ...zone,
           capacityRatio: normalizeCapacityRatio(zone.capacityRatio),

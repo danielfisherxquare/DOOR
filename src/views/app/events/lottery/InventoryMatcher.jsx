@@ -69,12 +69,12 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
     let alive = true
 
     Promise.all([
-      pipelineApi.getClothingLimits(Number(raceId)).catch(() => []),
+      pipelineApi.getClothingLimits(Number(raceId)).catch(() => ({ data: [] })),
       lotteryApi.getLotteryResults(Number(raceId)).catch(() => null),
       lotteryApi.hasSnapshot(Number(raceId)).catch(() => false),
-    ]).then(([limits, results, snapshot]) => {
+    ]).then(([limitsResponse, results, snapshot]) => {
       if (!alive) return
-      setInventory(limits || [])
+      setInventory(Array.isArray(limitsResponse?.data) ? limitsResponse.data : [])
       setResult(normalizeResult(results))
       setHasSnapshot(Boolean(snapshot))
     }).catch((error) => {
@@ -112,11 +112,11 @@ export default function InventoryMatcher({ raceId, raceDetail, preview, onUpdate
 
   const refresh = async () => {
     const [limits, results, snapshot] = await Promise.all([
-      pipelineApi.getClothingLimits(Number(raceId)).catch(() => []),
+      pipelineApi.getClothingLimits(Number(raceId)).catch(() => ({ data: [] })),
       lotteryApi.getLotteryResults(Number(raceId)).catch(() => null),
       lotteryApi.hasSnapshot(Number(raceId)).catch(() => false),
     ])
-    setInventory(limits || [])
+    setInventory(Array.isArray(limits?.data) ? limits.data : [])
     setResult(normalizeResult(results))
     setHasSnapshot(Boolean(snapshot))
   }

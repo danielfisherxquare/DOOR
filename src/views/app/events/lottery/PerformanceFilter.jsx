@@ -37,8 +37,9 @@ export default function PerformanceFilter({ raceId, raceDetail, preview, onUpdat
     let alive = true
 
     pipelineApi.getPerformanceRules(Number(raceId))
-      .then((items) => {
+      .then((response) => {
         if (!alive) return
+        const items = Array.isArray(response?.data) ? response.data : []
         setRules(items?.length ? items : buildDefaultRules(raceDetail, raceId))
       })
       .catch(() => {
@@ -98,8 +99,8 @@ export default function PerformanceFilter({ raceId, raceDetail, preview, onUpdat
     setMessage('')
     try {
       await persistRules()
-      const data = await pipelineApi.filterPerformance(Number(raceId))
-      setResult(data)
+      const response = await pipelineApi.filterPerformance(Number(raceId))
+      setResult(response.data)
       setMessage('成绩筛选已执行，达标人数和无成绩人数已重新统计。')
       setMessageTone('success')
       onUpdated?.()

@@ -316,7 +316,7 @@ export default function BibPage() {
 
       const [
         overview,
-        zones,
+        zonesResponse,
         executionDataset,
         trackingResponse,
         templateRows,
@@ -358,7 +358,7 @@ export default function BibPage() {
 
       setTemplates(Array.isArray(templateRows) ? templateRows : [])
 
-      const zoneList = Array.isArray(zones) ? zones : []
+      const zoneList = Array.isArray(zonesResponse?.data) ? zonesResponse.data : []
       const mappedEligibleRecords = Array.isArray(executionDataset?.eligibleRecords)
         ? executionDataset.eligibleRecords.map(toDbRecordForZonePreview)
         : []

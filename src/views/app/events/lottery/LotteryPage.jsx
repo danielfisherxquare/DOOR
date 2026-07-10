@@ -47,12 +47,12 @@ export default function LotteryPage() {
 
     setLoading(true)
     try {
-      const [raceResponse, previewData] = await Promise.all([
+      const [raceResponse, previewResponse] = await Promise.all([
         racesApi.getById(Number(raceId)),
         pipelineApi.getPreview(Number(raceId)),
       ])
       setRaceDetail(unwrapData(raceResponse) || null)
-      setPreview(previewData || null)
+      setPreview(previewResponse?.data || null)
       if (announce) {
         setMessage('抽签工作流数据已刷新。')
         setMessageTone('success')
