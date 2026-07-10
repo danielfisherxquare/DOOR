@@ -23,6 +23,8 @@ describe('API path ownership', () => {
     ]) {
       assert.equal(requestSource.includes(legacyPrefix), false)
     }
+
+    await assert.rejects(source('src/utils/surfaceApi.js'), { code: 'ENOENT' })
   })
 
   it('uses the mounted public tools route explicitly', async () => {
