@@ -3,11 +3,19 @@ import { useNavigate, useLocation, Link } from 'react-router-dom'
 import useAuthStore from '../stores/authStore'
 import useWorkspaceStore from '../features/workspace/workspaceStore'
 import { createWorkspaceSession } from '../features/workspace/workspaceSession'
+import { requestRaw } from '../utils/request'
+
+const SERVICE_STATUS_LABELS = {
+  checking: '正在检查服务',
+  online: '服务连接正常',
+  offline: '服务暂不可用',
+}
 
 function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
+  const [serviceStatus, setServiceStatus] = useState('checking')
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -39,6 +47,22 @@ function Login() {
     if (savedUsername) {
       setUsername(savedUsername)
       setRememberMe(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    requestRaw
+      .get('/health/live', {
+      signal: controller.signal,
+        timeout: 3500,
+      })
+      .then((response) => setServiceStatus(response.status >= 200 && response.status < 300 ? 'online' : 'offline'))
+      .catch(() => setServiceStatus('offline'))
+
+    return () => {
+      controller.abort()
     }
   }, [])
 
@@ -80,8 +104,10 @@ function Login() {
 
           <div className="login-brand__status">
             <div className="login-brand__status-row">
-              <div className="login-brand__status-dot" />
-              <span className="login-brand__status-text">当前服务正常</span>
+              <div className={`login-brand__status-dot login-brand__status-dot--${serviceStatus}`} />
+              <span className="login-brand__status-text" role="status">
+                {SERVICE_STATUS_LABELS[serviceStatus]}
+              </span>
             </div>
             <div className="login-brand__status-panel">
               <span>管理后台</span>

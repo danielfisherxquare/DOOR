@@ -161,6 +161,16 @@
   box-shadow: 0 0 0 5px rgba(22, 136, 90, 0.12);
 }
 
+.login-brand__status-dot--checking {
+  background: #b07720;
+  box-shadow: 0 0 0 5px rgba(176, 119, 32, 0.12);
+}
+
+.login-brand__status-dot--offline {
+  background: #b83b32;
+  box-shadow: 0 0 0 5px rgba(184, 59, 50, 0.12);
+}
+
 .login-brand__status-text {
   color: var(--login-ink);
   font-size: 0.86rem;
