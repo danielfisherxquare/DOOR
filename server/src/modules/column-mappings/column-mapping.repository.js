@@ -5,6 +5,11 @@ function mapRows(rows) {
     return rows.map(columnMappingMapper.fromDbRow);
 }
 
+export async function organizationExists(orgId) {
+    const row = await knex('organizations').where({ id: orgId }).first('id');
+    return Boolean(row);
+}
+
 let userScopeSupportPromise = null;
 
 async function supportsUserScopedMappings() {

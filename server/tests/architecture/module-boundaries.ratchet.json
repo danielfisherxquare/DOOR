@@ -1,15 +1,8 @@
 {
   "directDatabaseImports": [
-    "src/modules/column-mappings/column-mapping.routes.js",
-    "src/modules/pipeline/pipeline-config.routes.js",
     "src/modules/projects/projects.controller.js",
     "src/modules/races/race.routes.js",
     "src/modules/system-backups/system-backup.routes.js"
   ],
-  "rawRequestPersistenceCalls": [
-    "src/modules/clothing/clothing.routes.js:clothingRepo.saveLimit",
-    "src/modules/clothing/clothing.routes.js:clothingRepo.saveLimits",
-    "src/modules/pipeline/pipeline-config.routes.js:pipelineRepo.savePerformanceRule",
-    "src/modules/pipeline/pipeline-config.routes.js:pipelineRepo.saveStartZone"
-  ]
+  "rawRequestPersistenceCalls": []
 }

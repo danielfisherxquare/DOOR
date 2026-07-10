@@ -18,6 +18,11 @@ export async function getStartZones(orgId, raceId) {
     return rows.map(startZoneMapper.fromDbRow);
 }
 
+export async function getStartZoneRaceId(id) {
+    const row = await knex('start_zones').where({ id }).first('race_id');
+    return row?.race_id ?? null;
+}
+
 export async function saveStartZone(orgId, data) {
     const row = startZoneMapper.toDbInsert(data, orgId);
 
@@ -25,7 +30,7 @@ export async function saveStartZone(orgId, data) {
         // 更新已有记录
         const updateRow = startZoneMapper.toDbUpdate(data);
         const [updated] = await knex('start_zones')
-            .where({ org_id: orgId, id: data.id })
+            .where({ org_id: orgId, race_id: data.raceId, id: data.id })
             .update(updateRow)
             .returning('*');
         return startZoneMapper.fromDbRow(updated);
@@ -72,7 +77,7 @@ export async function savePerformanceRule(orgId, data) {
     if (data.id) {
         const updateRow = performanceRuleMapper.toDbUpdate(data);
         const [updated] = await knex('performance_rules')
-            .where({ org_id: orgId, id: data.id })
+            .where({ org_id: orgId, race_id: data.raceId, id: data.id })
             .update(updateRow)
             .returning('*');
         return performanceRuleMapper.fromDbRow(updated);

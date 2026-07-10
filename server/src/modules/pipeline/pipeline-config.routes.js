@@ -5,20 +5,21 @@
 import { Router } from 'express';
 import * as pipelineRepo from './pipeline-config.repository.js';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
-import knex from '../../db/knex.js';
+import {
+    parsePerformanceRulePayload,
+    parsePipelineId,
+    parseStartZonePayload,
+} from './pipeline-config.schema.js';
 
 const router = Router();
 
 async function resolveRaceIdByStartZoneId(req) {
-    const id = Number(req.params.id);
-    if (!Number.isFinite(id) || id <= 0) {
-        throw Object.assign(new Error('无效 startZoneId'), { status: 400, expose: true });
-    }
-    const row = await knex('start_zones').where({ id }).first('race_id');
-    if (!row) {
+    const id = parsePipelineId(req.params.id, 'startZoneId');
+    const raceId = await pipelineRepo.getStartZoneRaceId(id);
+    if (!raceId) {
         throw Object.assign(new Error('出发区不存在'), { status: 404, expose: true });
     }
-    return row.race_id;
+    return raceId;
 }
 
 // GET /api/pipeline/preview/:raceId — Pipeline 预览汇总
@@ -26,7 +27,7 @@ router.get('/preview/:raceId', requireRaceAccess('raceId'), async (req, res, nex
     try {
         const data = await pipelineRepo.getPreview(
             req.raceAccess.operatorOrgId,
-            Number(req.params.raceId),
+            parsePipelineId(req.params.raceId, 'raceId'),
         );
         res.json({ success: true, data });
     } catch (err) { next(err); }
@@ -40,15 +41,17 @@ router.get('/preview/:raceId', requireRaceAccess('raceId'), async (req, res, nex
 router.get('/start-zones/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await pipelineRepo.getStartZones(
-            req.raceAccess.operatorOrgId, Number(req.params.raceId));
+            req.raceAccess.operatorOrgId, parsePipelineId(req.params.raceId, 'raceId'));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
 
 // POST /api/pipeline/start-zones — 保存出发区（UPSERT）
-router.post('/start-zones', requireRaceAccess((req) => req.body.raceId), async (req, res, next) => {
+router.post('/start-zones', requireRaceAccess((req) => parsePipelineId(req.body?.raceId, 'raceId')), async (req, res, next) => {
     try {
-        const data = await pipelineRepo.saveStartZone(req.raceAccess.operatorOrgId, req.body);
+        const input = parseStartZonePayload(req.body);
+        const data = await pipelineRepo.saveStartZone(req.raceAccess.operatorOrgId, input);
+        if (!data) return res.status(404).json({ success: false, message: '出发区不存在' });
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -57,7 +60,7 @@ router.post('/start-zones', requireRaceAccess((req) => req.body.raceId), async (
 router.delete('/start-zones/:id', requireRaceAccess(resolveRaceIdByStartZoneId), async (req, res, next) => {
     try {
         const deleted = await pipelineRepo.deleteStartZone(
-            req.raceAccess.operatorOrgId, Number(req.params.id));
+            req.raceAccess.operatorOrgId, parsePipelineId(req.params.id));
         if (!deleted) return res.status(404).json({ success: false, message: '出发区不存在' });
         res.json({ success: true });
     } catch (err) { next(err); }
@@ -71,15 +74,17 @@ router.delete('/start-zones/:id', requireRaceAccess(resolveRaceIdByStartZoneId),
 router.get('/performance-rules/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await pipelineRepo.getPerformanceRules(
-            req.raceAccess.operatorOrgId, Number(req.params.raceId));
+            req.raceAccess.operatorOrgId, parsePipelineId(req.params.raceId, 'raceId'));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
 
 // POST /api/pipeline/performance-rules — 保存成绩规则（UPSERT）
-router.post('/performance-rules', requireRaceAccess((req) => req.body.raceId), async (req, res, next) => {
+router.post('/performance-rules', requireRaceAccess((req) => parsePipelineId(req.body?.raceId, 'raceId')), async (req, res, next) => {
     try {
-        const data = await pipelineRepo.savePerformanceRule(req.raceAccess.operatorOrgId, req.body);
+        const input = parsePerformanceRulePayload(req.body);
+        const data = await pipelineRepo.savePerformanceRule(req.raceAccess.operatorOrgId, input);
+        if (!data) return res.status(404).json({ success: false, message: '成绩规则不存在' });
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });
@@ -88,7 +93,7 @@ router.post('/performance-rules', requireRaceAccess((req) => req.body.raceId), a
 router.post('/filter-performance/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await pipelineRepo.stepFilterPerformance(
-            req.raceAccess.operatorOrgId, Number(req.params.raceId));
+            req.raceAccess.operatorOrgId, parsePipelineId(req.params.raceId, 'raceId'));
         res.json({ success: true, data });
     } catch (err) { next(err); }
 });

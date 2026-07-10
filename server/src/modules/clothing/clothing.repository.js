@@ -16,20 +16,22 @@ export async function saveLimits(orgId, items) {
     if (!items.length) return [];
     const rows = items.map(item => clothingLimitMapper.toDbInsert(item, orgId));
 
-    const results = [];
-    for (const row of rows) {
-        const [result] = await knex('clothing_limits')
-            .insert(row)
-            .onConflict(['org_id', 'race_id', 'event', 'gender', 'size'])
-            .merge({
-                total_inventory: row.total_inventory,
-                used_count: row.used_count,
-                updated_at: knex.fn.now(),
-            })
-            .returning('*');
-        results.push(clothingLimitMapper.fromDbRow(result));
-    }
-    return results;
+    return knex.transaction(async (trx) => {
+        const results = [];
+        for (const row of rows) {
+            const [result] = await trx('clothing_limits')
+                .insert(row)
+                .onConflict(['org_id', 'race_id', 'event', 'gender', 'size'])
+                .merge({
+                    total_inventory: row.total_inventory,
+                    used_count: row.used_count,
+                    updated_at: trx.fn.now(),
+                })
+                .returning('*');
+            results.push(clothingLimitMapper.fromDbRow(result));
+        }
+        return results;
+    });
 }
 
 export async function saveLimit(orgId, data) {
@@ -60,6 +62,9 @@ export async function saveLimit(orgId, data) {
 export async function incrementUsed(orgId, raceId, event, gender, size, delta = 1, database = knex) {
     const updated = await database('clothing_limits')
         .where({ org_id: orgId, race_id: raceId, event, gender, size })
+        .modify((query) => {
+            if (delta < 0) query.where('used_count', '>=', Math.abs(delta));
+        })
         .increment('used_count', delta);
 
     if (updated > 0) {
