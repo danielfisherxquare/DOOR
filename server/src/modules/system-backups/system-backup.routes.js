@@ -6,6 +6,7 @@ import {
   downloadBackup,
   downloadEnvFile,
   getBackupStatus,
+  getEncryptionStatus,
   getRestoreDetail,
   getRestoreStatus,
   listBackups,
@@ -16,6 +17,7 @@ import {
   updateUploadMetadata,
   uploadMiddleware,
 } from './system-backup.service.js';
+import { parseRestoreJobId, parseStartRestorePayload } from './system-backup.schema.js';
 
 const router = Router();
 
@@ -88,10 +90,7 @@ router.post('/restores/upload', uploadMiddleware.fields([{ name: 'file', maxCoun
 
 router.post('/restores', operationLog({ module: 'system', businessType: 'IMPORT', titleFactory: (req) => '启动系统恢复: uploadId=' + (req.body?.uploadId || '') }), async (req, res, next) => {
   try {
-    const { uploadId } = req.body || {};
-    if (!uploadId) {
-      return res.status(400).json({ success: false, message: '缺少 uploadId' });
-    }
+    const { uploadId } = parseStartRestorePayload(req.body);
     const job = await startRestore(uploadId);
     res.status(202).json({ success: true, data: job });
   } catch (error) {
@@ -119,7 +118,7 @@ router.get('/restores/status', async (_req, res, next) => {
 
 router.get('/restores/:jobId', async (req, res, next) => {
   try {
-    const job = await getRestoreDetail(req.params.jobId);
+    const job = await getRestoreDetail(parseRestoreJobId(req.params.jobId));
     res.json({ success: true, data: job });
   } catch (error) {
     next(error);
@@ -129,48 +128,9 @@ router.get('/restores/:jobId', async (req, res, next) => {
 // ── 加密密钥健康状态 ──────────────────────────────────────
 router.get('/encryption-status', async (_req, res, next) => {
   try {
-    const { checkKeyHealth, getCurrentKeyFingerprints } = await import('../../utils/key-guard.js');
-    const knex = (await import('../../db/knex.js')).default;
-
-    const fingerprints = getCurrentKeyFingerprints();
-    const health = await checkKeyHealth(knex);
-
-    // 查找可用的 .env 备份文件
-    const allBackups = await listBackups();
-    const envBackups = allBackups
-      .filter((b) => b.envFile)
-      .slice(0, 5)
-      .map((b) => ({
-        filename: b.envFile,
-        backupDate: b.createdAt,
-        trigger: b.trigger,
-      }));
-
-    // 读取数据库中存储的指纹（如有）
-    let storedFingerprint = null;
-    try {
-      const row = await knex('system_settings').where('key', 'pii_key_fingerprint').first();
-      if (row?.value) storedFingerprint = JSON.parse(row.value);
-    } catch { /* table may not exist yet */ }
-
     res.json({
       success: true,
-      data: {
-        healthy: health.healthy,
-        reason: health.reason || null,
-        current: {
-          version: fingerprints.version,
-          encryptionKeyFingerprint: fingerprints.encryptionKeyFingerprint,
-          hmacKeyFingerprint: fingerprints.hmacKeyFingerprint,
-          isSet: fingerprints.encryptionKeyFingerprint !== 'UNSET',
-        },
-        stored: storedFingerprint ? {
-          version: storedFingerprint.version,
-          encryptionKeyFingerprint: storedFingerprint.encryptionKeyFingerprint,
-          hmacKeyFingerprint: storedFingerprint.hmacKeyFingerprint,
-        } : null,
-        envBackups,
-      },
+      data: await getEncryptionStatus(),
     });
   } catch (error) {
     next(error);

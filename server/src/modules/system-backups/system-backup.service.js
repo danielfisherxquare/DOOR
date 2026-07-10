@@ -5,6 +5,10 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import { env } from '../../config/env.js';
+import knex from '../../db/knex.js';
+import { checkKeyHealth, getCurrentKeyFingerprints } from '../../utils/key-guard.js';
+import { readStoredEncryptionFingerprint } from './system-backup.repository.js';
+import { parseRestoreJobId, parseRestoreUploadId } from './system-backup.schema.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -234,7 +238,8 @@ export async function getRestoreStatus() {
 }
 
 export async function getRestoreDetail(jobId) {
-  const filePath = path.join(resolveRestoreDir(), `${jobId}.json`);
+  const safeJobId = parseRestoreJobId(jobId);
+  const filePath = path.join(resolveRestoreDir(), `${safeJobId}.json`);
   const job = await safeReadJson(filePath);
   if (!job) {
     throw createHttpError(404, '恢复任务不存在');
@@ -255,7 +260,8 @@ async function updateRestoreJob(jobId, updater) {
 }
 
 async function readUploadMetadata(uploadId) {
-  const filePath = path.join(resolveUploadDir(), `${uploadId}.json`);
+  const safeUploadId = parseRestoreUploadId(uploadId);
+  const filePath = path.join(resolveUploadDir(), `${safeUploadId}.json`);
   const metadata = await safeReadJson(filePath);
   if (!metadata) {
     throw createHttpError(404, '上传文件不存在或已过期');
@@ -289,7 +295,7 @@ export async function registerUpload(file) {
     throw createHttpError(400, '请先选择要上传的备份文件');
   }
 
-  const uploadId = `upload_${Date.now()}`;
+  const uploadId = `upload_${Date.now()}_${randomUUID()}`;
   const metadata = {
     uploadId,
     filename: file.originalname,
@@ -320,7 +326,8 @@ export async function registerEnvUpload(file) {
 }
 
 export async function updateUploadMetadata(uploadId, patch) {
-  const filePath = path.join(resolveUploadDir(), `${uploadId}.json`);
+  const safeUploadId = parseRestoreUploadId(uploadId);
+  const filePath = path.join(resolveUploadDir(), `${safeUploadId}.json`);
   const current = await readJson(filePath);
   const updated = { ...current, ...patch };
   await fs.writeFile(filePath, `${JSON.stringify(updated, null, 2)}\n`, 'utf8');
@@ -334,15 +341,16 @@ export async function startRestore(uploadId) {
     throw createHttpError(409, '已有数据库备份或恢复任务在执行中');
   }
 
-  const upload = await readUploadMetadata(uploadId);
+  const safeUploadId = parseRestoreUploadId(uploadId);
+  const upload = await readUploadMetadata(safeUploadId);
   const now = new Date();
   const timestamp = now.toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
-  const jobId = `restore_${Date.now()}`;
+  const jobId = `restore_${Date.now()}_${randomUUID()}`;
   const targetDatabase = `door_restore_${timestamp}`;
   const resultFile = path.join(resolveRestoreDir(), `${jobId}.result.json`);
   const job = {
     jobId,
-    uploadId,
+    uploadId: safeUploadId,
     filename: upload.originalFilename,
     storedFilename: upload.storedFilename,
     uploadedAt: upload.uploadedAt,
@@ -435,4 +443,55 @@ export async function startRestore(uploadId) {
 
 export function isValidBackupFilename(filename) {
   return backupFilenameRegex.test(filename);
+}
+
+function parseStoredFingerprint(value) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getEncryptionStatus({
+  database = knex,
+  keyHealthChecker = checkKeyHealth,
+  currentFingerprintReader = getCurrentKeyFingerprints,
+  storedFingerprintReader = readStoredEncryptionFingerprint,
+  backupLister = listBackups,
+} = {}) {
+  const [health, allBackups, storedFingerprintValue] = await Promise.all([
+    keyHealthChecker(database),
+    backupLister(),
+    storedFingerprintReader(database),
+  ]);
+  const fingerprints = currentFingerprintReader();
+  const storedFingerprint = parseStoredFingerprint(storedFingerprintValue);
+  const envBackups = allBackups
+    .filter((backup) => backup.envFile)
+    .slice(0, 5)
+    .map((backup) => ({
+      filename: backup.envFile,
+      backupDate: backup.createdAt,
+      trigger: backup.trigger,
+    }));
+
+  return {
+    healthy: health.healthy,
+    reason: health.reason || null,
+    current: {
+      version: fingerprints.version,
+      encryptionKeyFingerprint: fingerprints.encryptionKeyFingerprint,
+      hmacKeyFingerprint: fingerprints.hmacKeyFingerprint,
+      isSet: fingerprints.encryptionKeyFingerprint !== 'UNSET',
+    },
+    stored: storedFingerprint ? {
+      version: storedFingerprint.version,
+      encryptionKeyFingerprint: storedFingerprint.encryptionKeyFingerprint,
+      hmacKeyFingerprint: storedFingerprint.hmacKeyFingerprint,
+    } : null,
+    envBackups,
+  };
 }

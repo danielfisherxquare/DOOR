@@ -1,8 +1,7 @@
 {
   "directDatabaseImports": [
     "src/modules/projects/projects.controller.js",
-    "src/modules/races/race.routes.js",
-    "src/modules/system-backups/system-backup.routes.js"
+    "src/modules/races/race.routes.js"
   ],
   "rawRequestPersistenceCalls": []
 }
