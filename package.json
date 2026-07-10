@@ -71,6 +71,7 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "@tailwindcss/postcss": "^4.2.1",
     "@tailwindcss/vite": "^4.2.1",
     "@types/react": "^19.0.0",
@@ -81,7 +82,9 @@
     "autoprefixer": "^10.4.27",
     "cross-env": "^7.0.3",
     "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "exceljs": "^4.4.0",
+    "globals": "^17.7.0",
     "playwright": "^1.52.0",
     "postcss": "^8.5.8",
     "prettier": "^3.9.5",

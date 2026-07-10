@@ -220,14 +220,9 @@ function DevDebugMarker({ sceneBounds, referenceMode = 'world' }) {
   if (!import.meta.env.DEV) return null
   if (!hasViewerDebugFlag('showDebugMarker')) return null
 
-  const target = useMemo(() => {
-    const width = Math.max(sceneBounds?.width || 24, 8)
-    const depth = Math.max(sceneBounds?.depth || 18, 8)
-    if (referenceMode === 'bounded') {
-      return [width / 2, 1.2, depth / 2]
-    }
-    return [0, 1.2, 0]
-  }, [referenceMode, sceneBounds?.depth, sceneBounds?.width])
+  const width = Math.max(sceneBounds?.width || 24, 8)
+  const depth = Math.max(sceneBounds?.depth || 18, 8)
+  const target = referenceMode === 'bounded' ? [width / 2, 1.2, depth / 2] : [0, 1.2, 0]
 
   return (
     <mesh position={target} renderOrder={1000}>

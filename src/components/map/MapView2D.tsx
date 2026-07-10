@@ -481,7 +481,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
     const buildingLayerGroup = L.layerGroup().addTo(map);
     buildingLayerGroupRef.current = buildingLayerGroup;
 
-    const handleCreate = (e: L.PM.MapEventHandler) => {
+    const handleCreate: L.PM.CreateEventHandler = (e) => {
       const layer = (e as any).layer;
       const geojson = layer.toGeoJSON() as GeoJSON.Feature;
       const currentMeasurementMode = measurementModeRef.current;

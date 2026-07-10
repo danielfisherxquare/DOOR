@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback, useMemo, useState } from 'react';
-import { APILoader, Map, Polygon, Polyline, Marker, MouseTool, MouseToolDrawType } from '@uiw/react-amap';
+import { APILoader, Map, Marker, MouseTool, MouseToolDrawType, Polygon, Polyline } from '@uiw/react-amap';
 import gcoord from 'gcoord';
 import { useMapStore, type MapDrawToolId, type MapTreeNode } from '../../stores/mapStore';
 import {
@@ -136,24 +136,19 @@ type AMapInstance = {
   off: (event: string, cb: (...args: any[]) => void) => void;
 };
 
-type AMapLngLatLike =
-  | { lng?: number; lat?: number; getLng?: () => number; getLat?: () => number }
-  | [number, number];
-
 type AMapOverlayLike = {
-  setMap?: (map: unknown) => void;
-  getPosition?: () => AMapLngLatLike;
+  setMap?: (map: AMap.Map | null) => void;
+  getPosition?: () => unknown;
   getPath?: () => unknown;
-  getCenter?: () => AMapLngLatLike;
+  getCenter?: () => unknown;
   getRadius?: () => number;
   getBounds?: () => {
-    getSouthWest?: () => AMapLngLatLike;
-    getNorthEast?: () => AMapLngLatLike;
+    getSouthWest?: () => unknown;
+    getNorthEast?: () => unknown;
   };
 };
 
-type MouseToolDrawEvent = {
-  obj?: AMapOverlayLike;
+type MouseToolDrawEvent = Parameters<AMap.MouseToolEvents['onDraw']>[0] & {
   target?: AMapOverlayLike;
 };
 
@@ -802,13 +797,15 @@ export default function AMap3DView({ onBrowseStateChange, browseSyncToken, brows
                 <React.Fragment key={featureKey}>
                   <Polygon
                     path={gcjPath}
-                    style={{
-                      fillColor: String(props.fillColor || props.color || '#3388ff'),
-                      fillOpacity: fillOpacity * occlusionOpacity,
-                      strokeColor: borderColor,
-                      strokeOpacity: (((props.strokeOpacity as number | undefined) ?? 1)) * occlusionOpacity,
-                      strokeWeight: ((props.strokeWeight as number | undefined) ?? 3) + (isSelected ? 1 : 0),
-                    }}
+                    fillColor={String(props.fillColor || props.color || '#3388ff')}
+                    fillOpacity={fillOpacity * occlusionOpacity}
+                    strokeColor={borderColor}
+                    strokeOpacity={
+                      ((props.strokeOpacity as number | undefined) ?? 1) * occlusionOpacity
+                    }
+                    strokeWeight={
+                      ((props.strokeWeight as number | undefined) ?? 3) + (isSelected ? 1 : 0)
+                    }
                     onClick={() => handleSelectFeature(featureId)}
                   />
                   {labelText && (
@@ -834,11 +831,13 @@ export default function AMap3DView({ onBrowseStateChange, browseSyncToken, brows
                 <React.Fragment key={featureKey}>
                   <Polyline
                     path={gcjPath}
-                    style={{
-                      strokeColor: borderColor,
-                      strokeOpacity: (((props.strokeOpacity as number | undefined) ?? 1)) * occlusionOpacity,
-                      strokeWeight: ((props.strokeWeight as number | undefined) ?? 3) + (isSelected ? 1 : 0),
-                    }}
+                    strokeColor={borderColor}
+                    strokeOpacity={
+                      ((props.strokeOpacity as number | undefined) ?? 1) * occlusionOpacity
+                    }
+                    strokeWeight={
+                      ((props.strokeWeight as number | undefined) ?? 3) + (isSelected ? 1 : 0)
+                    }
                     onClick={() => handleSelectFeature(featureId)}
                   />
                   {labelText && (
@@ -941,13 +940,18 @@ export default function AMap3DView({ onBrowseStateChange, browseSyncToken, brows
               <React.Fragment key={featureKey}>
                 <Polygon
                   path={circlePoints}
-                  style={{
-                    fillColor: String(props.fillColor || props.color || '#3388ff'),
-                    fillOpacity: ((((props.fillOpacity as number | undefined) ?? 0.2) + (isSelected ? 0.08 : 0))) * occlusionOpacity,
-                    strokeColor: borderColor,
-                    strokeOpacity: (((props.strokeOpacity as number | undefined) ?? 1)) * occlusionOpacity,
-                    strokeWeight: ((props.strokeWeight as number | undefined) ?? 3) + (isSelected ? 1 : 0),
-                  }}
+                  fillColor={String(props.fillColor || props.color || '#3388ff')}
+                  fillOpacity={
+                    ((props.fillOpacity as number | undefined) ?? 0.2) * occlusionOpacity +
+                    (isSelected ? 0.08 * occlusionOpacity : 0)
+                  }
+                  strokeColor={borderColor}
+                  strokeOpacity={
+                    ((props.strokeOpacity as number | undefined) ?? 1) * occlusionOpacity
+                  }
+                  strokeWeight={
+                    ((props.strokeWeight as number | undefined) ?? 3) + (isSelected ? 1 : 0)
+                  }
                   onClick={() => handleSelectFeature(featureId)}
                 />
                 {labelText && (

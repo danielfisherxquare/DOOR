@@ -9,6 +9,12 @@ export interface ImportedMapFeature {
   node: Partial<MapTreeNode>;
 }
 
+export interface ArcSproMapFeatureCollection extends GeoJSON.FeatureCollection {
+  properties: {
+    doorExport: ReturnType<typeof buildExportManifest>;
+  };
+}
+
 function getFeatureType(geometry?: GeoJSON.Geometry | null): MapTreeNode['featureType'] {
   if (geometry?.type === 'Point') return 'marker';
   if (geometry?.type === 'LineString') return 'polyline';
@@ -20,7 +26,7 @@ export function buildMapFeatureCollection(
   treeNodes: MapTreeNode[],
   drawnFeatures: GeoJSON.Feature[],
   options: { exportName?: string; source?: string } = {},
-): GeoJSON.FeatureCollection {
+): ArcSproMapFeatureCollection {
   const nodesById = new Map(treeNodes.map((node) => [node.id, node]));
   const features = drawnFeatures.map((feature) => {
     const props = (feature.properties || {}) as Record<string, any>;

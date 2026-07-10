@@ -1,0 +1,22 @@
+node_modules/
+dist/
+coverage/
+public/
+server/
+package-lock.json
+
+# Existing documentation and root build files are migrated with their owning maintenance task.
+docs/
+*.md
+index.html
+postcss.config.js
+vite.config.js
+scripts/
+
+# Remove `src/` in Phase E after legacy source files are reformatted in bounded module commits.
+src/
+
+# Existing non-tooling tests are migrated with their owning business modules.
+tests/*
+!tests/tooling/
+!tests/tooling/**

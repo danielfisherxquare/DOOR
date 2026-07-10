@@ -1561,9 +1561,9 @@ test('TerrainModelPage exposes a manual terrain collection range that flows into
 
 test('TerrainModelPage allows manual terrain bounds that do not cover the whole GPX track', () => {
   const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
-  const readiness = source.match(/const manualTerrainBoundsReady = useMemo\(\(\) => \(([\s\S]*?)\n  \), \[/)?.[1] || ''
-  const applyManual = source.match(/const applyManualTerrainFootprint = useCallback\(\(footprint[\s\S]*?\n  \}, \[/)?.[0] || ''
-  const rotateManual = source.match(/const updateManualFootprintRotation = useCallback\(\(value\) => \{([\s\S]*?)\n  \}, \[/)?.[0] || ''
+  const readiness = source.match(/const manualTerrainBoundsReady = useMemo\(\(\) => \(([\s\S]*?)\n {2}\), \[/)?.[1] || ''
+  const applyManual = source.match(/const applyManualTerrainFootprint = useCallback\(\(footprint[\s\S]*?\n {2}\}, \[/)?.[0] || ''
+  const rotateManual = source.match(/const updateManualFootprintRotation = useCallback\(\(value\) => \{([\s\S]*?)\n {2}\}, \[/)?.[0] || ''
 
   assert.match(readiness, /terrainBoundsMode !== 'manual'[\s\S]*activeTerrainBoundsWgs84/)
   assert.doesNotMatch(readiness, /boundsContainTrackPoints/)
@@ -1607,8 +1607,8 @@ test('TerrainModelPage presents terrain collection range as a map-side control p
 
 test('TerrainModelPage starts manual bounds drawing on the first manual-adjust click', () => {
   const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
-  const handler = source.match(/const startManualTerrainBoundsDraw = useCallback\(\(\) => \{([\s\S]*?)\n  \}, \[/)?.[1] || ''
-  const firstSwitchBranch = handler.match(/if \(terrainBoundsMode !== 'manual' \|\| !activeTerrainBoundsWgs84\) \{([\s\S]*?)\n    \}/)?.[1] || ''
+  const handler = source.match(/const startManualTerrainBoundsDraw = useCallback\(\(\) => \{([\s\S]*?)\n {2}\}, \[/)?.[1] || ''
+  const firstSwitchBranch = handler.match(/if \(terrainBoundsMode !== 'manual' \|\| !activeTerrainBoundsWgs84\) \{([\s\S]*?)\n {4}\}/)?.[1] || ''
 
   assert.match(firstSwitchBranch, /setTerrainBoundsMode\('manual'\)/)
   assert.match(firstSwitchBranch, /const initialFootprint = createPresetFootprintPolygon\(baseBounds, 'rectangle', manualFootprintRotationDegrees\)/)

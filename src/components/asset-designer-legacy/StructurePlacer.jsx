@@ -15,7 +15,7 @@ export default function StructurePlacer({
     const [previewPos, setPreviewPos] = useState(null)
     const [rotation, setRotation] = useState(0)
 
-    const preset = activePreset || useMemo(() => {
+    const defaultPreset = useMemo(() => {
         switch (structureType) {
             case 'column': return COLUMN_PRESETS[0]
             case 'beam': return BEAM_PRESETS[0]
@@ -24,6 +24,7 @@ export default function StructurePlacer({
             default: return null
         }
     }, [structureType])
+    const preset = activePreset || defaultPreset
 
     const handlePointerMove = useCallback((e) => {
         e.stopPropagation()

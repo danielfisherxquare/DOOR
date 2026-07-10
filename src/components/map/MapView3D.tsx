@@ -1164,7 +1164,6 @@ function syncReferenceBuildings(
     tileset.skipLevelOfDetail = false;
     tileset.foveatedScreenSpaceError = false;
     tileset.foveatedTimeDelay = 0.0;
-    tileset.enableShowOutline = renderQuality.showOsmOutline;
     tileset.showOutline = renderQuality.showOsmOutline;
   };
 
@@ -1299,7 +1298,10 @@ function createCesiumImageryProvider(tileStyle: string): CesiumImagerySource {
   };
 }
 
-function syncExtrudedFeatures(viewer: Cesium.Viewer, drawnFeatures: GeoJSON.Feature[]): void {
+function syncExtrudedFeatures(
+  viewer: Cesium.Viewer,
+  drawnFeatures: GeoJSON.Feature[],
+): () => void {
   let cancelled = false;
   viewer.dataSources.removeAll();
 
@@ -2330,7 +2332,7 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
     const viewer = viewerRef.current;
     if (!viewer || viewer.isDestroyed()) return;
 
-    syncExtrudedFeatures(viewer, drawnFeatures);
+    return syncExtrudedFeatures(viewer, drawnFeatures);
   }, [drawnFeatures, viewerReadyToken]);
 
   useEffect(() => {

@@ -413,9 +413,9 @@ function FacePreview({ points }) {
     return geo
   }, [points])
 
-  if (!geometry) return null
+  useEffect(() => () => geometry?.dispose(), [geometry])
 
-  useEffect(() => () => geometry.dispose(), [geometry])
+  if (!geometry) return null
 
   return (
     <mesh geometry={geometry}>

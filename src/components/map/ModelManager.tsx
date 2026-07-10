@@ -68,6 +68,8 @@ export default function ModelManager({ disableAutoLoad = false }: ModelManagerPr
       pitch: 0,
       roll: 0,
       scale: 1,
+      clampToGround: true,
+      groundOffset: 0,
     });
   };
 

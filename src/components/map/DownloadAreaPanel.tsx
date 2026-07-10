@@ -11,7 +11,7 @@ import {
   updateTileAreaStats,
 } from '../../utils/db/tileAreaStore';
 import { bulkInsertTiles } from '../../utils/db/tileCacheStore';
-import { estimateDownload, type TileCoords } from '../../utils/map/tileCoords';
+import { estimateDownload } from '../../utils/map/tileCoords';
 import { resolveTileUrl } from '../../utils/map/tileUrlResolver';
 import { PRESET_TILE_SOURCES, type TileSourceConfig } from '../../utils/map/tileLayer';
 import type { TileArea } from '../../utils/db/database';

@@ -153,7 +153,7 @@ git commit -m "fix(tooling): restore reproducible frontend installs"
 
 **Files:**
 
-- Create: `.eslintrc.cjs`
+- Create: `eslint.config.js`
 - Create: `.prettierignore`
 - Create: `tsconfig.json`
 - Modify: `.prettierrc.json` if it exists after reconciling the original worktree proposal
@@ -161,7 +161,7 @@ git commit -m "fix(tooling): restore reproducible frontend installs"
 
 **Step 1: Write a tooling-config test**
 
-Create `tests/tooling/quality-gates.test.mjs` that asserts the lint config uses `@typescript-eslint/parser` for `*.ts` and `*.tsx`, and `tsconfig.json` includes all TypeScript source files.
+Create `tests/tooling/quality-gates.test.mjs` that asserts the flat lint config uses `@typescript-eslint/parser` for `*.ts` and `*.tsx`, `tsconfig.json` includes all TypeScript source files, and the temporary Prettier legacy-debt boundary is explicit.
 
 Run:
 
@@ -173,7 +173,7 @@ Expected: FAIL because the configs do not exist.
 
 **Step 2: Add minimal configs**
 
-Use JavaScript/React rules for JS/JSX and TypeScript parser overrides for TS/TSX. Start with correctness rules (`no-undef`, parser errors, invalid React hooks) and warnings for style debt.
+Use JavaScript/React rules for JS/JSX and TypeScript parser overrides for TS/TSX. Start with correctness rules (`no-undef`, parser errors, invalid React hooks) and warnings for style debt. Temporarily exclude `src/` from the Prettier gate; remove that exclusion module-by-module during Phase E instead of generating one unreviewable repository-wide formatting commit.
 
 **Step 3: Run the gates and record the baseline**
 

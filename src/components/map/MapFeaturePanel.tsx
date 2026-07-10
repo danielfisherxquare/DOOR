@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useMapStore } from '../../stores/mapStore';
+import { useMapStore, type GeneratedSceneOsmDiagnostics } from '../../stores/mapStore';
 import MapAdvancedPanel from './MapAdvancedPanel';
 import { CommandDetailPane } from '../command/CommandPrimitives';
 import studioProjectApi from '../../services/studioProjectApi';
@@ -41,7 +41,7 @@ export default function MapFeaturePanel({
   const [activeTab, setActiveTab] = useState<TabType>('properties');
   const [syncing, setSyncing] = useState(false);
   const [localProjectId, setLocalProjectId] = useState<string | null>(null);
-  const [exportDiagnostics, setExportDiagnostics] = useState<any>(null);
+  const [exportDiagnostics, setExportDiagnostics] = useState<GeneratedSceneOsmDiagnostics | null>(null);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -173,7 +173,7 @@ export default function MapFeaturePanel({
 
   const updateNodeFromWorkZone = (zoneRecord: any, targetProjectId = projectId) => {
     if (!zoneRecord?.id) return;
-    const nextNode = terrainWorkZoneToMapNode(zoneRecord) as any;
+    const nextNode = terrainWorkZoneToMapNode(zoneRecord);
     updateFeature(nodeId, {
       source: 'terrain-work-zone',
       sourceProjectId: targetProjectId || undefined,
@@ -221,7 +221,7 @@ export default function MapFeaturePanel({
   };
 
   const getExportDiagnosticRows = () => {
-    const diagnostics = exportDiagnostics || (node as any).generatedSceneOsmDiagnostics || null;
+    const diagnostics = exportDiagnostics || node.generatedSceneOsmDiagnostics || null;
     if (!diagnostics) return null;
     const filters = diagnostics.filters || {};
     return [
@@ -357,12 +357,12 @@ export default function MapFeaturePanel({
 
   const getDownloadFilename = (headers: Record<string, string>, fallback: string) => {
     const contentDisposition = headers['content-disposition'] || headers['Content-Disposition'] || '';
-    const match = contentDisposition.match(/filename\\*?=(?:UTF-8''|\"?)([^\";]+)/i);
+    const match = contentDisposition.match(/filename\*?=(?:UTF-8''|"?)([^";]+)/i);
     if (!match?.[1]) return fallback;
     try {
-      return decodeURIComponent(match[1].replace(/\"/g, ''));
+      return decodeURIComponent(match[1].replace(/"/g, ''));
     } catch {
-      return match[1].replace(/\"/g, '');
+      return match[1].replace(/"/g, '');
     }
   };
 
@@ -755,7 +755,7 @@ export default function MapFeaturePanel({
               <div className="feature-export-diagnostics">
                 <div className="feature-export-diagnostics__header">
                   <span>OSM 导出诊断</span>
-                  <strong>{(exportDiagnostics || (node as any).generatedSceneOsmDiagnostics)?.truncatedByMaxBuildings ? '已触顶' : '正常'}</strong>
+                  <strong>{(exportDiagnostics || node.generatedSceneOsmDiagnostics)?.truncatedByMaxBuildings ? '已触顶' : '正常'}</strong>
                 </div>
                 <div className="feature-export-diagnostics__grid">
                   {getExportDiagnosticRows()?.map(([label, value]) => (

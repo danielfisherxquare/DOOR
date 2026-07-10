@@ -78,6 +78,22 @@ export interface HiddenOsmBuilding {
   targetElevation?: number;
 }
 
+export interface GeneratedSceneOsmDiagnostics {
+  rawElementCount?: number;
+  renderableElementCount?: number;
+  footprintCount?: number;
+  returnedCount?: number;
+  truncatedByMaxBuildings?: boolean;
+  filters?: {
+    areaTooLarge?: number;
+    majorTooLong?: number;
+    ribbonLike?: number;
+    suppressedByBuildingParts?: number;
+    truncatedByMaxBuildings?: number;
+  };
+  [key: string]: unknown;
+}
+
 export interface MapTreeNode {
   id: string;
   name: string;
@@ -134,6 +150,13 @@ export interface MapTreeNode {
   exportTaskId?: string | null;
   exportTaskStatus?: string | null;
   exportOutputRoot?: string | null;
+  geometrySource?: string | null;
+  generatedSceneId?: string | null;
+  generatedSceneStatus?: string | null;
+  generatedSceneJobId?: string | null;
+  generatedSceneQualityPreset?: string | null;
+  generatedSceneOsmCount?: number | null;
+  generatedSceneOsmDiagnostics?: GeneratedSceneOsmDiagnostics | null;
   syncStatus?: 'local' | 'synced' | 'dirty';
   sourceProjectId?: string | null;
 }

@@ -5,6 +5,7 @@ import { showError, showSuccess, showWarning } from '../../utils/toast'
 import { useInventorySurface } from './useInventorySurface'
 
 function printQrItems(items) {
+    const closeScriptTag = '</scr' + 'ipt>'
     const blocks = items.map((item) => `
         <div class="qr-item">
             <div class="qr-code" id="qr-${item.id}"></div>
@@ -29,7 +30,7 @@ function printQrItems(items) {
         <head>
             <meta charset="utf-8">
             <title>二维码打印</title>
-            <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"><\/script>
+            <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js">${closeScriptTag}
             <style>
                 @page { size: A4; margin: 10mm; }
                 body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 0; }
@@ -42,7 +43,7 @@ function printQrItems(items) {
         </head>
         <body>
             <div class="qr-grid">${blocks}</div>
-            <script>${script}<\/script>
+            <script>${script}${closeScriptTag}
         </body>
         </html>
     `)

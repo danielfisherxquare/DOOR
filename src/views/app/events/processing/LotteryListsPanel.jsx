@@ -179,19 +179,15 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
   const handleEditSave = useCallback(async (formData) => {
     if (!editingEntry?.id) return
 
-    try {
-      await lotteryApi.updateLotteryList(editingEntry.id, {
-        name: formData.name,
-        idNumber: formData.idNumber,
-        phone: formData.phone,
-      })
-      setEditingEntry(null)
-      await refreshMatching({ announce: false })
-      setMessage('条目已更新。')
-      setMessageTone('success')
-    } catch (err) {
-      throw err
-    }
+    await lotteryApi.updateLotteryList(editingEntry.id, {
+      name: formData.name,
+      idNumber: formData.idNumber,
+      phone: formData.phone,
+    })
+    setEditingEntry(null)
+    await refreshMatching({ announce: false })
+    setMessage('条目已更新。')
+    setMessageTone('success')
   }, [editingEntry, refreshMatching])
 
   const handleDeleteEntry = useCallback(async (entryId) => {
