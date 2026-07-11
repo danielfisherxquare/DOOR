@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import assessmentPublicApi from '../../api/assessmentPublic'
 import {
@@ -180,7 +180,7 @@ function AssessmentPublicPage() {
 
   const membersPreview = useMemo(() => meta?.membersPreview || [], [meta])
 
-  const openMember = async (memberId, accessToken = token) => {
+  const openMember = useCallback(async (memberId, accessToken = token) => {
     if (!accessToken || !memberId) return
 
     const formRes = await assessmentPublicApi.getMemberForm(campaignId, memberId, accessToken)
@@ -201,9 +201,9 @@ function AssessmentPublicPage() {
     setComment(formRes.data?.draft?.comment || '')
     setDirty(false)
     setSaveState('idle')
-  }
+  }, [campaignId, token])
 
-  const hydrateProgress = async (progressData, accessToken = token) => {
+  const hydrateProgress = useCallback(async (progressData, accessToken = token) => {
     setProgress(progressData)
     const nextMemberId = progressData?.inviteCode?.lastMemberId || progressData?.nextPendingMemberId
     if (nextMemberId && progressData.completedCount < progressData.totalCount) {
@@ -215,19 +215,19 @@ function AssessmentPublicPage() {
     setScores([])
     setComment('')
     setDirty(false)
-  }
+  }, [openMember, token])
 
-  const loadMeta = async () => {
+  const loadMeta = useCallback(async () => {
     const res = await assessmentPublicApi.getMeta(campaignId)
     if (res.success) setMeta(res.data)
-  }
+  }, [campaignId])
 
-  const loadProgress = async (accessToken) => {
+  const loadProgress = useCallback(async (accessToken) => {
     const res = await assessmentPublicApi.getProgress(campaignId, accessToken)
     if (res.success) await hydrateProgress(res.data, accessToken)
-  }
+  }, [campaignId, hydrateProgress])
 
-  const flushDraft = async () => {
+  const flushDraft = useCallback(async () => {
     if (!token || !currentMember || !dirty) return
     setSaveState('saving')
     try {
@@ -238,7 +238,7 @@ function AssessmentPublicPage() {
       setSaveState('error')
       setMessage(error.message)
     }
-  }
+  }, [campaignId, comment, currentMember, dirty, scores, token])
 
   useEffect(() => {
     let cancelled = false
@@ -255,7 +255,7 @@ function AssessmentPublicPage() {
     return () => {
       cancelled = true
     }
-  }, [campaignId])
+  }, [loadMeta, loadProgress, token])
 
   useEffect(() => {
     if (!dirty || !token || !currentMember) return
@@ -264,7 +264,7 @@ function AssessmentPublicPage() {
       void flushDraft()
     }, 1200)
     return () => window.clearTimeout(saveTimerRef.current)
-  }, [dirty, scores, comment, token, currentMember])
+  }, [comment, currentMember, dirty, flushDraft, scores, token])
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -279,7 +279,7 @@ function AssessmentPublicPage() {
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
-  }, [token, currentMember, dirty, scores, comment])
+  }, [comment, currentMember, dirty, flushDraft, scores, token])
 
   const handleLogin = async (event) => {
     event.preventDefault()

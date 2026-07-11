@@ -2231,8 +2231,7 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
   }, [
     treeNodes,
     viewerReadyToken,
-    terrainWorkZoneRuntimePolicy.strategy,
-    terrainWorkZoneRuntimePolicy.fpsBucket,
+    terrainWorkZoneRuntimePolicy,
     syncRuntimePreviewSummary,
   ]);
 
@@ -2431,7 +2430,7 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
       });
     }
     clearFlyToFeature();
-  }, [flyToToken, viewerReadyToken]);
+  }, [clearFlyToFeature, flyToFeatureId, flyToToken, treeNodes, viewerReadyToken]);
 
   useEffect(() => {
     const viewer = viewerRef.current;

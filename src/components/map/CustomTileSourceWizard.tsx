@@ -4,7 +4,7 @@
  * 4步流程：类型选择 → 基本信息 → 高级参数 → 预览保存
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { createCustomSource, hasCustomSource } from '../../utils/db/customSourceStore';
 import { CommandPanel, CommandStepRail } from '../command/CommandPrimitives';
 import './CustomTileSourceWizard.css';
@@ -471,20 +471,23 @@ export default function CustomTileSourceWizard({ onClose, onComplete }: CustomTi
     { key: 4, label: '保存', icon: '4', completed: state.step > 4 },
   ];
 
-  const stepContent = useMemo(() => {
-    switch (state.step) {
-      case 1:
-        return renderStep1();
-      case 2:
-        return renderStep2();
-      case 3:
-        return renderStep3();
-      case 4:
-        return renderStep4();
-      default:
-        return null;
-    }
-  }, [state.step, state, errors, testing, testResult]);
+  let stepContent = null;
+  switch (state.step) {
+    case 1:
+      stepContent = renderStep1();
+      break;
+    case 2:
+      stepContent = renderStep2();
+      break;
+    case 3:
+      stepContent = renderStep3();
+      break;
+    case 4:
+      stepContent = renderStep4();
+      break;
+    default:
+      break;
+  }
 
   return (
     <div className="wizard-overlay">

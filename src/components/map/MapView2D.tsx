@@ -28,6 +28,14 @@ interface MapView2DProps {
   orgId?: string | null;
 }
 
+interface MapKeyboardActions {
+  stopDrawing: (options?: { cancel?: boolean; guide?: string }) => void;
+  handleDeleteSelected: () => void;
+  handleSaveDirtyFeatures: () => Promise<void>;
+  focusAllFeatures: () => void;
+  startDrawing: (toolId: MapDrawToolId) => void;
+}
+
 interface DrawToolDefinition {
   id: MapDrawToolId;
   shape: L.PM.SUPPORTED_SHAPES;
@@ -169,10 +177,13 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
   const snapEnabledRef = useRef(true);
   const continuousDrawingRef = useRef(false);
   const homeViewRef = useRef<MapBrowseState>(browseStateFallback());
+  const homeViewInitializedRef = useRef(false);
+  const onBrowseStateChangeRef = useRef(onBrowseStateChange);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const tileStyle = useMapStore((s) => s.tileStyle);
   const browseState = useMapStore((s) => s.browseState);
+  const initialTileStyleRef = useRef(tileStyle);
   const addFeature = useMapStore((s) => s.addFeature);
   const updateFeature = useMapStore((s) => s.updateFeature);
   const treeNodes = useMapStore((s) => s.treeNodes);
@@ -211,9 +222,14 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
   const [mapZoom, setMapZoom] = useState<number>(browseState.zoom);
   const [savingAll, setSavingAll] = useState(false);
 
-  useEffect(() => {
+  if (!homeViewInitializedRef.current) {
     homeViewRef.current = browseState;
-  }, []);
+    homeViewInitializedRef.current = true;
+  }
+
+  useEffect(() => {
+    onBrowseStateChangeRef.current = onBrowseStateChange;
+  }, [onBrowseStateChange]);
 
   useEffect(() => {
     let active = true;
@@ -446,13 +462,40 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
     setDrawGuide(`已删除 ${selectedFeatureNode.name}。`);
   }
 
+  const mapCreationActionsRef = useRef({
+    addFeature,
+    recordHistory,
+    resetDrawingState,
+    setPropsPanelNodeId,
+    setSelectedNodeId,
+    stopDrawing,
+    updateFeature,
+  });
+  mapCreationActionsRef.current = {
+    addFeature,
+    recordHistory,
+    resetDrawingState,
+    setPropsPanelNodeId,
+    setSelectedNodeId,
+    stopDrawing,
+    updateFeature,
+  };
+  const keyboardActionsRef = useRef<MapKeyboardActions | null>(null);
+  keyboardActionsRef.current = {
+    focusAllFeatures,
+    handleDeleteSelected,
+    handleSaveDirtyFeatures,
+    startDrawing,
+    stopDrawing,
+  };
+
   // 初始化地图
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
     const map = L.map(containerRef.current, {
-      center: browseState.centerWgs84,
-      zoom: browseState.zoom,
+      center: homeViewRef.current.centerWgs84,
+      zoom: homeViewRef.current.zoom,
       zoomControl: false,
     });
 
@@ -464,7 +507,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
       });
     });
 
-    const source = resolveTileSource(tileStyle);
+    const source = resolveTileSource(initialTileStyleRef.current);
     tileLayerRef.current = createTileLayer(source);
     tileLayerRef.current.addTo(map);
 
@@ -475,6 +518,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
     buildingLayerGroupRef.current = buildingLayerGroup;
 
     const handleCreate: L.PM.CreateEventHandler = (e) => {
+      const actions = mapCreationActionsRef.current;
       const layer = (e as any).layer;
       const geojson = layer.toGeoJSON() as GeoJSON.Feature;
       const currentMeasurementMode = measurementModeRef.current;
@@ -487,11 +531,11 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
       else if (layer instanceof L.Marker) featureType = 'marker';
 
       const radius = layer instanceof L.Circle ? layer.getRadius() : undefined;
-      recordHistory();
+      actions.recordHistory();
 
       if (currentMeasurementMode) {
         const measurement = measureGeometry(geojson.geometry);
-        const id = addFeature(geojson, {
+        const id = actions.addFeature(geojson, {
           featureType,
           name: currentMeasurementMode === 'distance' ? '测距线' : '测面区域',
           objectType: 'generic',
@@ -503,13 +547,13 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
           geometry: geojson.geometry,
           syncStatus: 'local',
         });
-        updateFeature(id, {
+        actions.updateFeature(id, {
           name: `${currentMeasurementMode === 'distance' ? '测距' : '测面'} · ${measurement.summary}`,
         });
-        setSelectedNodeId(id);
-        setPropsPanelNodeId(id);
+        actions.setSelectedNodeId(id);
+        actions.setPropsPanelNodeId(id);
         map.removeLayer(layer);
-        stopDrawing({ guide: measurement.summary });
+        actions.stopDrawing({ guide: measurement.summary });
         return;
       }
 
@@ -524,28 +568,28 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
         syncStatus: 'local' as const,
       };
 
-      const id = addFeature(
+      const id = actions.addFeature(
         geojson,
         activeTemplateRef.current
           ? applyAssetTemplateToNode(activeTemplateRef.current, baseNode)
           : baseNode,
       );
-      setSelectedNodeId(id);
-      setPropsPanelNodeId(id);
+      actions.setSelectedNodeId(id);
+      actions.setPropsPanelNodeId(id);
 
       map.removeLayer(layer);
       if (continuousDrawingRef.current && currentDrawTool) {
         setDrawGuide(`${baseNode.name} 已创建，可继续连续落图。`);
       } else {
-        stopDrawing({ guide: `${baseNode.name} 已创建，可继续选中编辑。` });
+        actions.stopDrawing({ guide: `${baseNode.name} 已创建，可继续选中编辑。` });
       }
     };
 
     const handleBrowseStateChange = () => {
       setMapZoom(map.getZoom());
-      if (mapRef.current && onBrowseStateChange) {
+      if (mapRef.current && onBrowseStateChangeRef.current) {
         const center = mapRef.current.getCenter();
-        onBrowseStateChange({
+        onBrowseStateChangeRef.current({
           centerWgs84: [center.lat, center.lng],
           zoom: mapRef.current.getZoom(),
           headingDeg: 0,
@@ -557,7 +601,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
     const handleDrawEnd = () => {
       if (!activeDrawToolRef.current) return;
       if (continuousDrawingRef.current) return;
-      resetDrawingState('绘制已结束，可切换其它工具或继续浏览。');
+      mapCreationActionsRef.current.resetDrawingState('绘制已结束，可切换其它工具或继续浏览。');
     };
 
     map.on('pm:create', handleCreate);
@@ -586,6 +630,8 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const actions = keyboardActionsRef.current;
+      if (!actions) return;
       const target = event.target as HTMLElement | null;
       const tagName = target?.tagName;
       if (tagName === 'INPUT' || tagName === 'SELECT' || tagName === 'TEXTAREA' || target?.isContentEditable) {
@@ -594,7 +640,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
 
       if (event.key === 'Escape' && (activeDrawToolRef.current || measurementModeRef.current)) {
         event.preventDefault();
-        stopDrawing({ cancel: true, guide: '草图已取消，返回浏览模式。' });
+        actions.stopDrawing({ cancel: true, guide: '草图已取消，返回浏览模式。' });
         return;
       }
 
@@ -612,7 +658,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
 
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
         event.preventDefault();
-        handleSaveDirtyFeatures();
+        void actions.handleSaveDirtyFeatures();
         return;
       }
 
@@ -632,7 +678,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
 
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedFeatureNode) {
         event.preventDefault();
-        handleDeleteSelected();
+        actions.handleDeleteSelected();
         return;
       }
 
@@ -657,7 +703,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
 
       if (event.key.toLowerCase() === 'f') {
         event.preventDefault();
-        focusAllFeatures();
+        actions.focusAllFeatures();
         return;
       }
 
@@ -670,7 +716,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
       const tool = DRAW_TOOLS.find((item) => item.shortcut === event.key);
       if (tool) {
         event.preventDefault();
-        startDrawing(tool.id);
+        actions.startDrawing(tool.id);
       }
     };
 
@@ -678,7 +724,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [copySelectedFeature, drawnFeatures, editingMode, handleSaveDirtyFeatures, pasteClipboardFeature, redoMapEdit, selectedFeatureNode, setEditingMode, undoMapEdit]);
+  }, [copySelectedFeature, drawnFeatures, editingMode, pasteClipboardFeature, redoMapEdit, selectedFeatureNode, setEditingMode, undoMapEdit]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { appInventoryApi } from '../../services/inventoryApi'
 import { showError, showSuccess } from '../../utils/toast'
@@ -104,7 +104,7 @@ function EditModal({ editingItem, formData, saving, setFormData, onClose, onSubm
 }
 
 export default function PreInboundManager({ inventoryApi = appInventoryApi }) {
-    const preInboundApi = inventoryApi.preInbound
+    const preInboundApi = useMemo(() => inventoryApi.preInbound, [inventoryApi])
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const selectedOrgId = searchParams.get('orgId')
@@ -128,7 +128,34 @@ export default function PreInboundManager({ inventoryApi = appInventoryApi }) {
     const nextStage = getNextStage(detail?.current_stage)
     const metrics = useMemo(() => [{ label: '流程单', value: summary?.total || 0 }, { label: '7日内到货', value: summary?.arrivingThisWeek || 0 }, { label: '延期风险', value: summary?.overdue || 0 }, { label: '待手工入库', value: summary?.readyForInbound || 0 }], [summary])
 
-    useEffect(() => { loadBoard() }, [selectedOrgId, filters.search, filters.stage, filters.priority])
+    const loadBoard = useCallback(async () => {
+        setLoading(true)
+        try {
+            const [summaryRes, itemsRes] = await Promise.all([preInboundApi.getSummary(selectedOrgId), preInboundApi.getItems({ ...(selectedOrgId ? { orgId: selectedOrgId } : {}), ...(filters.search ? { search: filters.search } : {}), ...(filters.stage ? { stage: filters.stage } : {}), ...(filters.priority ? { priority: filters.priority } : {}) })])
+            setSummary(summaryRes.data)
+            setItems(itemsRes.data || [])
+        } catch (err) {
+            showError(`加载入库前流程失败：${err.message}`)
+        } finally {
+            setLoading(false)
+        }
+    }, [filters.priority, filters.search, filters.stage, preInboundApi, selectedOrgId])
+
+    const loadDetail = useCallback(async (id) => {
+        if (!id) return
+        setDetailLoading(true)
+        try {
+            const result = await preInboundApi.getItem(id, selectedOrgId)
+            setDetail(result.data.item)
+            setLogs(result.data.logs || [])
+        } catch (err) {
+            showError(`加载流程详情失败：${err.message}`)
+        } finally {
+            setDetailLoading(false)
+        }
+    }, [preInboundApi, selectedOrgId])
+
+    useEffect(() => { void loadBoard() }, [loadBoard])
     useEffect(() => {
         if (!items.length) {
             setSelectedId(null)
@@ -142,34 +169,7 @@ export default function PreInboundManager({ inventoryApi = appInventoryApi }) {
             setLogs([])
         }
     }, [items, selectedId])
-    useEffect(() => { if (selectedId) loadDetail(selectedId) }, [selectedId, selectedOrgId])
-
-    async function loadBoard() {
-        setLoading(true)
-        try {
-            const [summaryRes, itemsRes] = await Promise.all([preInboundApi.getSummary(selectedOrgId), preInboundApi.getItems({ ...(selectedOrgId ? { orgId: selectedOrgId } : {}), ...(filters.search ? { search: filters.search } : {}), ...(filters.stage ? { stage: filters.stage } : {}), ...(filters.priority ? { priority: filters.priority } : {}) })])
-            setSummary(summaryRes.data)
-            setItems(itemsRes.data || [])
-        } catch (err) {
-            showError(`加载入库前流程失败：${err.message}`)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    async function loadDetail(id) {
-        if (!id) return
-        setDetailLoading(true)
-        try {
-            const result = await preInboundApi.getItem(id, selectedOrgId)
-            setDetail(result.data.item)
-            setLogs(result.data.logs || [])
-        } catch (err) {
-            showError(`加载流程详情失败：${err.message}`)
-        } finally {
-            setDetailLoading(false)
-        }
-    }
+    useEffect(() => { if (selectedId) void loadDetail(selectedId) }, [loadDetail, selectedId])
 
     function openCreateForm() { setEditingItem(null); setFormData(EMPTY_FORM); setShowForm(true) }
     function openEditForm() { if (!detail) return; setEditingItem(detail); setFormData(buildFormData(detail)); setShowForm(true) }
