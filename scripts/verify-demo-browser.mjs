@@ -40,6 +40,17 @@ const result = {
   failedRequests,
 };
 
+async function runAndWaitForSucceededJob(action, timeout = 60_000) {
+  const completedJob = page.waitForResponse(async (response) => {
+    if (!/\/api\/app\/jobs\/[^/]+$/.test(response.url()) || response.request().method() !== 'GET') return false;
+    if (!response.ok()) return false;
+    const payload = await response.json().catch(() => null);
+    return payload?.data?.status === 'succeeded';
+  }, { timeout });
+  await action();
+  return (await completedJob).json();
+}
+
 try {
   await page.goto(`${baseUrl}/login`, { waitUntil: 'networkidle' });
   await page.locator('#username').fill(username);
@@ -98,14 +109,9 @@ try {
   await page.getByText('显示前 3 条，共 3 条记录', { exact: true }).waitFor();
   await page.screenshot({ path: resolve(evidenceDir, '07-import-preview.png'), fullPage: true });
 
-  const completedJob = page.waitForResponse(async (response) => {
-    if (!/\/api\/app\/jobs\/[^/]+$/.test(response.url()) || response.request().method() !== 'GET') return false;
-    if (!response.ok()) return false;
-    const payload = await response.json().catch(() => null);
-    return payload?.data?.status === 'succeeded';
-  }, { timeout: 60_000 });
-  await page.getByRole('button', { name: '保存到数据库' }).click();
-  const completedJobPayload = await (await completedJob).json();
+  const completedJobPayload = await runAndWaitForSucceededJob(
+    () => page.getByRole('button', { name: '保存到数据库' }).click(),
+  );
 
   await page.goto(`${baseUrl}/app/events/records`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: '名单管理' }).first().waitFor();
@@ -120,15 +126,49 @@ try {
   };
   await page.screenshot({ path: resolve(evidenceDir, '08-records.png'), fullPage: true });
 
+  await page.goto(`${baseUrl}/app/events/processing?tab=audit`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: '名单处理' }).first().waitFor();
+  const auditTab = page.getByRole('tab', { name: /清洗流水线/ });
+  await auditTab.waitFor();
+  if (await auditTab.getAttribute('aria-selected') !== 'true') await auditTab.click();
+  await page.getByText('当前赛事总报名人数：3', { exact: true }).waitFor({ timeout: 15_000 });
+  await page.getByRole('button', { name: '开始流水线' }).click();
+
+  const auditSteps = ['未成年检查', '黑名单碰撞', '精英资质核验', '直通锁定', '大众池标记'];
+  const auditResults = [];
+  for (const [index, stepLabel] of auditSteps.entries()) {
+    const executeButton = page.getByRole('button', { name: `执行 ${stepLabel}` });
+    await executeButton.waitFor();
+    await page.waitForFunction((label) => {
+      const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === `执行 ${label}`);
+      return button && !button.disabled;
+    }, stepLabel);
+    const jobPayload = await runAndWaitForSucceededJob(() => executeButton.click());
+    const resultText = page.locator('.pipeline-result').filter({ hasText: /影响/ }).last();
+    await resultText.waitFor();
+    auditResults.push({
+      step: stepLabel,
+      text: (await resultText.innerText()).trim(),
+      result: jobPayload.data?.result || null,
+    });
+    const confirmLabel = index === auditSteps.length - 1 ? '确认完成' : '确认进入下一步';
+    const confirmButton = page.locator('button:enabled', { hasText: confirmLabel }).first();
+    await confirmButton.waitFor();
+    await confirmButton.click();
+  }
+  await page.getByText('五步二次清洗已全部完成。', { exact: false }).waitFor();
+  result.checks.auditPipeline = { steps: auditResults };
+  await page.screenshot({ path: resolve(evidenceDir, '09-audit-pipeline.png'), fullPage: true });
+
   await page.goto(`${baseUrl}/ops`, { waitUntil: 'networkidle' });
   await page.getByRole('heading', { name: '执行工作台' }).waitFor();
   result.checks.ops = { url: page.url() };
-  await page.screenshot({ path: resolve(evidenceDir, '09-ops.png'), fullPage: true });
+  await page.screenshot({ path: resolve(evidenceDir, '10-ops.png'), fullPage: true });
 
   await page.goto(`${baseUrl}/admin`, { waitUntil: 'networkidle' });
   await page.getByRole('heading', { name: '权限不足' }).waitFor();
   result.checks.adminDenied = { url: page.url() };
-  await page.screenshot({ path: resolve(evidenceDir, '10-admin-denied.png'), fullPage: true });
+  await page.screenshot({ path: resolve(evidenceDir, '11-admin-denied.png'), fullPage: true });
 
   assert.deepEqual(consoleErrors, []);
   assert.deepEqual(failedRequests, []);
