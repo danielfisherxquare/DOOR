@@ -8,7 +8,7 @@
 
 **复验日期：** 2026-07-11
 
-**代码验收提交：** `f7e2649d2fb6bef956dbf6d2bd20fd13800754ce`
+**代码验收提交：** `c58f07d80a02559e23cd82be72380f93543900a6`
 
 **当前完成度：** 98%
 
@@ -18,7 +18,7 @@
 
 | 问题 | 修复后的可观察结果 | 回归证据 |
 | --- | --- | --- |
-| 后端测试共享数据库，文件顺序变化会挂起或污染 | 每个 `*.test.js` 使用独立 `arcspro_test_<hash>` 数据库，执行后强制删除 | `npm test` 输出 `[isolated-db] PASS 93/93 files` |
+| 后端测试共享数据库，文件顺序变化会挂起或污染 | 每个 `*.test.js` 使用独立 `arcspro_test_<hash>` 数据库，执行后强制删除 | `npm test` 输出 `[isolated-db] PASS 100/100 files` |
 | race 权限继承、显式降权和共享赛事 profile 不一致 | owner、race_admin、组织授权和显式 viewer 降权按同一投影规则生效 | `org-race-permissions` 6/6；`permissions` 18/18 |
 | 姓名/电话/证件号搜索跨越加密边界 | 姓名保留模糊匹配；电话和证件号只走盲索引精确匹配；返回前按租户 AAD 解密 | `records-query` 18/18；`bib-tracking` 16/16 |
 | 已绑定库存对象可被重复绑定 | 重复绑定被拒绝，跨位置变更必须使用 move 流程 | `inventory-twin.integration` 通过 |
@@ -52,6 +52,7 @@
 | 地形建模核心同时维护默认值、旧字段兼容和全部网格建模 | 选项归一化拆入 `modelOptions.js`，建模核心由 3548 行降至 3255 行，架构上限从 3900 收紧到 3300；修复默认值遮蔽 `shape`、`qualityPreset`、`maxTerrainReliefMm` 等旧字段别名 | 新增选项契约测试 3/3；地形专项 131/131；根测试与生产构建通过 |
 | Cesium 3D 地图组件同时计算重点区运行策略和加载状态文案 | 运行策略、摘要和场景状态拆入 `terrainRuntimePolicy.ts`，`MapView3D.tsx` 由 2634 行降至 2413 行，架构上限收紧到 2450 行 | 新增策略单测 3/3；地图专项 6/6；根测试与生产构建通过 |
 | 设计协作工作台内联全部枚举、标签映射和格式化逻辑 | 静态配置与纯格式化拆入 `designRequestWorkspaceConfig.js`，页面由 1760 行降至 1527 行，并新增 1550 行架构门禁 | 新增配置与架构测试 5/5；根测试与生产构建通过 |
+| 库存空间导出文件同时负责 GLB 二进制编码、几何构建、路径管理和导出任务 | GLB 与实例化编码拆入 `inventory.spatial.glb.js`，公共数值辅助拆入 `inventory.spatial.export-utils.js`，主导出文件由 1660 行降至 1274 行并新增 1300 行门禁 | 原有 GLB 测试 4 项纳入根门禁；3D Studio 针对性 9/9；后端隔离测试 100/100 |
 
 ## 2. 自动化门禁
 
@@ -63,7 +64,7 @@ npm run check:secrets                  PASS
 npm run lint                           PASS，0 error / 0 warning
 npm run typecheck                      PASS
 npm run format:check                   PASS
-npm test                               PASS，329/329
+npm test                               PASS，333/333
 npm run build                          PASS，Vite 8
 npm audit --audit-level=low            PASS，0 vulnerabilities
 git diff --check                       PASS
@@ -73,13 +74,13 @@ ECharts 已按需注册，`vendor-echarts` 从约 1.12 MB 降到 443.08 kB；文
 
 ### 2.2 后端
 
-专用 PostgreSQL 16 容器只用于测试连接。测试 runner 为 99 个测试文件逐一创建隔离数据库：
+专用 PostgreSQL 16 容器只用于测试连接。测试 runner 为 100 个测试文件逐一创建隔离数据库：
 
 ```text
 npm test
 ...
-[isolated-db 99/99] tests/test-isolation-runner.test.js
-[isolated-db] PASS 99/99 files
+[isolated-db 100/100] tests/test-isolation-runner.test.js
+[isolated-db] PASS 100/100 files
 
 npm audit --workspace=arcspro-server --audit-level=low
 found 0 vulnerabilities
@@ -250,4 +251,4 @@ app 单独重建后网关探测                20/20 通过，Nginx 容器未重
 4. 推送分支，远程 CI 全绿；
 5. 在远程候选环境重跑迁移、健康、备份恢复和镜像回退；
 6. 生产切换后验证 endpoint、静态 chunk、健康检查和关键业务抽样；
-7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `f7e2649` 执行 329/329、地形专项 131/131、地图专项 6/6、生产构建及边界检查；该工作树在同一 lockfile 的上一代码节点执行 fresh `npm ci`，安装审计 0 vulnerabilities，后端 99/99 未因本次纯前端拆分发生变化。干净工作树无跟踪改动。
+7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `c58f07d` 执行 333/333、3D Studio 针对性测试、生产构建及边界检查；开发工作树使用专用 PostgreSQL 16 完成后端 100/100。该干净工作树在同一 lockfile 的上一代码节点执行 fresh `npm ci`，安装审计 0 vulnerabilities，且无跟踪改动。
