@@ -8,9 +8,9 @@
 
 **复验日期：** 2026-07-11
 
-**代码验收提交：** `a54c2b9bc0eae16d069628a6c67c9f4f4fbeb919`
+**代码验收提交：** `5e5a8a8cbf8227eb172e0999fe162b707d2dfbb9`
 
-**当前完成度：** 97%
+**当前完成度：** 98%
 
 **状态：** 本地代码、PostgreSQL、容器、备份恢复、Nginx、登录/平台管理和十个关键业务界面已经通过。代码质量门禁为 0 error / 0 warning。真实付费 OCR、库存扫码 UI 最终方案、生产密钥轮换、远程 CI 和生产发布尚未完成，长期目标继续保持 active。
 
@@ -48,6 +48,7 @@
 | 赛事分布饼图导入完整 ECharts 和未使用的 React wrapper | 只注册 Pie、Legend、Tooltip、Canvas，并移除 `echarts-for-react` | `vendor-echarts` 由约 1118 kB 降至 443.08 kB；根测试通过；生产构建通过 |
 | Excel、ZIP、Word 模板和下载工具被强制合并成一个 568 kB 文档包 | 移除未使用的 `docxtemplater`、`file-saver`，按实际格式拆为 XLSX 与 PizZip | `vendor-docs` 消失；`vendor-xlsx` 487.57 kB、`vendor-pizzip` 80.59 kB；构建门禁通过 |
 | 登录首屏因手工 React-Three vendor 分块预加载约 959 kB 3D 运行时 | 取消 React-Three 强制共享块，按地图和 Studio 动态路由自然分块；新增产物边界检查 | `dist/index.html` 不再 preload React-Three、Three Core 或 Studio；地图生产 E2E 3/3 |
+| 地形模型页面同时承载默认配置、保存配置归一化和范围几何转换 | 纯配置与几何转换拆入 `terrainModelPageConfig.js`，页面由 3612 行降至 3221 行，并把架构上限收紧到 3250 行 | 地形专项 128/128；新增配置单测 4/4；根测试与生产构建通过 |
 
 ## 2. 自动化门禁
 
@@ -59,7 +60,7 @@ npm run check:secrets                  PASS
 npm run lint                           PASS，0 error / 0 warning
 npm run typecheck                      PASS
 npm run format:check                   PASS
-npm test                               PASS，314/314
+npm test                               PASS，318/318
 npm run build                          PASS，Vite 8
 npm audit --audit-level=low            PASS，0 vulnerabilities
 git diff --check                       PASS
@@ -246,4 +247,4 @@ app 单独重建后网关探测                20/20 通过，Nginx 容器未重
 4. 推送分支，远程 CI 全绿；
 5. 在远程候选环境重跑迁移、健康、备份恢复和镜像回退；
 6. 生产切换后验证 endpoint、静态 chunk、健康检查和关键业务抽样；
-7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `a54c2b9` 执行 fresh `npm ci`，并完成 314/314、地图生产 E2E 3/3、99/99、生产构建及边界检查、根与 server workspace 双审计 0 vulnerabilities；干净工作树无跟踪改动。
+7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `5e5a8a8` 执行 fresh `npm ci`，并完成 318/318、地形专项 128/128、地图生产 E2E 3/3、99/99、生产构建及边界检查、根与 server workspace 双审计 0 vulnerabilities；干净工作树无跟踪改动。
