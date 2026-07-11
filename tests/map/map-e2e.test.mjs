@@ -13,12 +13,20 @@ const repoRoot = path.resolve(__dirname, '../..');
 const mockUser = {
   id: 'codex-map-user',
   username: 'codex-map-user',
+  orgId: 'org-codex',
   role: 'org_admin',
   defaultSurface: 'app',
   mustChangePassword: false,
   surfaceAccess: { app: true, admin: true, ops: true },
   scopedCapabilities: { inventory: ['3d_studio'] },
   preferences: {},
+};
+const mockProfile = {
+  orgId: 'org-codex',
+  raceId: null,
+  scopeType: 'org',
+  surfaces: ['app'],
+  modules: ['map', 'app:map', '3d-studio', 'app:3d-studio'],
 };
 
 async function startViteServer() {
@@ -127,6 +135,14 @@ async function openMapPage(browser, baseUrl, options = {}) {
       });
       return;
     }
+    if (url.includes('/api/authz/profile')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: mockProfile }),
+      });
+      return;
+    }
     if (url.includes('/api/app/3d-studio/asset-templates')) {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: [] }) });
       return;
@@ -176,13 +192,38 @@ async function openMapPage(browser, baseUrl, options = {}) {
       },
       version: 0,
     }));
+    localStorage.setItem('workspace-session', JSON.stringify({
+      state: {
+        session: {
+          orgId: 'org-codex',
+          orgName: 'Codex Org',
+          raceId: '',
+          raceName: '',
+          scopeType: 'org',
+          surface: 'app',
+          lastAppPath: '/app/map',
+          lastOpsPath: '/ops',
+          lastAdminPath: '/admin',
+        },
+      },
+      version: 0,
+    }));
   }, mockUser);
 
   await page.goto(`${baseUrl}/app/map${options.query || '?orgId=org-codex'}`, {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
-  await page.locator('.map-view-2d__panel--ovi-toolbar').waitFor({ state: 'visible', timeout: 20_000 });
+  try {
+    await page.locator('.map-view-2d__panel--ovi-toolbar').waitFor({ state: 'visible', timeout: 20_000 });
+  } catch (error) {
+    const body = await page.locator('body').innerText().catch(() => '');
+    const authStorage = await page.evaluate(() => localStorage.getItem('auth-storage')).catch(() => null);
+    throw new Error(
+      `Map toolbar did not render at ${page.url()}. API calls: ${JSON.stringify(apiCalls)}. Auth: ${authStorage}. Body: ${body.slice(0, 1200)}`,
+      { cause: error },
+    );
+  }
   const skipOnboarding = page.getByRole('button', { name: '跳过引导' });
   if (await skipOnboarding.isVisible().catch(() => false)) {
     await skipOnboarding.click();
@@ -237,6 +278,8 @@ async function drawAllShapesAndSave(browser, baseUrl, tempDir) {
     query: '?projectId=project-codex&orgId=org-codex',
   });
   try {
+    assert.equal(new URL(page.url()).searchParams.get('projectId'), 'project-codex');
+    assert.match(await page.locator('.app-map-layout__hint').textContent(), /当前编辑会同步到项目与工作区/);
     await waitForFeatureCount(page, 0);
 
     await page.locator('button[title="点位 (1)"]').click();
@@ -285,12 +328,30 @@ async function drawAllShapesAndSave(browser, baseUrl, tempDir) {
     assert.equal(exported.type, 'FeatureCollection');
     assert.equal(exported.features.length, 6);
 
-    await page.locator('.map-view-2d__tool-chip').filter({ hasText: '保存' }).click();
-    await page.waitForFunction(
-      () => Array.from(document.querySelectorAll('.map-view-2d__sync-pill')).some((node) => node.textContent?.includes('已同步')),
-      null,
-      { timeout: 12_000 },
-    );
+    const saveButton = page.locator('.map-view-2d__tool-chip').filter({ hasText: '保存' });
+    const syncPill = page.locator('.map-view-2d__sync-pill');
+    const preSaveUi = {
+      url: page.url(),
+      saveDisabled: await saveButton.isDisabled(),
+      syncText: await syncPill.textContent(),
+      projectHint: await page.locator('.app-map-layout__hint').textContent(),
+    };
+    await saveButton.click();
+    try {
+      await page.waitForFunction(
+        () => Array.from(document.querySelectorAll('.map-view-2d__sync-pill')).some((node) => node.textContent?.includes('已同步')),
+        null,
+        { timeout: 12_000 },
+      );
+    } catch (error) {
+      const failedState = await mapState(page);
+      throw new Error(
+        `Map save did not reach synced state. API calls: ${JSON.stringify(apiCalls)}. `
+        + `Pre-save UI: ${JSON.stringify(preSaveUi)}. `
+        + `Nodes: ${JSON.stringify(failedState.treeNodes?.map((node) => ({ id: node.id, syncStatus: node.syncStatus, backendObjectId: node.backendObjectId })))}`,
+        { cause: error },
+      );
+    }
     const savePosts = apiCalls.filter((call) =>
       call.method === 'POST' &&
       call.url.includes('/api/app/3d-studio/projects/project-codex/spatial-objects')

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../stores/authStore'
 import useWorkspaceStore from '../features/workspace/workspaceStore'
 import { createWorkspaceSession } from '../features/workspace/workspaceSession'
@@ -35,7 +35,11 @@ function Login() {
         setWorkspaceSession(createWorkspaceSession({ scopeType: 'platform', surface: 'admin' }))
       }
       const platformLanding = hasPlatformProfile ? getDefaultLandingPath() : '/workspaces'
-      const from = location.state?.from?.pathname || (redirect && redirect.startsWith('/') ? redirect : null) || platformLanding
+      const fromLocation = location.state?.from
+      const protectedRouteReturn = fromLocation?.pathname
+        ? `${fromLocation.pathname}${fromLocation.search || ''}${fromLocation.hash || ''}`
+        : null
+      const from = protectedRouteReturn || (redirect && redirect.startsWith('/') ? redirect : null) || platformLanding
       navigate(from, { replace: true })
     }
   }, [getDefaultLandingPath, isAuthenticated, navigate, location, setWorkspaceSession, user])
