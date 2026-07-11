@@ -13,6 +13,9 @@ test('CI has attributable frontend and backend jobs on clean checkouts', async (
   assert.equal((workflow.match(/actions\/setup-node@v4/g) || []).length, 2)
   assert.equal((workflow.match(/node-version: 20/g) || []).length, 2)
   assert.equal((workflow.match(/run: npm ci --ignore-scripts/g) || []).length, 2)
+  assert.equal((workflow.match(/^\s{4}runs-on:/gm) || []).length, 2)
+  assert.match(workflow, /cache-dependency-path: package-lock\.json/)
+  assert.doesNotMatch(workflow, /server\/package-lock\.json/)
 })
 
 test('frontend CI runs every reproducible repository gate', async () => {

@@ -491,7 +491,7 @@ describe('preview import deduplication', () => {
 
         const result = await previewService.recognizeFromPreview(projectId, userId, previewFileId, {
             provider: 'paid-provider',
-            baseUrl: 'https://paid.example/v1',
+            baseUrl: 'https://8.8.8.8/v1',
             apiKey: 'paid-key',
             modelName: 'paid-model',
         });
@@ -557,13 +557,13 @@ describe('preview import deduplication', () => {
         const results = await Promise.allSettled([
             previewService.recognizeFromPreview(projectId, userId, previewFileId, {
                 provider: 'paid-provider',
-                baseUrl: 'https://paid.example/v1',
+                baseUrl: 'https://8.8.8.8/v1',
                 apiKey: 'paid-key',
                 modelName: 'paid-model',
             }),
             previewService.recognizeFromPreview(projectId, userId, previewFileId, {
                 provider: 'paid-provider',
-                baseUrl: 'https://paid.example/v1',
+                baseUrl: 'https://8.8.8.8/v1',
                 apiKey: 'paid-key',
                 modelName: 'paid-model',
             }),

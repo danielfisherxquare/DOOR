@@ -89,10 +89,9 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install server from lockfile
-        working-directory: server
         run: npm ci --ignore-scripts
 
       - name: Verify test database guard

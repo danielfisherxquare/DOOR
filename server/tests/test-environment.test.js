@@ -64,8 +64,8 @@ test('server test script performs one preflight before test discovery', async ()
     packageJson.scripts.test,
     /^node \.\/tests\/support\/test-environment\.mjs && /,
   );
-  assert.match(packageJson.scripts.test, /tests\/\*\.test\.js/);
-  assert.match(packageJson.scripts.test, /tests\/\*\/\*\.test\.js/);
+  assert.match(packageJson.scripts.test, /run-isolated-tests\.mjs/);
+  assert.doesNotMatch(packageJson.scripts.test, /tests\/\*\.test\.js/);
   assert.match(packageJson.scripts['test:runtime'], /tenant-isolation\.runtime\.js/);
   await assert.rejects(access(new URL('./tenant-isolation.test.js', import.meta.url)), {
     code: 'ENOENT',

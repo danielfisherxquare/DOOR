@@ -140,7 +140,9 @@ describe('invoice processor OCR observability', () => {
             originalName: 'invoice-observability.png',
             config: {
                 provider: 'paid-provider',
-                baseUrl: 'https://paid.example/v1',
+                // A literal public IP keeps the SSRF policy active without a
+                // live DNS dependency; axios itself is mocked above.
+                baseUrl: 'https://8.8.8.8/v1',
                 apiKey: 'paid-key',
                 modelName: 'paid-model',
             },

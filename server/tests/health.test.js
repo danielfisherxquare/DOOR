@@ -7,6 +7,7 @@ const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@local
 process.env.DATABASE_URL = DATABASE_URL;
 
 const { default: knex } = await import('../src/db/knex.js');
+const { verifyEncryptionKeys } = await import('../src/utils/key-guard.js');
 
 describe('Health Routes', () => {
     let app;
@@ -15,6 +16,7 @@ describe('Health Routes', () => {
 
     before(async () => {
         await knex.migrate.latest();
+        await verifyEncryptionKeys(knex);
 
         const { default: healthRoutes } = await import('../src/modules/health/health.routes.js');
         app = express();
