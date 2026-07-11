@@ -1,208 +1,32 @@
 import { createHash } from 'node:crypto';
-import ExcelJS from 'exceljs';
 import knex from '../../db/knex.js';
-import { EVENT_TYPES } from './design-request.defaults.js';
 import { startApproval } from '../approvals/approval.service.js';
-
-const REQUIRED_HEADERS = ['使用区域', '项目', '设计'];
-const EXPORT_MODES = new Set(['blank_template', 'incremental', 'full_marked']);
-const BASE_HEADERS = [
-    '序号',
-    '使用区域',
-    '供方',
-    '类别',
-    '项目',
-    '材质',
-    '制作工艺',
-    '搭建尺寸',
-    '数量',
-    '单位',
-    '单价',
-    '总价',
-    '搭建备注',
-    '设计',
-    '需求部门',
-    '需求人',
-    '交付时间',
-    '优先级',
-    '材质',
-    '设计尺寸',
-    '设计备注',
-    '设计参考图',
-    '设计参考说明',
-];
-const EXPORT_HELPER_HEADERS = ['变更标记', '导出轮次', '提报时间', '最近修改时间', '系统行键'];
-const CHANGE_LABELS = {
-    new: '新增',
-    changed: '修改',
-    unchanged: '未变化',
-    new_category: '新类目',
-};
+import {
+    buildContentHash,
+    buildStableKey,
+    categoryKey,
+    computeSyncState,
+    dateOrNull,
+    exportFileName,
+    normalizeEventType,
+    normalizeExportMode,
+    normalizeNullableString,
+    normalizePriority,
+    normalizeRaceIds,
+    normalizeString,
+    normalizeUploadedFileName,
+    parseJson,
+    scopeKeyForRaceIds,
+} from './design-collaboration-data.js';
+import {
+    buildCollaborationExportWorkbook as buildExportWorkbook,
+    parseCollaborationWorkbook as parseWorkbook,
+} from './design-collaboration-workbook.js';
 
 function httpError(status, message) {
     return Object.assign(new Error(message), { status, expose: true });
 }
 
-function normalizeString(value) {
-    if (value === null || value === undefined) return '';
-    if (typeof value === 'number' && value === 0) return '';
-    return String(value).trim();
-}
-
-function normalizeNullableString(value) {
-    const text = normalizeString(value);
-    return text || null;
-}
-
-function normalizeUploadedFileName(value) {
-    const fileName = normalizeString(value) || '协同清单.xlsx';
-    const decoded = Buffer.from(fileName, 'latin1').toString('utf8');
-    const looksMojibake = /[ÃÂæèäå]/.test(fileName);
-    if (looksMojibake && /[\u4e00-\u9fff]/.test(decoded) && !decoded.includes('�')) {
-        return decoded;
-    }
-    return fileName;
-}
-
-function normalizeKeyPart(value) {
-    return normalizeString(value).replace(/\s+/g, ' ').toLowerCase();
-}
-
-function normalizeEventType(value) {
-    const eventType = normalizeString(value) || 'general';
-    return EVENT_TYPES.includes(eventType) ? eventType : 'general';
-}
-
-function normalizePriority(value) {
-    const priority = normalizeString(value);
-    const mapped = {
-        高: 'high',
-        紧急: 'urgent',
-        急: 'urgent',
-        低: 'low',
-        普通: 'normal',
-        一般: 'normal',
-        high: 'high',
-        urgent: 'urgent',
-        low: 'low',
-        normal: 'normal',
-    }[priority];
-    return mapped || 'normal';
-}
-
-function parseJson(value, fallback) {
-    if (value === null || value === undefined) return fallback;
-    if (typeof value === 'string') {
-        try {
-            return JSON.parse(value);
-        } catch {
-            return fallback;
-        }
-    }
-    return value;
-}
-
-function valueFromCell(cell) {
-    const value = cell?.value;
-    if (value === null || value === undefined) return null;
-    if (value instanceof Date) return value;
-    if (typeof value !== 'object') return value;
-    if (Object.prototype.hasOwnProperty.call(value, 'formula')) {
-        return cell.result ?? value.result ?? null;
-    }
-    if (Object.prototype.hasOwnProperty.call(value, 'result')) return value.result ?? null;
-    if (value.text) return value.text;
-    if (value.richText) return value.richText.map((part) => part.text || '').join('');
-    if (value.hyperlink) return value.text || value.hyperlink;
-    return String(value);
-}
-
-function numberOrNull(value) {
-    if (value === null || value === undefined || value === '') return null;
-    const number = Number(value);
-    return Number.isFinite(number) ? number : null;
-}
-
-function dateOrNull(value) {
-    if (!value) return null;
-    if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
-    if (typeof value === 'number') {
-        const excelEpochOffset = 25569;
-        const millisecondsPerDay = 24 * 60 * 60 * 1000;
-        const date = new Date((value - excelEpochOffset) * millisecondsPerDay);
-        return Number.isNaN(date.getTime()) ? null : date.toISOString();
-    }
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return null;
-    return date.toISOString();
-}
-
-function needsDesign(value) {
-    const text = normalizeString(value).toLowerCase();
-    return ['✅', '✓', '✔', '是', 'y', 'yes', 'true', '1'].includes(text);
-}
-
-function computeSyncState(row) {
-    if (!row.needsDesign) {
-        return { syncStatus: 'ignored', syncIssues: [] };
-    }
-
-    const issues = [];
-    if (!normalizeString(row.requesterDepartment)) issues.push('需求部门为空');
-    if (!normalizeString(row.requesterName)) issues.push('需求人为空');
-    if (!dateOrNull(row.dueAt)) issues.push(row.dueAt ? '交付时间格式不正确' : '交付时间为空');
-    return {
-        syncStatus: issues.length > 0 ? 'needs_info' : 'ready',
-        syncIssues: issues,
-    };
-}
-
-function hashJson(value) {
-    return createHash('sha256').update(JSON.stringify(value)).digest('hex');
-}
-
-function buildStableKey(row) {
-    return hashJson([
-        row.area,
-        row.category,
-        row.itemName,
-        row.supplier,
-        row.buildSize,
-        row.quantity,
-        row.unit,
-    ].map(normalizeKeyPart));
-}
-
-function buildContentHash(row) {
-    return hashJson({
-        area: row.area || '',
-        supplier: row.supplier || '',
-        category: row.category || '',
-        itemName: row.itemName || '',
-        buildMaterial: row.buildMaterial || '',
-        craft: row.craft || '',
-        buildSize: row.buildSize || '',
-        quantity: row.quantity ?? null,
-        unit: row.unit || '',
-        unitPrice: row.unitPrice ?? null,
-        totalPrice: row.totalPrice ?? null,
-        buildNote: row.buildNote || '',
-        needsDesign: Boolean(row.needsDesign),
-        requesterDepartment: row.requesterDepartment || '',
-        requesterName: row.requesterName || '',
-        dueAt: row.dueAt || null,
-        priority: row.priority || 'normal',
-        designMaterial: row.designMaterial || '',
-        designSize: row.designSize || '',
-        designNote: row.designNote || '',
-        referenceImage: row.referenceImage || '',
-        referenceNote: row.referenceNote || '',
-    });
-}
-
-function categoryKey(row) {
-    return [row.area, row.category].map(normalizeKeyPart).join('|');
-}
 
 async function findRace(raceId, trx = knex) {
     const numericRaceId = Number(raceId);
@@ -210,22 +34,6 @@ async function findRace(raceId, trx = knex) {
     const race = await trx('races').where({ id: numericRaceId }).first('id', 'org_id', 'name');
     if (!race) throw httpError(404, '赛事不存在');
     return race;
-}
-
-function normalizeRaceIds(value) {
-    const raw = Array.isArray(value)
-        ? value
-        : value === null || value === undefined || value === ''
-            ? []
-            : [value];
-    return [...new Set(raw.map(Number).filter(Boolean))];
-}
-
-function scopeKeyForRaceIds(raceIds = []) {
-    const normalized = normalizeRaceIds(raceIds).sort((a, b) => a - b);
-    if (normalized.length === 0) return 'org';
-    if (normalized.length === 1) return 'race:' + normalized[0];
-    return 'races:' + normalized.join(',');
 }
 
 async function resolveImportScope(context, payload = {}, trx = knex) {
@@ -385,140 +193,6 @@ function mapItem(row) {
     };
 }
 
-function findHeaderRow(sheet) {
-    for (let rowNumber = 1; rowNumber <= Math.min(sheet.rowCount, 20); rowNumber += 1) {
-        const row = sheet.getRow(rowNumber);
-        const labels = new Set();
-        row.eachCell((cell) => {
-            const label = normalizeString(valueFromCell(cell));
-            if (label) labels.add(label);
-        });
-        if (REQUIRED_HEADERS.every((header) => labels.has(header))) return rowNumber;
-    }
-    throw httpError(400, '未找到协同清单表头，请确认包含 使用区域、项目、设计 列');
-}
-
-function buildColumnMap(headerRow) {
-    const occurrences = new Map();
-    headerRow.eachCell((cell, columnNumber) => {
-        const label = normalizeString(valueFromCell(cell));
-        if (!label) return;
-        if (!occurrences.has(label)) occurrences.set(label, []);
-        occurrences.get(label).push(columnNumber);
-    });
-
-    for (const header of REQUIRED_HEADERS) {
-        if (!occurrences.has(header)) throw httpError(400, '缺少必需列：' + header);
-    }
-
-    const designColumn = occurrences.get('设计')[0];
-    const materialColumns = occurrences.get('材质') || [];
-    return {
-        sequence: occurrences.get('序号')?.[0] || null,
-        area: occurrences.get('使用区域')?.[0],
-        supplier: occurrences.get('供方')?.[0] || null,
-        category: occurrences.get('类别')?.[0] || null,
-        item: occurrences.get('项目')?.[0],
-        buildMaterial: materialColumns.find((column) => column < designColumn) || null,
-        craft: occurrences.get('制作工艺')?.[0] || null,
-        buildSize: occurrences.get('搭建尺寸')?.[0] || null,
-        quantity: occurrences.get('数量')?.[0] || null,
-        unit: occurrences.get('单位')?.[0] || null,
-        unitPrice: occurrences.get('单价')?.[0] || null,
-        totalPrice: occurrences.get('总价')?.[0] || null,
-        buildNote: occurrences.get('搭建备注')?.[0] || null,
-        design: designColumn,
-        requesterDepartment: occurrences.get('需求部门')?.[0] || null,
-        requesterName: occurrences.get('需求人')?.[0] || null,
-        dueAt: occurrences.get('交付时间')?.[0] || null,
-        priority: occurrences.get('优先级')?.[0] || null,
-        designMaterial: materialColumns.find((column) => column > designColumn) || null,
-        designSize: occurrences.get('设计尺寸')?.[0] || null,
-        designNote: occurrences.get('设计备注')?.[0] || null,
-        referenceImage: occurrences.get('设计参考图')?.[0] || null,
-        referenceNote: occurrences.get('设计参考说明')?.[0] || null,
-        systemKey: occurrences.get('系统行键')?.[0] || null,
-    };
-}
-
-function cellValue(row, column) {
-    if (!column) return null;
-    return valueFromCell(row.getCell(column));
-}
-
-async function parseWorkbook(buffer) {
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
-    const sheet = workbook.worksheets[0];
-    if (!sheet) throw httpError(400, 'Excel 文件没有工作表');
-
-    const headerRowNumber = findHeaderRow(sheet);
-    const columns = buildColumnMap(sheet.getRow(headerRowNumber));
-    const rows = [];
-    let currentArea = '';
-
-    for (let rowNumber = headerRowNumber + 1; rowNumber <= sheet.rowCount; rowNumber += 1) {
-        const row = sheet.getRow(rowNumber);
-        const rawValues = {};
-        for (const [name, column] of Object.entries(columns)) {
-            if (column) rawValues[name] = cellValue(row, column);
-        }
-
-        const meaningfulValues = [
-            rawValues.area,
-            rawValues.supplier,
-            rawValues.category,
-            rawValues.item,
-            rawValues.buildNote,
-            rawValues.design,
-            rawValues.quantity,
-            rawValues.unit,
-        ];
-        if (!meaningfulValues.some((value) => normalizeString(value))) continue;
-
-        const explicitArea = normalizeString(rawValues.area);
-        if (explicitArea) currentArea = explicitArea;
-
-        const parsed = {
-            excelRowNumber: rowNumber,
-            area: explicitArea || currentArea || null,
-            supplier: normalizeNullableString(rawValues.supplier),
-            category: normalizeNullableString(rawValues.category),
-            itemName: normalizeNullableString(rawValues.item),
-            buildMaterial: normalizeNullableString(rawValues.buildMaterial),
-            craft: normalizeNullableString(rawValues.craft),
-            buildSize: normalizeNullableString(rawValues.buildSize),
-            quantity: numberOrNull(rawValues.quantity),
-            unit: normalizeNullableString(rawValues.unit),
-            unitPrice: numberOrNull(rawValues.unitPrice),
-            totalPrice: numberOrNull(rawValues.totalPrice),
-            buildNote: normalizeNullableString(rawValues.buildNote),
-            needsDesign: needsDesign(rawValues.design),
-            requesterDepartment: normalizeNullableString(rawValues.requesterDepartment),
-            requesterName: normalizeNullableString(rawValues.requesterName),
-            dueAt: dateOrNull(rawValues.dueAt),
-            priority: normalizePriority(rawValues.priority),
-            designMaterial: normalizeNullableString(rawValues.designMaterial) || normalizeNullableString(rawValues.buildMaterial),
-            designSize: normalizeNullableString(rawValues.designSize) || normalizeNullableString(rawValues.buildSize),
-            designNote: normalizeNullableString(rawValues.designNote),
-            referenceImage: normalizeNullableString(rawValues.referenceImage),
-            referenceNote: normalizeNullableString(rawValues.referenceNote),
-            raw: rawValues,
-        };
-        const stableKey = normalizeNullableString(rawValues.systemKey) || buildStableKey(parsed);
-        const contentHash = buildContentHash(parsed);
-        const syncState = computeSyncState(parsed);
-        rows.push({
-            ...parsed,
-            ...syncState,
-            stableKey,
-            contentHash,
-            rowHash: contentHash,
-        });
-    }
-
-    return { sheetName: sheet.name, rows };
-}
 
 function summarizeRows(rows) {
     return {
@@ -1026,10 +700,6 @@ export async function commitImport(context, importId, payload = {}) {
     };
 }
 
-function normalizeExportMode(value) {
-    const mode = normalizeString(value) || 'full_marked';
-    return EXPORT_MODES.has(mode) ? mode : 'full_marked';
-}
 
 function mapExport(row) {
     return {
@@ -1117,85 +787,6 @@ function summarizeChangeTypes(rows) {
     };
 }
 
-function exportFileName(mode, roundNo) {
-    const modeName = {
-        blank_template: '标准模板',
-        incremental: '增量清单',
-        full_marked: '完整标记清单',
-    }[mode] || '协同清单';
-    return '设计协同' + modeName + '-第' + roundNo + '轮.xlsx';
-}
-
-function toExcelDate(value) {
-    if (!value) return null;
-    const date = value instanceof Date ? value : new Date(value);
-    return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function rowValuesForWorkbook(row, sequence, exportRow, changeType) {
-    return [
-        sequence,
-        row.area || '',
-        row.supplier || '',
-        row.category || '',
-        row.itemName || '',
-        row.buildMaterial || '',
-        row.craft || '',
-        row.buildSize || '',
-        row.quantity ?? '',
-        row.unit || '',
-        row.unitPrice ?? '',
-        row.totalPrice ?? '',
-        row.buildNote || '',
-        row.needsDesign ? '✅' : '',
-        row.requesterDepartment || '',
-        row.requesterName || '',
-        toExcelDate(row.dueAt) || '',
-        row.priority || 'normal',
-        row.designMaterial || '',
-        row.designSize || '',
-        row.designNote || '',
-        row.referenceImage || '',
-        row.referenceNote || '',
-        CHANGE_LABELS[changeType] || changeType,
-        exportRow.round_no,
-        toExcelDate(row.firstSeenAt) || '',
-        toExcelDate(row.lastChangedAt) || '',
-        row.stableKey || '',
-    ];
-}
-
-async function buildExportWorkbook(exportRow, exportItems) {
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'ArcSpro';
-    workbook.created = new Date();
-    const sheet = workbook.addWorksheet('搭建&设计 清单');
-    const headers = [...BASE_HEADERS, ...EXPORT_HELPER_HEADERS];
-    sheet.addRow(headers);
-    sheet.views = [{ state: 'frozen', ySplit: 1 }];
-
-    exportItems.forEach((item, index) => {
-        const rowJson = parseJson(item.row_json, {});
-        sheet.addRow(rowValuesForWorkbook(rowJson, index + 1, exportRow, item.change_type));
-    });
-
-    sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D5FD1' } };
-    sheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
-    sheet.autoFilter = { from: 'A1', to: sheet.getRow(1).getCell(headers.length).address };
-    sheet.columns = headers.map((header) => ({
-        header,
-        key: header,
-        width: Math.min(Math.max(String(header).length + 6, 10), 28),
-    }));
-    ['Q', 'Z', 'AA'].forEach((column) => {
-        sheet.getColumn(column).numFmt = 'yyyy-mm-dd hh:mm';
-    });
-    sheet.getColumn('AB').hidden = true;
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    return Buffer.from(buffer);
-}
 
 export async function listExports(context, filters = {}) {
     const query = knex('design_collaboration_exports as dce')

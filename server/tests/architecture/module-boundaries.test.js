@@ -9,7 +9,8 @@ const modulesRoot = path.join(serverRoot, 'src/modules')
 const ratchet = JSON.parse(
   await readFile(new URL('./module-boundaries.ratchet.json', import.meta.url), 'utf8'),
 )
-const reimbursementServiceLineLimits = {
+const moduleLineLimits = {
+  'src/modules/design-requests/design-collaboration-import.service.js': 950,
   'src/modules/reimbursement/preview.service.js': 1200,
   'src/modules/reimbursement/reimbursement.controller.js': 1000,
   'src/modules/reimbursement/reimbursement.service.js': 1250,
@@ -187,11 +188,19 @@ describe('backend module boundaries', () => {
     assert.deepEqual(violations, [])
   })
 
-  it('ratchets oversized reimbursement service facades', async () => {
-    for (const [file, lineLimit] of Object.entries(reimbursementServiceLineLimits)) {
+  it('ratchets oversized module facades', async () => {
+    for (const [file, lineLimit] of Object.entries(moduleLineLimits)) {
       const source = await readFile(path.join(serverRoot, file), 'utf8')
       const lineCount = source.split('\n').length
       assert.ok(lineCount <= lineLimit, `${file} has ${lineCount} lines; limit is ${lineLimit}`)
     }
+  })
+
+  it('keeps design collaboration spreadsheet IO outside the transaction service', async () => {
+    const source = await readFile(
+      path.join(serverRoot, 'src/modules/design-requests/design-collaboration-import.service.js'),
+      'utf8',
+    )
+    assert.doesNotMatch(source, /from ['"]exceljs['"]/)
   })
 })
