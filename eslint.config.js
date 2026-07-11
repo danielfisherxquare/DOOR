@@ -1,6 +1,7 @@
 import js from '@eslint/js'
 import tsPlugin from '@typescript-eslint/eslint-plugin'
 import tsParser from '@typescript-eslint/parser'
+import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 
@@ -12,6 +13,8 @@ const sharedGlobals = {
 const sharedRules = {
   ...js.configs.recommended.rules,
   'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+  'react/jsx-no-undef': 'error',
+  'react/jsx-uses-vars': 'error',
   'react-hooks/rules-of-hooks': 'error',
   'react-hooks/exhaustive-deps': 'warn',
 }
@@ -31,6 +34,7 @@ export default [
       },
     },
     plugins: {
+      react,
       'react-hooks': reactHooks,
     },
     rules: sharedRules,
@@ -48,6 +52,7 @@ export default [
     },
     plugins: {
       '@typescript-eslint': tsPlugin,
+      react,
       'react-hooks': reactHooks,
     },
     rules: {
