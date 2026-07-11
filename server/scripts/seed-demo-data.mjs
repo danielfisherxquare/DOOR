@@ -208,6 +208,9 @@ async function clearExistingDemoData(trx) {
         await trx('org_race_permissions').whereIn('race_id', raceIds).del();
     }
 
+    await trx('start_zones').whereIn('org_id', orgIds).del();
+    await trx('clothing_limits').whereIn('org_id', orgIds).del();
+    await trx('race_capacity').whereIn('org_id', orgIds).del();
     await trx('user_race_permissions').whereIn('org_id', orgIds).del();
     await trx('org_race_permissions').whereIn('org_id', orgIds).del();
     await trx('user_module_access').whereIn('org_id', orgIds).del();
@@ -324,10 +327,43 @@ async function main() {
         const eastOrg = orgMap.get('east');
         const mountainOrg = orgMap.get('mountain');
         const bayOrg = orgMap.get('bay');
+        const shanghaiFull = raceMap.get('shanghai-full');
         const chongqingTrail = raceMap.get('chongqing-trail');
         const shanghaiHalf = raceMap.get('shanghai-half');
         const suzhou10k = raceMap.get('suzhou-10k');
         const shenzhenNight = raceMap.get('shenzhen-bay-night');
+
+        await trx('race_capacity').insert({
+            org_id: eastOrg.id,
+            race_id: Number(shanghaiFull.id),
+            event: '全程马拉松',
+            target_count: 2,
+            draw_ratio: 0.85,
+            reserved_ratio: 0.15,
+            lottery_mode_override: 'lottery',
+        });
+
+        await trx('clothing_limits').insert([
+            { org_id: eastOrg.id, race_id: Number(shanghaiFull.id), event: 'ALL', gender: 'M', size: 'M', total_inventory: 2, used_count: 0 },
+            { org_id: eastOrg.id, race_id: Number(shanghaiFull.id), event: 'ALL', gender: 'F', size: 'S', total_inventory: 2, used_count: 0 },
+            { org_id: eastOrg.id, race_id: Number(shanghaiFull.id), event: 'ALL', gender: 'M', size: 'L', total_inventory: 2, used_count: 0 },
+        ]);
+
+        await trx('start_zones').insert({
+            org_id: eastOrg.id,
+            race_id: Number(shanghaiFull.id),
+            zone_name: 'A',
+            width: 20,
+            length: 20,
+            density: 2.5,
+            calculated_capacity: 1000,
+            color: '#3B82F6',
+            sort_order: 1,
+            gap_distance: 0,
+            event: '全程马拉松',
+            capacity_ratio: 1,
+            score_upper_seconds: null,
+        });
 
         const orgGrants = [
             { org_id: eastOrg.id, race_id: Number(chongqingTrail.id), access_level: 'viewer' },

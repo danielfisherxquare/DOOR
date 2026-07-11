@@ -87,4 +87,50 @@ test('demo seed is idempotent, isolated, and grants the acceptance surfaces', as
   for (const moduleId of ACCEPTANCE_ADMIN_MODULES) {
     assert.equal(adminModules.has(moduleId), true, `east.admin missing ${moduleId}`);
   }
+
+  const shanghaiRace = await knex('races as race')
+    .join('organizations as org', 'org.id', 'race.org_id')
+    .where({ 'org.slug': 'demo-east-run', 'race.name': '上海国际马拉松' })
+    .first('race.id', 'race.org_id');
+  assert.ok(shanghaiRace);
+
+  const capacities = await knex('race_capacity')
+    .where({ org_id: shanghaiRace.org_id, race_id: shanghaiRace.id })
+    .select('event', 'target_count', 'lottery_mode_override');
+  assert.deepEqual(capacities.map((row) => ({
+    event: row.event,
+    targetCount: Number(row.target_count),
+    lotteryModeOverride: row.lottery_mode_override,
+  })), [{ event: '全程马拉松', targetCount: 2, lotteryModeOverride: 'lottery' }]);
+
+  const clothing = await knex('clothing_limits')
+    .where({ org_id: shanghaiRace.org_id, race_id: shanghaiRace.id })
+    .orderBy(['gender', 'size'])
+    .select('event', 'gender', 'size', 'total_inventory', 'used_count');
+  assert.deepEqual(clothing.map((row) => ({
+    event: row.event,
+    gender: row.gender,
+    size: row.size,
+    totalInventory: Number(row.total_inventory),
+    usedCount: Number(row.used_count),
+  })), [
+    { event: 'ALL', gender: 'F', size: 'S', totalInventory: 2, usedCount: 0 },
+    { event: 'ALL', gender: 'M', size: 'L', totalInventory: 2, usedCount: 0 },
+    { event: 'ALL', gender: 'M', size: 'M', totalInventory: 2, usedCount: 0 },
+  ]);
+
+  const startZones = await knex('start_zones')
+    .where({ org_id: shanghaiRace.org_id, race_id: shanghaiRace.id })
+    .select('zone_name', 'event', 'calculated_capacity', 'sort_order');
+  assert.deepEqual(startZones.map((row) => ({
+    zoneName: row.zone_name,
+    event: row.event,
+    calculatedCapacity: Number(row.calculated_capacity),
+    sortOrder: Number(row.sort_order),
+  })), [{
+    zoneName: 'A',
+    event: '全程马拉松',
+    calculatedCapacity: 1000,
+    sortOrder: 1,
+  }]);
 });
