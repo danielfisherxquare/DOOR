@@ -223,34 +223,42 @@ describe('profile context options', () => {
         );
     });
 
-    it('does not list race options that authz/profile would reject', async () => {
+    it('keeps inherited owned-race access aligned with authz/profile', async () => {
         const raceAdminResponse = await api('/api/profile/context-options', {
             headers: authHeader('race_admin_no_race'),
         });
         assert.equal(raceAdminResponse.status, 200);
-        assert.deepEqual(raceAdminResponse.body.data.races, []);
-        assert.equal(raceAdminResponse.body.data.canSwitchRace, false);
+        assert.ok(raceAdminResponse.body.data.races.some(
+            (item) => Number(item.raceId) === Number(raceAId)
+                && item.sourceType === 'inherited'
+                && item.accessLevel === 'editor',
+        ));
+        assert.equal(raceAdminResponse.body.data.canSwitchRace, true);
         assert.equal(raceAdminResponse.body.data.current.raceId, null);
 
         const raceProfileResponse = await api(
             `/api/authz/profile?orgId=${orgAId}&raceId=${raceAId}`,
             { headers: authHeader('race_admin_no_race') },
         );
-        assert.equal(raceProfileResponse.status, 403);
+        assert.equal(raceProfileResponse.status, 200);
 
         const userResponse = await api('/api/profile/context-options', {
             headers: authHeader('user_no_race'),
         });
         assert.equal(userResponse.status, 200);
-        assert.deepEqual(userResponse.body.data.races, []);
-        assert.equal(userResponse.body.data.canSwitchRace, false);
+        assert.ok(userResponse.body.data.races.some(
+            (item) => Number(item.raceId) === Number(raceAId)
+                && item.sourceType === 'inherited'
+                && item.accessLevel === 'viewer',
+        ));
+        assert.equal(userResponse.body.data.canSwitchRace, true);
         assert.equal(userResponse.body.data.current.raceId, null);
 
         const userRaceProfileResponse = await api(
             `/api/authz/profile?orgId=${orgAId}&raceId=${raceAId}`,
             { headers: authHeader('user_no_race') },
         );
-        assert.equal(userRaceProfileResponse.status, 403);
+        assert.equal(userRaceProfileResponse.status, 200);
     });
 
     it('auth/me returns enriched racePermissions metadata', async () => {

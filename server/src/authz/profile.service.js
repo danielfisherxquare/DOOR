@@ -138,10 +138,21 @@ export async function buildAuthzProfileFromRows({
     },
   ];
 
+  const visibleRaceIds = new Set(
+    (rows.races || [])
+      .filter((race) => normalizeId(race.org_id || race.orgId) === orgId)
+      .map((race) => normalizeId(race.id || race.race_id || race.raceId))
+      .filter(Boolean),
+  );
+  for (const permission of rows.orgRacePermissions || []) {
+    if (normalizeId(permission.org_id || permission.orgId) !== orgId) continue;
+    const sharedRaceId = normalizeId(permission.race_id || permission.raceId);
+    if (sharedRaceId) visibleRaceIds.add(sharedRaceId);
+  }
+
   for (const race of rows.races || []) {
-    const rowOrgId = normalizeId(race.org_id || race.orgId);
     const rowRaceId = normalizeId(race.id || race.race_id || race.raceId);
-    if (!rowRaceId || rowOrgId !== orgId) continue;
+    if (!rowRaceId || !visibleRaceIds.has(rowRaceId)) continue;
     if (await check(authz, user, 'can_view', raceObjectId(rowRaceId))) {
       workspaceScopes.push({
         scopeType: 'race',

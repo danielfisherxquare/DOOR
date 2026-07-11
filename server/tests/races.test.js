@@ -8,10 +8,12 @@ import express from 'express';
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
 process.env.DATABASE_URL = DATABASE_URL;
+process.env.DISABLE_REGISTRATION = 'false';
 
 const { default: knex } = await import('../src/db/knex.js');
 const { default: authRoutes } = await import('../src/modules/auth/auth.routes.js');
 const { default: raceRoutes } = await import('../src/modules/races/race.routes.js');
+const { requireAuth } = await import('../src/middleware/require-auth.js');
 
 let app, server, baseUrl;
 
@@ -42,7 +44,7 @@ describe('Races CRUD', () => {
         app = express();
         app.use(express.json());
         app.use('/api/auth', authRoutes);
-        app.use('/api/races', raceRoutes);
+        app.use('/api/races', requireAuth, raceRoutes);
         server = app.listen(0);
         baseUrl = `http://localhost:${server.address().port}`;
 
@@ -79,7 +81,7 @@ describe('Races CRUD', () => {
                 name: '2026北京马拉松',
                 date: '2026-10-15',
                 location: '天安门广场',
-                events: [{ name: '全马', distance: 42195 }],
+                events: [{ name: '马拉松', targetCount: 5000 }],
                 conflictRule: 'strict',
             }),
             ...authed(tokenA),
@@ -87,7 +89,7 @@ describe('Races CRUD', () => {
         assert.equal(res.status, 201);
         assert.ok(res.body.data.id, '应返回赛事 ID');
         assert.equal(res.body.data.name, '2026北京马拉松');
-        assert.deepEqual(res.body.data.events, [{ name: '全马', distance: 42195 }]);
+        assert.deepEqual(res.body.data.events, [{ name: '马拉松', targetCount: 5000 }]);
         raceId = res.body.data.id;
     });
 
@@ -122,26 +124,26 @@ describe('Races CRUD', () => {
         assert.equal(res.body.data.length, 0, '组织B应看不到组织A的赛事');
     });
 
-    it('组织B获取组织A赛事 → 404', async () => {
+    it('组织B获取组织A赛事 → 403', async () => {
         const res = await api(`/api/races/${raceId}`, { ...authed(tokenB) });
-        assert.equal(res.status, 404);
+        assert.equal(res.status, 403);
     });
 
-    it('组织B更新组织A赛事 → 404', async () => {
+    it('组织B更新组织A赛事 → 403', async () => {
         const res = await api(`/api/races/${raceId}`, {
             method: 'PUT',
             body: JSON.stringify({ name: '篡改' }),
             ...authed(tokenB),
         });
-        assert.equal(res.status, 404);
+        assert.equal(res.status, 403);
     });
 
-    it('组织B删除组织A赛事 → 404', async () => {
+    it('组织B删除组织A赛事 → 403', async () => {
         const res = await api(`/api/races/${raceId}`, {
             method: 'DELETE',
             ...authed(tokenB),
         });
-        assert.equal(res.status, 404);
+        assert.equal(res.status, 403);
     });
 
     it('未认证请求 → 401', async () => {

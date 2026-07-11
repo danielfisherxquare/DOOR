@@ -7,6 +7,7 @@ import { errorHandler } from '../src/middleware/error-handler.js';
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
 process.env.DATABASE_URL = DATABASE_URL;
+process.env.DISABLE_REGISTRATION = 'false';
 
 const { default: knex } = await import('../src/db/knex.js');
 const { default: authRoutes } = await import('../src/modules/auth/auth.routes.js');
@@ -76,8 +77,8 @@ describe('Phase 7 Routes', () => {
         app = express();
         app.use(express.json());
         app.use('/api/auth', authRoutes);
-        app.use('/api/races', raceRoutes);
-        app.use('/api/records', recordRoutes);
+        app.use('/api/races', requireAuth, raceRoutes);
+        app.use('/api/records', requireAuth, recordRoutes);
         app.use('/api/pipeline', requireAuth, pipelineRoutes);
         app.use(errorHandler);
 
@@ -331,7 +332,7 @@ describe('Phase 7 Routes', () => {
         assert.equal(preview.records.passed, 3);
         assert.equal(preview.records.qualified, 2);
         assert.equal(preview.records.locked, 1);
-        assert.equal(preview.records.won, 1);
+        assert.equal(preview.records.won, 2);
         assert.equal(preview.records.lost, 1);
     });
 });

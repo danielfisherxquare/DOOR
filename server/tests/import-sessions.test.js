@@ -6,6 +6,7 @@ import { errorHandler } from '../src/middleware/error-handler.js';
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
 process.env.DATABASE_URL = DATABASE_URL;
+process.env.DISABLE_REGISTRATION = 'false';
 
 const { default: knex } = await import('../src/db/knex.js');
 const { default: authRoutes } = await import('../src/modules/auth/auth.routes.js');

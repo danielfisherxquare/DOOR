@@ -219,6 +219,14 @@ async function performBind(orgId, payload, action = 'scan') {
             );
         }
 
+        if (previousBinding && action !== 'move') {
+            throw bindingError(
+                'Object is already bound; use the move operation to change locations',
+                'INVENTORY_TWIN_BINDING_CONFLICT',
+                409
+            );
+        }
+
         ensureLocationAcceptsObject(location, object);
 
         if (!previousBinding && Number(location.capacity || 0) > 0 && Number(location.used_capacity || 0) >= Number(location.capacity || 0)) {

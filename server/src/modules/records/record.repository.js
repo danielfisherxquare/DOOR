@@ -148,17 +148,28 @@ function applyFilters(qb, filters) {
     }
 }
 
+function applyKeyword(qb, keyword) {
+    const term = keyword?.trim();
+    if (!term) return;
+
+    const namePattern = `%${term}%`;
+    const phoneHash = phoneBlindIndex(term);
+    const idNumberHash = idNumberBlindIndex(term);
+    qb.where(function keywordScope() {
+        this.whereILike('name', namePattern);
+        if (phoneHash) this.orWhere('phone_hash', phoneHash);
+        if (idNumberHash) this.orWhere('id_number_hash', idNumberHash);
+    });
+}
+
 // ── 综合查询 ──────────────────────────────────────────
 
 export async function query(orgId, raceId, { keyword, filters, offset = 0, limit = 50, sort } = {}) {
     const base = scopeOrg(knex('records'), orgId);
     if (raceId) base.where({ race_id: raceId });
 
-    // 关键词搜索（仅 name 可用 LIKE，加密字段无法模糊搜索）
-    if (keyword?.trim()) {
-        const kw = `%${keyword.trim()}%`;
-        base.whereILike('name', kw);
-    }
+    // 姓名支持模糊搜索；加密字段只能通过盲索引精确匹配。
+    applyKeyword(base, keyword);
 
     applyFilters(base, filters);
 
@@ -186,11 +197,7 @@ export async function analysis(orgId, raceId, { keyword, filters } = {}) {
     const base = scopeOrg(knex('records'), orgId);
     if (raceId) base.where({ race_id: raceId });
 
-    // 关键词搜索（仅 name 可用 LIKE，加密字段无法模糊搜索）
-    if (keyword?.trim()) {
-        const kw = `%${keyword.trim()}%`;
-        base.whereILike('name', kw);
-    }
+    applyKeyword(base, keyword);
     applyFilters(base, filters);
 
     // ── 并行执行所有统计查询（5 → 1 次往返）──────────────

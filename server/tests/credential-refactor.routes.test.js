@@ -41,7 +41,6 @@ async function createUser({ username, email, password, role, orgId }) {
 }
 
 before(async () => {
-    await knex.migrate.rollback(undefined, true);
     await knex.migrate.latest();
 
     await knex('credential_credential_access_areas').del();
@@ -74,12 +73,18 @@ before(async () => {
     }).returning('*');
     raceId = Number(race.id);
 
-    await createUser({
+    const admin = await createUser({
         username: 'credential_route_admin',
         email: 'credential_route_admin@test.com',
         password: 'admin123',
         role: 'org_admin',
         orgId: org.id,
+    });
+    await knex('user_module_access').insert({
+        user_id: admin.id,
+        org_id: org.id,
+        module_id: 'admin:credentials',
+        granted_by: admin.id,
     });
 
     server = app.listen(0);
@@ -119,7 +124,7 @@ after(async () => {
 });
 
 test('access areas reject non-numeric access codes and categories return card colors', async () => {
-    const invalidArea = await api(`/api/credential/access-areas/${raceId}`, {
+    const invalidArea = await api(`/api/admin/credentials/access-areas/${raceId}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -130,7 +135,7 @@ test('access areas reject non-numeric access codes and categories return card co
 
     assert.equal(invalidArea.status, 400);
 
-    const createdArea = await api(`/api/credential/access-areas/${raceId}`, {
+    const createdArea = await api(`/api/admin/credentials/access-areas/${raceId}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -141,7 +146,7 @@ test('access areas reject non-numeric access codes and categories return card co
     });
     assert.equal(createdArea.status, 201);
 
-    const createdCategory = await api(`/api/credential/categories/${raceId}`, {
+    const createdCategory = await api(`/api/admin/credentials/categories/${raceId}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -155,13 +160,13 @@ test('access areas reject non-numeric access codes and categories return card co
     assert.equal(createdCategory.body.data.cardColor, '#abcdef');
     assert.deepEqual(createdCategory.body.data.accessAreas.map((item) => item.accessCode), ['101']);
 
-    const listCategories = await api(`/api/credential/categories/${raceId}`, {
+    const listCategories = await api(`/api/admin/credentials/categories/${raceId}`, {
         headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(listCategories.status, 200);
     assert.equal(listCategories.body.data[0].cardColor, '#abcdef');
 
-    const requestCreate = await api(`/api/credential/requests/${raceId}`, {
+    const requestCreate = await api(`/api/admin/credentials/requests/${raceId}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -178,7 +183,7 @@ test('access areas reject non-numeric access codes and categories return card co
     assert.equal(requestCreate.body.data.categoryColor, '#abcdef');
     assert.deepEqual(requestCreate.body.data.accessAreas.map((item) => item.accessCode), ['101']);
 
-    const reviewResponse = await api(`/api/credential/requests/${raceId}/${requestCreate.body.data.id}/review`, {
+    const reviewResponse = await api(`/api/admin/credentials/requests/${raceId}/${requestCreate.body.data.id}/review`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -192,7 +197,7 @@ test('access areas reject non-numeric access codes and categories return card co
     assert.equal(reviewResponse.status, 200);
     assert.equal(reviewResponse.body.data.status, 'approved');
 
-    const requestDetail = await api(`/api/credential/requests/${raceId}/${requestCreate.body.data.id}`, {
+    const requestDetail = await api(`/api/admin/credentials/requests/${raceId}/${requestCreate.body.data.id}`, {
         headers: { Authorization: `Bearer ${token}` },
     });
     assert.equal(requestDetail.status, 200);

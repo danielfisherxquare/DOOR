@@ -8,11 +8,13 @@ import express from 'express';
 
 const DATABASE_URL = process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door_test';
 process.env.DATABASE_URL = DATABASE_URL;
+process.env.DISABLE_REGISTRATION = 'false';
 
 const { default: knex } = await import('../src/db/knex.js');
 const { default: authRoutes } = await import('../src/modules/auth/auth.routes.js');
 const { default: raceRoutes } = await import('../src/modules/races/race.routes.js');
 const { default: recordRoutes } = await import('../src/modules/records/record.routes.js');
+const { recordMapper } = await import('../src/db/mappers/records.js');
 
 let app, server, baseUrl;
 
@@ -72,11 +74,11 @@ describe('Records Query', () => {
 
         // 插入测试记录（直接入库）
         const records = [
-            { org_id: orgId, race_id: raceId, name: '张三', name_pinyin: 'zhangsan', phone: '13800138001', gender: 'M', event: '全马', clothing_size: 'L', province: '北京', city: '北京', id_number: '110101199001011001', _source: 'file1.xlsx', country: 'CN', source: 'excel' },
-            { org_id: orgId, race_id: raceId, name: '李四', name_pinyin: 'lisi', phone: '13800138002', gender: 'F', event: '半马', clothing_size: 'M', province: '上海', city: '上海', id_number: '310101199001011002', _source: 'file1.xlsx', country: 'CN', source: 'excel' },
-            { org_id: orgId, race_id: raceId, name: '王五', name_pinyin: 'wangwu', phone: '13800138003', gender: 'M', event: '全马', clothing_size: 'XL', province: '广东', city: '深圳', id_number: '440101199001011003', _source: 'file2.xlsx', country: 'US', source: 'api' },
-            { org_id: orgId, race_id: raceId, name: '', name_pinyin: '', phone: '', gender: '', event: '10K', clothing_size: '', province: '', city: '', id_number: '', _source: 'file3.xlsx', country: '', source: '' },
-        ];
+            { orgId, raceId, name: '张三', namePinyin: 'zhangsan', phone: '13800138001', gender: 'M', event: '全马', clothingSize: 'L', province: '北京', city: '北京', idNumber: '110101199001011001', _source: 'file1.xlsx', country: 'CN', source: 'excel' },
+            { orgId, raceId, name: '李四', namePinyin: 'lisi', phone: '13800138002', gender: 'F', event: '半马', clothingSize: 'M', province: '上海', city: '上海', idNumber: '310101199001011002', _source: 'file1.xlsx', country: 'CN', source: 'excel' },
+            { orgId, raceId, name: '王五', namePinyin: 'wangwu', phone: '13800138003', gender: 'M', event: '全马', clothingSize: 'XL', province: '广东', city: '深圳', idNumber: '440101199001011003', _source: 'file2.xlsx', country: 'US', source: 'api' },
+            { orgId, raceId, name: '', namePinyin: '', phone: '', gender: '', event: '10K', clothingSize: '', province: '', city: '', idNumber: '', _source: 'file3.xlsx', country: '', source: '' },
+        ].map((record) => recordMapper.toDbInsert(record));
         await knex('records').insert(records);
     });
 
@@ -115,14 +117,33 @@ describe('Records Query', () => {
         assert.equal(res.body.data.records[0].name, '张三');
     });
 
-    it('按证件号关键词搜索', async () => {
+    it('证件号局部关键词不会穿透加密边界', async () => {
         const res = await api('/api/records/query', {
             method: 'POST',
             body: JSON.stringify({ raceId, keyword: '310101' }),
             ...authed(token),
         });
+        assert.equal(res.body.data.total, 0);
+    });
+
+    it('按完整证件号精确搜索', async () => {
+        const res = await api('/api/records/query', {
+            method: 'POST',
+            body: JSON.stringify({ raceId, keyword: '310101199001011002' }),
+            ...authed(token),
+        });
         assert.equal(res.body.data.total, 1);
         assert.equal(res.body.data.records[0].name, '李四');
+    });
+
+    it('按完整手机号精确搜索', async () => {
+        const res = await api('/api/records/query', {
+            method: 'POST',
+            body: JSON.stringify({ raceId, keyword: '13800138003' }),
+            ...authed(token),
+        });
+        assert.equal(res.body.data.total, 1);
+        assert.equal(res.body.data.records[0].name, '王五');
     });
 
     // ── 6 种 Operator ──

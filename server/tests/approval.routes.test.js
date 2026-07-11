@@ -168,6 +168,13 @@ describe('approval and race staff routes', () => {
             username: 'approval_routes_design_lead',
         });
 
+        await knex('user_module_access').insert({
+            user_id: departmentOwner.user.id,
+            org_id: orgId,
+            module_id: 'app:design-requests',
+            granted_by: admin.user.id,
+        });
+
         await assignStaff({
             account: departmentOwner,
             roleKey: 'department_owner',

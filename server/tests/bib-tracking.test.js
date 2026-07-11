@@ -8,6 +8,7 @@ process.env.NODE_ENV = 'test';
 
 const { default: knex } = await import('../src/db/knex.js');
 const { default: app } = await import('../src/app.js');
+const { recordMapper } = await import('../src/db/mappers/records.js');
 
 let server;
 let baseUrl;
@@ -35,8 +36,13 @@ async function api(path, options = {}) {
     return { status: response.status, body };
 }
 
-function authHeader(role) {
-    return { Authorization: `Bearer ${tokens[role]}` };
+function authHeader(role, selectedRaceId = null) {
+    const usesOtherOrg = role === 'outsider';
+    return {
+        Authorization: `Bearer ${tokens[role]}`,
+        'X-ArcSpro-Org-Id': String(usesOtherOrg ? otherOrgId : orgId),
+        'X-ArcSpro-Race-Id': String(selectedRaceId || (usesOtherOrg ? otherRaceId : raceId)),
+    };
 }
 
 async function createUser({ username, email, password, role, userOrgId = null }) {
@@ -123,6 +129,12 @@ describe('bib tracking routes', () => {
             userOrgId: orgId,
         });
         orgAdminUserId = orgAdmin.id;
+        await knex('user_module_access').insert({
+            user_id: orgAdmin.id,
+            org_id: orgId,
+            module_id: 'admin:bib-tracking',
+            granted_by: orgAdmin.id,
+        });
         await createUser({
             username: 'bib_super_admin',
             email: 'bib_super_admin@test.com',
@@ -456,7 +468,12 @@ describe('bib tracking routes', () => {
     });
 
     it('allows super admin to search by name, bib number, phone, and id number', async () => {
-        await knex('records').where({ id: recordTwo.id }).update({ phone: '13800138000' });
+        await knex('records')
+            .where({ id: recordTwo.id })
+            .update(recordMapper.toDbUpdate({
+                phone: '13800138000',
+                idNumber: 'ID002',
+            }, orgId, raceId));
 
         const byName = await api(`/api/admin/bibs/items/${raceId}?keyword=Bob`, {
             headers: authHeader('superAdmin'),

@@ -26,7 +26,6 @@ after(async () => {
 });
 
 test('inventory twin integration flow keeps legacy location fields in sync and rejects a concurrent second bind', async () => {
-    await knex.migrate.rollback(undefined, true);
     await knex.migrate.latest();
 
     const [org] = await knex('organizations').insert({

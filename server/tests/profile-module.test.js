@@ -71,6 +71,52 @@ describe('profile service boundaries', () => {
     assert.equal(result.canSwitchRace, false)
   })
 
+  it('authorizes a shared race in the member organization workspace', async () => {
+    const profileRequests = []
+    const service = createProfileService({
+      repository: {
+        async findContextAccount() {
+          return { id: 'user-1', role: 'race_admin', org_id: 'org-shared', preferences: {} }
+        },
+        async findOrganization() {
+          return { id: 'org-shared', name: '协作机构', slug: 'shared' }
+        },
+        async findRacesByIds() {
+          return [{ id: 1001, org_id: 'org-owner', name: '共享赛事' }]
+        },
+      },
+      authz: {
+        async loadRows() {
+          return {}
+        },
+        async buildProfile(input) {
+          profileRequests.push(input)
+        },
+      },
+      raceAccess: {
+        async listEffectiveRacePermissionsForUser() {
+          return [{
+            raceId: 1001,
+            accessLevel: 'editor',
+            source: 'granted',
+            inheritedAccessLevel: 'editor',
+            explicitAccessLevel: null,
+          }]
+        },
+      },
+    })
+
+    const result = await service.getContextOptions({
+      userId: 'user-1',
+      requestedOrgId: null,
+      requestedRaceId: null,
+    })
+
+    assert.equal(profileRequests[0].requestedOrgId, 'org-shared')
+    assert.equal(result.races[0].orgId, 'org-shared')
+    assert.equal(result.races[0].ownerOrgId, 'org-owner')
+  })
+
   it('blocks viewing a user from another organization', async () => {
     const service = createProfileService({
       repository: {

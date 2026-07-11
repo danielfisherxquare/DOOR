@@ -109,6 +109,14 @@ function raceIdsForUser(userId, userRacePermissions = []) {
     .filter(Boolean);
 }
 
+function permissionKey(orgId, raceId) {
+  return `${normalizeId(orgId)}|${normalizeRaceId(raceId)}`;
+}
+
+function userRacePermissionKey(userId, raceId) {
+  return `${normalizeId(userId)}|${normalizeRaceId(raceId)}`;
+}
+
 export function projectAuthzTuples({
   organizations = [],
   users = [],
@@ -120,11 +128,34 @@ export function projectAuthzTuples({
   const tuples = createTupleCollector();
   const organizationIds = organizations.map((org) => normalizeId(org.id)).filter(Boolean);
   const racesByOrgId = new Map();
+  const raceOwnerOrgById = new Map();
+  const orgRaceAccessByKey = new Map();
+  const explicitRaceAccessByKey = new Map();
   const usersById = new Map(
     users
       .map((user) => [normalizeId(user.id || user.user_id || user.userId), user])
       .filter(([userId]) => userId),
   );
+
+  for (const permission of orgRacePermissions) {
+    const orgId = normalizeId(permission.org_id || permission.orgId);
+    const raceId = normalizeRaceId(permission.race_id || permission.raceId);
+    if (!orgId || !raceId) continue;
+    orgRaceAccessByKey.set(
+      permissionKey(orgId, raceId),
+      permission.access_level || permission.accessLevel,
+    );
+  }
+
+  for (const permission of userRacePermissions) {
+    const userId = normalizeId(permission.user_id || permission.userId);
+    const raceId = normalizeRaceId(permission.race_id || permission.raceId);
+    if (!userId || !raceId) continue;
+    explicitRaceAccessByKey.set(
+      userRacePermissionKey(userId, raceId),
+      permission.access_level || permission.accessLevel,
+    );
+  }
 
   for (const orgId of organizationIds) {
     tuples.add(PLATFORM_OBJECT, 'parent_platform', organizationObjectId(orgId));
@@ -136,7 +167,9 @@ export function projectAuthzTuples({
     if (!orgId || !raceId) continue;
     if (!racesByOrgId.has(orgId)) racesByOrgId.set(orgId, []);
     racesByOrgId.get(orgId).push(raceId);
+    raceOwnerOrgById.set(raceId, orgId);
     tuples.add(organizationObjectId(orgId), 'parent', raceObjectId(raceId));
+    tuples.add(`${organizationObjectId(orgId)}#member`, 'viewer', raceObjectId(raceId));
     tuples.add(`${organizationObjectId(orgId)}#admin`, 'manager', raceObjectId(raceId));
     tuples.add(`${organizationObjectId(orgId)}#platform_admin`, 'manager', raceObjectId(raceId));
   }
@@ -146,10 +179,25 @@ export function projectAuthzTuples({
     const raceId = normalizeRaceId(permission.race_id || permission.raceId);
     if (!orgId || !raceId) continue;
     const relation = relationForRaceAccess(permission.access_level || permission.accessLevel);
-    const userset = relation === 'manager'
-      ? `${organizationObjectId(orgId)}#admin`
-      : `${organizationObjectId(orgId)}#member`;
-    tuples.add(userset, relation, raceObjectId(raceId));
+    tuples.add(`${organizationObjectId(orgId)}#member`, 'viewer', raceObjectId(raceId));
+    if (relation === 'manager') {
+      tuples.add(`${organizationObjectId(orgId)}#admin`, 'manager', raceObjectId(raceId));
+    }
+  }
+
+  function visibleRaceIdsForOrg(orgId) {
+    const raceIds = new Set(racesByOrgId.get(orgId) || []);
+    for (const permission of orgRacePermissions) {
+      if (normalizeId(permission.org_id || permission.orgId) !== orgId) continue;
+      const raceId = normalizeRaceId(permission.race_id || permission.raceId);
+      if (raceId) raceIds.add(raceId);
+    }
+    return raceIds;
+  }
+
+  function inheritedRaceAccess(orgId, raceId) {
+    if (raceOwnerOrgById.get(raceId) === orgId) return 'editor';
+    return orgRaceAccessByKey.get(permissionKey(orgId, raceId)) || null;
   }
 
   for (const user of users) {
@@ -185,6 +233,16 @@ export function projectAuthzTuples({
     tuples.add(userObject, 'member', organizationObjectId(orgId));
     tuples.add(`${organizationObjectId(orgId)}#member`, 'granted', surfaceObjectId({ orgId, surface: 'app' }));
 
+    if (role === 'race_admin') {
+      for (const raceId of visibleRaceIdsForOrg(orgId)) {
+        const inheritedAccess = inheritedRaceAccess(orgId, raceId);
+        const explicitAccess = explicitRaceAccessByKey.get(userRacePermissionKey(userId, raceId));
+        if (inheritedAccess === 'editor' && explicitAccess !== 'viewer') {
+          tuples.add(userObject, 'manager', raceObjectId(raceId));
+        }
+      }
+    }
+
     if (role === 'org_admin') {
       tuples.add(userObject, 'admin', organizationObjectId(orgId));
       tuples.add(`${organizationObjectId(orgId)}#admin`, 'granted', surfaceObjectId({ orgId, surface: 'admin' }));
@@ -199,7 +257,9 @@ export function projectAuthzTuples({
 
     const roleDefaultModules = getRoleDefaultModules(role);
     if (Array.isArray(roleDefaultModules)) {
-      const raceIds = raceIdsForUser(userId, userRacePermissions);
+      const raceIds = role === 'race_admin'
+        ? [...visibleRaceIdsForOrg(orgId)]
+        : raceIdsForUser(userId, userRacePermissions);
       for (const moduleId of roleDefaultModules) {
         const parsed = parseModuleId(moduleId);
         if (!parsed) continue;
@@ -218,9 +278,19 @@ export function projectAuthzTuples({
     const userId = normalizeId(permission.user_id || permission.userId);
     const raceId = normalizeRaceId(permission.race_id || permission.raceId);
     if (!userId || !raceId) continue;
+    const user = usersById.get(userId);
+    const orgId = normalizeId(user?.org_id || user?.orgId);
+    const inheritedAccess = inheritedRaceAccess(orgId, raceId);
+    if (!user || !orgId || !inheritedAccess || user.role === 'org_admin' || user.role === 'super_admin') {
+      continue;
+    }
+    const requestedAccess = permission.access_level || permission.accessLevel;
+    const effectiveAccess = user.role === 'user'
+      ? 'viewer'
+      : (inheritedAccess === 'viewer' || requestedAccess === 'viewer' ? 'viewer' : 'editor');
     tuples.add(
       userObjectId(userId),
-      relationForRaceAccess(permission.access_level || permission.accessLevel),
+      relationForRaceAccess(effectiveAccess),
       raceObjectId(raceId),
     );
   }

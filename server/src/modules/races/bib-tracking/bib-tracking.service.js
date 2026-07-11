@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import knex from '../../../db/knex.js';
+import { decryptField } from '../../../utils/crypto.js';
 import { resolveRaceAccess } from '../race-access.service.js';
 import * as repo from './bib-tracking.repository.js';
 
@@ -113,6 +114,15 @@ function maskIdNumber(value) {
     return `${input.slice(0, 2)}${'*'.repeat(Math.max(1, input.length - 4))}${input.slice(-2)}`;
 }
 
+function decryptRecordField(item, columnName) {
+    return decryptField(item?.[columnName], {
+        tableName: 'records',
+        columnName,
+        orgId: item?.record_org_id,
+        raceId: Number(item?.record_race_id),
+    });
+}
+
 function serializeItem(item) {
     return {
         recordId: Number(item.record_id),
@@ -152,13 +162,15 @@ function serializeResolveItem(item) {
 }
 
 function serializeListItem(item) {
+    const phone = decryptRecordField(item, 'phone');
+    const idNumber = decryptRecordField(item, 'id_number');
     return {
         itemId: Number(item.item_id),
         recordId: Number(item.record_id),
         name: item.name || '',
         bibNumber: item.bib_number,
-        phoneMasked: maskPhone(item.phone),
-        idNumberMasked: maskIdNumber(item.id_number),
+        phoneMasked: maskPhone(phone),
+        idNumberMasked: maskIdNumber(idNumber),
         status: item.status,
         statusLabel: STATUS_LABELS[item.status] || item.status,
         qrVersion: Number(item.qr_version),
@@ -173,6 +185,8 @@ function serializeListItem(item) {
 }
 
 function serializeDetailItem(item) {
+    const phone = decryptRecordField(item, 'phone');
+    const idNumber = decryptRecordField(item, 'id_number');
     return {
         itemId: Number(item.item_id),
         raceId: Number(item.race_id),
@@ -180,10 +194,10 @@ function serializeDetailItem(item) {
         recordId: Number(item.record_id),
         name: item.name || '',
         bibNumber: item.bib_number,
-        phone: item.phone || '',
-        phoneMasked: maskPhone(item.phone),
-        idNumber: item.id_number || '',
-        idNumberMasked: maskIdNumber(item.id_number),
+        phone: phone || '',
+        phoneMasked: maskPhone(phone),
+        idNumber: idNumber || '',
+        idNumberMasked: maskIdNumber(idNumber),
         status: item.status,
         statusLabel: STATUS_LABELS[item.status] || item.status,
         receiptPrintedAt: item.receipt_printed_at,

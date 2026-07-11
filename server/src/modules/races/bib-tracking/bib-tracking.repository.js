@@ -1,4 +1,5 @@
 import knex from '../../../db/knex.js';
+import { idNumberBlindIndex, phoneBlindIndex } from '../../../utils/crypto.js';
 
 function isMissingUpdatedAtColumnError(err) {
     return err?.code === '42703' && String(err.message || '').includes('updated_at');
@@ -55,8 +56,12 @@ function applyKeywordFilter(base, keyword, useStoredSearchDocument = true) {
 
     const term = keyword.trim();
     const likeTerm = `%${term}%`;
+    const phoneHash = phoneBlindIndex(term);
+    const idNumberHash = idNumberBlindIndex(term);
     base.andWhere((qb) => {
-        qb.whereILike('bti.bib_number', likeTerm);
+        qb.whereILike('bti.bib_number', likeTerm)
+            .orWhere('r.phone_hash', phoneHash)
+            .orWhere('r.id_number_hash', idNumberHash);
         if (useStoredSearchDocument) {
             qb.orWhereRaw(
                 `
@@ -279,6 +284,8 @@ export async function listItems(orgId, raceId, { status, keyword, page = 1, limi
             .select(
                 'bti.id as item_id',
                 'bti.record_id',
+                'r.org_id as record_org_id',
+                'r.race_id as record_race_id',
                 'r.name',
                 'r.phone',
                 'r.id_number',
@@ -328,6 +335,8 @@ export async function getItemDetail(orgId, raceId, itemId) {
             'bti.race_id',
             'race.name as race_name',
             'bti.record_id',
+            'r.org_id as record_org_id',
+            'r.race_id as record_race_id',
             'r.name',
             'r.phone',
             'r.id_number',

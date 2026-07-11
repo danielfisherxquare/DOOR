@@ -134,6 +134,37 @@ describe('authz profile service', () => {
     assert.equal(profile.modules.includes('ops:credentials'), false);
   });
 
+  it('includes a shared race in the selected organization workspace', async () => {
+    const profile = await buildAuthzProfileFromRows({
+      authContext: { userId: 'u-race-admin', orgId: 'org-shared', role: 'race_admin' },
+      requestedOrgId: 'org-shared',
+      requestedRaceId: '1001',
+      rows: {
+        organizations: [
+          { id: 'org-owner', name: '赛事所有者' },
+          { id: 'org-shared', name: '协作机构' },
+        ],
+        users: [{ id: 'u-race-admin', org_id: 'org-shared', role: 'race_admin' }],
+        races: [{ id: 1001, org_id: 'org-owner', name: '共享赛事' }],
+        userRacePermissions: [],
+        orgRacePermissions: [
+          { org_id: 'org-shared', race_id: 1001, access_level: 'editor' },
+        ],
+        userModuleAccess: [],
+      },
+    });
+
+    assert.equal(profile.raceId, '1001');
+    assert.equal(profile.modules.includes('ops:scan'), true);
+    assert.deepEqual(profile.workspaceScopes.at(-1), {
+      scopeType: 'race',
+      orgId: 'org-shared',
+      orgName: '协作机构',
+      raceId: '1001',
+      raceName: '共享赛事',
+    });
+  });
+
   it('denies a requested organization outside the user context', async () => {
     await assert.rejects(
       () => buildAuthzProfileFromRows({

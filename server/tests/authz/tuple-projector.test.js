@@ -106,6 +106,83 @@ describe('authz tuple projector', () => {
     assert.equal(set.has('user:u-race-admin|granted|module:org-1/admin/dashboard'), false);
   });
 
+  it('projects owned races to organization members and inherited race admins', () => {
+    const tuples = projectAuthzTuples({
+      organizations: [{ id: 'org-1' }],
+      users: [
+        { id: 'u-race-admin', org_id: 'org-1', role: 'race_admin' },
+        { id: 'u-viewer', org_id: 'org-1', role: 'user' },
+      ],
+      races: [{ id: 1001, org_id: 'org-1' }],
+      userRacePermissions: [],
+      orgRacePermissions: [],
+      userModuleAccess: [],
+    });
+    const set = tupleSet(tuples);
+
+    assert.equal(set.has('organization:org-1#member|viewer|race:1001'), true);
+    assert.equal(set.has('user:u-race-admin|manager|race:1001'), true);
+    assert.equal(set.has('user:u-race-admin|granted|module:race-1001/ops/scan'), true);
+    assert.equal(set.has('user:u-viewer|manager|race:1001'), false);
+  });
+
+  it('projects external organization grants with role-aware editor access', () => {
+    const tuples = projectAuthzTuples({
+      organizations: [{ id: 'org-owner' }, { id: 'org-shared' }],
+      users: [
+        { id: 'u-org-admin', org_id: 'org-shared', role: 'org_admin' },
+        { id: 'u-race-admin', org_id: 'org-shared', role: 'race_admin' },
+        { id: 'u-viewer', org_id: 'org-shared', role: 'user' },
+      ],
+      races: [{ id: 1001, org_id: 'org-owner' }],
+      userRacePermissions: [],
+      orgRacePermissions: [
+        { org_id: 'org-shared', race_id: 1001, access_level: 'editor' },
+      ],
+      userModuleAccess: [],
+    });
+    const set = tupleSet(tuples);
+
+    assert.equal(set.has('organization:org-shared#member|viewer|race:1001'), true);
+    assert.equal(set.has('organization:org-shared#admin|manager|race:1001'), true);
+    assert.equal(set.has('user:u-race-admin|manager|race:1001'), true);
+    assert.equal(set.has('user:u-viewer|manager|race:1001'), false);
+  });
+
+  it('keeps an explicit viewer assignment stricter than inherited race-admin editor access', () => {
+    const tuples = projectAuthzTuples({
+      organizations: [{ id: 'org-1' }],
+      users: [{ id: 'u-race-admin', org_id: 'org-1', role: 'race_admin' }],
+      races: [{ id: 1001, org_id: 'org-1' }],
+      userRacePermissions: [
+        { user_id: 'u-race-admin', org_id: 'org-1', race_id: 1001, access_level: 'viewer' },
+      ],
+      orgRacePermissions: [],
+      userModuleAccess: [],
+    });
+    const set = tupleSet(tuples);
+
+    assert.equal(set.has('user:u-race-admin|viewer|race:1001'), true);
+    assert.equal(set.has('user:u-race-admin|manager|race:1001'), false);
+  });
+
+  it('caps ordinary users with explicit editor rows to viewer access', () => {
+    const tuples = projectAuthzTuples({
+      organizations: [{ id: 'org-1' }],
+      users: [{ id: 'u-user', org_id: 'org-1', role: 'user' }],
+      races: [{ id: 1001, org_id: 'org-1' }],
+      userRacePermissions: [
+        { user_id: 'u-user', org_id: 'org-1', race_id: 1001, access_level: 'editor' },
+      ],
+      orgRacePermissions: [],
+      userModuleAccess: [],
+    });
+    const set = tupleSet(tuples);
+
+    assert.equal(set.has('user:u-user|viewer|race:1001'), true);
+    assert.equal(set.has('user:u-user|manager|race:1001'), false);
+  });
+
   it('projects user_module_access into direct module grants', () => {
     const tuples = projectAuthzTuples({
       organizations: [{ id: 'org-1' }],

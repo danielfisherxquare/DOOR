@@ -45,11 +45,18 @@ async function api(path, options = {}) {
 }
 
 function authHeader() {
-    return { Authorization: `Bearer ${token}` };
+    return {
+        Authorization: `Bearer ${token}`,
+        'X-ArcSpro-Org-Id': String(orgId),
+        'X-ArcSpro-Race-Id': String(raceId),
+    };
 }
 
 function authHeaderFor(key) {
-    return { Authorization: `Bearer ${staffTokens[key]}` };
+    return {
+        Authorization: `Bearer ${staffTokens[key]}`,
+        'X-ArcSpro-Org-Id': String(orgId),
+    };
 }
 
 async function createApprovedDesignRequest(overrides = {}) {
@@ -519,7 +526,7 @@ describe('design request collaboration routes', () => {
             .returning('*');
         secondRaceId = Number(secondRace.id);
 
-        await createUser({
+        const manager = await createUser({
             username: 'design_manager',
             email: 'design_manager@test.com',
             password: 'manager123',
@@ -607,6 +614,33 @@ describe('design request collaboration routes', () => {
             scopeType: 'module',
             moduleKey: 'design_requests',
         });
+
+        await knex('user_module_access').insert([
+            {
+                user_id: manager.id,
+                org_id: orgId,
+                module_id: 'ops:design-requests',
+                granted_by: manager.id,
+            },
+            {
+                user_id: manager.id,
+                org_id: orgId,
+                module_id: 'app:design-requests',
+                granted_by: manager.id,
+            },
+            {
+                user_id: designer.id,
+                org_id: orgId,
+                module_id: 'app:design-requests',
+                granted_by: manager.id,
+            },
+            ...[departmentOwner, competitionOwner, raceDirector, designLead].map((account) => ({
+                user_id: account.user.id,
+                org_id: orgId,
+                module_id: 'app:design-requests',
+                granted_by: manager.id,
+            })),
+        ]);
 
         server = app.listen(0);
         baseUrl = `http://localhost:${server.address().port}`;
