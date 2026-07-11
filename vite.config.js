@@ -51,11 +51,12 @@ export default defineConfig({
             return 'vendor-three-core'
           }
 
-          if (
-            id.includes('/@react-three/fiber/') ||
-            id.includes('/@react-three/drei/')
-          ) {
-            return 'vendor-react-three'
+          if (id.includes('/use-sync-external-store/')) {
+            return 'vendor-react'
+          }
+
+          if (id.includes('/react-toastify/')) {
+            return 'vendor-ui'
           }
 
           if (
@@ -68,13 +69,6 @@ export default defineConfig({
 
           if (id.includes('/chart.js/')) {
             return 'vendor-chart'
-          }
-
-          if (
-            id.includes('/react-toastify/') ||
-            id.includes('/zustand/')
-          ) {
-            return 'vendor-ui'
           }
 
           if (id.includes('/xlsx/')) {

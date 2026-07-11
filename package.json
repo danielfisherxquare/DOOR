@@ -18,7 +18,7 @@
     "lint": "eslint src tests packages",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "build": "vite build",
+    "build": "vite build && node scripts/check-build-boundaries.mjs",
     "preview": "vite preview",
     "test:branding": "node --test tests/branding/branding.test.mjs",
     "test:contracts": "node --test packages/contracts/tests/contracts.test.js",

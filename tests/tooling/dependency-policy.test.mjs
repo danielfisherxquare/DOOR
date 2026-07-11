@@ -36,6 +36,7 @@ test('root scripts expose one repeatable verification entry point', async () => 
   assert.ok(pkg.scripts.lint)
   assert.ok(pkg.scripts['format:check'])
   assert.ok(pkg.scripts.typecheck)
+  assert.equal(pkg.scripts.build, 'vite build && node scripts/check-build-boundaries.mjs')
 })
 
 test('workspace uses one lockfile and patched dependency releases', async () => {
@@ -59,4 +60,14 @@ test('document tooling keeps independent formats in independent chunks', async (
   assert.match(viteConfig, /return 'vendor-xlsx'/)
   assert.match(viteConfig, /return 'vendor-pizzip'/)
   assert.doesNotMatch(viteConfig, /return 'vendor-docs'/)
+})
+
+test('React Three follows route boundaries instead of a forced shared chunk', async () => {
+  const viteConfig = await readFile(new URL('../../vite.config.js', import.meta.url), 'utf8')
+  const externalStoreRule = viteConfig.indexOf("id.includes('/use-sync-external-store/')")
+
+  assert.ok(externalStoreRule >= 0)
+  assert.match(viteConfig.slice(externalStoreRule), /return 'vendor-react'/)
+  assert.doesNotMatch(viteConfig, /id\.includes\(['"]\/zustand\//)
+  assert.doesNotMatch(viteConfig, /id\.includes\(['"]\/@react-three\//)
 })
