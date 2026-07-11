@@ -5,7 +5,7 @@ import { getAppNavGroups, getAppPortalCards } from '../src/components/app/appCon
 import { getOpsNavGroups, getOpsPortalCards } from '../src/components/ops/opsConfig.js'
 import { getAdminNavGroups } from '../src/components/admin/adminConfig.js'
 import { listAllModuleIds } from '../server/src/modules/module-access/module-access.registry.js'
-import { getRoleDefaultModules } from '../server/src/utils/capability-policy.js'
+import { getRoleDefaultModules, hasCapability } from '../server/src/utils/capability-policy.js'
 
 describe('module access helper', () => {
   it('requires backend-returned default modules for scoped users', () => {
@@ -95,6 +95,11 @@ describe('module access helper', () => {
 
     assert.equal(withoutCapability.includes('three-studio'), false)
     assert.equal(withCapability.includes('three-studio'), true)
+  })
+
+  it('lets an explicitly granted race operator use 3D studio without opening it to users', () => {
+    assert.equal(hasCapability('race_admin', 'inventory', '3d_studio'), true)
+    assert.equal(hasCapability('user', 'inventory', '3d_studio'), false)
   })
 
   it('filters ops sidebar groups and home cards by module access', () => {

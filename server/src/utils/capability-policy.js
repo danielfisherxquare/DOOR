@@ -50,7 +50,7 @@ const ROLE_POLICY = {
             race: ['view', 'operate'],
             org: [],
             platform: [],
-            inventory: [],
+            inventory: ['3d_studio'],
         },
         permissions: ['race:manage', 'race:read'],
         moduleAccess: ['app:home', 'app:profile', 'app:map', 'ops:home', 'ops:bib-pickup', 'ops:scan'],
