@@ -8,9 +8,11 @@
 
 **复验日期：** 2026-07-11
 
-**当前完成度：** 94%
+**代码验收提交：** `03d88d4cdb33c1aa7ed120d5b019d286082e5b10`
 
-**状态：** 本地代码、PostgreSQL、容器、备份恢复、Nginx 和登录/平台管理关键路径已经通过。生产密钥轮换、远程 CI、生产发布和带真实业务数据的九条 UI 全链路尚未完成，长期目标继续保持 active。
+**当前完成度：** 97%
+
+**状态：** 本地代码、PostgreSQL、容器、备份恢复、Nginx、登录/平台管理和十个关键业务界面已经通过。代码质量门禁为 0 error / 0 warning。真实付费 OCR、库存扫码 UI 最终方案、生产密钥轮换、远程 CI 和生产发布尚未完成，长期目标继续保持 active。
 
 ## 1. 本轮关闭的问题
 
@@ -36,6 +38,9 @@
 | 容器工作目录调整后，storage 与自动备份脚本仍指向旧路径 | storage 统一挂载 `/app/server/storage`；sidecar 调用 `/app/server/scripts/run-postgres-backup.sh` | 新镜像挂载检查；sidecar 启动即生成 `.dump` |
 | app 与 sidecar 使用各自 `/tmp` 锁，可能并发备份/恢复 | 两者使用备份挂载中的 `/backups/.db-ops.lock` | 实际创建共享锁后，app 备份返回 `Another backup/restore operation is already running` |
 | 上传压缩 SQL 可包含跨库语句 | 恢复只接受 PostgreSQL custom `.dump`，先读取 TOC 并拒绝数据库、表空间、函数、触发器等危险对象类型 | `.sql.gz` 被拒绝，目标库未创建；custom 归档恢复成功 |
+| React Hook 依赖缺失导致旧状态、重复订阅和资源泄漏 | Hook 依赖全部显式稳定化；事件解绑使用同一函数；Blob URL 按本次加载结果回收 | ESLint `react-hooks/exhaustive-deps` 0 warning；根测试和浏览器 E2E 通过 |
+| 地图和 DTO 边界保留 81 处显式 `any` | GeoJSON、Geoman、空间对象、地形工作区、场景导出任务均使用明确类型 | ESLint `@typescript-eslint/no-explicit-any` 0 warning；TypeScript 通过 |
+| Push/Pull 高度标签把建模文档当成浏览器 DOM | 高度标签只访问 `globalThis.document`，不再接收建模文档参数 | 新增架构回归测试；根测试通过 |
 
 ## 2. 自动化门禁
 
@@ -44,10 +49,10 @@
 ```text
 npm run check:encoding                 PASS
 npm run check:secrets                  PASS
-npm run lint -- --quiet                PASS
+npm run lint                           PASS，0 error / 0 warning
 npm run typecheck                      PASS
 npm run format:check                   PASS
-npm test                               PASS，304/304
+npm test                               PASS，310/310
 npm run build                          PASS，Vite 8
 npm audit --audit-level=low            PASS，0 vulnerabilities
 git diff --check                       PASS
@@ -57,17 +62,19 @@ git diff --check                       PASS
 
 ### 2.2 后端
 
-专用 PostgreSQL 16 容器只暴露 `door_test`。测试 runner 为 93 个测试文件逐一创建隔离数据库：
+专用 PostgreSQL 16 容器只用于测试连接。测试 runner 为 96 个测试文件逐一创建隔离数据库：
 
 ```text
 npm test
 ...
-[isolated-db 93/93] tests/test-isolation-runner.test.js
-[isolated-db] PASS 93/93 files
+[isolated-db 96/96] tests/test-isolation-runner.test.js
+[isolated-db] PASS 96/96 files
 
 npm audit --workspace=arcspro-server --audit-level=low
 found 0 vulnerabilities
 ```
+
+后端 workspace 没有独立 lockfile；仓库使用根 `package-lock.json`。因此 `npm audit --prefix server` 会返回 `ENOLOCK`，不作为门禁命令。有效命令是 `npm audit --workspace server --audit-level=low`，结果为 0 vulnerabilities。
 
 测试日志还有一条升级提示：lottery-v2 测试触发 `pg` 的并发 `client.query()` 弃用警告。当前用例全部通过；升级到 pg 9 前应改为串行 await 或独立 client。
 
@@ -183,6 +190,31 @@ app 单独重建后网关探测                20/20 通过，Nginx 容器未重
 
 浏览器诊断在修复前捕获到 `Cannot read properties of null (reading 'scopeType')`；修复后上述页面没有 `Runtime.exceptionThrown`、`Network.loadingFailed` 或 DOM 密码表单警告。
 
+### 5.3 带业务数据的运行时验收
+
+最新前端产物构建后，通过 `http://127.0.0.1:8088` 执行 `scripts/verify-business-surfaces.mjs`。结果写入 `output/remediation-acceptance-20260711/business-surfaces/result.json`：
+
+```json
+{
+  "credentialLifecycle": {
+    "personName": "验收制证-20260711073754",
+    "requestId": 4,
+    "credentialId": 4,
+    "requestStatus": "generated",
+    "credentialStatus": "issued"
+  },
+  "consoleErrors": [],
+  "pageErrors": [],
+  "failedRequests": [],
+  "resourceFailures": [],
+  "ok": true
+}
+```
+
+验收页面：服装物资、我的报销、证件中心、申请与建单、审核中心、领取管理、仓储作业台、3D 空间工作台、轨迹地形模型和 GIS 地图。服装库存卡合计 6 件、3 张非空卡；证件申请 4 完成 `generated -> issued`。
+
+生产构建地图链路同时通过：登录保留 `projectId` 查询参数，6 个地图对象保存并同步，GIS 地图到 3D Studio 的生成与导出没有失败请求。
+
 ## 6. 尚未关闭的门禁
 
 ### 6.1 生产与外部系统
@@ -192,24 +224,19 @@ app 单独重建后网关探测                20/20 通过，Nginx 容器未重
 - 当前分支未推送，GitHub Actions 没有远程运行记录；
 - 尚未部署远程服务器，远端 endpoint/chunk/health 三信号未复验。
 
-### 6.2 带业务数据的 UI 全链路
+### 6.2 仍缺的业务验收
 
-后端服务测试已覆盖导入、审核、抽签、号码布、证件、报销、库存和 3D/GIS 的核心事务与权限；本地浏览器库没有机构、赛事和报名记录，因此以下 UI 链路还缺少真实页面证据：
-
-1. 选择赛事 → 名单导入 → commit → records；
-2. 审核步骤 → job polling → 结果；
-3. 抽签 preview → finalize → rollback；
-4. 号码布分配 → 导出 → 追踪；
-5. 证件申请 → 审核 → 签发；
-6. 报销导入 → OCR → 匹配 → 导出；
-7. 库存入库 → 绑定 → 出库 → 盘点；
-8. GIS 地图 → 3D Studio → 导出。
+1. 报销导入、匹配和导出已通过；`REIMBURSEMENT_OCR_API_KEY` 与 `DASHSCOPE_API_KEY` 均为空，因此真实付费模型调用仍缺证据；
+2. 库存后端入库、绑定、出库、盘点及仓储作业台已通过；扫码操作 UI 仍等待“嵌入计划详情”方案确认；
+3. GIS 地图保存、3D Studio 导入和白模导出已通过；远程候选环境尚未重跑；
+4. 名单、审核、抽签和号码布已有自动化与后端隔离测试，仍可补充一轮人工业务操作录像，但不再是本地代码门禁。
 
 ## 7. 长期目标关闭条件
 
-1. 为浏览器验收库准备一套脱敏机构、赛事和报名数据，逐条补齐上面 8 条 UI 证据；
-2. 完成生产密钥轮换并保存平台回执；
-3. 推送分支，远程 CI 全绿；
-4. 在远程候选环境重跑迁移、健康、备份恢复和镜像回退；
-5. 生产切换后验证 endpoint、静态 chunk、健康检查和关键业务抽样；
-6. 最终 HEAD 从全新检出重跑全部门禁。
+1. 确认并完成库存扫码 UI，逐条验证入库、绑定、出库和盘点；
+2. 配置真实 OCR 密钥，保存一次发票和付款凭证识别结果及用量证据；
+3. 完成生产密钥轮换并保存平台回执；
+4. 推送分支，远程 CI 全绿；
+5. 在远程候选环境重跑迁移、健康、备份恢复和镜像回退；
+6. 生产切换后验证 endpoint、静态 chunk、健康检查和关键业务抽样；
+7. 最终 HEAD 从全新检出重跑全部门禁。本次已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `03d88d4` 完成一次。
