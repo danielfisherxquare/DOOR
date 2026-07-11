@@ -4,6 +4,24 @@ function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 }
 
+export function readWorkbookFromBytes(bytes, filename = '') {
+  const isCsv = filename.toLowerCase().endsWith('.csv')
+  if (isCsv) {
+    const text = new TextDecoder('utf-8').decode(bytes)
+    return XLSX.read(text, { type: 'string' })
+  }
+  return XLSX.read(bytes, { type: 'array' })
+}
+
+export function workbookToRows(workbook, sheetName = workbook.SheetNames[0], options = {}) {
+  const worksheet = workbook.Sheets[sheetName]
+  if (!worksheet) return []
+  return XLSX.utils.sheet_to_json(worksheet, {
+    defval: '',
+    raw: options.raw ?? false,
+  })
+}
+
 const ALIAS_MAP = {
   event: ['比赛项目', '参赛项目', '项目', '比赛组别', '组别', 'event', 'category', 'race_category', '报名项目', '赛事项目'],
   source: ['报名来源', '来源', '报名渠道', '渠道', 'source', 'channel', '报名平台', '平台'],
@@ -131,27 +149,15 @@ export async function parseFile(file, standardFields, savedMappings) {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target.result)
-        const readOptions = { type: 'array' }
         const isCsv = file.name.toLowerCase().endsWith('.csv')
-
-        // CSV files commonly arrive as UTF-8 from registration platforms.
-        // Without an explicit codepage, Chinese headers/content become mojibake.
-        if (isCsv) {
-          readOptions.codepage = 65001
-        }
-
-        const workbook = XLSX.read(data, readOptions)
+        const workbook = readWorkbookFromBytes(data, file.name)
         const originalFileName = file.name.replace(/\.[^.]+$/, '')
         const extractedSource = extractPlatform(file.name)
 
         const results = []
 
         for (const sheetName of workbook.SheetNames) {
-          const worksheet = workbook.Sheets[sheetName]
-          const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-            defval: '',
-            raw: !isCsv,
-          })
+          const jsonData = workbookToRows(workbook, sheetName, { raw: !isCsv })
 
           if (jsonData.length === 0) continue
 
