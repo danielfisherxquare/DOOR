@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { workbenchApi } from '../../services/inventoryApi'
 import { showError } from '../../utils/toast'
 import { CommandEmptyState, CommandNotice, ContextRequirementState } from '../../components/command/CommandPrimitives'
@@ -16,9 +16,7 @@ function formatTrendLabel(point) {
 
 export default function WmsDashboard() {
     const navigate = useNavigate()
-    const [searchParams] = useSearchParams()
-    const selectedOrgId = searchParams.get('orgId')
-    const { buildHref } = useInventorySurface()
+    const { buildHref, orgId: selectedOrgId } = useInventorySurface()
     const [overview, setOverview] = useState(null)
     const [selectedItem, setSelectedItem] = useState(null)
     const [loading, setLoading] = useState(false)

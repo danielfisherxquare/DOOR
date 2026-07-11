@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { adminCredentialApi as credentialApi } from '../../../api/credential'
+import { Link } from 'react-router-dom'
 import { useCredentialSurface } from './useCredentialSurface'
 import {
   AdminDataTable,
@@ -38,10 +37,7 @@ function formatNumber(value) {
 }
 
 export default function CredentialReviewPage() {
-  const [searchParams] = useSearchParams()
-  const raceId = searchParams.get('raceId')
-  const orgId = searchParams.get('orgId') || ''
-  const { buildHref } = useCredentialSurface()
+  const { buildHref, credentialApi, orgId, raceId } = useCredentialSurface()
   const context = useMemo(() => ({ orgId, raceId: raceId || '' }), [orgId, raceId])
 
   const [requests, setRequests] = useState([])
@@ -97,7 +93,7 @@ export default function CredentialReviewPage() {
 
   useEffect(() => {
     void loadData()
-  }, [raceId, statusFilter])
+  }, [credentialApi, raceId, statusFilter])
 
   const filteredRequests = useMemo(() => {
     const pendingStatuses = new Set(['submitted', 'under_review'])

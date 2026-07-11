@@ -96,4 +96,30 @@ describe('surface boundaries', () => {
       assert.equal(source.includes(path), false)
     }
   })
+
+  it('inherits credential and inventory context from the selected workspace', () => {
+    const credentialHook = read('src/views/admin/credential/useCredentialSurface.js')
+    assert.match(credentialHook, /resolveSurfaceOrgId/)
+    assert.match(credentialHook, /resolveSurfaceRaceId/)
+    assert.match(credentialHook, /useWorkspaceStore/)
+
+    for (const page of [
+      'src/views/admin/credential/CredentialCenterPage.jsx',
+      'src/views/admin/credential/CredentialApplicationPage.jsx',
+      'src/views/admin/credential/CredentialReviewPage.jsx',
+    ]) {
+      const source = read(page)
+      assert.doesNotMatch(source, /const raceId = searchParams\.get\('raceId'\)/, page)
+      assert.doesNotMatch(source, /adminCredentialApi/, page)
+    }
+    assert.match(credentialHook, /createCredentialApi/)
+
+    const inventoryHook = read('src/views/inventory/useInventorySurface.js')
+    assert.match(inventoryHook, /resolveSurfaceOrgId/)
+    assert.match(inventoryHook, /useWorkspaceStore/)
+    assert.doesNotMatch(
+      read('src/views/inventory/WmsDashboard.jsx'),
+      /searchParams\.get\('orgId'\)/,
+    )
+  })
 })

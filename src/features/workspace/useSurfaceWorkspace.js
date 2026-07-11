@@ -26,14 +26,32 @@ export default function useSurfaceWorkspace(surface) {
   useEffect(() => {
     if (!legacyOrgId && !legacyRaceId) return
 
-    setWorkspaceSession(createWorkspaceSession({
+    const nextSession = createWorkspaceSession({
       ...session,
       orgId: legacyOrgId || session?.orgId || '',
       raceId: legacyRaceId || session?.raceId || '',
+      scopeType: legacyRaceId ? 'race' : session?.scopeType,
       surface,
-    }))
+    })
+    const sessionAlreadyMatches = session?.orgId === nextSession.orgId
+      && session?.raceId === nextSession.raceId
+      && session?.scopeType === nextSession.scopeType
+      && session?.surface === nextSession.surface
+
+    if (!sessionAlreadyMatches) setWorkspaceSession(nextSession)
     setSearchParams(cleanLegacySearch(searchParams), { replace: true })
-  }, [legacyOrgId, legacyRaceId, searchParams, session, setSearchParams, setWorkspaceSession, surface])
+  }, [
+    legacyOrgId,
+    legacyRaceId,
+    searchParams,
+    session?.orgId,
+    session?.raceId,
+    session?.scopeType,
+    session?.surface,
+    setSearchParams,
+    setWorkspaceSession,
+    surface,
+  ])
 
   useEffect(() => {
     const hasPlatformProfile = user?.role === 'super_admin' && user?.authzProfile?.scopeType === 'platform'

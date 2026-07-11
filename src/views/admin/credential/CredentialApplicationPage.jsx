@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { adminCredentialApi as credentialApi } from '../../../api/credential'
+import { Link } from 'react-router-dom'
 import useAuthStore from '../../../stores/authStore'
 import { useCredentialSurface } from './useCredentialSurface'
 import {
@@ -52,10 +51,7 @@ function formatNumber(value) {
 
 export default function CredentialApplicationPage() {
   const { user } = useAuthStore()
-  const [searchParams] = useSearchParams()
-  const raceId = searchParams.get('raceId')
-  const orgId = searchParams.get('orgId') || ''
-  const { buildHref } = useCredentialSurface()
+  const { buildHref, credentialApi, orgId, raceId } = useCredentialSurface()
   const context = useMemo(() => ({ orgId, raceId: raceId || '' }), [orgId, raceId])
 
   const [categories, setCategories] = useState([])
@@ -95,7 +91,7 @@ export default function CredentialApplicationPage() {
 
   useEffect(() => {
     void loadData()
-  }, [raceId, statusFilter])
+  }, [credentialApi, raceId, statusFilter])
 
   const currentCategory = useMemo(
     () => categories.find((item) => String(item.id) === String(form.categoryId)) || null,

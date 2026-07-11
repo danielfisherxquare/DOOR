@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { adminCredentialApi as credentialApi } from '../../../api/credential'
+import { Link } from 'react-router-dom'
 import { useCredentialSurface } from './useCredentialSurface'
 import {
   AdminDataTable,
@@ -24,10 +23,7 @@ const STATUS_LABELS = {
 }
 
 export default function CredentialCenterPage() {
-  const [searchParams] = useSearchParams()
-  const raceId = searchParams.get('raceId')
-  const orgId = searchParams.get('orgId') || ''
-  const { buildHref } = useCredentialSurface()
+  const { buildHref, credentialApi, orgId, raceId } = useCredentialSurface()
 
   const [categories, setCategories] = useState([])
   const [accessAreas, setAccessAreas] = useState([])
@@ -62,7 +58,7 @@ export default function CredentialCenterPage() {
     }
 
     void load()
-  }, [raceId])
+  }, [credentialApi, raceId])
 
   const metrics = useMemo(() => {
     const pendingCount = requests.filter((item) => ['submitted', 'under_review'].includes(item.status)).length
