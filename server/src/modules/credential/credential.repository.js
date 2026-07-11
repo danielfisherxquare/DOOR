@@ -33,9 +33,9 @@ export async function findAccessAreasByIds(orgId, raceId, ids = []) {
         .orderBy('access_code', 'asc');
 }
 
-export async function findAccessAreasByCodes(orgId, raceId, codes = []) {
+export async function findAccessAreasByCodes(orgId, raceId, codes = [], database = knex) {
     if (!Array.isArray(codes) || codes.length === 0) return [];
-    return knex('credential_access_areas')
+    return database('credential_access_areas')
         .where({ org_id: orgId, race_id: raceId })
         .whereIn('access_code', codes)
         .orderBy('sort_order', 'asc')
@@ -75,8 +75,8 @@ export async function findCategoriesByRaceId(orgId, raceId, options = {}) {
         .orderBy('cc.category_code', 'asc');
 }
 
-export async function findCategoryById(orgId, id) {
-    return knex('credential_categories').where({ org_id: orgId, id }).first();
+export async function findCategoryById(orgId, id, database = knex) {
+    return database('credential_categories').where({ org_id: orgId, id }).first();
 }
 
 export async function findCategoryByCode(orgId, raceId, categoryCode) {
@@ -187,6 +187,13 @@ export async function findRequestById(orgId, id) {
         );
 }
 
+export async function findRequestByIdForUpdate(trx, orgId, id) {
+    return trx('credential_requests')
+        .where({ org_id: orgId, id })
+        .forUpdate()
+        .first();
+}
+
 export async function findRequestByUserAndRace(orgId, userId, raceId) {
     return knex('credential_requests')
         .where({ org_id: orgId, applicant_user_id: userId, race_id: raceId })
@@ -214,8 +221,8 @@ export async function insertRequestAccessArea(trx, payload) {
     await (trx || knex)('credential_request_access_areas').insert(payload);
 }
 
-export async function findRequestAccessAreas(requestId) {
-    return knex('credential_request_access_areas')
+export async function findRequestAccessAreas(requestId, database = knex) {
+    return database('credential_request_access_areas')
         .where({ request_id: requestId })
         .orderBy('sort_order', 'asc')
         .orderBy('access_code', 'asc');
@@ -252,8 +259,8 @@ export async function findCredentialByQrPayload(qrPayload) {
     return knex('credential_credentials').where({ qr_payload: qrPayload }).first();
 }
 
-export async function findCredentialByRequestId(orgId, requestId) {
-    return knex('credential_credentials').where({ org_id: orgId, request_id: requestId }).first();
+export async function findCredentialByRequestId(orgId, requestId, database = knex) {
+    return database('credential_credentials').where({ org_id: orgId, request_id: requestId }).first();
 }
 
 export async function insertCredential(trx, payload) {

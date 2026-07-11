@@ -185,9 +185,9 @@ function mapCredentialCore(cred, accessAreas = []) {
     };
 }
 
-async function loadAccessAreasForCodes(orgId, raceId, accessCodes) {
+async function loadAccessAreasForCodes(orgId, raceId, accessCodes, database = knex) {
     for (const accessCode of accessCodes) assertNumericAccessCode(accessCode);
-    const accessAreas = await repo.findAccessAreasByCodes(orgId, raceId, accessCodes);
+    const accessAreas = await repo.findAccessAreasByCodes(orgId, raceId, accessCodes, database);
     if (accessAreas.length !== accessCodes.length) {
         const existingCodes = new Set(accessAreas.map((item) => item.access_code));
         const missingCode = accessCodes.find((code) => !existingCodes.has(code));
@@ -584,34 +584,104 @@ export async function reviewRequest(authContext, rawRaceId, rawRequestId, data) 
     const requestId = Number(rawRequestId);
     const access = await resolveRaceAccess(authContext, raceId, 'POST');
     ensureEditorAccess(access);
-    const current = await repo.findRequestById(access.operatorOrgId, requestId);
-    if (!current || Number(current.race_id) !== raceId) throw notFound('Request not found');
-    if (![REQUEST_STATUS.SUBMITTED, REQUEST_STATUS.UNDER_REVIEW, REQUEST_STATUS.APPROVED].includes(current.status)) {
-        throw badRequest('Request cannot be reviewed in current status');
-    }
     const approved = data.approved === true;
-    const category = data.categoryId !== undefined
-        ? await repo.findCategoryById(access.operatorOrgId, Number(data.categoryId))
-        : await repo.findCategoryById(access.operatorOrgId, Number(current.category_id));
-    if (!category || Number(category.race_id) !== raceId) throw badRequest('Invalid category');
-    const currentAreas = await repo.findRequestAccessAreas(requestId);
-    const accessAreas = data.accessCodes !== undefined
-        ? await loadAccessAreasForCodes(access.operatorOrgId, raceId, data.accessCodes)
-        : currentAreas;
+
     await knex.transaction(async (trx) => {
+        const current = await repo.findRequestByIdForUpdate(trx, access.operatorOrgId, requestId);
+        if (!current || Number(current.race_id) !== raceId) throw notFound('Request not found');
+        if (![REQUEST_STATUS.SUBMITTED, REQUEST_STATUS.UNDER_REVIEW, REQUEST_STATUS.APPROVED].includes(current.status)) {
+            throw badRequest('Request cannot be reviewed in current status');
+        }
+
+        const existingCredential = await repo.findCredentialByRequestId(access.operatorOrgId, requestId, trx);
+        if (existingCredential) throw badRequest('Request already has a generated credential');
+
+        const category = data.categoryId !== undefined
+            ? await repo.findCategoryById(access.operatorOrgId, Number(data.categoryId), trx)
+            : await repo.findCategoryById(access.operatorOrgId, Number(current.category_id), trx);
+        if (!category || Number(category.race_id) !== raceId) throw badRequest('Invalid category');
+
+        const currentAreas = await repo.findRequestAccessAreas(requestId, trx);
+        const accessAreas = data.accessCodes !== undefined
+            ? await loadAccessAreasForCodes(access.operatorOrgId, raceId, data.accessCodes, trx)
+            : currentAreas;
+
+        if (!approved) {
+            await repo.updateRequestById(trx, requestId, {
+                reviewer_user_id: authContext.userId,
+                reviewed_at: trx.fn.now(),
+                review_remark: null,
+                reject_reason: data.rejectReason || null,
+                status: REQUEST_STATUS.REJECTED,
+                category_id: category.id,
+                category_name: category.category_name,
+                category_color: category.card_color,
+                job_title: data.jobTitle !== undefined ? data.jobTitle : current.job_title,
+                updated_by: authContext.userId || null,
+            });
+            return;
+        }
+
+        await trx.raw('SELECT pg_advisory_xact_lock(hashtext(?))', [
+            `credential:${access.operatorOrgId}:${raceId}`,
+        ]);
+        const credentialNo = await generateCredentialNo(trx, raceId);
+        const credential = await repo.insertCredential(trx, {
+            org_id: access.operatorOrgId,
+            race_id: raceId,
+            application_id: null,
+            request_id: requestId,
+            credential_no: credentialNo,
+            role_name: category.category_name,
+            category_name: category.category_name,
+            category_color: category.card_color,
+            job_title: data.jobTitle !== undefined ? data.jobTitle : current.job_title,
+            person_name: current.person_name,
+            org_name: current.org_name,
+            default_zone_code: accessAreas[0]?.access_code || null,
+            template_snapshot_json: {},
+            map_snapshot_json: null,
+            qr_payload: '',
+            qr_version: 1,
+            status: CREDENTIAL_STATUS.GENERATED,
+            created_by: authContext.userId || null,
+            updated_by: authContext.userId || null,
+        });
+        await repo.updateCredentialById(trx, credential.id, {
+            qr_payload: generateQrPayload(
+                Number(credential.id),
+                credentialNo,
+                raceId,
+                access.operatorOrgId,
+                1,
+            ),
+        });
+        for (const [index, area] of accessAreas.entries()) {
+            await repo.insertCredentialAccessArea(trx, {
+                credential_id: credential.id,
+                access_area_id: area.id || area.access_area_id || null,
+                access_code: area.access_code,
+                access_name: area.access_name,
+                access_color: area.access_color,
+                geometry: area.geometry ?? null,
+                access_description: area.description ?? area.access_description ?? null,
+                sort_order: index,
+            });
+        }
+
         await repo.updateRequestById(trx, requestId, {
             reviewer_user_id: authContext.userId,
             reviewed_at: trx.fn.now(),
             review_remark: data.remark ?? null,
-            reject_reason: approved ? null : (data.rejectReason || null),
-            status: approved ? REQUEST_STATUS.APPROVED : REQUEST_STATUS.REJECTED,
+            reject_reason: null,
+            status: REQUEST_STATUS.GENERATED,
             category_id: category.id,
             category_name: category.category_name,
             category_color: category.card_color,
             job_title: data.jobTitle !== undefined ? data.jobTitle : current.job_title,
             updated_by: authContext.userId || null,
         });
-        if (approved) await replaceRequestAccessAreas(trx, requestId, accessAreas);
+        await replaceRequestAccessAreas(trx, requestId, accessAreas);
     });
     return loadRequestWithRelations(access.operatorOrgId, requestId);
 }

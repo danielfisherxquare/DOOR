@@ -223,7 +223,8 @@ test('access areas reject non-numeric access codes and categories return card co
         }),
     });
     assert.equal(reviewResponse.status, 200);
-    assert.equal(reviewResponse.body.data.status, 'approved');
+    assert.equal(reviewResponse.body.data.status, 'generated');
+    assert.ok(reviewResponse.body.data.credentialId);
 
     const requestDetail = await api(`/api/admin/credentials/requests/${raceId}/${requestCreate.body.data.id}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -269,5 +270,95 @@ test('app race operators can list and review credential requests for their race'
         }),
     });
     assert.equal(reviewed.status, 200);
-    assert.equal(reviewed.body.data.status, 'approved');
+    assert.equal(reviewed.body.data.status, 'generated');
+    assert.ok(reviewed.body.data.credentialId);
+    assert.equal(reviewed.body.data.credentialStatus, 'generated');
+
+    const credentials = await knex('credential_credentials')
+        .where({ request_id: created.body.data.id })
+        .select('*');
+    assert.equal(credentials.length, 1);
+    assert.equal(credentials[0].person_name, 'App Operator Request');
+    assert.equal(credentials[0].category_name, category.category_name);
+    assert.equal(credentials[0].job_title, 'Lead Course Marshal');
+    assert.equal(credentials[0].status, 'generated');
+
+    const credentialAreas = await knex('credential_credential_access_areas')
+        .where({ credential_id: credentials[0].id })
+        .select('access_code');
+    assert.deepEqual(credentialAreas.map((item) => item.access_code), ['101']);
+
+    const duplicateReview = await api(`/api/app/credentials/requests/${raceId}/${created.body.data.id}/review`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({
+            approved: true,
+            categoryId: category.id,
+            accessCodes: ['101'],
+        }),
+    });
+    assert.equal(duplicateReview.status, 400);
+    assert.equal(
+        Number((await knex('credential_credentials').where({ request_id: created.body.data.id }).count('* as count').first()).count),
+        1,
+    );
+});
+
+test('credential generation failure rolls the review back', async () => {
+    const auth = { Authorization: `Bearer ${operatorToken}` };
+    const category = await knex('credential_categories').where({ race_id: raceId }).first();
+    assert.ok(category);
+
+    const created = await api(`/api/app/credentials/requests/${raceId}`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({
+            sourceMode: 'admin_direct',
+            categoryId: category.id,
+            personName: 'Credential Rollback Probe',
+            orgName: 'Race Operations',
+            jobTitle: 'Rollback Tester',
+            accessCodes: ['101'],
+        }),
+    });
+    assert.equal(created.status, 201);
+    assert.equal(created.body.data.status, 'submitted');
+
+    await knex.raw(`
+        CREATE OR REPLACE FUNCTION fail_credential_generation_for_test()
+        RETURNS trigger AS $$
+        BEGIN
+            IF NEW.person_name = 'Credential Rollback Probe' THEN
+                RAISE EXCEPTION 'forced credential generation failure';
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+        CREATE TRIGGER credential_generation_failure_test_trigger
+        BEFORE INSERT ON credential_credentials
+        FOR EACH ROW EXECUTE FUNCTION fail_credential_generation_for_test();
+    `);
+
+    try {
+        const reviewed = await api(`/api/app/credentials/requests/${raceId}/${created.body.data.id}/review`, {
+            method: 'POST',
+            headers: auth,
+            body: JSON.stringify({
+                approved: true,
+                categoryId: category.id,
+                accessCodes: ['101'],
+            }),
+        });
+        assert.equal(reviewed.status, 500);
+    } finally {
+        await knex.raw('DROP TRIGGER IF EXISTS credential_generation_failure_test_trigger ON credential_credentials');
+        await knex.raw('DROP FUNCTION IF EXISTS fail_credential_generation_for_test()');
+    }
+
+    const request = await knex('credential_requests').where({ id: created.body.data.id }).first();
+    assert.equal(request.status, 'submitted');
+    assert.equal(
+        Number((await knex('credential_credentials').where({ request_id: created.body.data.id }).count('* as count').first()).count),
+        0,
+    );
 });
