@@ -151,7 +151,7 @@ test('map selection studio snapshot exports even without semantic objects', () =
 test('GIS object export batches include shared geometry preflight metadata', async () => {
   const zone = {
     ...focusZone,
-    id: 'zone-gis-preflight',
+    id: `zone-gis-preflight-${process.pid}`,
     snapshotJson: {
       ...focusZone.snapshotJson,
     },
