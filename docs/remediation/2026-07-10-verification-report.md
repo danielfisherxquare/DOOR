@@ -8,7 +8,7 @@
 
 **复验日期：** 2026-07-12
 
-**代码验收提交：** `b190eda17fef0218bf626435d948ac99a2e2c313`
+**代码验收提交：** `71af029e800a50bed4fb385d7c5016c35f44ece9`
 
 **当前完成度：** 98%
 
@@ -18,7 +18,7 @@
 
 | 问题 | 修复后的可观察结果 | 回归证据 |
 | --- | --- | --- |
-| 后端测试共享数据库，文件顺序变化会挂起或污染 | 每个 `*.test.js` 使用独立 `arcspro_test_<hash>` 数据库，执行后强制删除 | `npm test` 输出 `[isolated-db] PASS 104/104 files` |
+| 后端测试共享数据库，文件顺序变化会挂起或污染 | 每个 `*.test.js` 使用独立 `arcspro_test_<hash>` 数据库，执行后强制删除 | `npm test` 输出 `[isolated-db] PASS 105/105 files` |
 | race 权限继承、显式降权和共享赛事 profile 不一致 | owner、race_admin、组织授权和显式 viewer 降权按同一投影规则生效 | `org-race-permissions` 6/6；`permissions` 18/18 |
 | 姓名/电话/证件号搜索跨越加密边界 | 姓名保留模糊匹配；电话和证件号只走盲索引精确匹配；返回前按租户 AAD 解密 | `records-query` 18/18；`bib-tracking` 16/16 |
 | 已绑定库存对象可被重复绑定 | 重复绑定被拒绝，跨位置变更必须使用 move 流程 | `inventory-twin.integration` 通过 |
@@ -57,6 +57,7 @@
 | 报销控制器同时维护 OCR 请求配置、服务端付费配置、密钥遮罩和上游错误归一化 | 配置解析与响应整形拆入 `reimbursement-ocr-config.js`，控制器由 1116 行降至 956 行，并新增 1000 行架构门禁；保留原控制器导出兼容 | OCR 配置单测 4/4；控制器兼容与架构测试 11/11；后端隔离测试 102/102 |
 | 后端测试日志直接打印完整 JWT、解密后的手机号、证件号和盲索引片段 | 删除敏感值输出，新增递归扫描全部后端测试文件的日志安全门禁，阻止凭证或解密 PII 进入 `console` | 日志门禁与全链路加密测试 23/23；后端隔离测试 103/103；`records-query` 不再输出 token |
 | 设计协作导入服务同时承担权限事务、字段归一化、稳定键计算、Excel 输入解析和输出渲染 | 纯数据契约拆入 `design-collaboration-data.js`，Excel 读写拆入 `design-collaboration-workbook.js`；事务服务由 1316 行降至 906 行，新增 950 行门禁并禁止直接依赖 `exceljs` | 数据/工作簿与架构测试 8/8；设计协作完整路由 7/7；后端隔离测试 104/104 |
+| 考评服务重复维护两份默认模板，并混合输入归一化、报告统计、红线分级和数据库编排 | 默认模板、标题、名单与评分归一化、均值/方差及人才分级统一拆入 `assessment-domain.js`；service 由 1281 行降至 897 行并新增 950 行门禁 | 领域与架构测试 10/10，覆盖 S/A/B/C/D、单/双红线和公开错误契约；后端隔离测试 105/105；根测试与生产构建通过 |
 
 ## 2. 自动化门禁
 
@@ -255,4 +256,4 @@ app 单独重建后网关探测                20/20 通过，Nginx 容器未重
 4. 推送分支，远程 CI 全绿；
 5. 在远程候选环境重跑迁移、健康、备份恢复和镜像回退；
 6. 生产切换后验证 endpoint、静态 chunk、健康检查和关键业务抽样；
-7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `b190eda` 执行 333/333、设计协作数据/工作簿与架构测试 8/8、生产构建及边界检查；开发工作树使用专用 PostgreSQL 16 完成设计协作完整路由 7/7、报销数据库集成 14/14 和后端 104/104。该干净工作树在同一 lockfile 的上一代码节点执行 fresh `npm ci`，安装审计 0 vulnerabilities，且无跟踪改动。
+7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `71af029` 执行 333/333、考评领域与架构测试 10/10、format/lint/typecheck、编码/密钥扫描、生产构建及边界检查；开发工作树使用专用 PostgreSQL 16 完成后端隔离测试 105/105。该干净工作树在同一 lockfile 的上一代码节点执行 fresh `npm ci`，安装审计 0 vulnerabilities，且无跟踪改动。
