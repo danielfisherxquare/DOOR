@@ -114,6 +114,12 @@ describe('surface boundaries', () => {
     }
     assert.match(credentialHook, /createCredentialApi/)
 
+    const issuePage = read('src/views/admin/credential/CredentialIssuePage.jsx')
+    assert.doesNotMatch(issuePage, /adminCredentialApi/)
+    assert.doesNotMatch(issuePage, /useSearchParams/)
+    assert.match(issuePage, /credentialApi, orgId, raceId/)
+    assert.match(issuePage, /setCredentials\(res\.data \|\| \[\]\)/)
+
     const inventoryHook = read('src/views/inventory/useInventorySurface.js')
     assert.match(inventoryHook, /resolveSurfaceOrgId/)
     assert.match(inventoryHook, /useWorkspaceStore/)

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { adminCredentialApi as credentialApi } from '../../../api/credential'
+import { Link } from 'react-router-dom'
 import { useCredentialSurface } from './useCredentialSurface'
 import {
   AdminDataTable,
@@ -33,10 +32,7 @@ function formatNumber(value) {
 }
 
 export default function CredentialIssuePage() {
-  const [searchParams] = useSearchParams()
-  const raceId = searchParams.get('raceId')
-  const orgId = searchParams.get('orgId') || ''
-  const { buildHref } = useCredentialSurface()
+  const { buildHref, credentialApi, orgId, raceId } = useCredentialSurface()
   const context = useMemo(() => ({ orgId, raceId: raceId || '' }), [orgId, raceId])
 
   const [credentials, setCredentials] = useState([])
@@ -63,7 +59,7 @@ export default function CredentialIssuePage() {
       try {
         const res = await credentialApi.getCredentials(raceId, { status: statusFilter || undefined })
         if (res.success) {
-          setCredentials(res.data.items || [])
+          setCredentials(res.data || [])
         } else {
           setMessage(res.message || '加载证件列表失败')
         }
@@ -75,7 +71,7 @@ export default function CredentialIssuePage() {
     }
 
     void loadCredentials()
-  }, [raceId, statusFilter])
+  }, [credentialApi, raceId, statusFilter])
 
   const filteredCredentials = useMemo(() => {
     const keyword = searchKeyword.trim()

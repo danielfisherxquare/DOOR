@@ -411,7 +411,7 @@ const componentRoutes = [
   ['credential-applications', 'credential/applications', 'redirect-credential-requests', { moduleId: 'credentials' }],
   ['credential-requests', 'credential/requests', 'credential-requests'],
   ['credential-review', 'credential/review', 'credential-review'],
-  ['credential-issue', 'credential/issue', 'redirect-credential-center', { moduleId: 'credentials' }],
+  ['credential-issue', 'credential/issue', 'credential-issue', { moduleId: 'credentials' }],
   ['inventory-workbench', 'inventory', 'inventory-workbench'],
   ['inventory-inbound-center', 'inventory/inbound', 'inventory-inbound', { moduleId: 'inventory' }],
   ['inventory-outbound-center', 'inventory/outbound', 'inventory-outbound', { moduleId: 'inventory' }],

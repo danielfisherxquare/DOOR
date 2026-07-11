@@ -86,4 +86,10 @@ describe('surface route registries', () => {
     assert.equal(getAppRouteMeta('/app/profile').title, '个人资料')
     assert.equal(getAppRouteMeta('/app/profile').groupKey, 'account')
   })
+
+  it('routes app credential issuance to the real issuance workspace', () => {
+    const route = APP_ROUTE_REGISTRY.find((item) => item.key === 'credential-issue')
+    assert.equal(route?.componentKey, 'credential-issue')
+    assert.equal(route?.moduleId, 'credentials')
+  })
 })

@@ -26,6 +26,7 @@ const Reports = lazy(() => import('../views/inventory/Reports'))
 const CredentialCenterPage = lazy(() => import('../features/credential/app/CredentialCenterPage'))
 const CredentialApplicationPage = lazy(() => import('../features/credential/app/CredentialApplicationPage'))
 const CredentialReviewPage = lazy(() => import('../features/credential/app/CredentialReviewPage'))
+const CredentialIssuePage = lazy(() => import('../views/admin/credential/CredentialIssuePage'))
 const InterviewList = lazy(() => import('../views/interview/InterviewList'))
 const InterviewCompare = lazy(() => import('../views/interview/InterviewCompare'))
 const InterviewForm = lazy(() => import('../views/interview/InterviewForm'))
@@ -59,6 +60,7 @@ const simpleComponents = {
   'credential-center': CredentialCenterPage,
   'credential-requests': CredentialApplicationPage,
   'credential-review': CredentialReviewPage,
+  'credential-issue': CredentialIssuePage,
   'interview-list': InterviewList,
   'interview-compare': InterviewCompare,
   'interview-form': InterviewForm,
