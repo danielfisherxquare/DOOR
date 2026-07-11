@@ -334,7 +334,7 @@ export default function DatabaseBackupPage() {
       setUploadedFile(data.data)
       setMessage({
         type: 'success',
-        text: `已上传 ${data.data.filename}${envFile ? '，同时附带 .env 文件。' : '。'}`,
+        text: `已上传 ${data.data.filename}${envFile ? '，同时附带 .env 快照（不会自动应用）。' : '。'}`,
       })
       setEnvFile(null)
       if (envFileInputRef.current) envFileInputRef.current.value = ''
@@ -451,8 +451,8 @@ export default function DatabaseBackupPage() {
       <div className="command-grid command-grid--two">
         <CommandPanel
           title="上传恢复到测试库"
-          subtitle="仅支持 `.sql.gz`，恢复后会创建新的 `door_restore_*` 测试库。"
-          footer="恢复成功后仍需核对 users、orgs、races、records 与 knex_migrations 等核心表。"
+          subtitle="仅支持 PostgreSQL custom `.dump`，恢复后会创建新的 `door_restore_*` 测试库。"
+          footer="恢复成功后仍需核对 users、organizations、races、records 与 knex_migrations 等核心表。"
         >
           <div className="command-stack">
             <div className="command-actions-row">
@@ -460,7 +460,7 @@ export default function DatabaseBackupPage() {
                 {uploading ? '上传中...' : '选择恢复文件'}
               </button>
               <button className="btn btn--ghost" onClick={() => envFileInputRef.current?.click()} disabled={busy}>
-                {envFile ? '已附加 .env 文件' : '附加 .env 文件'}
+                {envFile ? '已附加 .env 快照' : '附加 .env 快照'}
               </button>
               <button className="btn btn--primary" onClick={handleStartRestore} disabled={!uploadedFile || busy}>
                 {startingRestore ? '恢复中...' : '恢复到测试库'}
@@ -487,7 +487,7 @@ export default function DatabaseBackupPage() {
             )}
 
             <CommandNotice tone="warning">
-              恢复不会直接覆盖生产数据库，但仍属于高风险动作，建议先在业务低峰期执行。
+              恢复不会覆盖生产数据库，也不会自动应用 .env；密钥快照仅随恢复记录保留，正式切换需按运维手册执行。
             </CommandNotice>
           </div>
         </CommandPanel>
@@ -536,6 +536,7 @@ export default function DatabaseBackupPage() {
                           <span>连接：{job.checks.connectivity ? '通过' : '失败'}</span>
                           <span>Migration：{job.checks.migrationTablePresent ? '存在' : '缺失'}</span>
                           <span>核心表：{job.checks.tablesPresent ? '齐全' : '缺失'}</span>
+                          <span>.env 快照：{job.envSnapshotProvided ? '已附加（未应用）' : '未附加'}</span>
                           {job.error ? <span style={{ color: 'var(--danger)' }}>错误：{job.error}</span> : null}
                         </div>
                       ) : (
@@ -553,7 +554,7 @@ export default function DatabaseBackupPage() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".sql.gz"
+        accept=".dump"
         style={{ display: 'none' }}
         onChange={handleUpload}
       />

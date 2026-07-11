@@ -28,7 +28,8 @@ export const env = {
   DATABASE_URL: process.env.DATABASE_URL || 'postgres://door:door_dev@localhost:5432/door',
   SUPER_ADMIN_USERNAME: process.env.SUPER_ADMIN_USERNAME || 'superadmin',
   SUPER_ADMIN_EMAIL: process.env.SUPER_ADMIN_EMAIL || 'admin@platform.local',
-  SUPER_ADMIN_PASSWORD: process.env.SUPER_ADMIN_PASSWORD || 'admin123',
+  SUPER_ADMIN_PASSWORD: process.env.SUPER_ADMIN_PASSWORD
+    || (process.env.NODE_ENV === 'production' ? '' : 'admin123'),
   // 安全敏感配置：生产环境必须设置
   JWT_SECRET: requireEnv('JWT_SECRET') || 'door-secret-key-dev-only',
   ASSESSMENT_FIELD_ENCRYPTION_KEY: requireEnv('ASSESSMENT_FIELD_ENCRYPTION_KEY') || 'door-assessment-field-encryption-key-dev',

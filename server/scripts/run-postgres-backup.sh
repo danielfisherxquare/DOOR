@@ -22,7 +22,7 @@ DB_OPS_LOCK_DIR="${DB_OPS_LOCK_DIR:-/tmp/door-db-ops.lock}"
 DATABASE_URL="${DATABASE_URL:-postgres://door:door_dev@postgres:5432/door}"
 FILE_PREFIX="${BACKUP_FILE_PREFIX:-door_backup}"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-FILENAME="${FILE_PREFIX}_${TIMESTAMP}.sql.gz"
+FILENAME="${FILE_PREFIX}_${TIMESTAMP}.dump"
 TARGET_PATH="${BACKUP_DIR}/${FILENAME}"
 TMP_PATH="${TARGET_PATH}.tmp"
 META_PATH="${BACKUP_DIR}/${FILE_PREFIX}_${TIMESTAMP}.meta.json"
@@ -51,7 +51,7 @@ fi
 
 trap cleanup EXIT
 
-pg_dump "${DATABASE_URL}" | gzip -c > "${TMP_PATH}"
+pg_dump --format=custom --no-owner --no-acl --file="${TMP_PATH}" "${DATABASE_URL}"
 
 if [[ ! -s "${TMP_PATH}" ]]; then
   echo "Backup file is empty" >&2
@@ -81,7 +81,7 @@ cat > "${META_PATH}" <<EOF
   "createdAt": "${CREATED_AT}",
   "sizeBytes": ${SIZE_BYTES},
   "database": "door",
-  "format": "sql.gz",
+  "format": "pg-custom",
   "trigger": "${TRIGGER}",
   "status": "success",
   "sha256": "${SHA256}"$(if [[ ${ENV_SIZE} -gt 0 ]]; then echo ",
@@ -94,7 +94,7 @@ mapfile -t META_FILES < <(find "${BACKUP_DIR}" -maxdepth 1 -type f -name "${FILE
 if (( ${#META_FILES[@]} > BACKUP_RETENTION_COUNT )); then
   for META in "${META_FILES[@]:BACKUP_RETENTION_COUNT}"; do
     BASE="${META%.meta.json}"
-    rm -f "${META}" "${BASE}.sql.gz" "${BASE}.env"
+    rm -f "${META}" "${BASE}.dump" "${BASE}.sql.gz" "${BASE}.env"
   done
 fi
 

@@ -16,7 +16,7 @@ const serverRoot = path.resolve(__dirname, '../../..');
 const scriptsDir = path.resolve(serverRoot, 'scripts');
 const backupScriptPath = path.join(scriptsDir, 'run-postgres-backup.sh');
 const restoreScriptPath = path.join(scriptsDir, 'run-postgres-restore.sh');
-const backupFilenameRegex = /^door_backup_\d{8}_\d{6}\.sql\.gz$/;
+const backupFilenameRegex = /^door_backup_\d{8}_\d{6}\.(?:dump|sql\.gz)$/;
 const envFilenameRegex = /^door_backup_\d{8}_\d{6}\.env$/;
 
 function createHttpError(status, message, expose = true) {
@@ -275,15 +275,15 @@ export const uploadMiddleware = multer({
       ensureStorageDirs().then(() => cb(null, resolveUploadDir())).catch((error) => cb(error));
     },
     filename: (_req, file, cb) => {
-      const ext = String(file.originalname || '').toLowerCase().endsWith('.env') ? '.env' : '.sql.gz';
+      const ext = String(file.originalname || '').toLowerCase().endsWith('.env') ? '.env' : '.dump';
       cb(null, `${Date.now()}-${randomUUID()}${ext}`);
     },
   }),
   limits: { fileSize: 2 * 1024 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const name = String(file.originalname || '').toLowerCase();
-    if (!name.endsWith('.sql.gz') && !name.endsWith('.env')) {
-      cb(createHttpError(400, '仅支持上传 .sql.gz 备份文件或 .env 配置文件'));
+    if (!name.endsWith('.dump') && !name.endsWith('.env')) {
+      cb(createHttpError(400, '仅支持上传 PostgreSQL custom .dump 备份或 .env 快照'));
       return;
     }
     cb(null, true);
@@ -360,6 +360,7 @@ export async function startRestore(uploadId) {
     startedAt: now.toISOString(),
     finishedAt: null,
     checks: null,
+    envSnapshotProvided: Boolean(upload.envFilePath),
     error: null,
   };
 
@@ -426,14 +427,18 @@ export async function startRestore(uploadId) {
         finishedAt,
         restoredAt: result?.restoredAt || finishedAt,
         checks: result?.checks || null,
+        envSnapshotProvided: Boolean(result?.envSnapshotProvided),
       }));
       return;
     }
 
+    const result = await safeReadJson(resultFile);
     await updateRestoreJob(jobId, (current) => ({
       ...current,
       status: 'failed',
       finishedAt,
+      checks: result?.checks || current.checks,
+      envSnapshotProvided: Boolean(result?.envSnapshotProvided ?? current.envSnapshotProvided),
       error: (stderr || stdout || '恢复任务失败').trim(),
     }));
   });

@@ -1,7 +1,6 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: door-postgres
     environment:
       POSTGRES_DB: door
       POSTGRES_USER: door
@@ -10,7 +9,7 @@ services:
       # ⚠️ 绑定挂载到宿主机目录，docker compose down -v 不会删除
       - ${PGDATA_HOST_DIR:-./pgdata}:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U door" ]
       interval: 5s
@@ -18,23 +17,41 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: door-redis
     command: [ "redis-server", "--save", "", "--appendonly", "no" ]
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       retries: 5
 
+  migrate:
+    image: arcspro-server-app:latest
+    command: [ "npm", "run", "migrate" ]
+    healthcheck:
+      disable: true
+    environment:
+      DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   app:
     image: arcspro-server-app:latest
-    build: .
-    container_name: arcspro-app
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
     command: [ "node", "src/index.js" ]
     ports:
-      - "3001:3001"
+      - "${APP_PORT:-3001}:3001"
     environment:
       DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
+      ASSESSMENT_FIELD_ENCRYPTION_KEY: ${ASSESSMENT_FIELD_ENCRYPTION_KEY:-}
+      ASSESSMENT_SESSION_JWT_SECRET: ${ASSESSMENT_SESSION_JWT_SECRET:-}
+      ASSESSMENT_HASH_PEPPER: ${ASSESSMENT_HASH_PEPPER:-}
+      SUPER_ADMIN_USERNAME: ${SUPER_ADMIN_USERNAME:-superadmin}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL:-admin@platform.local}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-}
       NODE_ENV: ${NODE_ENV:-development}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       AUTHZ_PROVIDER: ${AUTHZ_PROVIDER:-}
@@ -55,6 +72,7 @@ services:
       BACKUP_DIR: ${BACKUP_DIR:-/backups}
       BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-10}
       RESTORE_UPLOAD_DIR: ${RESTORE_UPLOAD_DIR:-/backups/uploads}
+      DB_OPS_LOCK_DIR: ${DB_OPS_LOCK_DIR:-/backups/.db-ops.lock}
       REIMBURSEMENT_OCR_PROVIDER: ${REIMBURSEMENT_OCR_PROVIDER:-qwen}
       REIMBURSEMENT_OCR_BASE_URL: ${REIMBURSEMENT_OCR_BASE_URL:-}
       REIMBURSEMENT_OCR_API_KEY: ${REIMBURSEMENT_OCR_API_KEY:-}
@@ -66,6 +84,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3001/api/health/ready || exit 1" ]
       interval: 30s
@@ -74,17 +94,21 @@ services:
       retries: 3
     volumes:
       - ${HOST_BACKUP_DIR:-./backups}:${BACKUP_DIR:-/backups}
-      - ./storage:/app/storage
+      - ./storage:/app/server/storage
       # Required for .env backup to function correctly inside the container
-      - ./.env:/app/.env:ro
+      - ./.env:/app/server/.env:ro
 
   worker:
     image: arcspro-server-app:latest
-    container_name: door-worker
     command: [ "node", "src/worker.js" ]
+    healthcheck:
+      disable: true
     environment:
       DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
+      ASSESSMENT_FIELD_ENCRYPTION_KEY: ${ASSESSMENT_FIELD_ENCRYPTION_KEY:-}
+      ASSESSMENT_SESSION_JWT_SECRET: ${ASSESSMENT_SESSION_JWT_SECRET:-}
+      ASSESSMENT_HASH_PEPPER: ${ASSESSMENT_HASH_PEPPER:-}
       NODE_ENV: ${NODE_ENV:-development}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       AUTHZ_PROVIDER: ${AUTHZ_PROVIDER:-}
@@ -107,25 +131,28 @@ services:
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
     volumes:
-      - ./storage:/app/storage
+      - ./storage:/app/server/storage
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   # 自动备份：每 6 小时调用现有备份脚本，与 Web 后台完全集成
   pg-backup:
     image: arcspro-server-app:latest
-    container_name: door-pg-backup
+    healthcheck:
+      disable: true
     environment:
       DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
       BACKUP_DIR: ${BACKUP_DIR:-/backups}
       BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-20}
-      DB_OPS_LOCK_DIR: /tmp/door-db-ops.lock
+      DB_OPS_LOCK_DIR: ${DB_OPS_LOCK_DIR:-/backups/.db-ops.lock}
     volumes:
       - ${HOST_BACKUP_DIR:-./backups}:${BACKUP_DIR:-/backups}
-      - ./.env:/app/.env:ro
+      - ./.env:/app/server/.env:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -138,7 +165,7 @@ services:
         echo "[auto-backup] 保留策略: 最近 $${BACKUP_RETENTION_COUNT} 份"
         while true; do
           echo "[auto-backup] 开始备份 ($$(date '+%Y-%m-%d %H:%M:%S'))"
-          bash /app/scripts/run-postgres-backup.sh --trigger auto 2>&1 && \
+          bash /app/server/scripts/run-postgres-backup.sh --trigger auto 2>&1 && \
             echo "[auto-backup] ✅ 备份成功" || \
             echo "[auto-backup] ❌ 备份失败"
           echo "[auto-backup] 下次备份: 6小时后"
@@ -148,10 +175,9 @@ services:
 
   nginx:
     image: nginx:alpine
-    container_name: door-nginx
     ports:
-      - "80:80"
-      - "443:443"
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
       - ../dist:/usr/share/nginx/html:ro

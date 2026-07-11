@@ -1,0 +1,12 @@
+.git
+.worktrees
+node_modules
+dist
+coverage
+*.log
+.env
+.env.*
+server/backups
+server/pgdata
+server/storage
+server/test-output

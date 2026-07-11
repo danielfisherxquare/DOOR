@@ -44,9 +44,23 @@ if [[ ! -f "${INPUT_PATH}" ]]; then
   exit 1
 fi
 
-if [[ "${INPUT_PATH}" != *.sql.gz ]]; then
-  echo "Only .sql.gz backups are supported" >&2
+if [[ "${INPUT_PATH}" != *.dump ]]; then
+  echo "Only PostgreSQL custom .dump archives are supported" >&2
   exit 1
+fi
+
+if [[ ! "${TARGET_DB}" =~ ^door_restore_[A-Za-z0-9_]{1,48}$ ]]; then
+  echo "Unsafe restore target database name: ${TARGET_DB}" >&2
+  exit 1
+fi
+
+ENV_SNAPSHOT_PROVIDED=false
+if [[ -n "${ENV_FILE}" ]]; then
+  if [[ ! -f "${ENV_FILE}" ]]; then
+    echo "Environment snapshot not found: ${ENV_FILE}" >&2
+    exit 1
+  fi
+  ENV_SNAPSHOT_PROVIDED=true
 fi
 
 if ! mkdir "${DB_OPS_LOCK_DIR}" 2>/dev/null; then
@@ -55,10 +69,23 @@ if ! mkdir "${DB_OPS_LOCK_DIR}" 2>/dev/null; then
 fi
 
 cleanup() {
+  rm -f "${ARCHIVE_LIST_PATH:-}"
   rmdir "${DB_OPS_LOCK_DIR}" 2>/dev/null || true
 }
 
 trap cleanup EXIT
+
+ARCHIVE_LIST_PATH="${RESULT_FILE}.toc.tmp"
+if ! pg_restore --list "${INPUT_PATH}" > "${ARCHIVE_LIST_PATH}"; then
+  echo "Invalid PostgreSQL custom archive: ${INPUT_PATH}" >&2
+  exit 1
+fi
+
+UNSAFE_ARCHIVE_LINE="$(grep -E '^[0-9-]+; [0-9]+ [0-9]+ (DATABASE( PROPERTIES)?|TABLESPACE|EXTENSION|PROCEDURAL LANGUAGE|FUNCTION|PROCEDURE|TRIGGER|EVENT TRIGGER|FOREIGN DATA WRAPPER|SERVER|USER MAPPING|PUBLICATION|SUBSCRIPTION)( |$)' "${ARCHIVE_LIST_PATH}" | head -n 1 || true)"
+if [[ -n "${UNSAFE_ARCHIVE_LINE}" ]]; then
+  echo "Unsafe archive object type: ${UNSAFE_ARCHIVE_LINE}" >&2
+  exit 1
+fi
 
 DB_EXISTS="$(psql "${ADMIN_DATABASE_URL}" -tAc "SELECT 1 FROM pg_database WHERE datname = '${TARGET_DB}'" | tr -d '[:space:]')"
 if [[ "${DB_EXISTS}" == "1" ]]; then
@@ -67,7 +94,12 @@ if [[ "${DB_EXISTS}" == "1" ]]; then
 fi
 
 psql "${ADMIN_DATABASE_URL}" -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"${TARGET_DB}\";"
-gzip -dc "${INPUT_PATH}" | psql "${DATABASE_URL%/*}/${TARGET_DB}" -v ON_ERROR_STOP=1 >/dev/null
+pg_restore \
+  --exit-on-error \
+  --no-owner \
+  --no-acl \
+  --dbname="${DATABASE_URL%/*}/${TARGET_DB}" \
+  "${INPUT_PATH}" >/dev/null
 
 CONNECTIVITY=false
 MIGRATION_TABLE_PRESENT=false
@@ -81,30 +113,18 @@ if [[ "$(psql "${DATABASE_URL%/*}/${TARGET_DB}" -tAc "SELECT to_regclass('public
   MIGRATION_TABLE_PRESENT=true
 fi
 
-TABLE_COUNT="$(psql "${DATABASE_URL%/*}/${TARGET_DB}" -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('users', 'orgs', 'races', 'records')" | tr -d '[:space:]')"
+TABLE_COUNT="$(psql "${DATABASE_URL%/*}/${TARGET_DB}" -tAc "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('users', 'organizations', 'races', 'records')" | tr -d '[:space:]')"
 if [[ "${TABLE_COUNT}" == "4" ]]; then
   TABLES_PRESENT=true
 fi
 
 RESTORED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-# ── 还原 .env 文件 ──────────────────────────────────────────────
-ENV_RESTORED=false
-if [[ -n "${ENV_FILE}" && -f "${ENV_FILE}" ]]; then
-  ENV_DST="$(cd "$(dirname "$0")/.." && pwd)/.env"
-  if [[ -f "${ENV_DST}" ]]; then
-    cp "${ENV_DST}" "${ENV_DST}.bak.$(date +%s)"
-  fi
-  cp "${ENV_FILE}" "${ENV_DST}"
-  chmod 600 "${ENV_DST}"
-  ENV_RESTORED=true
-fi
-
 cat > "${RESULT_FILE}" <<EOF
 {
   "targetDatabase": "${TARGET_DB}",
   "restoredAt": "${RESTORED_AT}",
-  "envRestored": ${ENV_RESTORED},
+  "envSnapshotProvided": ${ENV_SNAPSHOT_PROVIDED},
   "checks": {
     "connectivity": ${CONNECTIVITY},
     "migrationTablePresent": ${MIGRATION_TABLE_PRESENT},
@@ -112,3 +132,8 @@ cat > "${RESULT_FILE}" <<EOF
   }
 }
 EOF
+
+if [[ "${CONNECTIVITY}" != "true" || "${MIGRATION_TABLE_PRESENT}" != "true" || "${TABLES_PRESENT}" != "true" ]]; then
+  echo "Restore verification failed for ${TARGET_DB}" >&2
+  exit 1
+fi

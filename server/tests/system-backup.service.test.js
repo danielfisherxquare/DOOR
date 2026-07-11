@@ -10,6 +10,7 @@ import {
 } from '../src/modules/system-backups/system-backup.schema.js';
 
 test('accepts valid backup filenames', () => {
+  assert.equal(isValidBackupFilename('door_backup_20260314_033000.dump'), true);
   assert.equal(isValidBackupFilename('door_backup_20260314_033000.sql.gz'), true);
 });
 

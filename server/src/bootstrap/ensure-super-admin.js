@@ -22,6 +22,10 @@ export async function ensureSuperAdmin() {
         return { created: false, reason: 'non_empty_users_table' };
     }
 
+    if (!env.SUPER_ADMIN_PASSWORD) {
+        return { created: false, reason: 'missing_seed_password' };
+    }
+
     const passwordHash = await bcrypt.hash(env.SUPER_ADMIN_PASSWORD, 10);
     const [createdUser] = await knex('users')
         .insert({
@@ -31,7 +35,7 @@ export async function ensureSuperAdmin() {
             password_hash: passwordHash,
             role: 'super_admin',
             status: 'active',
-            must_change_password: false,
+            must_change_password: true,
         })
         .returning(['id', 'username', 'email']);
 
