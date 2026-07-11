@@ -9,6 +9,10 @@ const requireCredentialAdmin = authorize({
   action: 'assume',
   resource: { kind: 'role', roles: ['org_admin', 'super_admin'] },
 })
+const requireCredentialOperator = authorize({
+  action: 'assume',
+  resource: { kind: 'role', roles: ['race_admin', 'org_admin', 'super_admin'] },
+})
 
 router.get(
   '/access-areas/:raceId',
@@ -69,7 +73,7 @@ router.delete(
 )
 router.get(
   '/requests/:raceId',
-  requireCredentialAdmin,
+  requireCredentialOperator,
   requireRaceAccess('raceId'),
   credentialController.getRequests,
 )
@@ -86,7 +90,7 @@ router.post(
     businessType: 'UPDATE',
     titleFactory: (req) => `审核证件申请: ${req.params?.requestId || ''}`,
   }),
-  requireCredentialAdmin,
+  requireCredentialOperator,
   requireRaceAccess('raceId'),
   credentialController.reviewRequest,
 )

@@ -11,6 +11,7 @@ const { default: app } = await import('../src/app.js');
 let server;
 let baseUrl;
 let token;
+let operatorToken;
 let raceId;
 
 async function api(path, options = {}) {
@@ -18,6 +19,7 @@ async function api(path, options = {}) {
         ...options,
         headers: {
             'Content-Type': 'application/json',
+            Connection: 'close',
             ...(options.headers || {}),
         },
     });
@@ -59,6 +61,7 @@ before(async () => {
     await knex('credential_zones').del();
     await knex('user_race_permissions').del();
     await knex('org_race_permissions').del();
+    await knex('user_module_access').del();
     await knex('refresh_tokens').del();
     await knex('users').del();
     await knex('races').del();
@@ -86,6 +89,19 @@ before(async () => {
         module_id: 'admin:credentials',
         granted_by: admin.id,
     });
+    const operator = await createUser({
+        username: 'credential_route_operator',
+        email: 'credential_route_operator@test.com',
+        password: 'operator123',
+        role: 'race_admin',
+        orgId: org.id,
+    });
+    await knex('user_module_access').insert({
+        user_id: operator.id,
+        org_id: org.id,
+        module_id: 'app:credentials',
+        granted_by: admin.id,
+    });
 
     server = app.listen(0);
     baseUrl = `http://localhost:${server.address().port}`;
@@ -96,9 +112,21 @@ before(async () => {
     });
     assert.equal(login.status, 200);
     token = login.body.data.accessToken;
+    const operatorLogin = await api('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ login: 'credential_route_operator', password: 'operator123' }),
+    });
+    assert.equal(operatorLogin.status, 200);
+    operatorToken = operatorLogin.body.data.accessToken;
 });
 
 after(async () => {
+    if (server) {
+        await new Promise((resolve) => {
+            server.close(resolve);
+            server.closeAllConnections?.();
+        });
+    }
     await knex('credential_credential_access_areas').del();
     await knex('credential_request_access_areas').del();
     await knex('credential_requests').del();
@@ -115,11 +143,11 @@ after(async () => {
     await knex('credential_zones').del();
     await knex('user_race_permissions').del();
     await knex('org_race_permissions').del();
+    await knex('user_module_access').del();
     await knex('refresh_tokens').del();
     await knex('users').del();
     await knex('races').del();
     await knex('organizations').del();
-    server?.close();
     await knex.destroy();
 });
 
@@ -204,4 +232,42 @@ test('access areas reject non-numeric access codes and categories return card co
     assert.equal(requestDetail.body.data.categoryName, 'Media');
     assert.equal(requestDetail.body.data.categoryColor, '#abcdef');
     assert.equal(requestDetail.body.data.jobTitle, 'Lead Photographer');
+});
+
+test('app race operators can list and review credential requests for their race', async () => {
+    const auth = { Authorization: `Bearer ${operatorToken}` };
+    const category = await knex('credential_categories').where({ race_id: raceId }).first();
+    assert.ok(category);
+
+    const created = await api(`/api/app/credentials/requests/${raceId}`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({
+            sourceMode: 'admin_direct',
+            categoryId: category.id,
+            personName: 'App Operator Request',
+            orgName: 'Race Operations',
+            jobTitle: 'Course Marshal',
+            accessCodes: ['101'],
+        }),
+    });
+    assert.equal(created.status, 201);
+
+    const list = await api(`/api/app/credentials/requests/${raceId}`, { headers: auth });
+    assert.equal(list.status, 200);
+    assert.equal(list.body.data.some((item) => item.id === created.body.data.id), true);
+
+    const reviewed = await api(`/api/app/credentials/requests/${raceId}/${created.body.data.id}/review`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({
+            approved: true,
+            categoryId: category.id,
+            jobTitle: 'Lead Course Marshal',
+            accessCodes: ['101'],
+            remark: 'Approved in app workspace',
+        }),
+    });
+    assert.equal(reviewed.status, 200);
+    assert.equal(reviewed.body.data.status, 'approved');
 });
