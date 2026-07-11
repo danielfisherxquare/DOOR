@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import lotteryApi from '../../../../api/lottery'
-import racesApi from '../../../../api/races'
+import appRacesApi from '../../../../api/appRaces'
 import recordsApi, { fetchAllRecords } from '../../../../api/records'
 import { isWildcard, buildResolvedEntries, applyStatusesForEntries } from '../../../../utils/listMatching'
 import { parseListExcel } from '../../../../utils/excelProcessor'
@@ -42,7 +42,7 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
       const [listsResponse, statsResponse, raceResponse] = await Promise.all([
         lotteryApi.getLotteryLists(Number(raceId)),
         recordsApi.quickStats(Number(raceId)).catch(() => null),
-        raceDetail ? Promise.resolve({ data: raceDetail }) : racesApi.getById(Number(raceId)).catch(() => null),
+        raceDetail ? Promise.resolve({ data: raceDetail }) : appRacesApi.getById(Number(raceId)).catch(() => null),
       ])
 
       setListEntries(Array.isArray(listsResponse?.data) ? listsResponse.data : [])
@@ -118,7 +118,7 @@ export default function LotteryListsPanel({ raceId, raceDetail, onDataChanged })
 
   const handleConflictRuleChange = useCallback(async (nextRule) => {
     try {
-      await racesApi.update(Number(raceId), { conflictRule: nextRule })
+      await appRacesApi.updateConflictRule(Number(raceId), nextRule)
       setConflictRule(nextRule)
       setMessage(`已切换到${nextRule === 'strict' ? '严格' : '宽松'}模式，正在重新应用名单规则。`)
       setMessageTone('success')

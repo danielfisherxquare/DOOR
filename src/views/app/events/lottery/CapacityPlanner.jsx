@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import racesApi from '../../../../api/races'
+import appRacesApi from '../../../../api/appRaces'
 import lotteryApi from '../../../../api/lottery'
 import {
   AppH5EmptyState,
@@ -106,9 +106,7 @@ export default function CapacityPlanner({ raceId, raceDetail, preview, onUpdated
     setSaving(true)
     setMessage('')
     try {
-      await racesApi.update(Number(raceId), {
-        lotteryModeDefault: raceMode,
-      })
+      await appRacesApi.updateLotteryMode(Number(raceId), raceMode)
 
       const existingResponse = await lotteryApi.getRaceCapacity(Number(raceId))
       const existing = Array.isArray(existingResponse?.data) ? existingResponse.data : []

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import pipelineApi from '../../../../api/pipeline'
-import racesApi from '../../../../api/races'
+import appRacesApi from '../../../../api/appRaces'
 import useAuthStore from '../../../../stores/authStore'
 import useRaceContextStore from '../../../../stores/raceContextStore'
 import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
@@ -47,7 +47,7 @@ export default function LotteryPage() {
     setLoading(true)
     try {
       const [raceResponse, previewResponse] = await Promise.all([
-        racesApi.getById(Number(raceId)),
+        appRacesApi.getById(Number(raceId)),
         pipelineApi.getPreview(Number(raceId)),
       ])
       setRaceDetail(raceResponse?.data || null)

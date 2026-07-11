@@ -60,6 +60,29 @@ describe('API path ownership', () => {
     assert.match(appSource, /app\.use\('\/api\/app\/races\/dashboard'/)
   })
 
+  it('keeps app race context and lottery mode off admin race CRUD routes', async () => {
+    const [appRaceApiSource, appSource] = await Promise.all([
+      source('src/api/appRaces.js'),
+      source('server/src/app.js'),
+    ])
+
+    assert.match(appRaceApiSource, /['"`]\/app\/races/)
+    assert.match(appRaceApiSource, /lottery-mode/)
+    assert.doesNotMatch(appRaceApiSource, /['"`]\/admin\/races/)
+    assert.match(appSource, /app\.use\('\/api\/app\/races', appModule\('events'\)/)
+
+    for (const relativePath of [
+      'src/views/app/events/processing/ProcessingCenterPage.jsx',
+      'src/views/app/events/processing/LotteryListsPanel.jsx',
+      'src/views/app/events/lottery/LotteryPage.jsx',
+      'src/views/app/events/lottery/CapacityPlanner.jsx',
+    ]) {
+      const viewSource = await source(relativePath)
+      assert.doesNotMatch(viewSource, /api\/races/, relativePath)
+      assert.match(viewSource, /appRacesApi/, relativePath)
+    }
+  })
+
   it('keeps app project planning on an app-owned backend route', async () => {
     const projectsSource = await source('src/api/projects.js')
     const appSource = await source('server/src/app.js')

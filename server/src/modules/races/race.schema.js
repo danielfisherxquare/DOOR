@@ -1,4 +1,4 @@
-import { pickFields, validationError } from '../../lib/http/validation.js';
+import { pickFields, requireRecord, validationError } from '../../lib/http/validation.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -147,4 +147,37 @@ export function parseRaceUpdatePayload(value) {
 export function parseRaceListFilters(value = {}) {
   const query = pickFields(value, ['orgId'], { label: '查询参数' });
   return compact({ orgId: uuid(query.orgId, 'orgId', { optional: true }) });
+}
+
+export function parseRaceLotteryModePayload(value) {
+  const record = requireRecord(value);
+  const unknownFields = Object.keys(record).filter((key) => key !== 'lotteryModeDefault');
+  if (unknownFields.length > 0) {
+    invalid(`不支持修改字段：${unknownFields.join('、')}`);
+  }
+  if (!Object.hasOwn(record, 'lotteryModeDefault')) {
+    invalid('lotteryModeDefault 不能为空');
+  }
+  return {
+    lotteryModeDefault: option(
+      record.lotteryModeDefault,
+      'lotteryModeDefault',
+      lotteryModes,
+      { fallback: 'lottery' },
+    ),
+  };
+}
+
+export function parseRaceConflictRulePayload(value) {
+  const record = requireRecord(value);
+  const unknownFields = Object.keys(record).filter((key) => key !== 'conflictRule');
+  if (unknownFields.length > 0) {
+    invalid(`不支持修改字段：${unknownFields.join('、')}`);
+  }
+  if (!Object.hasOwn(record, 'conflictRule')) {
+    invalid('conflictRule 不能为空');
+  }
+  return {
+    conflictRule: option(record.conflictRule, 'conflictRule', conflictRules),
+  };
 }

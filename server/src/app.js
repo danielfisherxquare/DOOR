@@ -11,6 +11,7 @@ import jobRoutes from './modules/jobs/job.routes.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import raceRoutes from './modules/races/race.routes.js';
 import raceDashboardRoutes from './modules/races/race-dashboard/race-dashboard.routes.js';
+import raceAppRoutes from './modules/races/race-app.routes.js';
 import recordRoutes from './modules/records/record.routes.js';
 import columnMappingRoutes from './modules/column-mappings/column-mapping.routes.js';
 import importSessionRoutes from './modules/import-sessions/import-session.routes.js';
@@ -129,6 +130,7 @@ const adminModule = (moduleId) => requireAuthz({ surface: 'admin', moduleId, sco
 
 app.use('/api/app/jobs', appModule('events'), jobRoutes);
 app.use('/api/app/races/dashboard', appModule('events'), raceDashboardRoutes);
+app.use('/api/app/races', appModule('events'), raceAppRoutes);
 app.use('/api/app/records', appModule('events'), recordRoutes);
 app.use('/api/app/column-mappings', appModule('events'), columnMappingRoutes);
 app.use('/api/app/import-sessions', appModule('events'), importSessionRoutes);

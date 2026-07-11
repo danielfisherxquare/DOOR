@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import racesApi from '../../../../api/races'
+import appRacesApi from '../../../../api/appRaces'
 import useAuthStore from '../../../../stores/authStore'
 import useRaceContextStore from '../../../../stores/raceContextStore'
 import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
@@ -46,7 +46,7 @@ export default function ProcessingCenterPage() {
 
     let alive = true
 
-    racesApi.getById(Number(raceId))
+    appRacesApi.getById(Number(raceId))
       .then((response) => {
         if (!alive) return
         setRaceDetail(response?.data || null)
