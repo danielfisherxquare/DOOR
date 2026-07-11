@@ -8,7 +8,7 @@
 
 **复验日期：** 2026-07-11
 
-**代码验收提交：** `5a75c879934dba9c272144bfd74217f896f7773c`
+**代码验收提交：** `a54c2b9bc0eae16d069628a6c67c9f4f4fbeb919`
 
 **当前完成度：** 97%
 
@@ -45,7 +45,9 @@
 | 报销 OCR 元数据合并在主服务和预览服务重复实现 | `isPlainObject` 与 `mergeRecordOcrMeta` 收敛到 `reimbursement-ocr-meta.js` | 元数据单测 3/3；报销服务与预览集成测试通过 |
 | 报销预览服务同时负责导出风险分析和 Excel 工作表渲染 | 214 行导出检查逻辑拆入 `reimbursement-export-checks.js`，预览服务由 1405 行降到 1193 行 | 导出检查单测 2/2；预览集成测试 14/14 |
 | 报销主服务同时维护处理队列、状态统计和业务记录 | 处理记录职责拆入 `reimbursement-processing.service.js`，主服务由 1574 行降到 1442 行，并增加 1450 行回退门禁 | 处理 API 门面测试、报销集成测试 14/14、架构测试通过 |
-| 赛事分布饼图导入完整 ECharts 和未使用的 React wrapper | 只注册 Pie、Legend、Tooltip、Canvas，并移除 `echarts-for-react` | `vendor-echarts` 由约 1118 kB 降至 443.08 kB；根测试 312/312；生产构建通过 |
+| 赛事分布饼图导入完整 ECharts 和未使用的 React wrapper | 只注册 Pie、Legend、Tooltip、Canvas，并移除 `echarts-for-react` | `vendor-echarts` 由约 1118 kB 降至 443.08 kB；根测试通过；生产构建通过 |
+| Excel、ZIP、Word 模板和下载工具被强制合并成一个 568 kB 文档包 | 移除未使用的 `docxtemplater`、`file-saver`，按实际格式拆为 XLSX 与 PizZip | `vendor-docs` 消失；`vendor-xlsx` 487.57 kB、`vendor-pizzip` 80.59 kB；构建门禁通过 |
+| 登录首屏因手工 React-Three vendor 分块预加载约 959 kB 3D 运行时 | 取消 React-Three 强制共享块，按地图和 Studio 动态路由自然分块；新增产物边界检查 | `dist/index.html` 不再 preload React-Three、Three Core 或 Studio；地图生产 E2E 3/3 |
 
 ## 2. 自动化门禁
 
@@ -57,13 +59,13 @@ npm run check:secrets                  PASS
 npm run lint                           PASS，0 error / 0 warning
 npm run typecheck                      PASS
 npm run format:check                   PASS
-npm test                               PASS，312/312
+npm test                               PASS，314/314
 npm run build                          PASS，Vite 8
 npm audit --audit-level=low            PASS，0 vulnerabilities
 git diff --check                       PASS
 ```
 
-ECharts 已按需注册，`vendor-echarts` 从约 1.12 MB 降到 443.08 kB，不再触发 500 kB 警告。构建产物仍有大 chunk 警告：`vendor-react-three` 约 959 kB、`vendor-three-core` 约 635 kB、`vendor-docs` 约 568 kB、`StudioProjectPage` 约 557 kB；这些文件应继续按编辑器能力和实际交互时机拆分。
+ECharts 已按需注册，`vendor-echarts` 从约 1.12 MB 降到 443.08 kB；文档工具拆分为 `vendor-xlsx` 487.57 kB 和 `vendor-pizzip` 80.59 kB，均不再触发 500 kB 警告。构建产物仍对 `StudioProjectPage` 和 Three Core 报大 chunk，但它们已从首屏 preload 图中移除，只在地图或 3D Studio 路由加载。`npm run build` 会额外执行 `scripts/check-build-boundaries.mjs`，阻止 3D 包回流首屏，并限制 ECharts/XLSX 单块不超过 500 KiB。
 
 ### 2.2 后端
 
@@ -244,4 +246,4 @@ app 单独重建后网关探测                20/20 通过，Nginx 容器未重
 4. 推送分支，远程 CI 全绿；
 5. 在远程候选环境重跑迁移、健康、备份恢复和镜像回退；
 6. 生产切换后验证 endpoint、静态 chunk、健康检查和关键业务抽样；
-7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `f62a7aa` 执行 fresh `npm ci`，并完成 312/312、99/99、生产构建、根与 server workspace 双审计 0 vulnerabilities；干净工作树无跟踪改动。
+7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `a54c2b9` 执行 fresh `npm ci`，并完成 314/314、地图生产 E2E 3/3、99/99、生产构建及边界检查、根与 server workspace 双审计 0 vulnerabilities；干净工作树无跟踪改动。
