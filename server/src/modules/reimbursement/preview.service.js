@@ -59,6 +59,7 @@ import {
     reorderProjectRecordIndexes,
 } from './reimbursement.service.js';
 import { attachOcrReview } from './ocr.review.js';
+import { isPlainObject, mergeRecordOcrMeta } from './reimbursement-ocr-meta.js';
 
 const STORAGE_DIR = path.join(process.cwd(), 'storage', 'preview');
 const PREVIEW_STATUS = {
@@ -82,29 +83,6 @@ async function getNextRecordIndex(projectId) {
         .first();
 
     return (maxIndex?.max || 0) + 1;
-}
-
-function isPlainObject(value) {
-    return value && typeof value === 'object' && !Array.isArray(value);
-}
-
-function mergeRecordOcrMeta(existingMeta, key, nextMeta) {
-    if (!nextMeta) return existingMeta || null;
-    if (!isPlainObject(existingMeta)) return { [key]: nextMeta };
-
-    const hasGroupedMeta = isPlainObject(existingMeta.invoice) || isPlainObject(existingMeta.payment);
-    if (hasGroupedMeta) {
-        return {
-            ...existingMeta,
-            [key]: nextMeta,
-        };
-    }
-
-    const counterpartKey = key === 'invoice' ? 'payment' : 'invoice';
-    return {
-        [counterpartKey]: existingMeta,
-        [key]: nextMeta,
-    };
 }
 
 function buildReviewedOcrMeta(fileType, ocrMeta, ocrData) {

@@ -14,6 +14,7 @@ import {
   decryptReimbursementLlmConfig,
   encryptReimbursementLlmConfig,
 } from './reimbursement-llm-secret.js';
+import { isPlainObject, mergeRecordOcrMeta } from './reimbursement-ocr-meta.js';
 import { createPendingMatchWorkflow } from './reimbursement-pending-match.workflow.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -158,29 +159,6 @@ function compareRecordOrder(left, right) {
   if (dateDiff !== 0) return dateDiff;
 
   return Number(left.index || 0) - Number(right.index || 0);
-}
-
-function isPlainObject(value) {
-  return value && typeof value === 'object' && !Array.isArray(value);
-}
-
-function mergeRecordOcrMeta(existingMeta, key, nextMeta) {
-  if (!nextMeta) return existingMeta || null;
-  if (!isPlainObject(existingMeta)) return { [key]: nextMeta };
-
-  const hasGroupedMeta = isPlainObject(existingMeta.invoice) || isPlainObject(existingMeta.payment);
-  if (hasGroupedMeta) {
-    return {
-      ...existingMeta,
-      [key]: nextMeta,
-    };
-  }
-
-  const counterpartKey = key === 'invoice' ? 'payment' : 'invoice';
-  return {
-    [counterpartKey]: existingMeta,
-    [key]: nextMeta,
-  };
 }
 
 function buildPaymentReviewRecordData(paymentData = {}) {
