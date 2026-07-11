@@ -5,8 +5,8 @@ export interface StudioAssetTemplate {
   kind?: string | null;
   source?: string | null;
   thumbnailUrl?: string | null;
-  defaultParameters?: Record<string, any> | null;
-  parametersSchema?: Record<string, any> | null;
+  defaultParameters?: Record<string, unknown> | null;
+  parametersSchema?: Record<string, unknown> | null;
   modelUrl?: string | null;
 }
 
@@ -66,7 +66,7 @@ export function getTemplateSceneSnapshot(template?: StudioAssetTemplate | null) 
   return defaults.warehouseScene || defaults.sceneSnapshot || defaults.snapshotJson || null;
 }
 
-export function applyAssetTemplateToNode(template?: StudioAssetTemplate | null, currentNode: Record<string, any> = {}) {
+export function applyAssetTemplateToNode(template?: StudioAssetTemplate | null, currentNode: Record<string, unknown> = {}) {
   if (!template) return currentNode;
 
   const defaults = template.defaultParameters || {};

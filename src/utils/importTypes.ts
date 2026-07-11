@@ -53,6 +53,12 @@ export interface JobStatusResponse {
     status: 'queued' | 'running' | 'succeeded' | 'failed';
     progress: number;
     message: string;
-    result?: any;
+    result?: {
+        addedCount?: number;
+        updatedCount?: number;
+        internalCount?: number;
+        rejectedCount?: number;
+        [key: string]: unknown;
+    };
     error?: { message?: string } | null;
 }

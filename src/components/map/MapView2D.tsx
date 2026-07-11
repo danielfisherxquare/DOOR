@@ -3,7 +3,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
-import { useMapStore, type MapDrawToolId, type MapMeasurementMode } from '../../stores/mapStore';
+import { useMapStore, type MapDrawToolId, type MapMeasurementMode, type MapTreeNode } from '../../stores/mapStore';
 import {
   createTileLayer,
   replaceTileLayer,
@@ -34,6 +34,31 @@ interface MapKeyboardActions {
   handleSaveDirtyFeatures: () => Promise<void>;
   focusAllFeatures: () => void;
   startDrawing: (toolId: MapDrawToolId) => void;
+}
+
+type MapFeatureProperties = Partial<MapTreeNode> & {
+  id?: string | number;
+  studioDerived?: boolean;
+  dashArray?: string;
+};
+
+type GeoJsonLeafletLayer = L.Layer & {
+  toGeoJSON: () => GeoJSON.Feature;
+};
+
+type GeomanEditableLayer = L.Layer & {
+  pm?: {
+    enable: (options?: L.PM.EditModeOptions) => void;
+    enableLayerDrag: () => void;
+  };
+};
+
+type GeomanDrawRegistry = L.Map['pm'] & {
+  Draw?: Partial<Record<L.PM.SUPPORTED_SHAPES, { cancel?: () => void }>>;
+};
+
+function cancelActiveDraw(map: L.Map, shape: L.PM.SUPPORTED_SHAPES) {
+  (map.pm as GeomanDrawRegistry).Draw?.[shape]?.cancel?.();
 }
 
 interface DrawToolDefinition {
@@ -313,7 +338,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
         const measureShape = currentMeasureMode === 'distance' ? 'Line' : 'Polygon';
         try {
           if (options?.cancel) {
-            ((map.pm as any).Draw?.[measureShape] as { cancel?: () => void } | undefined)?.cancel?.();
+            cancelActiveDraw(map, measureShape);
           }
           map.pm.disableDraw(measureShape as L.PM.SUPPORTED_SHAPES);
         } catch (error) {
@@ -327,7 +352,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
     const currentTool = DRAW_TOOL_BY_ID[currentToolId];
     if (options?.cancel) {
       try {
-        ((map.pm as any).Draw?.[currentTool.shape] as { cancel?: () => void } | undefined)?.cancel?.();
+        cancelActiveDraw(map, currentTool.shape);
       } catch (error) {
         console.warn('[MapView2D] Failed to cancel drawing', error);
       }
@@ -368,14 +393,14 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
         templineStyle: {
           color: '#f97316',
           weight: 3,
-          dashArray: [10, 8],
+            dashArray: '10 8',
         },
         hintlineStyle: {
           color: '#fdba74',
           weight: 2,
-          dashArray: [6, 6],
+            dashArray: '6 6',
         },
-      } as any);
+      });
       activeDrawToolRef.current = toolId;
       setEditingMode('draw');
       setMeasurementMode(null);
@@ -407,14 +432,14 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
         templineStyle: {
           color: '#16a34a',
           weight: 3,
-          dashArray: [8, 6],
+            dashArray: '8 6',
         },
         hintlineStyle: {
           color: '#86efac',
           weight: 2,
-          dashArray: [6, 6],
+            dashArray: '6 6',
         },
-      } as any);
+      });
       setMeasurementMode(mode);
       setEditingMode('measure');
       setDrawGuide(mode === 'distance' ? '测距已启用，逐点绘制后双击结束。' : '测面已启用，围合区域后双击结束。');
@@ -519,7 +544,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
 
     const handleCreate: L.PM.CreateEventHandler = (e) => {
       const actions = mapCreationActionsRef.current;
-      const layer = (e as any).layer;
+      const layer = e.layer as GeoJsonLeafletLayer;
       const geojson = layer.toGeoJSON() as GeoJSON.Feature;
       const currentMeasurementMode = measurementModeRef.current;
       const currentDrawTool = activeDrawToolRef.current;
@@ -598,14 +623,14 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
       }
     };
 
-    const handleDrawEnd = () => {
+    const handleDrawEnd: L.PM.DrawEndEventHandler = () => {
       if (!activeDrawToolRef.current) return;
       if (continuousDrawingRef.current) return;
       mapCreationActionsRef.current.resetDrawingState('绘制已结束，可切换其它工具或继续浏览。');
     };
 
     map.on('pm:create', handleCreate);
-    map.on('pm:drawend', handleDrawEnd as any);
+    map.on('pm:drawend', handleDrawEnd);
     map.on('moveend zoomend', handleBrowseStateChange);
 
     const container = containerRef.current;
@@ -618,7 +643,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
 
     return () => {
       map.off('pm:create', handleCreate);
-      map.off('pm:drawend', handleDrawEnd as any);
+      map.off('pm:drawend', handleDrawEnd);
       map.off('moveend zoomend', handleBrowseStateChange);
       resizeObserver?.disconnect();
       map.remove();
@@ -735,14 +760,14 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
 
     const visibleNodeIds = new Set(treeNodes.filter((node) => node.visible !== false).map((node) => node.id));
     const renderableFeatures = drawnFeatures.filter((feature) => {
-      const source = (feature.properties as any)?.source;
-      const props = (feature.properties || {}) as Record<string, any>;
+      const props = (feature.properties || {}) as MapFeatureProperties;
+      const source = props.source;
       const featureId = String(feature.id || props.id || '');
-      return source !== 'studio-building' && !(feature.properties as any)?.studioDerived && (!featureId || visibleNodeIds.has(featureId));
+      return source !== 'studio-building' && !props.studioDerived && (!featureId || visibleNodeIds.has(featureId));
     });
 
     renderableFeatures.forEach((feature) => {
-      const props = (feature.properties || {}) as Record<string, any>;
+      const props = (feature.properties || {}) as MapFeatureProperties;
       const featureId = String(feature.id || props.id || '');
       const isTerrainWorkZone = props.source === 'terrain-work-zone';
       const isSelected = Boolean(featureId) && featureId === selectedNodeId;
@@ -755,7 +780,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
       const fillOpacity = Math.min((props.fillOpacity ?? (isTerrainWorkZone ? 0.18 : 0.28)) + (isSelected ? 0.08 : 0), 0.42);
 
       try {
-        const layer = L.geoJSON(feature as any, {
+        const layer = L.geoJSON(feature, {
           style: {
             color: strokeColor,
             weight: strokeWeight,
@@ -785,6 +810,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
             });
           },
           onEachFeature: (_geoFeature, childLayer) => {
+            const editableLayer = childLayer as GeomanEditableLayer;
             const tooltip = props.name || '未命名图形';
             childLayer.bindTooltip(tooltip, {
               permanent: props.labelMode === 'name',
@@ -797,17 +823,17 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
               setPropsPanelNodeId(featureId);
               setDrawGuide(`已选中 ${tooltip}，可定位、删除或继续编辑属性。`);
             });
-            if ((childLayer as any).pm && editingMode === 'edit' && !isTerrainWorkZone) {
+            if (editableLayer.pm && editingMode === 'edit' && !isTerrainWorkZone) {
               try {
-                (childLayer as any).pm.enable({
+                editableLayer.pm.enable({
                   snappable: snapEnabled,
                   allowSelfIntersection: false,
                 });
-                (childLayer as any).pm.enableLayerDrag?.();
+                editableLayer.pm.enableLayerDrag();
                 const handleLayerChanged = () => {
                   if (!featureId) return;
                   recordHistory();
-                  const nextGeoJson = (childLayer as any).toGeoJSON() as GeoJSON.Feature;
+                  const nextGeoJson = (childLayer as GeoJsonLeafletLayer).toGeoJSON();
                   const nextRadius = childLayer instanceof L.Circle ? childLayer.getRadius() : props.radius;
                   updateFeature(featureId, {
                     geometry: nextGeoJson.geometry,
@@ -815,8 +841,8 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
                   });
                   setDrawGuide(`已更新 ${tooltip}。${measureGeometry(nextGeoJson.geometry).summary}`);
                 };
-                childLayer.on('pm:edit' as any, handleLayerChanged);
-                childLayer.on('pm:dragend' as any, handleLayerChanged);
+                childLayer.on('pm:edit', handleLayerChanged);
+                childLayer.on('pm:dragend', handleLayerChanged);
               } catch (error) {
                 console.warn('[MapView2D] Failed to enable feature editing', error);
               }
@@ -826,7 +852,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
 
         layer.addTo(group);
         if (isSelected) {
-          (layer as any).bringToFront?.();
+          layer.bringToFront();
         }
       } catch (error) {
         console.warn('[MapView2D] Skipped invalid GeoJSON feature', {
@@ -847,16 +873,19 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
     group.clearLayers();
 
     const buildingFeatures = drawnFeatures.filter(
-      (f) => (f.properties as any)?.source === 'studio-building' || (f.properties as any)?.studioDerived,
+      (f) => {
+        const props = (f.properties || {}) as MapFeatureProperties;
+        return props.source === 'studio-building' || props.studioDerived;
+      },
     );
 
     buildingFeatures.forEach((feature) => {
       if (!feature.geometry || feature.geometry.type !== 'Polygon') return;
-      const props = (feature.properties || {}) as Record<string, any>;
+      const props = (feature.properties || {}) as MapFeatureProperties;
       const buildingId = props.buildingId;
       if (!buildingId) return;
 
-      const polygon = L.geoJSON(feature as any, {
+      const polygon = L.geoJSON(feature, {
         style: {
           color: props.strokeColor || '#2563eb',
           weight: props.strokeWeight || 2,
@@ -866,18 +895,19 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
           dashArray: '6 4',
         },
         onEachFeature: (_feature, layer) => {
+          const editableLayer = layer as GeomanEditableLayer;
           const name = props.name || '建筑';
           layer.bindTooltip(name, { permanent: false, direction: 'center', className: 'studio-building-tooltip' });
 
           try {
-            if ((layer as any).pm) {
-              (layer as any).pm.enableLayerDrag();
+            if (editableLayer.pm) {
+              editableLayer.pm.enableLayerDrag();
             }
           } catch (error) {
             console.warn('[MapView2D] Failed to enable layer drag:', error);
           }
 
-          layer.on('pm:dragend' as any, () => {
+          layer.on('pm:dragend', () => {
             const center = computeLayerCenter(layer as L.Polygon);
             if (center && buildingId) {
               notifyBuildingMoved(buildingId, center);
@@ -962,8 +992,8 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
       }
       showSuccess(`已导入 ${imported.length} 个 GeoJSON 要素`);
       setDrawGuide(`已导入 ${imported.length} 个图形，可继续编辑或保存到项目。`);
-    } catch (error: any) {
-      showError(`导入 GeoJSON 失败：${error.message}`);
+    } catch (error: unknown) {
+      showError(`导入 GeoJSON 失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       if (importInputRef.current) importInputRef.current.value = '';
     }
@@ -1021,8 +1051,8 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
         }
 
         const response = node.backendObjectId
-          ? await studioProjectApi.updateSpatialObject(node.backendObjectId, mapNodeToSpatialObjectPayload(node as any), orgId || undefined)
-          : await studioProjectApi.createSpatialObject(projectId, mapNodeToSpatialObjectPayload(node as any), orgId || undefined);
+          ? await studioProjectApi.updateSpatialObject(node.backendObjectId, mapNodeToSpatialObjectPayload(node), orgId || undefined)
+          : await studioProjectApi.createSpatialObject(projectId, mapNodeToSpatialObjectPayload(node), orgId || undefined);
         const objectId = response?.data?.id || node.backendObjectId || null;
         updateFeature(node.id, {
           backendObjectId: objectId,
@@ -1035,8 +1065,8 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
 
       showSuccess(`已保存 ${candidates.length} 个地图对象`);
       setDrawGuide(`已保存 ${candidates.length} 个对象到项目。`);
-    } catch (error: any) {
-      showError(`保存项目对象失败：${error.message}`);
+    } catch (error: unknown) {
+      showError(`保存项目对象失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setSavingAll(false);
     }

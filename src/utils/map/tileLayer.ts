@@ -150,7 +150,7 @@ export function createTileLayer(source: TileSourceConfig): L.GridLayer {
 
       createTile(
         coords: { x: number; y: number; z: number },
-        done: (error?: any, tile?: HTMLElement) => void,
+        done: L.DoneCallback,
       ) {
         const tile = document.createElement('img');
 
@@ -177,7 +177,7 @@ export function createTileLayer(source: TileSourceConfig): L.GridLayer {
         tile.onload = () => done(null, tile);
         tile.onerror = (error) => {
           logTileLoadError(source, coords, url, error);
-          done(error, tile);
+          done(error instanceof Error ? error : new Error('Tile image failed to load'), tile);
         };
 
         return tile;
@@ -864,7 +864,7 @@ export function createCachedTileLayer(source: TileSourceConfig): L.GridLayer {
 
     async createTile(
       coords: { x: number; y: number; z: number },
-      done: (error?: any, tile?: HTMLElement) => void,
+      done: L.DoneCallback,
     ) {
       const tile = document.createElement('img');
       const tileSize = this.getTileSize();
@@ -930,7 +930,7 @@ export function createCachedTileLayer(source: TileSourceConfig): L.GridLayer {
       tile.onload = () => done(null, tile);
       tile.onerror = (error) => {
         logTileLoadError(source, coords, url, error);
-        done(error, tile);
+        done(error instanceof Error ? error : new Error('Tile image failed to load'), tile);
       };
 
       return tile;

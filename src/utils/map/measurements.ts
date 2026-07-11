@@ -51,7 +51,7 @@ export function measureGeometry(geometry?: GeoJSON.Geometry | null): GeometryMea
 
     if (geometry.type === 'Polygon') {
       const ring = geometry.coordinates[0] || [];
-      const areaSquareMeters = turf.area(turf.polygon(geometry.coordinates as any));
+      const areaSquareMeters = turf.area(turf.polygon(geometry.coordinates));
       const perimeterMeters = ring.length > 1 ? turf.length(turf.lineString(ring), { units: 'meters' }) : 0;
       return {
         areaSquareMeters,
@@ -62,7 +62,7 @@ export function measureGeometry(geometry?: GeoJSON.Geometry | null): GeometryMea
     }
 
     if (geometry.type === 'MultiPolygon') {
-      const areaSquareMeters = turf.area(turf.multiPolygon(geometry.coordinates as any));
+      const areaSquareMeters = turf.area(turf.multiPolygon(geometry.coordinates));
       return {
         areaSquareMeters,
         vertexCount,

@@ -72,8 +72,8 @@ export default function MapObjectTree() {
       }
       deleteFeature(node.id);
       setPendingDelete(null);
-    } catch (error: any) {
-      showError(`删除图形失败：${error.message}`);
+    } catch (error: unknown) {
+      showError(`删除图形失败：${error instanceof Error ? error.message : String(error)}`);
     }
   };
 

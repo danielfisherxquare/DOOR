@@ -7,7 +7,7 @@
 import React from 'react';
 
 // 简单的事件发射器实现（浏览器兼容）
-type EventHandler = (...args: any[]) => void;
+type EventHandler = (stats: TileNetworkStats) => void;
 
 class SimpleEventEmitter {
   private listeners: Map<string, Set<EventHandler>> = new Map();
@@ -23,8 +23,8 @@ class SimpleEventEmitter {
     this.listeners.get(event)?.delete(handler);
   }
 
-  emit(event: string, ...args: any[]): void {
-    this.listeners.get(event)?.forEach((handler) => handler(...args));
+  emit(event: string, stats: TileNetworkStats): void {
+    this.listeners.get(event)?.forEach((handler) => handler(stats));
   }
 }
 

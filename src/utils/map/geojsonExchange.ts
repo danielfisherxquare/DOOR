@@ -15,6 +15,12 @@ export interface ArcSproMapFeatureCollection extends GeoJSON.FeatureCollection {
   };
 }
 
+type MapFeatureProperties = Partial<MapTreeNode> & {
+  id?: string | number;
+  featureId?: string | number;
+  title?: string;
+};
+
 function getFeatureType(geometry?: GeoJSON.Geometry | null): MapTreeNode['featureType'] {
   if (geometry?.type === 'Point') return 'marker';
   if (geometry?.type === 'LineString') return 'polyline';
@@ -29,7 +35,7 @@ export function buildMapFeatureCollection(
 ): ArcSproMapFeatureCollection {
   const nodesById = new Map(treeNodes.map((node) => [node.id, node]));
   const features = drawnFeatures.map((feature) => {
-    const props = (feature.properties || {}) as Record<string, any>;
+    const props = (feature.properties || {}) as MapFeatureProperties;
     const featureId = String(feature.id || props.id || props.featureId || '');
     const node = nodesById.get(featureId);
     return {
@@ -70,7 +76,7 @@ export function buildMapFeatureCollection(
         },
         diagnostics: {
           syncedFeatureCount: features.filter((feature) => {
-            const props = (feature.properties || {}) as Record<string, any>;
+            const props = (feature.properties || {}) as MapFeatureProperties;
             return Boolean(props.backendObjectId || props.backendWorkZoneId);
           }).length,
         },
@@ -89,7 +95,7 @@ export function parseMapFeatureCollection(input: unknown): ImportedMapFeature[] 
   return collection.features
     .filter((feature) => feature?.type === 'Feature' && feature.geometry)
     .map((feature, index) => {
-      const props = (feature.properties || {}) as Record<string, any>;
+      const props = (feature.properties || {}) as MapFeatureProperties;
       const featureType = props.featureType || getFeatureType(feature.geometry);
       const name = props.name || props.title || `导入图形 ${index + 1}`;
       return {

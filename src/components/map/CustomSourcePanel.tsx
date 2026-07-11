@@ -363,7 +363,7 @@ export default function CustomSourcePanel() {
               <label>类型</label>
               <select
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as SourceFormData['type'] })}
               >
                 {SOURCE_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -376,7 +376,7 @@ export default function CustomSourcePanel() {
               <label>坐标系</label>
               <select
                 value={formData.projection}
-                onChange={(e) => setFormData({ ...formData, projection: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, projection: e.target.value as SourceFormData['projection'] })}
               >
                 <option value="wgs84">WGS84 (GPS)</option>
                 <option value="gcj02">GCJ02 (国测局)</option>

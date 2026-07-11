@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useMapStore } from '../stores/mapStore';
+import { useMapStore, type MapTreeNode } from '../stores/mapStore';
 import studioProjectApi from '../services/studioProjectApi';
 import { spatialObjectToGeoJSONFeature, spatialObjectToMapNode } from '../utils/map/spatialObjects';
 import { terrainWorkZoneToGeoJSONFeature, terrainWorkZoneToMapNode } from '../utils/map/terrainWorkZones';
@@ -11,7 +11,7 @@ function normalizeStudioProjectId(projectId?: string | null) {
   return normalized;
 }
 
-function isProjectSyncedNode(node: any) {
+function isProjectSyncedNode(node: MapTreeNode) {
   return node?.source === 'spatial-object'
     || node?.source === 'terrain-work-zone'
     || Boolean(node?.backendObjectId)
@@ -20,7 +20,7 @@ function isProjectSyncedNode(node: any) {
 }
 
 function isProjectSyncedFeature(feature: GeoJSON.Feature) {
-  const props = (feature.properties || {}) as any;
+  const props = (feature.properties || {}) as Partial<MapTreeNode>;
   return props.source === 'spatial-object'
     || props.source === 'terrain-work-zone'
     || Boolean(props.backendObjectId)

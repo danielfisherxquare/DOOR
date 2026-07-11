@@ -555,7 +555,7 @@ export const useMapStore = create<MapState>()(
         const feature = get().clipboardFeature;
         if (!feature) return;
         get().recordHistory();
-        const sourceProps = (feature.properties || {}) as Record<string, any>;
+        const sourceProps = (feature.properties || {}) as Partial<MapTreeNode> & { name?: string };
         const pastedFeature: GeoJSON.Feature = {
           ...JSON.parse(JSON.stringify(feature)),
           id: undefined,
@@ -676,15 +676,15 @@ export const useMapStore = create<MapState>()(
           historyPast: [],
           historyFuture: [],
           clipboardFeature: null,
-          buildingStyle: (payload as any).buildingStyle || 'none',
-          hiddenOsmBuildings: Array.isArray((payload as any).hiddenOsmBuildings)
-            ? (payload as any).hiddenOsmBuildings
+          buildingStyle: payload.buildingStyle || 'none',
+          hiddenOsmBuildings: Array.isArray(payload.hiddenOsmBuildings)
+            ? payload.hiddenOsmBuildings
             : [],
           renderFps: null,
-          renderQuality: (payload as any).renderQuality
+          renderQuality: payload.renderQuality
             ? {
               ...DEFAULT_MAP_RENDER_QUALITY,
-              ...(payload as any).renderQuality,
+              ...payload.renderQuality,
             }
             : DEFAULT_MAP_RENDER_QUALITY,
         }),

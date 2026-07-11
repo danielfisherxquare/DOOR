@@ -66,11 +66,11 @@ function computeFeatureInfo(node: MapTreeNode): FeatureInfo | null {
 
   try {
     // 获取边界框
-    const bboxResult = turf.bbox(geometry as any);
+    const bboxResult = turf.bbox(geometry);
     bbox = bboxResult as [number, number, number, number];
 
     // 计算中心点
-    const centroid = turf.centroid(geometry as any);
+    const centroid = turf.centroid(geometry);
     center = centroid.geometry.coordinates as [number, number];
 
     if (geometry.type === 'Point') {
@@ -83,7 +83,7 @@ function computeFeatureInfo(node: MapTreeNode): FeatureInfo | null {
     } else if (geometry.type === 'Polygon') {
       const rings = geometry.coordinates as [number, number][][];
       coordinates = rings[0] || [];
-      const polygon = turf.polygon(geometry.coordinates as any);
+      const polygon = turf.polygon(geometry.coordinates);
       area = turf.area(polygon);
       perimeter = turf.length(turf.lineString(rings[0]), { units: 'meters' });
       edgeLengths = computeEdgeLengths(rings[0]);
@@ -91,7 +91,7 @@ function computeFeatureInfo(node: MapTreeNode): FeatureInfo | null {
       // 取第一个多边形
       const firstPoly = geometry.coordinates[0] as [number, number][][];
       coordinates = firstPoly[0] || [];
-      const multiPoly = turf.multiPolygon(geometry.coordinates as any);
+      const multiPoly = turf.multiPolygon(geometry.coordinates);
       area = turf.area(multiPoly);
       // 计算所有外边界的周长
       let totalPerimeter = 0;
@@ -226,17 +226,17 @@ export default function MapAdvancedPanel({ nodeId }: MapAdvancedPanelProps) {
     MultiPolygon: '多面',
   };
 
-  const basicMetrics = [
+  const basicMetrics: Array<{ label: string; value: string | number }> = [
     { label: '类型', value: typeLabels[info.type] || info.type },
     { label: '顶点数', value: info.vertices }
   ];
   if (info.radius !== undefined) {
-    basicMetrics.push({ label: '半径', value: formatDistance(info.radius) as any });
+    basicMetrics.push({ label: '半径', value: formatDistance(info.radius) });
   }
 
-  const dimMetrics = [];
-  if (info.area !== undefined) dimMetrics.push({ label: '面积', value: formatArea(info.area) as any });
-  if (info.perimeter !== undefined) dimMetrics.push({ label: '周长', value: formatDistance(info.perimeter) as any });
+  const dimMetrics: Array<{ label: string; value: string | number }> = [];
+  if (info.area !== undefined) dimMetrics.push({ label: '面积', value: formatArea(info.area) });
+  if (info.perimeter !== undefined) dimMetrics.push({ label: '周长', value: formatDistance(info.perimeter) });
 
   return (
     <div className="advanced-panel">

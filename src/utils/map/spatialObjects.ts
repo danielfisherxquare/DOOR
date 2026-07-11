@@ -14,6 +14,38 @@ export const SPATIAL_OBJECT_PRESETS = [
 
 export type SpatialObjectPreset = typeof SPATIAL_OBJECT_PRESETS[number];
 
+export interface SpatialObjectDto {
+  id: string | number;
+  projectId?: string | null;
+  objectType?: string | null;
+  templateId?: string | null;
+  variantId?: string | null;
+  title?: string | null;
+  placementMode?: MapTreeNode['placementMode'];
+  brandingPackId?: string | null;
+  focusZoneId?: string | null;
+  metadata?: {
+    geometry?: GeoJSON.Geometry | null;
+    featureType?: MapTreeNode['featureType'];
+    mapNodeId?: string | null;
+    radius?: number | null;
+    templateName?: string | null;
+    assetTemplateSource?: string | null;
+    assetTemplateKind?: string | null;
+  } | null;
+  materialVariant?: {
+    color?: string | null;
+    strokeColor?: string | null;
+    fasciaStyle?: string | null;
+    sponsorName?: string | null;
+    accentColor?: string | null;
+  } | null;
+  renderProfile?: {
+    fillOpacity?: number | null;
+    strokeWeight?: number | null;
+  } | null;
+}
+
 export function getSpatialObjectPreset(objectType?: string | null): SpatialObjectPreset {
   return SPATIAL_OBJECT_PRESETS.find((item) => item.objectType === objectType) || SPATIAL_OBJECT_PRESETS[0];
 }
@@ -124,7 +156,7 @@ export function mapNodeToSpatialObjectPayload(node: MapTreeNode) {
   };
 }
 
-export function spatialObjectToMapNode(object: any): MapTreeNode {
+export function spatialObjectToMapNode(object: SpatialObjectDto): MapTreeNode {
   const geometry = object?.metadata?.geometry || null;
   const preset = getSpatialObjectPreset(object?.objectType);
   const featureType = object?.metadata?.featureType || toMapFeatureType(geometry);
@@ -132,7 +164,7 @@ export function spatialObjectToMapNode(object: any): MapTreeNode {
   const strokeColor = object?.materialVariant?.strokeColor || fillColor;
 
   return {
-    id: object?.metadata?.mapNodeId || `spatial:${object.id}`,
+    id: object?.metadata?.mapNodeId || `spatial:${String(object.id)}`,
     name: object?.title || getSpatialObjectLabel(object?.objectType),
     type: 'feature',
     icon: preset.objectType === 'tent' ? '⛺' : preset.objectType === 'stage' ? '🎪' : preset.objectType === 'light_tower' ? '💡' : 'place',
@@ -159,13 +191,13 @@ export function spatialObjectToMapNode(object: any): MapTreeNode {
     sponsorName: object?.materialVariant?.sponsorName || null,
     accentColor: object?.materialVariant?.accentColor || strokeColor,
     focusZoneId: object?.focusZoneId || null,
-    backendObjectId: object?.id || null,
+    backendObjectId: object?.id == null ? null : String(object.id),
     syncStatus: 'synced',
     sourceProjectId: object?.projectId || null,
   };
 }
 
-export function spatialObjectToGeoJSONFeature(object: any, nodeId?: string): GeoJSON.Feature | null {
+export function spatialObjectToGeoJSONFeature(object: SpatialObjectDto, nodeId?: string): GeoJSON.Feature | null {
   const geometry = object?.metadata?.geometry;
   if (!geometry) return null;
 

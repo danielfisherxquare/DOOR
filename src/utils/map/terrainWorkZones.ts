@@ -8,6 +8,57 @@ export const TERRAIN_WORK_ZONE_PRESETS = [
 
 export type TerrainWorkZonePreset = typeof TERRAIN_WORK_ZONE_PRESETS[number];
 
+interface TerrainWorkZoneSummary {
+  totalObjects?: number;
+  batchCount?: number;
+  byLodLevel?: Record<string, number>;
+  totalResources?: number;
+  byLod?: Record<string, number>;
+  optimization?: {
+    instancingEligibleCount?: number;
+    geometryFamilyCount?: number;
+    instancingReadyResources?: number;
+    instancingReadyObjects?: number;
+  };
+}
+
+export interface TerrainWorkZoneDto {
+  id: string;
+  projectId?: string | null;
+  name?: string | null;
+  zoneType?: MapTreeNode['zoneType'];
+  clipPolygonWgs84?: GeoJSON.Polygon | GeoJSON.Position[] | null;
+  terrainResolution?: number | null;
+  includedObjectIds?: string[] | null;
+  metadata?: {
+    mapNodeId?: string | null;
+    terrainPatchGeneratedAt?: string | null;
+    terrainHeightDeltaMeters?: number | null;
+    publishManifestGeneratedAt?: string | null;
+    exportPackageGeneratedAt?: string | null;
+    exportTaskId?: string | null;
+    exportTaskStatus?: string | null;
+    exportOutputRoot?: string | null;
+    geometrySource?: string | null;
+  } | null;
+  snapshotJson?: {
+    terrainPatch?: {
+      sampledAt?: string | null;
+      heightDeltaMeters?: number | null;
+    } | null;
+  } | null;
+  publishTarget?: {
+    manifestSummary?: TerrainWorkZoneSummary | null;
+    exportPackageSummary?: TerrainWorkZoneSummary | null;
+    lastManifestGeneratedAt?: string | null;
+    exportPackageGeneratedAt?: string | null;
+    exportTaskId?: string | null;
+    exportTaskStatus?: string | null;
+    exportOutputRoot?: string | null;
+    geometrySource?: string | null;
+  } | null;
+}
+
 export function getTerrainWorkZonePreset(zoneType?: string | null): TerrainWorkZonePreset {
   return TERRAIN_WORK_ZONE_PRESETS.find((item) => item.zoneType === zoneType) || TERRAIN_WORK_ZONE_PRESETS[0];
 }
@@ -21,13 +72,13 @@ function cloneGeometry<T>(geometry?: T): T | undefined {
   return JSON.parse(JSON.stringify(geometry));
 }
 
-function normalizePolygonGeometry(geometry: any): GeoJSON.Polygon | undefined {
+function normalizePolygonGeometry(geometry: TerrainWorkZoneDto['clipPolygonWgs84']): GeoJSON.Polygon | undefined {
   const nextGeometry = cloneGeometry(geometry) as GeoJSON.Polygon | undefined;
   if (!nextGeometry || nextGeometry.type !== 'Polygon' || !Array.isArray(nextGeometry.coordinates)) {
     return nextGeometry;
   }
 
-  const firstEntry = nextGeometry.coordinates[0] as any;
+  const firstEntry: unknown = nextGeometry.coordinates[0];
   if (Array.isArray(firstEntry) && typeof firstEntry[0] === 'number' && typeof firstEntry[1] === 'number') {
     nextGeometry.coordinates = [nextGeometry.coordinates as unknown as GeoJSON.Position[]];
   }
@@ -35,7 +86,7 @@ function normalizePolygonGeometry(geometry: any): GeoJSON.Polygon | undefined {
   return nextGeometry;
 }
 
-export function terrainWorkZoneToMapNode(zone: any): MapTreeNode {
+export function terrainWorkZoneToMapNode(zone: TerrainWorkZoneDto): MapTreeNode {
   const preset = getTerrainWorkZonePreset(zone?.zoneType);
   const manifestSummary = zone?.publishTarget?.manifestSummary || null;
   const exportPackageSummary = zone?.publishTarget?.exportPackageSummary || null;
@@ -82,7 +133,7 @@ export function terrainWorkZoneToMapNode(zone: any): MapTreeNode {
   };
 }
 
-export function terrainWorkZoneToGeoJSONFeature(zone: any, nodeId?: string): GeoJSON.Feature | null {
+export function terrainWorkZoneToGeoJSONFeature(zone: TerrainWorkZoneDto, nodeId?: string): GeoJSON.Feature | null {
   if (!zone?.clipPolygonWgs84) return null;
   const nextNode = terrainWorkZoneToMapNode(zone);
   const id = nodeId || nextNode.id;

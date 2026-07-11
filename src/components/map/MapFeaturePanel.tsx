@@ -5,7 +5,7 @@ import MapAdvancedPanel from './MapAdvancedPanel';
 import { CommandDetailPane } from '../command/CommandPrimitives';
 import studioProjectApi from '../../services/studioProjectApi';
 import { getSpatialObjectLabel, mapNodeToSpatialObjectPayload } from '../../utils/map/spatialObjects';
-import { getTerrainWorkZoneLabel, terrainWorkZoneToMapNode } from '../../utils/map/terrainWorkZones';
+import { getTerrainWorkZoneLabel, terrainWorkZoneToMapNode, type TerrainWorkZoneDto } from '../../utils/map/terrainWorkZones';
 import { measureGeometry } from '../../utils/map/measurements';
 import { createBlankStudioScene } from '../../utils/studioProjectUtils';
 import { buildAppHref } from '../app/appConfig';
@@ -23,6 +23,23 @@ interface MapFeaturePanelProps {
 type TabType = 'properties' | 'advanced' | 'export';
 const SCENE_EXPORT_POLL_INTERVAL_MS = 1500;
 const SCENE_EXPORT_MAX_ATTEMPTS = 80;
+
+interface SceneExportJobRecord {
+  id: string;
+  status: string;
+  stage?: string | null;
+  errorMessage?: string | null;
+  generatedSceneId?: string | null;
+  qualityPreset?: string | null;
+  generatedScene?: {
+    status?: string | null;
+    manifestJson?: {
+      osm?: { diagnostics?: GeneratedSceneOsmDiagnostics | null };
+      stats?: { osmBuildingCount?: number };
+    } | null;
+    metadata?: { osmDiagnostics?: GeneratedSceneOsmDiagnostics | null } | null;
+  } | null;
+}
 
 function normalizeStudioProjectId(projectId?: string | null) {
   const normalized = String(projectId || '').trim();
@@ -118,7 +135,7 @@ export default function MapFeaturePanel({
         const payload = mapNodeToSpatialObjectPayload({
           ...node,
           syncStatus: 'dirty',
-        } as any);
+        });
         response = node.backendObjectId
           ? await studioProjectApi.updateSpatialObject(node.backendObjectId, payload, orgId || undefined)
           : await studioProjectApi.createSpatialObject(projectId, payload, orgId || undefined);
@@ -143,8 +160,8 @@ export default function MapFeaturePanel({
         });
         showSuccess(node.backendObjectId ? '项目空间对象已更新' : '项目空间对象已创建');
       }
-    } catch (error: any) {
-      showError(`${isTerrainWorkZone ? '同步地形工作区' : '同步空间对象'}失败：${error.message}`);
+    } catch (error: unknown) {
+      showError(`${isTerrainWorkZone ? '同步地形工作区' : '同步空间对象'}失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setSyncing(false);
     }
@@ -164,14 +181,14 @@ export default function MapFeaturePanel({
       deleteFeature(nodeId);
       showSuccess(isTerrainWorkZone ? '地形工作区已删除' : '项目空间对象已删除');
       onClose?.();
-    } catch (error: any) {
-      showError(`删除失败：${error.message}`);
+    } catch (error: unknown) {
+      showError(`删除失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setSyncing(false);
     }
   };
 
-  const updateNodeFromWorkZone = (zoneRecord: any, targetProjectId = projectId) => {
+  const updateNodeFromWorkZone = (zoneRecord: TerrainWorkZoneDto, targetProjectId = projectId) => {
     if (!zoneRecord?.id) return;
     const nextNode = terrainWorkZoneToMapNode(zoneRecord);
     updateFeature(nodeId, {
@@ -204,7 +221,7 @@ export default function MapFeaturePanel({
     });
   };
 
-  const updateNodeFromGeneratedScene = (jobRecord: any) => {
+  const updateNodeFromGeneratedScene = (jobRecord: SceneExportJobRecord) => {
     if (!jobRecord) return;
     const osmDiagnostics = jobRecord?.generatedScene?.manifestJson?.osm?.diagnostics
       || jobRecord?.generatedScene?.metadata?.osmDiagnostics
@@ -296,7 +313,7 @@ export default function MapFeaturePanel({
     return zoneRecord;
   };
 
-  const ensureTerrainPatch = async (zoneRecord: any) => {
+  const ensureTerrainPatch = async (zoneRecord: TerrainWorkZoneDto) => {
     if (zoneRecord?.snapshotJson?.terrainPatch) return zoneRecord;
 
     const result = await studioProjectApi.syncTerrainWorkZoneTerrainPatch(zoneRecord.id, {
@@ -308,7 +325,7 @@ export default function MapFeaturePanel({
   };
 
   const waitForSceneExportJob = async (jobId: string) => {
-    let latestJob: any = null;
+    let latestJob: SceneExportJobRecord | null = null;
     for (let attempt = 0; attempt < SCENE_EXPORT_MAX_ATTEMPTS; attempt += 1) {
       const response = await studioProjectApi.getSceneExportJob(jobId, orgId || undefined);
       latestJob = response?.data || null;
@@ -384,8 +401,8 @@ export default function MapFeaturePanel({
       showSuccess('选区白模已导入 3D Studio');
       const href = buildAppHref(`/3d-studio/${importedProjectId}`, { orgId, raceId });
       navigate(new URL(href, window.location.origin).pathname + new URL(href, window.location.origin).search);
-    } catch (error: any) {
-      showError(`导出到 3D Studio 失败：${error.message}`);
+    } catch (error: unknown) {
+      showError(`导出到 3D Studio 失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setSyncing(false);
     }
@@ -408,8 +425,8 @@ export default function MapFeaturePanel({
       const filename = getDownloadFilename(downloadResponse.headers || {}, `${node.name || 'white-model'}.glb`);
       triggerSceneDownload(downloadResponse.data, filename);
       showSuccess('白模文件已生成并开始下载');
-    } catch (error: any) {
-      showError(`导出白模文件失败：${error.message}`);
+    } catch (error: unknown) {
+      showError(`导出白模文件失败：${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setSyncing(false);
     }
