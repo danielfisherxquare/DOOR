@@ -26,6 +26,22 @@ async function listBoundaryFiles(directory) {
   return files.sort()
 }
 
+async function listJavaScriptFiles(directory) {
+  const entries = await readdir(directory, { withFileTypes: true })
+  const files = []
+
+  for (const entry of entries) {
+    const absolutePath = path.join(directory, entry.name)
+    if (entry.isDirectory()) {
+      files.push(...(await listJavaScriptFiles(absolutePath)))
+    } else if (entry.isFile() && entry.name.endsWith('.js')) {
+      files.push(absolutePath)
+    }
+  }
+
+  return files.sort()
+}
+
 function relativePath(file) {
   return path.relative(serverRoot, file).split(path.sep).join('/')
 }
@@ -105,6 +121,24 @@ function findRawRequestPersistenceCalls(file, source) {
   return matches
 }
 
+function findConcurrentTransactionQueries(file, source) {
+  const matches = []
+  const promiseAllPattern = /\bPromise\.all\s*\(/g
+  let match
+
+  while ((match = promiseAllPattern.exec(source)) !== null) {
+    const openIndex = source.indexOf('(', match.index)
+    const closeIndex = findClosingParenthesis(source, openIndex)
+    const callSource = source.slice(openIndex + 1, closeIndex)
+    if (/\btrx\s*\(/.test(callSource)) {
+      matches.push(`${relativePath(file)}:${source.slice(0, match.index).split('\n').length}`)
+    }
+    promiseAllPattern.lastIndex = closeIndex + 1
+  }
+
+  return matches
+}
+
 function sortedUnique(values) {
   return [...new Set(values)].sort()
 }
@@ -135,5 +169,16 @@ describe('backend module boundaries', () => {
     }
 
     assert.deepEqual(sortedUnique(violations), sortedUnique(ratchet.rawRequestPersistenceCalls))
+  })
+
+  it('does not run concurrent queries through one transaction client', async () => {
+    const violations = []
+
+    for (const file of await listJavaScriptFiles(path.join(serverRoot, 'src'))) {
+      const source = await readFile(file, 'utf8')
+      violations.push(...findConcurrentTransactionQueries(file, source))
+    }
+
+    assert.deepEqual(violations, [])
   })
 })

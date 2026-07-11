@@ -279,22 +279,21 @@ export async function saveConfig(orgId, raceId, data, database = knex) {
 }
 
 async function readBaseData(orgId, raceId, trx = knex) {
-    const [config, capacities, limits, lists, records] = await Promise.all([
-        getConfig(orgId, raceId, trx),
-        trx('race_capacity').where({ org_id: orgId, race_id: raceId }).orderBy('event'),
-        trx('clothing_limits').where({ org_id: orgId, race_id: raceId }),
-        trx('lottery_lists')
-            .where({ org_id: orgId, race_id: raceId })
-            .select('id', 'list_type', 'name', 'id_number', 'phone', 'matched_record_id', 'match_type', 'created_at'),
-        trx('records')
-            .where({ org_id: orgId, race_id: raceId })
-            .select(
-                'id', 'name', 'event', 'gender', 'province', 'city', 'district',
-                'clothing_size', 'audit_status', 'lottery_status', 'is_locked',
-                'runner_category', 'personal_best_full', 'personal_best_half',
-                '_imported_at', 'updated_at',
-            ),
-    ]);
+    // Keep reads sequential because callers can pass a single-client transaction.
+    const config = await getConfig(orgId, raceId, trx);
+    const capacities = await trx('race_capacity').where({ org_id: orgId, race_id: raceId }).orderBy('event');
+    const limits = await trx('clothing_limits').where({ org_id: orgId, race_id: raceId });
+    const lists = await trx('lottery_lists')
+        .where({ org_id: orgId, race_id: raceId })
+        .select('id', 'list_type', 'name', 'id_number', 'phone', 'matched_record_id', 'match_type', 'created_at');
+    const records = await trx('records')
+        .where({ org_id: orgId, race_id: raceId })
+        .select(
+            'id', 'name', 'event', 'gender', 'province', 'city', 'district',
+            'clothing_size', 'audit_status', 'lottery_status', 'is_locked',
+            'runner_category', 'personal_best_full', 'personal_best_half',
+            '_imported_at', 'updated_at',
+        );
     return { config, capacities, limits, lists, records };
 }
 

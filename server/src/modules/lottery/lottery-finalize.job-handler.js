@@ -163,22 +163,22 @@ registerHandler('lottery:finalize', async (job, { knex, heartbeat }) => {
 
             await heartbeat(18, `快照完成 (${snapshotResult.itemCount} 条), 读取配置`);
 
-            const [capacities, raceRow, performanceRules, lotteryWeights, inventoryRows] = await Promise.all([
-                trx('race_capacity').where({ org_id: orgId, race_id: raceId }),
-                trx('races')
-                    .where({ id: raceId, org_id: orgId })
-                    .select('lottery_mode_default')
-                    .first(),
-                trx('performance_rules')
-                    .where({ org_id: orgId, race_id: raceId })
-                    .select('event', 'priority_ratio'),
-                trx('lottery_weights')
-                    .where({ org_id: orgId, race_id: raceId, enabled: 1, weight_type: 'gender' })
-                    .select('target_group', 'weight_config'),
-                trx('clothing_limits')
-                    .where({ org_id: orgId, race_id: raceId })
-                    .select('event', 'gender', 'size', 'total_inventory', 'used_count'),
-            ]);
+            // A Knex transaction owns one pg client. Querying it concurrently triggers
+            // pg's deprecated "client.query while already executing" path and will fail in pg 9.
+            const capacities = await trx('race_capacity').where({ org_id: orgId, race_id: raceId });
+            const raceRow = await trx('races')
+                .where({ id: raceId, org_id: orgId })
+                .select('lottery_mode_default')
+                .first();
+            const performanceRules = await trx('performance_rules')
+                .where({ org_id: orgId, race_id: raceId })
+                .select('event', 'priority_ratio');
+            const lotteryWeights = await trx('lottery_weights')
+                .where({ org_id: orgId, race_id: raceId, enabled: 1, weight_type: 'gender' })
+                .select('target_group', 'weight_config');
+            const inventoryRows = await trx('clothing_limits')
+                .where({ org_id: orgId, race_id: raceId })
+                .select('event', 'gender', 'size', 'total_inventory', 'used_count');
 
             const raceDefaultMode = raceRow?.lottery_mode_default || 'lottery';
             const resolveEffectiveMode = buildEffectiveModeResolver(capacities, raceDefaultMode);
@@ -186,20 +186,18 @@ registerHandler('lottery:finalize', async (job, { knex, heartbeat }) => {
             const performancePriorityByGroup = buildPerformancePriorityLookup(performanceRules);
             const genderWeightByGroup = buildGenderWeightLookup(lotteryWeights);
 
-            const [candidates, lockedRecords] = await Promise.all([
-                trx('records')
-                    .where({ org_id: orgId, race_id: raceId })
-                    .where(function () {
-                        this.whereIn('audit_status', ['pass', 'review', 'qualified_time']);
-                    })
-                    .where('lottery_status', '参与抽签')
-                    .where('is_locked', 0)
-                    .select('id', 'event', 'gender', 'clothing_size', 'audit_status'),
-                trx('records')
-                    .where({ org_id: orgId, race_id: raceId, is_locked: 1 })
-                    .whereIn('lottery_status', DIRECT_STATUSES)
-                    .select('event', 'gender', 'clothing_size'),
-            ]);
+            const candidates = await trx('records')
+                .where({ org_id: orgId, race_id: raceId })
+                .where(function () {
+                    this.whereIn('audit_status', ['pass', 'review', 'qualified_time']);
+                })
+                .where('lottery_status', '参与抽签')
+                .where('is_locked', 0)
+                .select('id', 'event', 'gender', 'clothing_size', 'audit_status');
+            const lockedRecords = await trx('records')
+                .where({ org_id: orgId, race_id: raceId, is_locked: 1 })
+                .whereIn('lottery_status', DIRECT_STATUSES)
+                .select('event', 'gender', 'clothing_size');
 
             await heartbeat(32, `候选人 ${candidates.length} 名，准备分桶抽签`);
 
