@@ -1,4 +1,8 @@
 import knex from '../../db/knex.js';
+import {
+  attachDocumentReview,
+  buildReviewRecordData,
+} from './reimbursement-record-data.js';
 
 const ACTIVE_PROCESSING_STATUSES = ['processing', 'completed'];
 
@@ -105,4 +109,27 @@ export async function clearProcessingRecords(projectId) {
   return knex('reimbursement_processed_files')
     .where({ project_id: projectId })
     .del();
+}
+
+export async function updateProcessingStatus(
+  recordId,
+  status,
+  { errorMessage, ocrResult, ocrMeta, documentType } = {},
+) {
+  const reviewedOcrMeta = attachDocumentReview(
+    ocrMeta,
+    documentType,
+    buildReviewRecordData(documentType, ocrResult),
+  );
+  const updateData = {
+    status,
+    processed_at: knex.fn.now(),
+    error_message: errorMessage ?? undefined,
+    ocr_result: ocrResult ?? undefined,
+    ocr_meta: reviewedOcrMeta ?? undefined,
+  };
+
+  return knex('reimbursement_processed_files')
+    .where({ id: recordId })
+    .update(updateData);
 }

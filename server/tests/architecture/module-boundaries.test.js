@@ -11,7 +11,7 @@ const ratchet = JSON.parse(
 )
 const reimbursementServiceLineLimits = {
   'src/modules/reimbursement/preview.service.js': 1200,
-  'src/modules/reimbursement/reimbursement.service.js': 1450,
+  'src/modules/reimbursement/reimbursement.service.js': 1250,
 }
 
 async function listBoundaryFiles(directory) {
