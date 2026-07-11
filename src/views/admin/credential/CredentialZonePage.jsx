@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { adminCredentialApi as credentialApi } from '../../../api/credential'
 import { useCredentialSurface } from './useCredentialSurface'
@@ -31,7 +31,7 @@ function CredentialZonePage() {
     const [editingArea, setEditingArea] = useState(null)
     const [form, setForm] = useState(EMPTY_FORM)
 
-    const loadAccessAreas = async () => {
+    const loadAccessAreas = useCallback(async () => {
         if (!raceId) return
         setLoading(true)
         try {
@@ -44,11 +44,11 @@ function CredentialZonePage() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [raceId])
 
     useEffect(() => {
         void loadAccessAreas()
-    }, [raceId])
+    }, [loadAccessAreas])
 
     const resetForm = () => {
         setEditingArea(null)

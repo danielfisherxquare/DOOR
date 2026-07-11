@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import useAuthStore from '../../stores/authStore'
 import racesApi from '../../api/races'
@@ -100,7 +100,7 @@ function RaceManagementPage() {
     ]
   }, [races])
 
-  const loadRaces = async () => {
+  const loadRaces = useCallback(async () => {
     setLoading(true)
     setMessage('')
 
@@ -116,11 +116,11 @@ function RaceManagementPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [isSuperAdmin, selectedOrgId])
 
   useEffect(() => {
     void loadRaces()
-  }, [isSuperAdmin, selectedOrgId])
+  }, [loadRaces])
 
   const resetForm = () => {
     setEditingRace(null)

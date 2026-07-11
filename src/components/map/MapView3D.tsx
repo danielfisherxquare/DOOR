@@ -1717,17 +1717,19 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
       },
       () => useMapStore.getState().autoTilt,
     );
+    const terrainWorkZoneRuntime = terrainWorkZoneRuntimeRef.current;
+    const terrainWorkZoneRuntimeLoading = terrainWorkZoneRuntimeLoadingRef.current;
 
     return () => {
       if (syncReleaseTimerRef.current) {
         clearTimeout(syncReleaseTimerRef.current);
         syncReleaseTimerRef.current = null;
       }
-      terrainWorkZoneRuntimeRef.current.forEach((handle) => {
+      terrainWorkZoneRuntime.forEach((handle) => {
         unloadTerrainWorkZoneRuntimePreview(viewer, handle);
       });
-      terrainWorkZoneRuntimeRef.current.clear();
-      terrainWorkZoneRuntimeLoadingRef.current.clear();
+      terrainWorkZoneRuntime.clear();
+      terrainWorkZoneRuntimeLoading.clear();
       syncRuntimePreviewSummary();
       window.clearInterval(idleFpsResetTimer);
       cleanupCameraControls();

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import pipelineApi from '../../../../api/pipeline'
 import appRacesApi from '../../../../api/appRaces'
@@ -41,7 +41,7 @@ export default function LotteryPage() {
   const [message, setMessage] = useState('')
   const [messageTone, setMessageTone] = useState('info')
 
-  const refreshPreview = async (announce = false) => {
+  const refreshPreview = useCallback(async (announce = false) => {
     if (!raceId) return
 
     setLoading(true)
@@ -62,11 +62,11 @@ export default function LotteryPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [raceId])
 
   useEffect(() => {
     refreshPreview(false)
-  }, [raceId])
+  }, [refreshPreview])
 
   const activeMeta = useMemo(
     () => STEPS.find((step) => step.key === activeStep) || STEPS[0],

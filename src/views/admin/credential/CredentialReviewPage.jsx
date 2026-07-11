@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCredentialSurface } from './useCredentialSurface'
 import {
@@ -70,7 +70,7 @@ export default function CredentialReviewPage() {
     })
   }
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!raceId) return
     setLoading(true)
 
@@ -89,11 +89,11 @@ export default function CredentialReviewPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [credentialApi, raceId, statusFilter])
 
   useEffect(() => {
     void loadData()
-  }, [credentialApi, raceId, statusFilter])
+  }, [loadData])
 
   const filteredRequests = useMemo(() => {
     const pendingStatuses = new Set(['submitted', 'under_review'])
@@ -111,8 +111,10 @@ export default function CredentialReviewPage() {
       return
     }
 
+    if (nextSelected === selectedRequest) return
+
     resetReviewForm(nextSelected)
-  }, [filteredRequests])
+  }, [filteredRequests, selectedRequest])
 
   const metrics = useMemo(() => {
     const pendingCount = requests.filter((item) => ['submitted', 'under_review'].includes(item.status)).length

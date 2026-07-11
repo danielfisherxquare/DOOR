@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import adminApi from '../../api/adminApi'
 import {
@@ -24,7 +24,7 @@ export default function OrgListPage() {
   const [total, setTotal] = useState(0)
   const limit = 20
 
-  const fetchOrgs = async () => {
+  const fetchOrgs = useCallback(async () => {
     setLoading(true)
     try {
       const res = await adminApi.getOrgs({ page, limit, keyword })
@@ -35,11 +35,11 @@ export default function OrgListPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [keyword, page])
 
   useEffect(() => {
     void fetchOrgs()
-  }, [page])
+  }, [fetchOrgs])
 
   const handleSearch = (event) => {
     event.preventDefault()

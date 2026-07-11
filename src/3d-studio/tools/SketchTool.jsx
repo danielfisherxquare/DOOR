@@ -111,7 +111,7 @@ export default function SketchTool() {
   }, [clearInferenceHint, sketchMode])
 
   const allPreviewPoints = useMemo(() => (
-    previewPointRef.current ? [...points, previewPointRef.current] : points
+    previewPoint ? [...points, previewPoint] : points
   ), [points, previewPoint])
 
   // Stable callback for creating paths
@@ -585,7 +585,6 @@ function DimensionLabelDOM({ camera, point, value }) {
       whiteSpace: 'nowrap',
       fontFamily: 'ui-monospace, SFMono-Regular, monospace',
     })
-    el.textContent = value
     document.body.appendChild(el)
     labelRef.current = el
     return () => {

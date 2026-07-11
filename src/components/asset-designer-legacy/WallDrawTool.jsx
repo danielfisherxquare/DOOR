@@ -38,7 +38,7 @@ export default function WallDrawTool({
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [onCancel])
+    }, [onCancel, onPreview])
 
     // 计算吸附点
     const getSnappedPoint = useCallback((point) => {

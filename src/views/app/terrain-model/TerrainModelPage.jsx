@@ -1889,6 +1889,21 @@ export default function TerrainModelPage() {
     setOpenTopoStatus({ tone: 'idle', label: '等待获取' })
   }, [resetGeneratedOutputs])
 
+  const applyManualTerrainFootprint = useCallback((footprint, shape = manualFootprintShape) => {
+    const nextFootprint = normalizeManualFootprintWgs84(footprint)
+    const nextBounds = manualFootprintToBoundsWgs84(nextFootprint)
+    if (!nextBounds) {
+      showError('手动范围无效')
+      return
+    }
+    setManualFootprintShape(MANUAL_FOOTPRINT_SHAPES.some((item) => item.key === shape) ? shape : 'custom')
+    setManualFootprintWgs84(nextFootprint)
+    setManualBoundsWgs84(boundsToInputValues(nextBounds))
+    setTerrainBoundsMode('manual')
+    resetGeneratedOutputs()
+    setOpenTopoStatus({ tone: 'idle', label: '等待获取' })
+  }, [manualFootprintShape, resetGeneratedOutputs])
+
   const startManualTerrainBoundsDraw = useCallback(() => {
     if (!track?.points?.length) {
       showError('请先上传 GPX')
@@ -1919,7 +1934,7 @@ export default function TerrainModelPage() {
     resetGeneratedOutputs()
     setOpenTopoStatus({ tone: 'idle', label: '等待获取' })
     setManualDrawRequest((current) => current + 1)
-  }, [activeTerrainBoundsWgs84, autoTerrainBounds, manualFootprintRotationDegrees, manualFootprintShape, resetGeneratedOutputs, terrainBoundsMode, track])
+  }, [activeTerrainBoundsWgs84, applyManualTerrainFootprint, autoTerrainBounds, manualFootprintRotationDegrees, manualFootprintShape, resetGeneratedOutputs, terrainBoundsMode, track])
 
   const updateManualBoundsWgs84 = useCallback((key, value) => {
     setManualBoundsWgs84((current) => {
@@ -1937,21 +1952,6 @@ export default function TerrainModelPage() {
     resetGeneratedOutputs()
     setOpenTopoStatus({ tone: 'idle', label: '等待获取' })
   }, [manualFootprintRotationDegrees, resetGeneratedOutputs])
-
-  const applyManualTerrainFootprint = useCallback((footprint, shape = manualFootprintShape) => {
-    const nextFootprint = normalizeManualFootprintWgs84(footprint)
-    const nextBounds = manualFootprintToBoundsWgs84(nextFootprint)
-    if (!nextBounds) {
-      showError('手动范围无效')
-      return
-    }
-    setManualFootprintShape(MANUAL_FOOTPRINT_SHAPES.some((item) => item.key === shape) ? shape : 'custom')
-    setManualFootprintWgs84(nextFootprint)
-    setManualBoundsWgs84(boundsToInputValues(nextBounds))
-    setTerrainBoundsMode('manual')
-    resetGeneratedOutputs()
-    setOpenTopoStatus({ tone: 'idle', label: '等待获取' })
-  }, [manualFootprintShape, resetGeneratedOutputs])
 
   const applyCurrentTerrainBounds = useCallback(() => {
     if (!autoTerrainBounds) return

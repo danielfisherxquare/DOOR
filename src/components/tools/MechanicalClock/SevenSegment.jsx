@@ -79,7 +79,7 @@ const Segment = memo(({ segmentId, isOn, prevOn }) => {
         setFlipDirection(null)
       }, totalDuration)
     }
-  }, [isOn, prevOn, isMuted, playSegmentFlipSound, randomDelay])
+  }, [getAudioContext, isMuted, isOn, playSegmentFlipSound, prevOn, randomDelay])
 
   // 组件卸载时清理
   useEffect(() => {

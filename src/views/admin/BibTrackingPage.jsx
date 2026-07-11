@@ -138,7 +138,7 @@ function BibTrackingPage() {
         return () => {
             cancelled = true
         }
-    }, [isSuperAdmin, selectedOrgId, selectedRaceId, setSearchParams])
+    }, [isSuperAdmin, searchParams, selectedOrgId, selectedRaceId, setSearchParams])
 
     useEffect(() => {
         if (!selectedRaceId) {

@@ -97,18 +97,22 @@ const ThumbnailList = ({ items, borderColor, onPreview }) => {
 
   useEffect(() => {
     let mounted = true;
+    const createdUrls = [];
     const loadUrls = async () => {
       for (const item of items) {
         const url = await getAttachmentThumbnail(item.id);
         if (mounted && url) {
+          createdUrls.push(url);
           setUrls((prev) => ({ ...prev, [item.id]: url }));
+        } else if (url) {
+          URL.revokeObjectURL(url);
         }
       }
     };
     loadUrls();
     return () => {
       mounted = false;
-      Object.values(urls).forEach((url) => {
+      createdUrls.forEach((url) => {
         if (url) URL.revokeObjectURL(url);
       });
     };
@@ -147,9 +151,11 @@ const AttachmentPreviewModal = ({ attachment, onClose }) => {
 
   useEffect(() => {
     let mounted = true;
+    let loadedUrl = null;
     const loadImage = async () => {
       try {
         const url = await getAttachmentImage(attachment.id);
+        loadedUrl = url;
         if (mounted) {
           setImageUrl(url);
           setLoading(false);
@@ -161,7 +167,7 @@ const AttachmentPreviewModal = ({ attachment, onClose }) => {
     loadImage();
     return () => {
       mounted = false;
-      if (imageUrl) URL.revokeObjectURL(imageUrl);
+      if (loadedUrl) URL.revokeObjectURL(loadedUrl);
     };
   }, [attachment.id, getAttachmentImage]);
 

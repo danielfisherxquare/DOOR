@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import assessmentAdminApi from '../../../api/assessmentAdmin'
 import { loadChartJs } from '../../../utils/chartLoader'
@@ -144,7 +144,7 @@ function AssessmentCampaignDetailPage() {
     return `${window.location.origin}/assessment/${id}`
   }, [id])
 
-  const loadDetail = async () => {
+  const loadDetail = useCallback(async () => {
     setLoading(true)
     setMessage('')
     try {
@@ -166,9 +166,9 @@ function AssessmentCampaignDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
 
-  const loadCandidates = async (keyword = '') => {
+  const loadCandidates = useCallback(async (keyword = '') => {
     setCandidateLoading(true)
     try {
       const res = await assessmentAdminApi.getTeamCandidates(id, keyword)
@@ -180,12 +180,12 @@ function AssessmentCampaignDetailPage() {
     } finally {
       setCandidateLoading(false)
     }
-  }
+  }, [id])
 
   useEffect(() => {
     void loadDetail()
     void loadCandidates('')
-  }, [id])
+  }, [loadCandidates, loadDetail])
 
   const updateTemplateItem = (index, key, value) => {
     setDetail((prev) => {
@@ -329,7 +329,7 @@ function AssessmentCampaignDetailPage() {
     }
   }
 
-  const renderRadarChart = (report) => {
+  const renderRadarChart = useCallback((report) => {
     if (!radarChartRef.current || !chartLoaded || !window.Chart) return
 
     const itemAverages = report.itemAverages || []
@@ -373,7 +373,7 @@ function AssessmentCampaignDetailPage() {
         plugins: { legend: { display: false } }
       }
     })
-  }
+  }, [chartLoaded])
 
   useEffect(() => {
     if (selectedMemberReport?.report && chartLoaded) {
@@ -385,7 +385,7 @@ function AssessmentCampaignDetailPage() {
         radarChartInstance.current = null
       }
     }
-  }, [selectedMemberReport, chartLoaded])
+  }, [chartLoaded, renderRadarChart, selectedMemberReport])
 
   const handleGrowthSearch = async () => {
     if (!growthCode.trim()) return

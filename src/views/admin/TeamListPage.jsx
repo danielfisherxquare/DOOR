@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import adminApi from '../../api/adminApi'
@@ -239,7 +239,7 @@ export default function TeamListPage() {
     }
   }, [photoPreviewUrl])
 
-  const loadItems = async () => {
+  const loadItems = useCallback(async () => {
     if (!canUsePage) {
       setItems([])
       setTotal(0)
@@ -259,7 +259,7 @@ export default function TeamListPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [canUsePage, query])
 
   const loadEmployeeCodeCatalog = async () => {
     if (!canUsePage) {
@@ -307,7 +307,7 @@ export default function TeamListPage() {
 
   useEffect(() => {
     void loadItems()
-  }, [canUsePage, query])
+  }, [loadItems])
 
   const resetPhotoState = (hasPhoto = false) => {
     setPhotoFile(null)

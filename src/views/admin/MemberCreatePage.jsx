@@ -35,7 +35,7 @@ function MemberCreatePage() {
                 }
             })
             .catch(() => { })
-    }, [isSuperAdmin, orgId])
+    }, [isSuperAdmin, orgId, selectedOrgId])
 
     const targetOrgId = useMemo(() => {
         if (!isSuperAdmin) return orgId

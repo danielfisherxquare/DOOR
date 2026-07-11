@@ -27,6 +27,34 @@ export default function MeasureTool({
     const [previewPoint, setPreviewPoint] = useState(null)
     const [shiftPressed, setShiftPressed] = useState(false)
 
+    const commitMeasurement = useCallback((finalPoints) => {
+        if (finalPoints.length < 2) return
+
+        let value = 0
+        let label = ''
+
+        if (mode === 'distance') {
+            value = calculatePathLength(finalPoints)
+            label = formatDistance(value)
+        } else if (mode === 'area' && finalPoints.length >= 3) {
+            value = calculatePolygonArea(finalPoints)
+            label = formatArea(value)
+        } else if (mode === 'angle' && finalPoints.length === 3) {
+            value = calculateAngle(finalPoints[0], finalPoints[1], finalPoints[2])
+            label = formatAngle(value)
+        }
+
+        onCommit?.({
+            type: mode,
+            points: finalPoints,
+            value,
+            label,
+        })
+
+        setPoints([])
+        setPreviewPoint(null)
+    }, [mode, onCommit])
+
     // 监听键盘
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -49,7 +77,7 @@ export default function MeasureTool({
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [points, onCancel])
+    }, [commitMeasurement, onCancel, points])
 
     // 计算吸附点
     const getSnappedPoint = useCallback((point) => {
@@ -86,7 +114,7 @@ export default function MeasureTool({
         } else {
             setPoints(prev => [...prev, point])
         }
-    }, [mode, points, getSnappedPoint])
+    }, [commitMeasurement, getSnappedPoint, mode, points, warehouseOffset.x, warehouseOffset.z])
 
     // 双击完成
     const handleDoubleClick = useCallback((e) => {
@@ -94,36 +122,7 @@ export default function MeasureTool({
         if (points.length >= 2) {
             commitMeasurement(points)
         }
-    }, [points])
-
-    // 提交测量结果
-    const commitMeasurement = (finalPoints) => {
-        if (finalPoints.length < 2) return
-
-        let value = 0
-        let label = ''
-
-        if (mode === 'distance') {
-            value = calculatePathLength(finalPoints)
-            label = formatDistance(value)
-        } else if (mode === 'area' && finalPoints.length >= 3) {
-            value = calculatePolygonArea(finalPoints)
-            label = formatArea(value)
-        } else if (mode === 'angle' && finalPoints.length === 3) {
-            value = calculateAngle(finalPoints[0], finalPoints[1], finalPoints[2])
-            label = formatAngle(value)
-        }
-
-        onCommit?.({
-            type: mode,
-            points: finalPoints,
-            value,
-            label,
-        })
-
-        setPoints([])
-        setPreviewPoint(null)
-    }
+    }, [commitMeasurement, points])
 
     // 计算预览值
     const previewValue = useMemo(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { adminCredentialApi as credentialApi } from '../../../api/credential'
 import { useCredentialSurface } from './useCredentialSurface'
@@ -38,7 +38,7 @@ function CredentialStylePage() {
     const [form, setForm] = useState(EMPTY_TEMPLATE)
     const [previewLayout, setPreviewLayout] = useState(null)
 
-    const loadTemplates = async () => {
+    const loadTemplates = useCallback(async () => {
         if (!raceId) return
         setLoading(true)
         try {
@@ -51,11 +51,11 @@ function CredentialStylePage() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [raceId, statusFilter])
 
     useEffect(() => {
         void loadTemplates()
-    }, [raceId, statusFilter])
+    }, [loadTemplates])
 
     const resetForm = () => {
         setEditingTemplate(null)

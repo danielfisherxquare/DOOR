@@ -84,7 +84,7 @@ const Segment3D = memo(({ segmentId, isOn, prevOn, digitDelay = 0 }) => {
                 setFlipDirection(null)
             }, cleanupDelay)
         }
-    }, [isOn, prevOn, isMuted, playSegmentFlipSound, totalDelay, animDuration])
+    }, [animDuration, getAudioContext, isMuted, isOn, playSegmentFlipSound, prevOn, totalDelay])
 
     useEffect(() => {
         return () => {

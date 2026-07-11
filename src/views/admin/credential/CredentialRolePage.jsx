@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { adminCredentialApi as credentialApi } from '../../../api/credential'
 import { useCredentialSurface } from './useCredentialSurface'
@@ -32,7 +32,7 @@ function CredentialRolePage() {
     const [editingCategory, setEditingCategory] = useState(null)
     const [form, setForm] = useState(EMPTY_FORM)
 
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         if (!raceId) return
         setLoading(true)
         try {
@@ -47,11 +47,11 @@ function CredentialRolePage() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [raceId])
 
     useEffect(() => {
         void loadData()
-    }, [raceId])
+    }, [loadData])
 
     const resetForm = () => {
         setEditingCategory(null)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import useAuthStore from '../../../stores/authStore'
 import { useCredentialSurface } from './useCredentialSurface'
@@ -70,7 +70,7 @@ export default function CredentialApplicationPage() {
 
   const canDirectCreate = ['race_admin', 'org_admin', 'super_admin'].includes(user?.role)
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!raceId) return
     setLoading(true)
     try {
@@ -87,11 +87,11 @@ export default function CredentialApplicationPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [credentialApi, raceId, statusFilter])
 
   useEffect(() => {
     void loadData()
-  }, [credentialApi, raceId, statusFilter])
+  }, [loadData])
 
   const currentCategory = useMemo(
     () => categories.find((item) => String(item.id) === String(form.categoryId)) || null,

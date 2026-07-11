@@ -90,7 +90,7 @@ function ColorSchemePage() {
       loadOrgScheme(orgId, currentSurface)
       loadCustomSchemes(orgId, currentSurface)
     }
-  }, [orgId, currentSurface])
+  }, [currentSurface, loadCustomSchemes, loadOrgScheme, orgId])
 
   // 应用配色到整个系统
   useEffect(() => {

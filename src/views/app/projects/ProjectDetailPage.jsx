@@ -18,6 +18,8 @@ export default function ProjectDetailPage() {
     const [saving, setSaving] = useState(false);
     const [availableRaces, setAvailableRaces] = useState([]);
     const [viewMode, setViewMode] = useState('list');
+    const requestedOrgId = searchParams.get('orgId');
+    const userOrgId = user?.orgId || user?.org?.id || '';
 
     useEffect(() => {
         if (id !== 'new') {
@@ -30,7 +32,7 @@ export default function ProjectDetailPage() {
                 name: '',
                 description: '',
                 race_id: '',
-                org_id: searchParams.get('orgId') || user?.orgId || user?.org?.id || '',
+                org_id: requestedOrgId || userOrgId,
             });
         }
 
@@ -39,14 +41,14 @@ export default function ProjectDetailPage() {
                 setAvailableRaces(res.data || []);
             }
         }).catch((err) => console.error('Failed to load races', err));
-    }, [id]);
+    }, [id, requestedOrgId, userOrgId]);
 
     const handleSave = async () => {
         setSaving(true);
         try {
             const payload = {
                 ...project,
-                org_id: project.org_id || searchParams.get('orgId') || user?.orgId || user?.org?.id || null,
+                org_id: project.org_id || requestedOrgId || userOrgId || null,
             };
             const data = id === 'new'
                 ? await projectsApi.create(payload)

@@ -77,14 +77,6 @@ function BibPickupPage() {
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
-    const preset = searchParams.get('t')
-    if (preset) {
-      handleToken(preset)
-    }
-    scanningRef.current = false
-  }, [searchParams])
-
-  useEffect(() => {
     return () => {
       controlsRef.current?.stop()
       readerRef.current = null
@@ -118,6 +110,14 @@ function BibPickupPage() {
       setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    const preset = searchParams.get('t')
+    if (preset) {
+      handleToken(preset)
+    }
+    scanningRef.current = false
+  }, [handleToken, searchParams])
 
   const handleDetectedToken = useCallback((token) => {
     if (!token) return

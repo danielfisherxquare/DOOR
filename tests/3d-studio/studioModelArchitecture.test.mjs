@@ -13,3 +13,10 @@ test('editor document delegates primitive geometry to focused modules', async ()
   assert.match(source, /from '\.\/planeGeometry\.js'/)
   assert.match(source, /from '\.\/polygonGeometry\.js'/)
 })
+
+test('push pull height label uses the browser document instead of the modeling document', async () => {
+  const source = await readFile(new URL('src/3d-studio/tools/PushPullTool.jsx', rootUrl), 'utf8')
+
+  assert.doesNotMatch(source, /<PushPullHeightLabel[^>]+document=\{document\}/)
+  assert.match(source, /const domDocument = globalThis\.document/)
+})

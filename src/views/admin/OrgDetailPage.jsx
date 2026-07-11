@@ -61,7 +61,7 @@ function OrgDetailPage() {
     }
   }, [orgId])
 
-  const overview = data?.overview || {}
+  const overview = useMemo(() => data?.overview || {}, [data?.overview])
   const users = data?.users || []
   const races = data?.races || []
   const teamMembers = data?.teamMembers || []

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import lotteryApi from '../../../../api/lottery'
 import {
   AppH5DataTable,
@@ -107,7 +107,7 @@ export default function LotteryV2BetaPanel({ raceId, onUpdated }) {
   const [message, setMessage] = useState('')
   const [messageTone, setMessageTone] = useState('info')
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     setLoading(true)
     try {
       const [configResponse, previewResponse, resultsResponse] = await Promise.all([
@@ -126,11 +126,11 @@ export default function LotteryV2BetaPanel({ raceId, onUpdated }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [raceId])
 
   useEffect(() => {
     loadAll()
-  }, [raceId])
+  }, [loadAll])
 
   const canFinalize = Boolean(preview?.status === 'ready' && (!preview?.errors || preview.errors.length === 0))
   const previewSummary = preview?.resultSummary || {}

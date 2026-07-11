@@ -65,19 +65,17 @@ function InvoiceProcessingCenter({ projectId, onImportToRecords }) {
             });
             setStats(newStats);
 
-            if (selectedInvoice) {
-                const updated = data.queue.find(inv => inv.id === selectedInvoice.id);
-                if (updated) {
-                    setSelectedInvoice(updated);
-                }
-            }
+            setSelectedInvoice((current) => {
+                if (!current) return current;
+                return data.queue.find(inv => inv.id === current.id) || current;
+            });
         } catch (error) {
             console.error('获取处理队列失败:', error);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [projectId, selectedInvoice?.id]);
+    }, [projectId]);
 
     useEffect(() => {
         if (projectId) {

@@ -24,7 +24,9 @@ const initialStatus: OfflineStatus = {
  * 获取网络连接类型
  */
 function getConnectionType(): string {
-  const nav = navigator as any;
+  const nav = navigator as Navigator & {
+    connection?: EventTarget & { effectiveType?: string; type?: string };
+  };
 
   if (nav.connection) {
     return nav.connection.effectiveType || nav.connection.type || 'unknown';
@@ -71,14 +73,15 @@ export function useOfflineStatus(): OfflineStatus {
     window.addEventListener('offline', handleOffline);
 
     // 监听连接类型变化 (如果支持)
-    const nav = navigator as any;
+    const nav = navigator as Navigator & { connection?: EventTarget };
+    const handleConnectionChange = () => {
+      setStatus((prev) => ({
+        ...prev,
+        connectionType: getConnectionType(),
+      }));
+    };
     if (nav.connection) {
-      nav.connection.addEventListener('change', () => {
-        setStatus((prev) => ({
-          ...prev,
-          connectionType: getConnectionType(),
-        }));
-      });
+      nav.connection.addEventListener('change', handleConnectionChange);
     }
 
     return () => {
@@ -86,7 +89,7 @@ export function useOfflineStatus(): OfflineStatus {
       window.removeEventListener('offline', handleOffline);
 
       if (nav.connection) {
-        nav.connection.removeEventListener('change', () => {});
+        nav.connection.removeEventListener('change', handleConnectionChange);
       }
     };
   }, []);
@@ -98,8 +101,7 @@ export function useOfflineStatus(): OfflineStatus {
  * 网络恢复提示 Hook
  */
 export function useNetworkRecovery(
-  onRecovery: () => void,
-  deps: any[] = []
+  onRecovery: () => void
 ): void {
   const [wasOffline, setWasOffline] = useState(false);
 
@@ -122,7 +124,7 @@ export function useNetworkRecovery(
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [wasOffline, ...deps]);
+  }, [onRecovery, wasOffline]);
 }
 
 /**

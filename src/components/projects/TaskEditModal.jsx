@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import projectsApi from '../../api/projects'
 import './projects-components.css'
 
@@ -72,7 +72,7 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
     [candidates],
   )
 
-  const loadCandidates = async (keyword = '') => {
+  const loadCandidates = useCallback(async (keyword = '') => {
     setLoadingCandidates(true)
     try {
       const res = await projectsApi.getTeamCandidates(projectId, keyword)
@@ -80,12 +80,12 @@ export default function TaskEditModal({ task, projectId, onClose, onSaveSuccess 
     } finally {
       setLoadingCandidates(false)
     }
-  }
+  }, [projectId])
 
   useEffect(() => {
     if (!task) return
     void loadCandidates('')
-  }, [task, projectId])
+  }, [loadCandidates, task])
 
   const toggleCandidate = (candidateId) => {
     setSelectedAssignees((prev) => {

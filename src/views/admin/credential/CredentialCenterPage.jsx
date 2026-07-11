@@ -92,7 +92,7 @@ export default function CredentialCenterPage() {
         { label: '领取管理', href: buildHref('/credential/issue', context) },
       ],
     },
-  ]), [context])
+  ]), [buildHref, context])
 
   return (
     <div style={{ display: 'grid', gap: 18 }}>

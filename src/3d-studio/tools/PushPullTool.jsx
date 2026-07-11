@@ -129,16 +129,17 @@ export default function PushPullTool() {
     }
   }, [camera, commitDocument, document, gl, raycaster, selectedGeometry, setDirty, setPushPullPreview])
 
-  return <PushPullHeightLabel preview={pushPullPreview} document={document} />
+  return <PushPullHeightLabel preview={pushPullPreview} />
 }
 
-function PushPullHeightLabel({ preview, document }) {
+function PushPullHeightLabel({ preview }) {
   const { camera } = useThree()
   const labelRef = useRef(null)
+  const domDocument = globalThis.document
 
   useEffect(() => {
-    if (!preview?.height) return
-    const el = document.createElement('div')
+    if (!preview?.height || !domDocument) return
+    const el = domDocument.createElement('div')
     Object.assign(el.style, {
       position: 'fixed',
       padding: '2px 10px',
@@ -153,13 +154,13 @@ function PushPullHeightLabel({ preview, document }) {
       fontFamily: 'ui-monospace, SFMono-Regular, monospace',
     })
     el.textContent = `高度: ${preview.height.toFixed(2)}m`
-    document.body.appendChild(el)
+    domDocument.body.appendChild(el)
     labelRef.current = el
     return () => {
       if (el.parentElement) el.parentElement.removeChild(el)
       labelRef.current = null
     }
-  }, [preview?.height])
+  }, [domDocument, preview?.height])
 
   useEffect(() => {
     if (!labelRef.current || !preview?.height) return
@@ -171,7 +172,7 @@ function PushPullHeightLabel({ preview, document }) {
     const center = preview.center
     const vector = new THREE.Vector3(center[0], preview.height + 0.3, center[2]).project(camera)
     if (!Number.isFinite(vector.x)) return
-    const rect = document.documentElement.getBoundingClientRect()
+    const rect = domDocument.documentElement.getBoundingClientRect()
     const x = ((vector.x + 1) / 2) * rect.width
     const y = ((-vector.y + 1) / 2) * rect.height
     labelRef.current.style.left = `${x - 40}px`
