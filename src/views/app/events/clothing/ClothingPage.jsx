@@ -6,6 +6,11 @@ import useRaceContextStore from '../../../../stores/raceContextStore'
 import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
 import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../../../utils/surfaceContext'
 import {
+  buildClothingStatisticsRows,
+  findClothingLimit,
+  formatClothingGender,
+} from './clothingViewModel'
+import {
   AppH5ContextState,
   AppH5DataTable,
   AppH5EmptyState,
@@ -37,7 +42,9 @@ export default function ClothingPage() {
       ])
       setLimits(Array.isArray(limitsResponse?.data) ? limitsResponse.data : Array.isArray(limitsResponse) ? limitsResponse : [])
       const statsData = statsResponse?.data || statsResponse
-      setStatistics(Array.isArray(statsData?.items) ? statsData.items : [])
+      setStatistics(buildClothingStatisticsRows(
+        Array.isArray(statsData?.items) ? statsData.items : [],
+      ))
     } catch (err) {
       console.error('加载服装数据失败:', err)
     } finally {
@@ -59,14 +66,9 @@ export default function ClothingPage() {
     return Array.from(sizes).sort()
   }
 
-  const getLimit = (event, gender, size) => {
-    const limit = limits.find(l => l.event === event && l.gender === gender && l.size === size)
-    return limit
-  }
-
   const totalInventory = limits.reduce((sum, item) => sum + Number(item.totalInventory || 0), 0)
   const totalUsed = limits.reduce((sum, item) => sum + Number(item.usedCount || 0), 0)
-  const totalGap = statistics.reduce((sum, item) => sum + Math.max(0, Number(item.gap || 0)), 0)
+  const totalGap = statistics.reduce((sum, item) => sum + item.overstock, 0)
   const eventCount = new Set(limits.map((item) => item.event).filter(Boolean)).size
 
   const metrics = [
@@ -136,7 +138,7 @@ export default function ClothingPage() {
                   <h4>男子</h4>
                   <div className="clothing-grid">
                     {sizes.map(size => {
-                      const limit = getLimit(event, 'Male', size)
+                      const limit = findClothingLimit(limits, event, 'M', size)
                       return (
                         <div key={`male-${size}`} className="clothing-card">
                           <div className="clothing-card-size">{size}</div>
@@ -158,7 +160,7 @@ export default function ClothingPage() {
                   <h4>女子</h4>
                   <div className="clothing-grid">
                     {sizes.map(size => {
-                      const limit = getLimit(event, 'Female', size)
+                      const limit = findClothingLimit(limits, event, 'F', size)
                       return (
                         <div key={`female-${size}`} className="clothing-card">
                           <div className="clothing-card-size">{size}</div>
@@ -188,21 +190,23 @@ export default function ClothingPage() {
                         <th>项目</th>
                         <th>性别</th>
                         <th>尺码</th>
-                        <th>需求</th>
+                        <th>已用</th>
                         <th>库存</th>
-                        <th>缺口</th>
+                        <th>剩余</th>
+                        <th>超额</th>
                       </tr>
                     </thead>
                     <tbody>
                       {statistics.map((s, i) => (
                         <tr key={i}>
                           <td>{s.event}</td>
-                          <td>{s.gender === 'Male' ? '男子' : '女子'}</td>
+                          <td>{formatClothingGender(s.gender)}</td>
                           <td>{s.size}</td>
-                          <td>{s.demand || 0}</td>
-                          <td>{s.inventory || 0}</td>
-                          <td className={s.gap > 0 ? 'clothing-gap-negative' : ''}>
-                            {s.gap > 0 ? `-${s.gap}` : 0}
+                          <td>{s.usedCount}</td>
+                          <td>{s.totalInventory}</td>
+                          <td>{s.remaining}</td>
+                          <td className={s.overstock > 0 ? 'clothing-gap-negative' : ''}>
+                            {s.overstock > 0 ? `+${s.overstock}` : 0}
                           </td>
                         </tr>
                       ))}

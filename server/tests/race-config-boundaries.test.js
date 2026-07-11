@@ -80,6 +80,16 @@ describe('clothing schemas', () => {
     )
     assert.throws(
       () =>
+        parseClothingLimitPayload({
+          raceId: 7,
+          event: 'FULL',
+          gender: 'Male',
+          size: 'L',
+        }),
+      /gender/,
+    )
+    assert.throws(
+      () =>
         parseClothingBulkPayload({
           items: [
             { raceId: 7, event: 'FULL', gender: 'M', size: 'L' },

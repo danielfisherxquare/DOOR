@@ -20,6 +20,12 @@ function integer(value, label, { min = 0, max = 1_000_000 } = {}) {
   return parsed
 }
 
+function gender(value) {
+  const parsed = text(value, 'gender', 1).toUpperCase()
+  if (!['M', 'F', 'U'].includes(parsed)) invalid('gender 必须是 M、F 或 U')
+  return parsed
+}
+
 export function parseClothingRaceId(value) {
   return integer(value, 'raceId', { min: 1, max: Number.MAX_SAFE_INTEGER })
 }
@@ -36,7 +42,7 @@ export function parseClothingLimitPayload(value) {
   return {
     raceId: parseClothingRaceId(data.raceId),
     event: text(data.event, 'event'),
-    gender: text(data.gender, 'gender', 20),
+    gender: gender(data.gender),
     size: text(data.size, 'size', 50),
     totalInventory: data.totalInventory === undefined
       ? 0
@@ -63,7 +69,7 @@ export function parseClothingIncrementPayload(value) {
   return {
     raceId: parseClothingRaceId(data.raceId),
     event: text(data.event, 'event'),
-    gender: text(data.gender, 'gender', 20),
+    gender: gender(data.gender),
     size: text(data.size, 'size', 50),
     delta,
   }

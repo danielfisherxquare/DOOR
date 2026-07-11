@@ -2,7 +2,7 @@
  * Clothing Repository 鈥?鏈嶈搴撳瓨 鏁版嵁璁块棶灞? * 澶氱鎴烽殧绂伙細鎵€鏈夋煡璇㈠繀椤诲甫 org_id
  */
 import knex from '../../db/knex.js';
-import { clothingLimitMapper } from '../../db/mappers/clothing.js';
+import { clothingLimitMapper, clothingStatisticsMapper } from '../../db/mappers/clothing.js';
 import { normalizeEvent } from '../../utils/event-normalizer.js';
 
 export async function getLimits(orgId, raceId) {
@@ -150,7 +150,7 @@ export async function getStatistics(orgId, raceId) {
         .first();
 
     return {
-        items: rows,
+        items: rows.map(clothingStatisticsMapper.fromDbRow),
         summary: {
             totalInventory: summary?.total_inventory || 0,
             totalUsed: summary?.total_used || 0,

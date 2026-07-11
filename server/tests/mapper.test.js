@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { orgMapper, userMapper, refreshTokenMapper } from '../src/db/mappers/auth.js';
 import { raceMapper } from '../src/db/mappers/races.js';
 import { recordMapper } from '../src/db/mappers/records.js';
+import { clothingStatisticsMapper } from '../src/db/mappers/clothing.js';
 
 // ═══════════════════════════════════════════════════════
 // Auth Mapper
@@ -173,6 +174,28 @@ describe('Race Mapper', () => {
 
     it('fromDbRow null 返回 null', () => {
         assert.equal(raceMapper.fromDbRow(null), null);
+    });
+});
+
+describe('Clothing Mapper', () => {
+    it('does not leak database field names from statistics responses', () => {
+        assert.deepEqual(clothingStatisticsMapper.fromDbRow({
+            event: 'ALL',
+            gender: 'M',
+            size: 'L',
+            total_inventory: '10',
+            used_count: '12',
+            remaining: '-2',
+            usage_pct: '120.0',
+        }), {
+            event: 'ALL',
+            gender: 'M',
+            size: 'L',
+            totalInventory: 10,
+            usedCount: 12,
+            remaining: -2,
+            usagePercent: 120,
+        });
     });
 });
 

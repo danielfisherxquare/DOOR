@@ -43,3 +43,18 @@ export const clothingLimitMapper = {
         return row;
     },
 };
+
+export const clothingStatisticsMapper = {
+    fromDbRow(row) {
+        if (!row) return null;
+        return {
+            event: row.event,
+            gender: row.gender,
+            size: row.size,
+            totalInventory: Number(row.total_inventory),
+            usedCount: Number(row.used_count),
+            remaining: Number(row.remaining),
+            usagePercent: Number(row.usage_pct),
+        };
+    },
+};
