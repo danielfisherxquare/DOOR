@@ -220,7 +220,8 @@ async function openMapPage(browser, baseUrl, options = {}) {
     const body = await page.locator('body').innerText().catch(() => '');
     const authStorage = await page.evaluate(() => localStorage.getItem('auth-storage')).catch(() => null);
     throw new Error(
-      `Map toolbar did not render at ${page.url()}. API calls: ${JSON.stringify(apiCalls)}. Auth: ${authStorage}. Body: ${body.slice(0, 1200)}`,
+      `Map toolbar did not render at ${page.url()}. API calls: ${JSON.stringify(apiCalls)}. `
+      + `Console: ${JSON.stringify(consoleErrors)}. Auth: ${authStorage}. Body: ${body.slice(0, 1200)}`,
       { cause: error },
     );
   }

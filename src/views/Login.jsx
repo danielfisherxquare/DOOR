@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import useAuthStore from '../stores/authStore'
 import useWorkspaceStore from '../features/workspace/workspaceStore'
 import { createWorkspaceSession } from '../features/workspace/workspaceSession'
