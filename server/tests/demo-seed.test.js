@@ -133,4 +133,36 @@ test('demo seed is idempotent, isolated, and grants the acceptance surfaces', as
     calculatedCapacity: 1000,
     sortOrder: 1,
   }]);
+
+  const accessAreas = await knex('credential_access_areas')
+    .where({ org_id: shanghaiRace.org_id, race_id: shanghaiRace.id })
+    .select('id', 'access_code', 'access_name', 'is_active');
+  assert.deepEqual(accessAreas.map((row) => ({
+    accessCode: row.access_code,
+    accessName: row.access_name,
+    isActive: row.is_active,
+  })), [{
+    accessCode: '101',
+    accessName: '终点核心区',
+    isActive: true,
+  }]);
+
+  const categories = await knex('credential_categories')
+    .where({ org_id: shanghaiRace.org_id, race_id: shanghaiRace.id })
+    .select('id', 'category_code', 'category_name', 'requires_review');
+  assert.deepEqual(categories.map((row) => ({
+    categoryCode: row.category_code,
+    categoryName: row.category_name,
+    requiresReview: row.requires_review,
+  })), [{
+    categoryCode: 'OPS',
+    categoryName: '赛事执行',
+    requiresReview: true,
+  }]);
+
+  const categoryAreaLinks = await knex('credential_category_access_areas')
+    .where({ category_id: categories[0].id, access_area_id: accessAreas[0].id })
+    .count('* as count')
+    .first();
+  assert.equal(Number(categoryAreaLinks.count), 1);
 });

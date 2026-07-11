@@ -365,6 +365,37 @@ async function main() {
             score_upper_seconds: null,
         });
 
+        const [credentialAccessArea] = await trx('credential_access_areas')
+            .insert({
+                org_id: eastOrg.id,
+                race_id: Number(shanghaiFull.id),
+                access_code: '101',
+                access_name: '终点核心区',
+                access_color: '#DC2626',
+                sort_order: 1,
+                description: '终点拱门、混合采访区和完赛物资交接区域',
+                is_active: true,
+            })
+            .returning(['id']);
+        const [credentialCategory] = await trx('credential_categories')
+            .insert({
+                org_id: eastOrg.id,
+                race_id: Number(shanghaiFull.id),
+                category_name: '赛事执行',
+                category_code: 'OPS',
+                card_color: '#1D4ED8',
+                requires_review: true,
+                is_active: true,
+                description: '赛事现场执行人员验收类别',
+                sort_order: 1,
+            })
+            .returning(['id']);
+        await trx('credential_category_access_areas').insert({
+            category_id: credentialCategory.id,
+            access_area_id: credentialAccessArea.id,
+            sort_order: 1,
+        });
+
         const orgGrants = [
             { org_id: eastOrg.id, race_id: Number(chongqingTrail.id), access_level: 'viewer' },
             { org_id: mountainOrg.id, race_id: Number(shanghaiHalf.id), access_level: 'editor' },
