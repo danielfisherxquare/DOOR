@@ -2,7 +2,12 @@
  * EventDistribution - Pie/donut chart for event distribution using ECharts
  */
 import { useEffect, useRef } from 'react';
-import * as echarts from 'echarts';
+import { PieChart } from 'echarts/charts';
+import { LegendComponent, TooltipComponent } from 'echarts/components';
+import { init, use as registerEChartsFeatures } from 'echarts/core';
+import { CanvasRenderer } from 'echarts/renderers';
+
+registerEChartsFeatures([PieChart, LegendComponent, TooltipComponent, CanvasRenderer]);
 
 function EventDistribution({ data }) {
     const chartRef = useRef(null);
@@ -13,7 +18,7 @@ function EventDistribution({ data }) {
 
         // Initialize or reuse chart
         if (!chartInstanceRef.current) {
-            chartInstanceRef.current = echarts.init(chartRef.current);
+            chartInstanceRef.current = init(chartRef.current);
         }
 
         const chartData = data.map((item) => ({
