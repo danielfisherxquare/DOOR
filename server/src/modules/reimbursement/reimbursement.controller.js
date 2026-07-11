@@ -10,14 +10,19 @@ import path from 'path';
 import { processInvoice, processPayment } from './ocr.service.js';
 import * as service from './reimbursement.service.js';
 import { generateExportWorkbook } from './preview.service.js';
-import { env } from '../../config/env.js';
 import { attachOcrReview } from './ocr.review.js';
 import {
-  maskReimbursementLlmConfig,
-  sanitizeReimbursementLlmRequestConfig,
-} from './reimbursement-llm-secret.js';
+  buildPaymentReviewRecordData,
+  buildSettingsUpdatePayload,
+  createMissingOcrConfigError,
+  normalizeOcrError,
+  resolveReimbursementOcrConfig,
+  toSettingsResponse,
+} from './reimbursement-ocr-config.js';
 import { replaceAttachmentFile } from './reimbursement-attachment.storage.js';
 import { resolveReimbursementExportName } from './reimbursement-export-name.js';
+
+export { buildSettingsUpdatePayload, normalizeOcrError, toSettingsResponse };
 
 // 配置文件上传
 const upload = multer({
@@ -37,174 +42,10 @@ const upload = multer({
   },
 });
 
-const DEFAULT_LLM_CONFIG = {
-  provider: 'qwen',
-  baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-  apiKey: '',
-  modelName: 'qwen3.5-plus',
-};
-
-function getServerLlmConfig() {
-  return {
-    provider: env.REIMBURSEMENT_OCR_PROVIDER || DEFAULT_LLM_CONFIG.provider,
-    baseUrl: env.REIMBURSEMENT_OCR_BASE_URL || DEFAULT_LLM_CONFIG.baseUrl,
-    apiKey: env.REIMBURSEMENT_OCR_API_KEY || '',
-    modelName: env.REIMBURSEMENT_OCR_MODEL_NAME || DEFAULT_LLM_CONFIG.modelName,
-  };
-}
-
-function buildPaymentReviewRecordData(paymentData = {}) {
-  const rawExpense = paymentData.amount ?? paymentData.expense ?? null;
-  return {
-    payment_date: paymentData.date || paymentData.payment_date || null,
-    category: paymentData.category || null,
-    sub_category: paymentData.subCategory || paymentData.sub_category || null,
-    expense: rawExpense != null ? Math.abs(Number(rawExpense) || 0) || null : null,
-    company: paymentData.payee || paymentData.targetName || paymentData.company || null,
-  };
-}
-
-function mergeNonEmptyConfig(...configs) {
-  const merged = {};
-
-  for (const config of configs) {
-    if (!config || typeof config !== 'object') continue;
-
-    for (const [key, value] of Object.entries(config)) {
-      if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (trimmed) {
-          merged[key] = trimmed;
-        }
-        continue;
-      }
-
-      if (value != null) {
-        merged[key] = value;
-      }
-    }
-  }
-
-  return merged;
-}
-
-function getServerOcrOverrideConfig() {
-  const serverConfig = getServerLlmConfig();
-
-  if (!serverConfig.apiKey) {
-    return null;
-  }
-
-  return serverConfig;
-}
-
-function readRequestConfig(req) {
-  const directConfig = {
-    provider: req.body?.provider,
-    baseUrl: req.body?.baseUrl,
-    apiKey: req.body?.apiKey,
-    modelName: req.body?.modelName,
-  };
-
-  if (!req.body?.config) {
-    return sanitizeReimbursementLlmRequestConfig(directConfig);
-  }
-
-  try {
-    const parsed = typeof req.body.config === 'string' ? JSON.parse(req.body.config) : req.body.config;
-    return sanitizeReimbursementLlmRequestConfig({ ...directConfig, ...(parsed || {}) });
-  } catch {
-    return sanitizeReimbursementLlmRequestConfig(directConfig);
-  }
-}
-
 export async function resolveOcrConfig(req) {
   const userId = req.authContext?.userId;
   const settings = userId ? await service.getUserSettings(userId) : null;
-  const requestConfig = readRequestConfig(req);
-
-  return mergeNonEmptyConfig(
-    DEFAULT_LLM_CONFIG,
-    settings?.llm_config,
-    requestConfig,
-    getServerOcrOverrideConfig(),
-  );
-}
-
-function createMissingOcrConfigError() {
-  const error = new Error('缺少 OCR 模型配置，请在报销助手中填写模型配置，或由服务端配置 REIMBURSEMENT_OCR_* 环境变量');
-  error.status = 400;
-  error.expose = true;
-  return error;
-}
-
-export function normalizeOcrError(error, label) {
-  const upstreamStatus = error?.response?.status;
-  if (!upstreamStatus) {
-    return error;
-  }
-
-  const upstreamData = error.response?.data;
-  const rawDetail = typeof upstreamData === 'string'
-    ? upstreamData
-    : upstreamData?.message || upstreamData?.error?.message || upstreamData?.error || '';
-  const detail = typeof rawDetail === 'string' ? rawDetail : JSON.stringify(rawDetail);
-  const message = upstreamStatus === 401
-    ? `${label}上游模型鉴权失败，请检查 API Key、Base URL 与模型配置`
-    : `${label}上游模型调用失败 (${upstreamStatus})`;
-
-  const normalized = new Error(detail ? `${message}: ${String(detail).slice(0, 240)}` : message);
-  normalized.status = 502;
-  normalized.expose = true;
-  return normalized;
-}
-
-export function toSettingsResponse(settings) {
-  const userConfig = settings?.llm_config || {};
-  const serverConfig = getServerLlmConfig();
-  const hasServerLlmConfig = Boolean(serverConfig.apiKey && serverConfig.baseUrl);
-
-  const hasUserApiKey = Boolean(userConfig.apiKey?.trim());
-  const maskedUserConfig = maskReimbursementLlmConfig(userConfig);
-  const mergedConfig = {
-    ...DEFAULT_LLM_CONFIG,
-    provider: hasUserApiKey ? (userConfig.provider || DEFAULT_LLM_CONFIG.provider) : (hasServerLlmConfig ? serverConfig.provider : (userConfig.provider || DEFAULT_LLM_CONFIG.provider)),
-    baseUrl: hasUserApiKey ? (userConfig.baseUrl || DEFAULT_LLM_CONFIG.baseUrl) : (hasServerLlmConfig ? serverConfig.baseUrl : (userConfig.baseUrl || serverConfig.baseUrl || DEFAULT_LLM_CONFIG.baseUrl)),
-    apiKey: hasUserApiKey ? maskedUserConfig.apiKey : '',
-    modelName: hasUserApiKey ? (userConfig.modelName || DEFAULT_LLM_CONFIG.modelName) : (hasServerLlmConfig ? serverConfig.modelName : (userConfig.modelName || serverConfig.modelName || DEFAULT_LLM_CONFIG.modelName)),
-  };
-
-  return {
-    defaultReporter: settings?.default_reporter || '',
-    watchDirectoryPath: settings?.watch_directory_path || '',
-    llmConfig: mergedConfig,
-    hasServerLlmConfig,
-    hasUserLlmConfig: hasUserApiKey,
-  };
-}
-
-export function buildSettingsUpdatePayload(body = {}, current = {}) {
-  const requestConfig = body.llmConfig ?? body.llm_config;
-  const submittedConfig = sanitizeReimbursementLlmRequestConfig(requestConfig);
-  const currentConfig = current.llm_config || DEFAULT_LLM_CONFIG;
-
-  return {
-    default_reporter:
-      body.defaultReporter ?? body.default_reporter ?? current.default_reporter ?? '',
-    watch_directory_path:
-      body.watchDirectoryPath ??
-      body.watch_directory_path ??
-      current.watch_directory_path ??
-      '',
-    llm_config: {
-      provider: submittedConfig.provider || currentConfig.provider || DEFAULT_LLM_CONFIG.provider,
-      baseUrl: submittedConfig.baseUrl || currentConfig.baseUrl || DEFAULT_LLM_CONFIG.baseUrl,
-      apiKey:
-        body.clearApiKey === true ? '' : submittedConfig.apiKey || currentConfig.apiKey || '',
-      modelName:
-        submittedConfig.modelName || currentConfig.modelName || DEFAULT_LLM_CONFIG.modelName,
-    },
-  };
+  return resolveReimbursementOcrConfig({ body: req.body, settings });
 }
 
 // ==================== OCR识别 ====================

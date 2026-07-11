@@ -11,6 +11,7 @@ const ratchet = JSON.parse(
 )
 const reimbursementServiceLineLimits = {
   'src/modules/reimbursement/preview.service.js': 1200,
+  'src/modules/reimbursement/reimbursement.controller.js': 1000,
   'src/modules/reimbursement/reimbursement.service.js': 1250,
 }
 
