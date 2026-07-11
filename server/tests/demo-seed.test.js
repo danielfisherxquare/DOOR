@@ -64,10 +64,27 @@ after(async () => {
 });
 
 test('demo seed is idempotent, isolated, and grants the acceptance surfaces', async () => {
-  for (let run = 1; run <= 2; run += 1) {
-    const result = runDemoSeed();
-    assert.equal(result.status, 0, `seed run ${run} failed: ${result.stderr || result.stdout}`);
-  }
+  const firstRun = runDemoSeed();
+  assert.equal(firstRun.status, 0, `seed run 1 failed: ${firstRun.stderr || firstRun.stdout}`);
+
+  const preservedRace = await knex('races as race')
+    .join('organizations as org', 'org.id', 'race.org_id')
+    .where({ 'org.slug': 'demo-east-run', 'race.name': '上海国际马拉松' })
+    .first('race.id', 'race.org_id');
+  assert.ok(preservedRace);
+  await knex('records').insert({
+    org_id: preservedRace.org_id,
+    race_id: preservedRace.id,
+    name: '种子重跑保留哨兵',
+    id_number: 'SEED-PRESERVE-001',
+    phone: '13800009999',
+    gender: 'M',
+    event: '全程马拉松',
+    _source: 'acceptance_seed_preserved',
+  });
+
+  const secondRun = runDemoSeed();
+  assert.equal(secondRun.status, 0, `seed run 2 failed: ${secondRun.stderr || secondRun.stdout}`);
 
   const demoOrganizations = await knex('organizations').whereIn('slug', DEMO_SLUGS).select('id');
   const demoOrgIds = demoOrganizations.map((row) => row.id);
@@ -77,6 +94,7 @@ test('demo seed is idempotent, isolated, and grants the acceptance surfaces', as
   assert.equal(await knex('users').whereIn('org_id', demoOrgIds).count('* as count').first().then((row) => Number(row.count)), 9);
   assert.equal(await knex('team_members').whereIn('org_id', demoOrgIds).count('* as count').first().then((row) => Number(row.count)), 11);
   assert.equal(await knex('organizations').where({ slug: 'acceptance-seed-sentinel' }).count('* as count').first().then((row) => Number(row.count)), 1);
+  assert.equal(await knex('records').where({ _source: 'acceptance_seed_preserved' }).count('* as count').first().then((row) => Number(row.count)), 1);
 
   const operatorModules = new Set(await listModules('east.ops'));
   for (const moduleId of ACCEPTANCE_OPERATOR_MODULES) {

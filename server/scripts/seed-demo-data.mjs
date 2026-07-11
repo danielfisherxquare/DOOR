@@ -4,7 +4,6 @@ import { ensureSuperAdmin } from '../src/bootstrap/ensure-super-admin.js';
 import { encryptField } from '../src/modules/team/team-crypto.js';
 
 const DEMO_PASSWORD = 'ArcSproDemo@123';
-const DEMO_SLUGS = ['demo-east-run', 'demo-mountain-ops', 'demo-bay-volunteers'];
 
 const orgSeeds = [
     {
@@ -185,43 +184,6 @@ function buildTeamMemberRow(orgId, member) {
     };
 }
 
-async function clearExistingDemoData(trx) {
-    const demoOrgs = await trx('organizations').whereIn('slug', DEMO_SLUGS).select('id');
-    const orgIds = demoOrgs.map((org) => org.id);
-    if (orgIds.length === 0) return;
-
-    const demoUsers = await trx('users').whereIn('org_id', orgIds).select('id');
-    const userIds = demoUsers.map((user) => user.id);
-    const demoRaces = await trx('races').whereIn('org_id', orgIds).select('id');
-    const raceIds = demoRaces.map((race) => Number(race.id));
-
-    if (userIds.length > 0) {
-        await trx('refresh_tokens').whereIn('user_id', userIds).del();
-        await trx('user_module_access').whereIn('user_id', userIds).del();
-        await trx('user_race_permissions').whereIn('user_id', userIds).del();
-        await trx('user_race_permissions').whereIn('created_by', userIds).update({ created_by: null });
-        await trx('org_race_permissions').whereIn('granted_by', userIds).update({ granted_by: null });
-    }
-
-    if (raceIds.length > 0) {
-        await trx('user_race_permissions').whereIn('race_id', raceIds).del();
-        await trx('org_race_permissions').whereIn('race_id', raceIds).del();
-    }
-
-    await trx('start_zones').whereIn('org_id', orgIds).del();
-    await trx('clothing_limits').whereIn('org_id', orgIds).del();
-    await trx('race_capacity').whereIn('org_id', orgIds).del();
-    await trx('user_race_permissions').whereIn('org_id', orgIds).del();
-    await trx('org_race_permissions').whereIn('org_id', orgIds).del();
-    await trx('user_module_access').whereIn('org_id', orgIds).del();
-    await trx('team_members').whereIn('org_id', orgIds).update({ account_user_id: null });
-    await trx('users').whereIn('org_id', orgIds).update({ team_member_id: null });
-    await trx('users').whereIn('org_id', orgIds).del();
-    await trx('team_members').whereIn('org_id', orgIds).del();
-    await trx('races').whereIn('org_id', orgIds).del();
-    await trx('organizations').whereIn('id', orgIds).del();
-}
-
 async function main() {
     const bootstrapResult = await ensureSuperAdmin();
     const superAdmin = await knex('users').where({ role: 'super_admin' }).orderBy('created_at', 'asc').first('id');
@@ -240,8 +202,6 @@ async function main() {
     };
 
     await knex.transaction(async (trx) => {
-        await clearExistingDemoData(trx);
-
         const orgMap = new Map();
         const raceMap = new Map();
         const userMap = new Map();
@@ -249,23 +209,29 @@ async function main() {
         for (const orgSeed of orgSeeds) {
             const [org] = await trx('organizations')
                 .insert({ name: orgSeed.name, slug: orgSeed.slug })
+                .onConflict('slug')
+                .merge({ name: orgSeed.name })
                 .returning(['id', 'name', 'slug']);
             orgMap.set(orgSeed.key, org);
             summary.orgs.push(org);
 
             for (const raceSeed of orgSeed.races) {
-                const [race] = await trx('races')
-                    .insert({
-                        org_id: org.id,
-                        name: raceSeed.name,
-                        date: raceSeed.date,
-                        location: raceSeed.location,
-                        location_lat: raceSeed.locationLat,
-                        location_lng: raceSeed.locationLng,
-                        events: JSON.stringify(raceSeed.events),
-                        conflict_rule: 'strict',
-                    })
-                    .returning(['id', 'name', 'org_id']);
+                const raceRow = {
+                    org_id: org.id,
+                    name: raceSeed.name,
+                    date: raceSeed.date,
+                    location: raceSeed.location,
+                    location_lat: raceSeed.locationLat,
+                    location_lng: raceSeed.locationLng,
+                    events: JSON.stringify(raceSeed.events),
+                    conflict_rule: 'strict',
+                };
+                const existingRace = await trx('races')
+                    .where({ org_id: org.id, name: raceSeed.name })
+                    .first('id');
+                const [race] = existingRace
+                    ? await trx('races').where({ id: existingRace.id }).update(raceRow).returning(['id', 'name', 'org_id'])
+                    : await trx('races').insert(raceRow).returning(['id', 'name', 'org_id']);
                 raceMap.set(raceSeed.key, race);
                 summary.races.push({ id: Number(race.id), name: race.name, orgName: org.name });
             }
@@ -273,6 +239,8 @@ async function main() {
             for (const memberSeed of orgSeed.members) {
                 const [teamMember] = await trx('team_members')
                     .insert(buildTeamMemberRow(org.id, memberSeed))
+                    .onConflict(['org_id', 'employee_code'])
+                    .merge(buildTeamMemberRow(org.id, memberSeed))
                     .returning(['id', 'employee_code', 'employee_name']);
                 summary.teamMembers += 1;
 
@@ -289,6 +257,19 @@ async function main() {
                         status: 'active',
                         must_change_password: false,
                         created_by: superAdmin.id,
+                        team_member_id: teamMember.id,
+                        account_source: memberSeed.role === 'org_admin' ? 'manual' : 'team_member_auto',
+                        job_title: memberSeed.title,
+                        department: memberSeed.department,
+                    })
+                    .onConflict(['org_id', 'username'])
+                    .merge({
+                        org_id: org.id,
+                        email: `${username}@demo.door.local`,
+                        password_hash: passwordHash,
+                        role: memberSeed.role,
+                        status: 'active',
+                        must_change_password: false,
                         team_member_id: teamMember.id,
                         account_source: memberSeed.role === 'org_admin' ? 'manual' : 'team_member_auto',
                         job_title: memberSeed.title,
@@ -318,7 +299,11 @@ async function main() {
                             expires_at: null,
                         })
                         .onConflict(['user_id', 'module_id'])
-                        .ignore();
+                        .merge({
+                            org_id: org.id,
+                            granted_by: superAdmin.id,
+                            expires_at: null,
+                        });
                     summary.moduleGrants += 1;
                 }
             }
@@ -341,18 +326,40 @@ async function main() {
             draw_ratio: 0.85,
             reserved_ratio: 0.15,
             lottery_mode_override: 'lottery',
+        }).onConflict(['org_id', 'race_id', 'event']).merge({
+            target_count: 2,
+            draw_ratio: 0.85,
+            reserved_ratio: 0.15,
+            lottery_mode_override: 'lottery',
         });
 
-        await trx('clothing_limits').insert([
+        const clothingRows = [
             { org_id: eastOrg.id, race_id: Number(shanghaiFull.id), event: 'ALL', gender: 'M', size: 'M', total_inventory: 2, used_count: 0 },
             { org_id: eastOrg.id, race_id: Number(shanghaiFull.id), event: 'ALL', gender: 'F', size: 'S', total_inventory: 2, used_count: 0 },
             { org_id: eastOrg.id, race_id: Number(shanghaiFull.id), event: 'ALL', gender: 'M', size: 'L', total_inventory: 2, used_count: 0 },
-        ]);
+        ];
+        for (const clothingRow of clothingRows) {
+            await trx('clothing_limits')
+                .insert(clothingRow)
+                .onConflict(['org_id', 'race_id', 'event', 'gender', 'size'])
+                .merge({ total_inventory: clothingRow.total_inventory, used_count: clothingRow.used_count });
+        }
 
         await trx('start_zones').insert({
             org_id: eastOrg.id,
             race_id: Number(shanghaiFull.id),
             zone_name: 'A',
+            width: 20,
+            length: 20,
+            density: 2.5,
+            calculated_capacity: 1000,
+            color: '#3B82F6',
+            sort_order: 1,
+            gap_distance: 0,
+            event: '全程马拉松',
+            capacity_ratio: 1,
+            score_upper_seconds: null,
+        }).onConflict(['org_id', 'race_id', 'zone_name']).merge({
             width: 20,
             length: 20,
             density: 2.5,
@@ -376,6 +383,14 @@ async function main() {
                 description: '终点拱门、混合采访区和完赛物资交接区域',
                 is_active: true,
             })
+            .onConflict(['org_id', 'race_id', 'access_code'])
+            .merge({
+                access_name: '终点核心区',
+                access_color: '#DC2626',
+                sort_order: 1,
+                description: '终点拱门、混合采访区和完赛物资交接区域',
+                is_active: true,
+            })
             .returning(['id']);
         const [credentialCategory] = await trx('credential_categories')
             .insert({
@@ -389,12 +404,21 @@ async function main() {
                 description: '赛事现场执行人员验收类别',
                 sort_order: 1,
             })
+            .onConflict(['org_id', 'race_id', 'category_code'])
+            .merge({
+                category_name: '赛事执行',
+                card_color: '#1D4ED8',
+                requires_review: true,
+                is_active: true,
+                description: '赛事现场执行人员验收类别',
+                sort_order: 1,
+            })
             .returning(['id']);
         await trx('credential_category_access_areas').insert({
             category_id: credentialCategory.id,
             access_area_id: credentialAccessArea.id,
             sort_order: 1,
-        });
+        }).onConflict(['category_id', 'access_area_id']).merge({ sort_order: 1 });
 
         const orgGrants = [
             { org_id: eastOrg.id, race_id: Number(chongqingTrail.id), access_level: 'viewer' },
@@ -407,7 +431,7 @@ async function main() {
                 ...grant,
                 granted_by: superAdmin.id,
             })),
-        );
+        ).onConflict(['org_id', 'race_id']).merge(['access_level', 'granted_by']);
         summary.orgRaceGrants = orgGrants.length;
 
         const userGrants = [
@@ -427,7 +451,7 @@ async function main() {
                 access_level: grant.access_level,
                 created_by: superAdmin.id,
             })),
-        );
+        ).onConflict(['user_id', 'race_id']).merge(['org_id', 'access_level', 'created_by']);
         summary.userRaceGrants = userGrants.length;
     });
 
