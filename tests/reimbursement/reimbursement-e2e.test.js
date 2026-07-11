@@ -1,607 +1,395 @@
-/**
- * ArcSpro 发票报销模块端到端测试
- * 
- * 测试目标：验证用户从登录到完成发票报销全流程
- * 1. 正确上传识别发票
- * 2. 正确上传识别付款凭证
- * 3. 正确汇总为表格
- * 4. 正确导出为表格 + 命名后的文件
- */
+import assert from 'node:assert/strict'
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
+import { chromium } from 'playwright'
+import * as XLSX from 'xlsx'
 
-import { chromium } from 'playwright';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+const baseUrl = process.env.ARCSPRO_TEST_URL || process.env.URL || 'http://127.0.0.1:8088'
+const username = process.env.ARCSPRO_TEST_USERNAME || 'east.ops'
+const password = process.env.ARCSPRO_TEST_PASSWORD || 'ArcSproDemo@123'
+const raceName = process.env.ARCSPRO_TEST_RACE || '上海国际马拉松'
+const headless = process.env.HEADLESS !== 'false'
+const runId = new Date().toISOString().replace(/\D/g, '').slice(0, 14)
+const projectName = `报销验收-${runId}`
+const projectShortName = `报销${runId.slice(-6)}`
+const evidenceDir = resolve(
+  process.env.ARCSPRO_REIMBURSEMENT_EVIDENCE_DIR
+    || 'output/remediation-acceptance-20260711/reimbursement',
+)
+const invoiceFixture = resolve('tests/reimbursement/fixtures/invoice-sample.jpg')
+const paymentFixture = resolve('tests/reimbursement/fixtures/payment-receipt.png')
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+await mkdir(evidenceDir, { recursive: true })
 
-// 配置
-const BASE_URL = process.env.ARCSPRO_TEST_URL || process.env.URL || 'http://127.0.0.1:3001';
-const TIMEOUT = 90000; // 90 秒超时
-const SCREENSHOT_DIR = path.join(__dirname, 'screenshots');
-
-// 测试凭据
-const CREDENTIALS = {
-  username: process.env.ARCSPRO_TEST_USERNAME || 'test@example.com',
-  password: process.env.ARCSPRO_TEST_PASSWORD || 'TestPassword123!',
-  testProjectName: `测试报销项目-${Date.now()}`
-};
-
-// 确保截图目录存在
-if (!fs.existsSync(SCREENSHOT_DIR)) {
-  fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+const report = {
+  baseUrl,
+  raceName,
+  projectName,
+  context: null,
+  steps: {},
+  expectedExternalBlockers: [],
+  expectedConsoleErrors: [],
+  unexpectedApiFailures: [],
+  unexpectedConsoleErrors: [],
+  pageErrors: [],
+  cleanup: null,
 }
 
-// 测试数据目录
-const FIXTURES_DIR = path.join(__dirname, 'fixtures');
+const browser = await chromium.launch({ headless })
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } })
+page.setDefaultTimeout(30_000)
+page.setDefaultNavigationTimeout(30_000)
 
-// 测试结果
-const testResults = {
-  timestamp: new Date().toISOString(),
-  tests: [],
-  screenshots: [],
-  issues: []
-};
+let activeStep = 'bootstrap'
+let projectId = null
 
-/**
- * 辅助函数：等待并截图
- */
-async function waitAndScreenshot(page, name) {
-  await page.waitForTimeout(2000);
-  const screenshotPath = path.join(SCREENSHOT_DIR, `${name}-${Date.now()}.png`);
-  await page.screenshot({ path: screenshotPath, fullPage: false });
-  testResults.screenshots.push({ name, path: screenshotPath });
-  console.log(`  📸 截图：${name}`);
-  return screenshotPath;
-}
+page.on('pageerror', (error) => {
+  report.pageErrors.push({ step: activeStep, message: error.message, url: page.url() })
+})
 
-/**
- * 测试 1：登录系统
- * ArcSpro 登录页面使用特定的选择器：
- * - 用户名：input#username
- * - 密码：input#password
- * - 提交按钮：button[type="submit"]
- */
-async function testLogin(page) {
-  console.log('\n【测试 1】登录系统');
-  console.log('  ⚠️ 注意：需要有效的测试账号才能继续');
-  
-  try {
-    // 导航到登录页
-    await page.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(3000); // 等待页面完全加载
-    await waitAndScreenshot(page, 'login-page');
-    
-    // 使用 ArcSpro 特定的选择器
-    const usernameInput = page.locator('#username');
-    const passwordInput = page.locator('#password');
-    const submitButton = page.locator('button[type="submit"]');
-    
-    // 检查元素是否存在
-    if (await usernameInput.count() === 0) {
-      console.log('  ❌ 未找到用户名输入框');
-      return false;
-    }
-    
-    if (await passwordInput.count() === 0) {
-      console.log('  ❌ 未找到密码输入框');
-      return false;
-    }
-    
-    console.log('  📝 找到登录表单元素');
-    
-    // 填写用户名
-    await usernameInput.fill(CREDENTIALS.username);
-    console.log(`  📝 已填写用户名：${CREDENTIALS.username}`);
-    
-    // 填写密码
-    await passwordInput.fill(CREDENTIALS.password);
-    console.log('  📝 已填写密码');
-    
-    // 点击登录按钮
-    await submitButton.click();
-    console.log('  🖱️ 点击登录按钮');
-    
-    // 等待页面跳转（登录成功后会跳转到 /app）
-    await page.waitForTimeout(5000);
-    
-    // 等待 URL 变化或页面内容变化
-    try {
-      await page.waitForURL(/\/app/, { timeout: 30000 });
-    } catch (e) {
-      console.log('  ⏳ 等待跳转超时，检查当前页面状态...');
-    }
-    
-    // 验证是否登录成功
-    const url = page.url();
-    const isLoggedIn = url.includes('/app');
-    
-    if (!isLoggedIn) {
-      // 尝试检查是否有错误信息
-      const errorElement = page.locator('.login-error');
-      if (await errorElement.count() > 0) {
-        const errorMsg = await errorElement.textContent();
-        console.log(`  ❌ 登录错误：${errorMsg}`);
-      } else {
-        console.log('  ⚠️ 登录可能未成功，但将继续尝试测试...');
-      }
-    } else {
-      console.log('  ✅ 已登录到应用页面');
-      await waitAndScreenshot(page, 'after-login');
-    }
-    
-    return true; // 总是返回 true 以便继续测试
-    
-  } catch (error) {
-    console.log(`  ⚠️ 登录测试出错：${error.message}`);
-    console.log('  💡 提示：测试将在当前状态下继续...');
-    return false;
+page.on('console', (message) => {
+  if (message.type() !== 'error') return
+  const entry = { step: activeStep, text: message.text(), url: page.url() }
+  if (
+    activeStep === 'recognize-without-key'
+    && /识别失败|400 \(Bad Request\)/.test(entry.text)
+  ) {
+    report.expectedConsoleErrors.push(entry)
+    return
   }
-}
+  report.unexpectedConsoleErrors.push(entry)
+})
 
-/**
- * 测试 2：导航到发票报销页面并创建项目
- */
-async function testCreateProject(page) {
-  console.log('\n【测试 2】导航到发票报销页面并创建项目');
-  
-  // 导航到发票报销页面
-  await page.goto(`${BASE_URL}/app/reimbursement`, { waitUntil: 'networkidle' });
-  await waitAndScreenshot(page, 'reimbursement-page');
-  
-  // 检查是否需要创建项目
-  const hasProject = await page.isVisible('.project-selector').catch(() => false);
-  
-  if (!hasProject) {
-    console.log('  需要创建新项目...');
-    
-    // 点击创建项目
-    const createButton = page.locator('button:has-text("创建项目"), button:has-text("新建项目")');
-    if (await createButton.count() > 0) {
-      await createButton.click();
-      
-      // 填写项目名称
-      const nameInput = page.locator('input[placeholder*="项目名称"], input[name="name"]');
-      await nameInput.fill(CREDENTIALS.testProjectName);
-      
-      // 提交创建
-      const submitButton = page.locator('button[type="submit"]');
-      await submitButton.click();
-      
-      // 等待项目创建完成
-      await page.waitForTimeout(3000);
-      console.log(`  ✅ 项目 "${CREDENTIALS.testProjectName}" 创建成功`);
-    }
-  } else {
-    console.log('  ✅ 已有项目，跳过创建');
-  }
-  
-  await waitAndScreenshot(page, 'after-project-ready');
-  return true;
-}
-
-/**
- * 测试 3：上传识别发票
- */
-async function testUploadInvoice(page) {
-  console.log('\n【测试 3】上传识别发票');
-  
-  // 检查是否有上传按钮
-  const uploadButton = page.locator('button:has-text("上传发票")');
-  const uploadButtonCount = await uploadButton.count();
-  
-  if (uploadButtonCount === 0) {
-    console.log('  ⚠️ 未找到上传发票按钮');
-    testResults.issues.push({
-      test: 'upload-invoice',
-      severity: 'high',
-      issue: '未找到上传发票按钮'
-    });
-    return false;
-  }
-  
-  // 点击上传按钮
-  await uploadButton.first().click();
-  await page.waitForTimeout(1000);
-  
-  // 检查是否有文件上传弹窗
-  const fileInput = page.locator('input[type="file"]');
-  const fileInputCount = await fileInput.count();
-  
-  if (fileInputCount === 0) {
-    console.log('  ⚠️ 未找到文件上传输入框');
-    testResults.issues.push({
-      test: 'upload-invoice',
-      severity: 'high',
-      issue: '未找到文件上传输入框'
-    });
-    return false;
-  }
-  
-  // 准备测试文件（如果存在）
-  const testInvoicePath = path.join(FIXTURES_DIR, 'invoice-sample.jpg');
-  
-  if (fs.existsSync(testInvoicePath)) {
-    // 上传测试文件
-    await fileInput.first().setInputFiles(testInvoicePath);
-    console.log(`  📤 上传测试发票：${testInvoicePath}`);
-  } else {
-    console.log('  ⚠️ 测试发票文件不存在，跳过实际上传');
-    testResults.issues.push({
-      test: 'upload-invoice',
-      severity: 'medium',
-      issue: `测试文件不存在：${testInvoicePath}`
-    });
-    // 关闭弹窗
-    await page.keyboard.press('Escape');
-    return false;
-  }
-  
-  // 等待上传处理
-  console.log('  ⏳ 等待上传和 OCR 处理...');
-  await page.waitForTimeout(10000);
-  
-  // 验证上传结果
-  const completedStatus = page.locator('.status-completed, .status-done, text=已完成');
-  const processingStatus = page.locator('.status-processing, text=处理中');
-  
-  const isCompleted = await completedStatus.count() > 0;
-  const isProcessing = await processingStatus.count() > 0;
-  
-  if (isCompleted) {
-    console.log('  ✅ 发票上传并识别完成');
-    await waitAndScreenshot(page, 'invoice-uploaded');
-    return true;
-  } else if (isProcessing) {
-    console.log('  ⏳ 发票仍在处理中...');
-    // 再等待一会儿
-    await page.waitForTimeout(15000);
-    const stillCompleted = await completedStatus.count() > 0;
-    if (stillCompleted) {
-      console.log('  ✅ 发票处理完成');
-      await waitAndScreenshot(page, 'invoice-processed');
-      return true;
-    }
-  }
-  
-  console.log('  ⚠️ 发票处理状态未知');
-  await waitAndScreenshot(page, 'invoice-upload-result');
-  return isCompleted;
-}
-
-/**
- * 测试 4：上传识别付款凭证
- */
-async function testUploadPayment(page) {
-  console.log('\n【测试 4】上传识别付款凭证');
-  
-  // 检查是否有上传付款凭证按钮
-  const uploadButton = page.locator('button:has-text("上传付款凭证")');
-  const uploadButtonCount = await uploadButton.count();
-  
-  if (uploadButtonCount === 0) {
-    console.log('  ⚠️ 未找到上传付款凭证按钮');
-    testResults.issues.push({
-      test: 'upload-payment',
-      severity: 'high',
-      issue: '未找到上传付款凭证按钮'
-    });
-    return false;
-  }
-  
-  // 点击上传按钮
-  await uploadButton.first().click();
-  await page.waitForTimeout(1000);
-  
-  // 准备测试文件
-  const testPaymentPath = path.join(FIXTURES_DIR, 'payment-receipt.png');
-  
-  if (fs.existsSync(testPaymentPath)) {
-    // 上传测试文件
-    const fileInput = page.locator('input[type="file"]');
-    await fileInput.first().setInputFiles(testPaymentPath);
-    console.log(`  📤 上传测试付款凭证：${testPaymentPath}`);
-  } else {
-    console.log('  ⚠️ 测试付款凭证文件不存在，跳过实际上传');
-    testResults.issues.push({
-      test: 'upload-payment',
-      severity: 'medium',
-      issue: `测试文件不存在：${testPaymentPath}`
-    });
-    await page.keyboard.press('Escape');
-    return false;
-  }
-  
-  // 等待上传处理
-  console.log('  ⏳ 等待上传和 OCR 处理...');
-  await page.waitForTimeout(10000);
-  
-  // 验证上传结果
-  const completedStatus = page.locator('.status-completed, .status-done, text=已完成');
-  const isCompleted = await completedStatus.count() > 0;
-  
-  if (isCompleted) {
-    console.log('  ✅ 付款凭证上传并识别完成');
-    await waitAndScreenshot(page, 'payment-uploaded');
-    return true;
-  }
-  
-  console.log('  ⚠️ 付款凭证处理状态未知');
-  await waitAndScreenshot(page, 'payment-upload-result');
-  return isCompleted;
-}
-
-/**
- * 测试 5：汇总为表格
- */
-async function testTableSummary(page) {
-  console.log('\n【测试 5】汇总为表格');
-  
-  // 点击"报销明细"标签
-  const recordsTab = page.locator('button:has-text("报销明细"), .tab-btn:has-text("明细")');
-  const recordsTabCount = await recordsTab.count();
-  
-  if (recordsTabCount === 0) {
-    console.log('  ⚠️ 未找到报销明细标签');
-    testResults.issues.push({
-      test: 'table-summary',
-      severity: 'high',
-      issue: '未找到报销明细标签'
-    });
-    return false;
-  }
-  
-  await recordsTab.first().click();
-  await page.waitForTimeout(3000);
-  await waitAndScreenshot(page, 'records-table');
-  
-  // 验证表格存在
-  const table = page.locator('table, .reimbursement-table');
-  const tableCount = await table.count();
-  
-  if (tableCount === 0) {
-    console.log('  ⚠️ 未找到表格组件');
-    testResults.issues.push({
-      test: 'table-summary',
-      severity: 'high',
-      issue: '未找到表格组件'
-    });
-    return false;
-  }
-  
-  // 检查表格行
-  const rows = page.locator('table tbody tr, .reimbursement-table tbody tr');
-  const rowCount = await rows.count();
-  
-  console.log(`  📊 表格行数：${rowCount}`);
-  
-  // 检查表头
-  const headers = page.locator('table thead th, .reimbursement-table thead th');
-  const headerTexts = [];
-  for (let i = 0; i < await headers.count(); i++) {
-    const text = await headers.nth(i).textContent();
-    headerTexts.push(text?.trim());
-  }
-  
-  console.log(`  📋 表头字段：${headerTexts.join(', ')}`);
-  
-  // 验证关键字段存在
-  const requiredFields = ['日期', '大类', '金额', '收入', '支出'];
-  const missingFields = requiredFields.filter(field => 
-    !headerTexts.some(h => h.includes(field))
-  );
-  
-  if (missingFields.length > 0) {
-    console.log(`  ⚠️ 缺少字段：${missingFields.join(', ')}`);
-    testResults.issues.push({
-      test: 'table-summary',
-      severity: 'medium',
-      issue: `缺少字段：${missingFields.join(', ')}`
-    });
-  } else {
-    console.log('  ✅ 表格字段完整');
-  }
-  
-  // 检查统计信息
-  const stats = page.locator('.reimbursement-table__stats, .stats');
-  if (await stats.count() > 0) {
-    const statsText = await stats.first().textContent();
-    console.log(`  📈 统计信息：${statsText?.trim()}`);
-  }
-  
-  await waitAndScreenshot(page, 'records-table-details');
-  return true;
-}
-
-/**
- * 测试 6：导出为表格
- */
-async function testExport(page) {
-  console.log('\n【测试 6】导出为表格 + 命名后的文件');
-  
-  // 检查是否有导出按钮
-  const exportButton = page.locator('button:has-text("导出"), button:has-text("导出 Excel")');
-  const exportButtonCount = await exportButton.count();
-  
-  if (exportButtonCount === 0) {
-    console.log('  ⚠️ 未找到导出按钮');
-    testResults.issues.push({
-      test: 'export',
-      severity: 'high',
-      issue: '未找到导出按钮'
-    });
-    return false;
-  }
-  
-  // 监听文件下载
-  const downloadPromise = page.waitForEvent('download');
-  
-  // 点击导出按钮
-  await exportButton.first().click();
-  console.log('  📤 点击导出按钮');
-  
-  try {
-    const download = await downloadPromise;
-    const fileName = download.suggestedFilename();
-    const savePath = path.join(SCREENSHOT_DIR, fileName);
-    
-    await download.saveAs(savePath);
-    
-    console.log(`  ✅ 导出成功：${fileName}`);
-    console.log(`  💾 保存位置：${savePath}`);
-    
-    // 验证文件名格式
-    const isValidName = fileName.includes('报销单') || fileName.includes('.xlsx') || fileName.includes('.zip');
-    
-    if (!isValidName) {
-      console.log(`  ⚠️ 文件名格式可能不正确：${fileName}`);
-      testResults.issues.push({
-        test: 'export',
-        severity: 'low',
-        issue: `文件名格式可能不正确：${fileName}`
-      });
-    } else {
-      console.log('  ✅ 文件名格式正确');
-    }
-    
-    // 验证文件大小
-    const stats = fs.statSync(savePath);
-    console.log(`  📊 文件大小：${(stats.size / 1024).toFixed(2)} KB`);
-    
-    if (stats.size === 0) {
-      console.log('  ❌ 导出文件为空');
-      testResults.issues.push({
-        test: 'export',
-        severity: 'high',
-        issue: '导出文件为空'
-      });
-      return false;
-    }
-    
-    testResults.screenshots.push({
-      name: 'exported-file',
-      path: savePath
-    });
-    
-    await waitAndScreenshot(page, 'after-export');
-    return true;
-    
-  } catch (error) {
-    console.log(`  ❌ 导出失败：${error.message}`);
-    testResults.issues.push({
-      test: 'export',
-      severity: 'high',
-      issue: `导出失败：${error.message}`
-    });
-    return false;
-  }
-}
-
-/**
- * 主测试函数
- */
-async function runReimbursementTests() {
-  console.log('='.repeat(60));
-  console.log('ArcSpro 发票报销模块端到端测试');
-  console.log('='.repeat(60));
-  console.log(`测试环境：${BASE_URL}`);
-  console.log(`测试时间：${testResults.timestamp}`);
-  console.log(`测试账号：${CREDENTIALS.username}`);
-  
-  const browser = await chromium.launch({
-    headless: false, // 使用有头模式便于观察
-    slowMo: 500,     // 慢动作，便于观察测试过程
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--start-maximized']
-  });
-  
-  const context = await browser.newContext({
-    viewport: { width: 1920, height: 1080 },
-    deviceScaleFactor: 1
-  });
-  
-  const page = await context.newPage();
-  
-  // 设置超时
-  page.setDefaultTimeout(TIMEOUT);
-  page.setDefaultNavigationTimeout(TIMEOUT);
-  
-  try {
-    // 运行所有测试
-    const tests = [
-      { name: '登录系统', fn: () => testLogin(page), passed: false },
-      { name: '创建项目', fn: () => testCreateProject(page), passed: false },
-      { name: '上传发票', fn: () => testUploadInvoice(page), passed: false },
-      { name: '上传付款凭证', fn: () => testUploadPayment(page), passed: false },
-      { name: '汇总表格', fn: () => testTableSummary(page), passed: false },
-      { name: '导出文件', fn: () => testExport(page), passed: false }
-    ];
-    
-    for (const test of tests) {
-      try {
-        test.passed = await test.fn();
-        testResults.tests.push({
-          name: test.name,
-          passed: test.passed,
-          timestamp: new Date().toISOString()
-        });
-      } catch (error) {
-        console.error(`  ❌ ${test.name} 测试失败：${error.message}`);
-        testResults.tests.push({
-          name: test.name,
-          passed: false,
-          error: error.message,
-          timestamp: new Date().toISOString()
-        });
-      }
-    }
-    
-  } finally {
-    // 保存测试结果
-    const reportPath = path.join(SCREENSHOT_DIR, `test-report-${Date.now()}.json`);
-    fs.writeFileSync(reportPath, JSON.stringify(testResults, null, 2));
-    console.log(`\n💾 测试报告：${reportPath}`);
-    
-    // 关闭浏览器
-    await browser.close();
-  }
-  
-  // 输出测试摘要
-  console.log('\n' + '='.repeat(60));
-  console.log('测试摘要');
-  console.log('='.repeat(60));
-  
-  const passedCount = testResults.tests.filter(t => t.passed).length;
-  const totalCount = testResults.tests.length;
-  
-  console.log(`通过：${passedCount}/${totalCount}`);
-  console.log(`截图：${testResults.screenshots.length} 张`);
-  console.log(`问题：${testResults.issues.length} 个`);
-  
-  if (testResults.issues.length > 0) {
-    console.log('\n问题列表:');
-    testResults.issues.forEach((issue, i) => {
-      console.log(`  ${i + 1}. [${issue.severity}] ${issue.test}: ${issue.issue}`);
-    });
-  }
-  
-  // 返回测试结果
-  return {
-    passed: passedCount === totalCount,
-    passedCount,
-    totalCount,
-    report: testResults
-  };
-}
-
-// 运行测试
-runReimbursementTests()
-  .then(result => {
-    console.log('\n' + '='.repeat(60));
-    console.log(result.passed ? '✅ 所有测试通过!' : '⚠️ 部分测试未通过');
-    console.log('='.repeat(60));
-    process.exit(result.passed ? 0 : 1);
+page.on('response', (response) => {
+  if (response.status() < 400 || !response.url().includes('/api/')) return
+  if (
+    activeStep === 'recognize-without-key'
+    && response.status() === 400
+    && response.url().endsWith('/recognize')
+  ) return
+  report.unexpectedApiFailures.push({
+    step: activeStep,
+    method: response.request().method(),
+    status: response.status(),
+    url: response.url(),
   })
-  .catch(error => {
-    console.error('测试执行失败:', error);
-    process.exit(1);
-  });
+})
+
+function workspaceUrl(path) {
+  assert.ok(report.context?.orgId, 'workspace context should be available')
+  const url = new URL(`${baseUrl}${path}`)
+  url.searchParams.set('orgId', report.context.orgId)
+  url.searchParams.set('raceId', report.context.raceId)
+  return url.toString()
+}
+
+async function screenshot(name) {
+  const target = resolve(evidenceDir, `${name}.png`)
+  await page.screenshot({ path: target, fullPage: true })
+  return target
+}
+
+async function chooseFile(buttonName, filePath) {
+  const chooserPromise = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: buttonName, exact: true }).click()
+  const chooser = await chooserPromise
+  await chooser.setFiles(filePath)
+}
+
+function waitForResponses(predicate, count) {
+  return new Promise((resolveResponses, rejectResponses) => {
+    const matches = []
+    const timeout = setTimeout(() => {
+      page.off('response', handleResponse)
+      rejectResponses(new Error(`timed out waiting for ${count} matching responses; received ${matches.length}`))
+    }, 30_000)
+    const handleResponse = (response) => {
+      if (!predicate(response)) return
+      matches.push(response)
+      if (matches.length < count) return
+      clearTimeout(timeout)
+      page.off('response', handleResponse)
+      resolveResponses(matches)
+    }
+    page.on('response', handleResponse)
+  })
+}
+
+async function createFixtureRecord(id) {
+  return page.evaluate(async ({ targetProjectId, body }) => {
+    const auth = JSON.parse(window.localStorage.getItem('auth-storage') || 'null')
+    const workspace = JSON.parse(window.localStorage.getItem('workspace-session') || 'null')
+    const token = auth?.state?.token
+    const session = workspace?.state?.session || workspace?.session || workspace
+    if (!token || !session?.orgId || !session?.raceId) {
+      throw new Error('browser session is missing auth or workspace context')
+    }
+
+    const response = await fetch(`/api/app/reimbursements/projects/${targetProjectId}/records`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'X-ArcSpro-Scope-Type': session.scopeType,
+        'X-ArcSpro-Org-Id': String(session.orgId),
+        'X-ArcSpro-Race-Id': String(session.raceId),
+      },
+      body: JSON.stringify(body),
+    })
+    const payload = await response.json()
+    return { status: response.status, payload }
+  }, {
+    targetProjectId: id,
+    body: {
+      payment_date: '2026-07-11',
+      category: '赛事交通费',
+      sub_category: '车辆调度',
+      description: '报销验收交通费',
+      income: 0,
+      expense: 128.5,
+      reporter: '验收操作员',
+      has_invoice: true,
+      invoice_code: 'TEST20260711',
+      invoice_number: runId,
+      company: 'ArcSpro 验收供应商',
+      remarks: '由严格验收脚本注入，非 OCR 识别结果',
+      unit_price: 128.5,
+      unit: '次',
+      quantity: 1,
+    },
+  })
+}
+
+async function deleteProjectFallback() {
+  if (!projectId || page.isClosed()) return false
+  return page.evaluate(async (targetProjectId) => {
+    const auth = JSON.parse(window.localStorage.getItem('auth-storage') || 'null')
+    const workspace = JSON.parse(window.localStorage.getItem('workspace-session') || 'null')
+    const token = auth?.state?.token
+    const session = workspace?.state?.session || workspace?.session || workspace
+    if (!token || !session?.orgId || !session?.raceId) return false
+    const response = await fetch(`/api/app/reimbursements/projects/${targetProjectId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'X-ArcSpro-Scope-Type': session.scopeType,
+        'X-ArcSpro-Org-Id': String(session.orgId),
+        'X-ArcSpro-Race-Id': String(session.raceId),
+      },
+    })
+    return response.ok
+  }, projectId).catch(() => false)
+}
+
+try {
+  activeStep = 'login'
+  await page.goto(`${baseUrl}/login`, { waitUntil: 'networkidle' })
+  await page.locator('#username').fill(username)
+  await page.locator('#password').fill(password)
+  await page.locator('button[type="submit"]').click()
+  await page.waitForURL(/\/workspaces(?:\?|$)/)
+  await page.waitForFunction(() => document.querySelectorAll('select')[0]?.options.length > 1)
+  await page.locator('select').nth(1).selectOption({ label: raceName })
+  await page.getByRole('button', { name: /进入工作区/ }).click()
+  await page.waitForURL(/\/launcher(?:\?|$)/)
+  await page.getByRole('button', { name: /应用层/ }).click()
+  await page.waitForURL(/\/app(?:\/|\?|$)/)
+
+  const session = await page.evaluate(() => {
+    const parsed = JSON.parse(window.localStorage.getItem('workspace-session') || 'null')
+    return parsed?.state?.session || parsed?.session || parsed
+  })
+  assert.ok(session?.orgId, 'workspace session should include orgId')
+  assert.ok(session?.raceId, 'workspace session should include raceId')
+  report.context = { orgId: String(session.orgId), raceId: String(session.raceId) }
+  report.steps.login = { ok: true }
+
+  activeStep = 'create-project'
+  await page.goto(workspaceUrl('/app/reimbursements'), { waitUntil: 'networkidle' })
+  await page.getByRole('heading', { name: '我的报销', exact: true }).waitFor()
+  await page.getByText('发票报销控制面', { exact: true }).waitFor()
+  await page.getByText('需配置', { exact: false }).first().waitFor()
+
+  const firstProjectButton = page.getByRole('button', { name: '创建第一个项目', exact: true })
+  if (await firstProjectButton.isVisible().catch(() => false)) {
+    await firstProjectButton.click()
+  } else {
+    await page.getByTitle('创建新项目').click()
+  }
+
+  await page.getByPlaceholder('例如：2026 上海差旅报销').fill(projectName)
+  await page.getByPlaceholder('用于导出文件命名，可留空').fill(projectShortName)
+  const createResponsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'POST'
+    && /\/api\/app\/reimbursements\/projects$/.test(response.url())
+  ))
+  await page.getByRole('button', { name: '创建项目', exact: true }).click()
+  const createResponse = await createResponsePromise
+  assert.equal(createResponse.status(), 201)
+  const createdProject = (await createResponse.json()).project
+  projectId = createdProject.id
+  assert.equal(createdProject.name, projectName)
+  await assert.doesNotReject(async () => {
+    await page.locator('.project-selector__select').waitFor()
+    assert.equal(await page.locator('.project-selector__select').inputValue(), projectId)
+  })
+  report.steps.createProject = { ok: true, projectId }
+  await screenshot('01-project-created')
+
+  activeStep = 'import-invoice'
+  const importResponsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'POST'
+    && response.url().includes(`/api/app/reimbursements/projects/${projectId}/preview/import`)
+  ))
+  await chooseFile('导入发票', invoiceFixture)
+  const importResponse = await importResponsePromise
+  assert.equal(importResponse.status(), 200)
+  const importPayload = await importResponse.json()
+  assert.equal(importPayload.imported.length, 1)
+  assert.equal(importPayload.duplicates.length, 0)
+  await page.getByText(/已导入 1 个新文件/).waitFor()
+  await page.getByRole('button', { name: '逐张识别 (1)', exact: true }).waitFor()
+  report.steps.importInvoice = { ok: true, imported: 1 }
+  await screenshot('02-invoice-imported')
+
+  activeStep = 'deduplicate-import'
+  const duplicateResponsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'POST'
+    && response.url().includes(`/api/app/reimbursements/projects/${projectId}/preview/import`)
+  ))
+  await chooseFile('导入发票', invoiceFixture)
+  const duplicateResponse = await duplicateResponsePromise
+  assert.equal(duplicateResponse.status(), 200)
+  const duplicatePayload = await duplicateResponse.json()
+  assert.equal(duplicatePayload.imported.length, 0)
+  assert.equal(duplicatePayload.duplicates.length, 1)
+  await page.getByText(/跳过 1 个重复文件/).waitFor()
+  report.steps.deduplicateImport = { ok: true, duplicates: 1 }
+
+  activeStep = 'import-payment'
+  const paymentResponsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'POST'
+    && response.url().includes(`/api/app/reimbursements/projects/${projectId}/preview/import`)
+  ))
+  await chooseFile('导入付款凭证', paymentFixture)
+  const paymentResponse = await paymentResponsePromise
+  assert.equal(paymentResponse.status(), 200)
+  const paymentPayload = await paymentResponse.json()
+  assert.equal(paymentPayload.documentType, 'payment')
+  assert.equal(paymentPayload.imported.length, 1)
+  assert.equal(paymentPayload.duplicates.length, 0)
+  await page.getByText(/已导入 1 个新文件/).waitFor()
+  await page.getByRole('button', { name: '逐张识别 (2)', exact: true }).waitFor()
+  report.steps.importPayment = { ok: true, imported: 1 }
+  await screenshot('03-payment-imported')
+
+  activeStep = 'recognize-without-key'
+  const recognitionResponsesPromise = waitForResponses((response) => (
+    response.request().method() === 'POST'
+    && response.url().includes(`/api/app/reimbursements/projects/${projectId}/preview/`)
+    && response.url().endsWith('/recognize')
+  ), 2)
+  await page.getByRole('button', { name: '逐张识别 (2)', exact: true }).click()
+  const recognitionResponses = await recognitionResponsesPromise
+  const recognitionPayloads = await Promise.all(recognitionResponses.map(async (response) => {
+    assert.equal(response.status(), 400)
+    return response.json()
+  }))
+  assert.deepEqual(recognitionPayloads.map((payload) => payload.error), [
+    '请先配置模型 API',
+    '请先配置模型 API',
+  ])
+  await page.getByText(/失败 2 个：请先配置模型 API/).waitFor()
+  report.expectedExternalBlockers.push({
+    step: activeStep,
+    status: 400,
+    calls: 2,
+    error: '请先配置模型 API',
+    reason: 'REIMBURSEMENT_OCR_API_KEY and DASHSCOPE_API_KEY are not configured',
+  })
+  report.steps.recognizeWithoutKey = { ok: true, expectedBlocked: true }
+  await screenshot('04-ocr-key-blocker')
+
+  activeStep = 'fixture-record'
+  const fixtureRecord = await createFixtureRecord(projectId)
+  assert.equal(fixtureRecord.status, 201)
+  assert.equal(fixtureRecord.payload.record.description, '报销验收交通费')
+  report.steps.fixtureRecord = {
+    ok: true,
+    recordId: fixtureRecord.payload.record.id,
+    source: 'test fixture, not OCR',
+  }
+
+  activeStep = 'export-excel'
+  await page.goto(workspaceUrl('/app/reimbursements'), { waitUntil: 'networkidle' })
+  await page.getByRole('tab', { name: /报销明细/ }).click()
+  const recordRow = page.getByRole('row').filter({ hasText: '报销验收交通费' })
+  await recordRow.waitFor()
+  await recordRow.getByText('128.50', { exact: false }).waitFor()
+  await screenshot('05-record-ready-for-export')
+
+  page.once('dialog', (dialog) => dialog.accept())
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: '导出 Excel', exact: true }).click()
+  const download = await downloadPromise
+  const suggestedFilename = download.suggestedFilename()
+  assert.match(suggestedFilename, /\.xlsx$/i)
+  assert.ok(suggestedFilename.includes(projectShortName))
+  const exportPath = resolve(evidenceDir, suggestedFilename)
+  await download.saveAs(exportPath)
+  assert.ok((await stat(exportPath)).size > 0)
+
+  const workbook = XLSX.read(await readFile(exportPath), { type: 'buffer' })
+  assert.ok(workbook.SheetNames.length >= 1)
+  const workbookText = workbook.SheetNames
+    .map((name) => JSON.stringify(XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1 })))
+    .join('\n')
+  assert.match(workbookText, /报销验收交通费/)
+  assert.match(workbookText, /128\.5/)
+  report.steps.exportExcel = {
+    ok: true,
+    filename: suggestedFilename,
+    bytes: (await stat(exportPath)).size,
+    sheetNames: workbook.SheetNames,
+  }
+  await screenshot('06-export-complete')
+
+  activeStep = 'cleanup'
+  await page.goto(workspaceUrl('/app/reimbursements/projects'), { waitUntil: 'networkidle' })
+  const projectRow = page.getByRole('row').filter({ hasText: projectName })
+  await projectRow.waitFor()
+  page.once('dialog', (dialog) => dialog.accept())
+  const deleteResponsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'DELETE'
+    && response.url().endsWith(`/api/app/reimbursements/projects/${projectId}`)
+  ))
+  await projectRow.getByRole('button', { name: '删除', exact: true }).click()
+  const deleteResponse = await deleteResponsePromise
+  assert.equal(deleteResponse.status(), 200)
+  await projectRow.waitFor({ state: 'detached' })
+  report.cleanup = { ok: true, mode: 'ui' }
+  projectId = null
+
+  assert.deepEqual(report.unexpectedApiFailures, [])
+  assert.deepEqual(report.unexpectedConsoleErrors, [])
+  assert.deepEqual(report.pageErrors, [])
+  report.ok = true
+} catch (error) {
+  report.ok = false
+  report.error = error instanceof Error ? error.stack : String(error)
+  report.failureUrl = page.url()
+  report.failureBody = await page.locator('body').innerText().catch(() => '')
+  await screenshot('failure').catch(() => undefined)
+  throw error
+} finally {
+  if (projectId) {
+    report.cleanup = {
+      ok: await deleteProjectFallback(),
+      mode: 'api-fallback',
+    }
+  }
+  await writeFile(resolve(evidenceDir, 'result.json'), `${JSON.stringify(report, null, 2)}\n`)
+  await browser.close()
+}
+
+console.log(JSON.stringify(report, null, 2))

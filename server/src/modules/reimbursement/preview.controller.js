@@ -5,6 +5,7 @@
 
 import * as previewService from './preview.service.js';
 import * as reimbursementService from './reimbursement.service.js';
+import { resolveReimbursementExportName } from './reimbursement-export-name.js';
 
 const DEFAULT_LLM_CONFIG = {
     provider: 'qwen',
@@ -189,7 +190,7 @@ export async function exportWithImages(req, res, next) {
         // 获取项目名称
         const project = await reimbursementService.getProjectById(projectId);
 
-        const projectName = project?.name || '报销单';
+        const projectName = resolveReimbursementExportName(project);
         const exportDate = new Date().toISOString().slice(0, 10);
 
         // 生成ZIP

@@ -273,6 +273,10 @@ describe('invoice async upload controller', () => {
 
         assert.equal(nextError, null);
         assert.equal(res.headers['content-type'], 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        assert.match(
+            res.headers['content-disposition'],
+            /^attachment; filename\*=UTF-8''AUP_\d{4}-\d{2}-\d{2}\.xlsx$/
+        );
         assert.ok(res.rawBody);
 
         const workbook = new ExcelJS.Workbook();

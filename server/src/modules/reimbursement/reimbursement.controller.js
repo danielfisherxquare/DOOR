@@ -17,6 +17,7 @@ import {
   sanitizeReimbursementLlmRequestConfig,
 } from './reimbursement-llm-secret.js';
 import { replaceAttachmentFile } from './reimbursement-attachment.storage.js';
+import { resolveReimbursementExportName } from './reimbursement-export-name.js';
 
 // 配置文件上传
 const upload = multer({
@@ -718,7 +719,7 @@ export async function exportExcel(req, res, next) {
     const excelBuffer = await generateExportWorkbook(projectId);
 
     // 设置响应头
-    const fileName = `${project?.name || '报销单'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const fileName = `${resolveReimbursementExportName(project)}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
