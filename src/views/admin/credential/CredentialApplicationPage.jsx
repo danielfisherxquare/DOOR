@@ -68,7 +68,7 @@ export default function CredentialApplicationPage() {
     personName: user?.name || '',
   })
 
-  const isAdmin = ['org_admin', 'super_admin'].includes(user?.role)
+  const canDirectCreate = ['race_admin', 'org_admin', 'super_admin'].includes(user?.role)
 
   const loadData = async () => {
     if (!raceId) return
@@ -123,7 +123,7 @@ export default function CredentialApplicationPage() {
   const resetForm = () => {
     setForm({
       ...EMPTY_FORM,
-      sourceMode: isAdmin ? 'admin_direct' : 'self_service',
+      sourceMode: canDirectCreate ? 'admin_direct' : 'self_service',
       personName: user?.name || '',
     })
   }
@@ -165,7 +165,7 @@ export default function CredentialApplicationPage() {
 
     try {
       await credentialApi.createRequest(raceId, {
-        sourceMode: isAdmin ? form.sourceMode : 'self_service',
+        sourceMode: canDirectCreate ? form.sourceMode : 'self_service',
         categoryId: Number(form.categoryId),
         personName: form.personName.trim(),
         orgName: form.orgName.trim() || undefined,
@@ -318,7 +318,7 @@ export default function CredentialApplicationPage() {
         >
           {panelMode === 'create' ? (
             <form onSubmit={handleSubmit} style={formStyle}>
-              {isAdmin ? (
+              {canDirectCreate ? (
                 <label style={fieldStyle}>
                   <span style={fieldLabelStyle}>创建方式</span>
                   <select

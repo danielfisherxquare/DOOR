@@ -112,6 +112,11 @@ describe('surface boundaries', () => {
       assert.doesNotMatch(source, /const raceId = searchParams\.get\('raceId'\)/, page)
       assert.doesNotMatch(source, /adminCredentialApi/, page)
     }
+    assert.match(
+      read('src/views/admin/credential/CredentialApplicationPage.jsx'),
+      /race_admin/,
+      'race operators should be able to create direct requests for issuance work',
+    )
     assert.match(credentialHook, /createCredentialApi/)
 
     const issuePage = read('src/views/admin/credential/CredentialIssuePage.jsx')
