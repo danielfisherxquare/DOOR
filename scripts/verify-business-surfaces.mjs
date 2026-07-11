@@ -7,6 +7,8 @@ const baseUrl = process.env.ARCSPRO_BASE_URL || 'http://127.0.0.1:8088'
 const username = process.env.ARCSPRO_DEMO_USERNAME || 'east.ops'
 const password = process.env.ARCSPRO_DEMO_PASSWORD || 'ArcSproDemo@123'
 const raceName = process.env.ARCSPRO_DEMO_RACE || '上海国际马拉松'
+const runId = new Date().toISOString().replace(/\D/g, '').slice(0, 14)
+const credentialPersonName = `验收制证-${runId}`
 const evidenceDir = resolve(
   process.env.ARCSPRO_EVIDENCE_DIR || 'output/remediation-acceptance-20260711/business-surfaces',
 )
@@ -19,6 +21,7 @@ const report = {
   baseUrl,
   raceName,
   context: null,
+  credentialLifecycle: null,
   surfaces: {},
   consoleErrors: [],
   pageErrors: [],
@@ -110,7 +113,78 @@ try {
   await openSurface({ key: 'reimbursements', path: '/app/reimbursements', heading: '我的报销' })
   await openSurface({ key: 'credential-center', path: '/app/credential-center', heading: '证件中心' })
   await openSurface({ key: 'credential-requests', path: '/app/credential/requests', heading: '申请与建单' })
+
+  await page.locator('label').filter({ hasText: '创建方式' }).locator('select').selectOption('admin_direct')
+  await page.locator('label').filter({ hasText: '证件类别' }).locator('select').selectOption({ label: '赛事执行（需审核）' })
+  await page.getByLabel('姓名', { exact: true }).fill(credentialPersonName)
+  await page.getByLabel('单位名称', { exact: true }).fill('ArcSpro 验收组')
+  await page.getByLabel('职务', { exact: true }).fill('终点执行主管')
+  await page.getByText('终点核心区', { exact: true }).waitFor()
+
+  const createResponsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'POST'
+    && /\/api\/app\/credentials\/requests\/\d+$/.test(response.url())
+  ))
+  await page.getByRole('button', { name: '提交请求', exact: true }).click()
+  const createResponse = await createResponsePromise
+  assert.equal(createResponse.status(), 201)
+  const createdRequest = (await createResponse.json()).data
+  assert.equal(createdRequest.status, 'submitted')
+  await page.getByText('请求已提交，申请池已刷新', { exact: true }).waitFor()
+  const createdRow = page.getByRole('row').filter({ hasText: credentialPersonName })
+  await createdRow.getByText('待审核', { exact: true }).waitFor()
+  await page.screenshot({ path: resolve(evidenceDir, 'credential-01-request-submitted.png'), fullPage: true })
+
   await openSurface({ key: 'credential-review', path: '/app/credential/review', heading: '审核中心' })
+  const reviewRow = page.getByRole('row').filter({ hasText: credentialPersonName })
+  await reviewRow.getByRole('button', { name: '去审核', exact: true }).click()
+  await page.getByText(`审核 ${credentialPersonName}`, { exact: true }).waitFor()
+  assert.equal(
+    await page.locator('label').filter({ hasText: '最终证件类别' }).locator('select').inputValue(),
+    String(createdRequest.categoryId),
+  )
+
+  const reviewResponsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'POST'
+    && new RegExp(`/api/app/credentials/requests/\\d+/${createdRequest.id}/review$`).test(response.url())
+  ))
+  await page.getByRole('button', { name: '确认审核结果', exact: true }).click()
+  const reviewResponse = await reviewResponsePromise
+  assert.equal(reviewResponse.status(), 200)
+  const reviewedRequest = (await reviewResponse.json()).data
+  assert.equal(reviewedRequest.status, 'generated')
+  assert.ok(reviewedRequest.credentialId)
+  assert.equal(reviewedRequest.credentialStatus, 'generated')
+  await page.getByText('审核完成，列表已刷新', { exact: true }).waitFor()
+  await page.getByRole('button', { name: '全部请求', exact: true }).click()
+  const generatedRow = page.getByRole('row').filter({ hasText: credentialPersonName })
+  await generatedRow.getByText('已生成', { exact: true }).waitFor()
+  await page.screenshot({ path: resolve(evidenceDir, 'credential-02-generated.png'), fullPage: true })
+
+  await openSurface({ key: 'credential-issue', path: '/app/credential/issue', heading: '领取管理' })
+  await page.getByPlaceholder('搜索姓名 / 编号 / 岗位').fill(credentialPersonName)
+  const issueRow = page.getByRole('row').filter({ hasText: credentialPersonName })
+  await issueRow.getByRole('button', { name: '去发放', exact: true }).click()
+  assert.equal(await page.getByLabel('领取人姓名', { exact: true }).inputValue(), credentialPersonName)
+
+  const issueResponsePromise = page.waitForResponse((response) => (
+    response.request().method() === 'POST'
+    && new RegExp(`/api/app/credentials/credentials/\\d+/${reviewedRequest.credentialId}/issue$`).test(response.url())
+  ))
+  await page.getByRole('button', { name: '确认发放', exact: true }).click()
+  const issueResponse = await issueResponsePromise
+  assert.equal(issueResponse.status(), 200)
+  await page.getByText('证件发放完成', { exact: true }).waitFor()
+  await issueRow.getByText('已领取', { exact: true }).waitFor()
+  await page.screenshot({ path: resolve(evidenceDir, 'credential-03-issued.png'), fullPage: true })
+  report.credentialLifecycle = {
+    personName: credentialPersonName,
+    requestId: createdRequest.id,
+    credentialId: reviewedRequest.credentialId,
+    requestStatus: reviewedRequest.status,
+    credentialStatus: 'issued',
+  }
+
   await openSurface({ key: 'inventory', path: '/app/inventory', heading: '仓储作业台' })
   await openSurface({ key: 'three-studio', path: '/app/3d-studio', heading: '空间工作台' })
   await openSurface({ key: 'terrain-model', path: '/app/terrain-model', heading: '轨迹地形模型' })
