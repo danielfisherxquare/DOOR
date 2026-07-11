@@ -7,7 +7,7 @@ import {
     EXPORT_COORDINATE_SYSTEMS,
     buildExportManifest,
     buildGeometryPreflight,
-} from '../../../../src/utils/exportManifest.js';
+} from '@arcspro/studio-model/export-manifest';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

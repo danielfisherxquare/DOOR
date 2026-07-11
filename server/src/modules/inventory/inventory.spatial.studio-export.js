@@ -2,7 +2,7 @@ import {
     EXPORT_COORDINATE_SYSTEMS,
     buildExportManifest,
     buildGeometryPreflight,
-} from '../../../../src/utils/exportManifest.js';
+} from '@arcspro/studio-model/export-manifest';
 
 function ensureArray(value) {
     return Array.isArray(value) ? value : [];

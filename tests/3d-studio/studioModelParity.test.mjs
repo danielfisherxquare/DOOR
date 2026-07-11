@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readdir, readFile } from 'node:fs/promises'
+import path from 'node:path'
 import test from 'node:test'
 
 import * as frontendModel from '../../src/utils/studioProjectUtils.js'
@@ -35,11 +36,17 @@ test('frontend and server use one studio model implementation', () => {
   }
 })
 
-test('server studio services do not import application source files', async () => {
-  const source = await readFile(
-    new URL('../../server/src/modules/inventory/inventory.spatial.generated-scene.service.js', import.meta.url),
-    'utf8',
-  )
-  assert.equal(source.includes("../../../../src/3d-studio"), false)
-  assert.match(source, /@arcspro\/studio-model/)
+test('server inventory services do not import application source files', async () => {
+  const inventoryDirectory = new URL('../../server/src/modules/inventory/', import.meta.url)
+  const violations = []
+
+  for (const entry of await readdir(inventoryDirectory, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue
+    const source = await readFile(new URL(entry.name, inventoryDirectory), 'utf8')
+    if (/from ['"]\.\.\/\.\.\/\.\.\/\.\.\/src\//.test(source)) {
+      violations.push(path.posix.join('server/src/modules/inventory', entry.name))
+    }
+  }
+
+  assert.deepEqual(violations, [])
 })

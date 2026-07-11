@@ -2,7 +2,7 @@ import {
     EXPORT_COORDINATE_SYSTEMS,
     buildExportManifest,
     buildTerrainPatchDiagnostics,
-} from '../../../../src/utils/exportManifest.js';
+} from '@arcspro/studio-model/export-manifest';
 
 const OBJECT_LABELS = {
     arch: '赛事拱门',

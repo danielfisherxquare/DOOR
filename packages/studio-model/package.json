@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.js",
     "./editor-document": "./src/editorDocument.js",
+    "./export-manifest": "./src/exportManifest.js",
     "./studio-project": "./src/studioProjectUtils.js"
   },
   "engines": {
