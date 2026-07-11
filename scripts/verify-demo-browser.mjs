@@ -160,15 +160,122 @@ try {
   result.checks.auditPipeline = { steps: auditResults };
   await page.screenshot({ path: resolve(evidenceDir, '09-audit-pipeline.png'), fullPage: true });
 
+  await page.goto(`${baseUrl}/app/events/lottery`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: '抽签管理' }).first().waitFor();
+  await page.getByRole('tab', { name: /物资匹配与最终执行/ }).click();
+  const initialV2ConfigPromise = page.waitForResponse((response) => (
+    /\/api\/app\/lottery-v2\/config\/\d+$/.test(response.url()) && response.request().method() === 'GET'
+  ));
+  await page.getByRole('tab', { name: 'V2 测试版' }).click();
+  await initialV2ConfigPromise;
+  await page.getByRole('button', { name: '刷新数据' }).waitFor();
+  const seedInput = page.getByLabel('随机种子');
+  await seedInput.click();
+  await seedInput.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+  await seedInput.pressSequentially('door-acceptance-20260711');
+  await seedInput.press('Tab');
+  assert.equal(await seedInput.inputValue(), 'door-acceptance-20260711');
+  const configRequestPromise = page.waitForRequest((request) => (
+    /\/api\/app\/lottery-v2\/config\/\d+$/.test(request.url()) && request.method() === 'PUT'
+  ));
+  const configResponsePromise = page.waitForResponse((response) => (
+    /\/api\/app\/lottery-v2\/config\/\d+$/.test(response.url()) && response.request().method() === 'PUT'
+  ));
+  await page.getByRole('button', { name: '保存 V2 配置' }).click();
+  const configRequest = await configRequestPromise;
+  const configResponse = await configResponsePromise;
+  const configRequestBody = configRequest.postDataJSON();
+  const configResponseBody = await configResponse.json();
+  assert.equal(configRequestBody.seed, 'door-acceptance-20260711');
+  assert.equal(configResponseBody.data?.seed, 'door-acceptance-20260711');
+  await page.getByText('V2 配置已保存，旧预演已标记为失效。', { exact: true }).waitFor();
+
+  const previewJob = await runAndWaitForSucceededJob(
+    () => page.getByRole('button', { name: '执行 V2 预演' }).click(),
+  );
+  await page.getByText('V2 预演完成，已刷新预演结果。', { exact: true }).waitFor();
+  await page.getByText('ready', { exact: true }).first().waitFor();
+  await page.screenshot({ path: resolve(evidenceDir, '10-lottery-v2-preview.png'), fullPage: true });
+
+  page.once('dialog', (dialog) => dialog.accept());
+  const finalizeJob = await runAndWaitForSucceededJob(
+    () => page.getByRole('button', { name: '执行 V2 正式抽签' }).click(),
+  );
+  await page.getByText('V2 正式执行完成。', { exact: true }).waitFor();
+  const finalizedCounts = {
+    winners: Number(finalizeJob.data?.result?.resultSummary?.winners ?? 0),
+    losers: Number(finalizeJob.data?.result?.resultSummary?.losers ?? 0),
+    waitlist: Number(finalizeJob.data?.result?.resultSummary?.waitlist ?? 0),
+  };
+  assert.deepEqual(finalizedCounts, { winners: 2, losers: 1, waitlist: 0 });
+  assert.equal(finalizeJob.data?.result?.seed, 'door-acceptance-20260711');
+  result.checks.lotteryV2 = {
+    preview: previewJob.data?.result || null,
+    finalized: finalizeJob.data?.result || null,
+    counts: finalizedCounts,
+  };
+  await page.screenshot({ path: resolve(evidenceDir, '11-lottery-v2-finalized.png'), fullPage: true });
+
+  await page.goto(`${baseUrl}/app/events/bib`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: '选手排号' }).first().waitFor();
+  await page.getByText('已排号 0 / 可排号 2', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '预览排号结果（100人）' }).click();
+  await page.getByText(/预计分配 2 人/).waitFor();
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '执行排号（自动创建快照）' }).click();
+  await page.getByText('排号完成：参与 2 人，不参与 1 人', { exact: true }).waitFor();
+  await page.getByText('已排号 2 / 可排号 2', { exact: true }).waitFor();
+  const assignedBibs = await page.locator('.bib-preview-item').evaluateAll((items) => items.map((item) => ({
+    name: item.querySelector('.bib-preview-item__name')?.textContent?.trim() || '',
+    bibNumber: item.querySelector('.bib-preview-item__number')?.textContent?.trim() || '',
+  })));
+  assert.equal(assignedBibs.length, 2);
+  assert.equal(assignedBibs.every((item) => item.name && item.bibNumber), true);
+  await page.screenshot({ path: resolve(evidenceDir, '12-bib-assigned.png'), fullPage: true });
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '回滚到上次执行前' }).click();
+  await page.getByText('排号已回滚到上次执行前状态', { exact: true }).waitFor();
+  await page.getByText('已排号 0 / 可排号 2', { exact: true }).waitFor();
+  result.checks.bib = { assignedBibs, rolledBack: true };
+
+  await page.goto(`${baseUrl}/app/bib-tracking`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: '号牌布控' }).first().waitFor();
+  await page.screenshot({ path: resolve(evidenceDir, '13-bib-tracking.png'), fullPage: true });
+
+  await page.goto(`${baseUrl}/app/events/lottery`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { name: '抽签管理' }).first().waitFor();
+  await page.getByRole('tab', { name: /物资匹配与最终执行/ }).click();
+  await page.getByRole('tab', { name: 'V2 测试版' }).click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: '回滚 V2 结果' }).click();
+  await page.getByText('V2 回滚完成。', { exact: true }).waitFor();
+
+  const restoredRecordsPromise = page.waitForResponse((response) => (
+    /\/api\/app\/records\/query$/.test(response.url()) && response.request().method() === 'POST'
+  ));
+  await page.goto(`${baseUrl}/app/events/records`, { waitUntil: 'domcontentloaded' });
+  const restoredRecordsPayload = await (await restoredRecordsPromise).json();
+  await page.getByRole('heading', { name: '名单管理' }).first().waitFor();
+  await page.getByRole('cell', { name: '验收选手甲', exact: true }).waitFor();
+  const restoredLotteryStatuses = (restoredRecordsPayload.data?.records || [])
+    .filter((record) => record.lotteryStatus === '参与抽签')
+    .length;
+  assert.equal(restoredLotteryStatuses, 3);
+  result.checks.lotteryV2.rolledBack = true;
+  result.checks.lotteryV2.restoredLotteryStatuses = restoredLotteryStatuses;
+  await page.screenshot({ path: resolve(evidenceDir, '14-lottery-v2-rolled-back.png'), fullPage: true });
+
   await page.goto(`${baseUrl}/ops`, { waitUntil: 'networkidle' });
   await page.getByRole('heading', { name: '执行工作台' }).waitFor();
   result.checks.ops = { url: page.url() };
-  await page.screenshot({ path: resolve(evidenceDir, '10-ops.png'), fullPage: true });
+  await page.screenshot({ path: resolve(evidenceDir, '15-ops.png'), fullPage: true });
 
   await page.goto(`${baseUrl}/admin`, { waitUntil: 'networkidle' });
   await page.getByRole('heading', { name: '权限不足' }).waitFor();
   result.checks.adminDenied = { url: page.url() };
-  await page.screenshot({ path: resolve(evidenceDir, '11-admin-denied.png'), fullPage: true });
+  await page.screenshot({ path: resolve(evidenceDir, '16-admin-denied.png'), fullPage: true });
 
   assert.deepEqual(consoleErrors, []);
   assert.deepEqual(failedRequests, []);
