@@ -2512,7 +2512,7 @@ export default function TerrainModelPage() {
     } finally {
       setBuildingSurfaceTexture(false)
     }
-  }, [getSurfaceTextureSourceOptions, model, surfaceTextureQuality, surfaceTextureSourceKey])
+  }, [getSurfaceTextureSourceOptions, model, options.colorMode, surfaceTextureQuality, surfaceTextureSourceKey, terrainBounds])
 
   const handleGenerate = useCallback(async () => {
     if (!track?.points?.length) {
@@ -2591,7 +2591,7 @@ export default function TerrainModelPage() {
     } finally {
       setBuilding(false)
     }
-  }, [activeManualFootprintWgs84, activeTerrainBoundsWgs84, buildSurfaceTextureForModel, demRaster, generationOptions, manualTerrainBoundsReady, options.colorMode, summary?.distanceMeters, surfaceTextureEnabled, terrainBoundsMode, track, useSampledTerrain])
+  }, [activeManualFootprintWgs84, activeTerrainBoundsWgs84, buildSurfaceTextureForModel, demRaster, generationOptions, manualFootprintRotationDegrees, manualTerrainBoundsReady, options.colorMode, summary?.distanceMeters, surfaceTextureEnabled, terrainBoundsMode, track, useSampledTerrain])
 
   const handleDownloadZip = useCallback(async () => {
     if (exportBlockedBySurfaceTexture) {

@@ -115,12 +115,12 @@ export default function AssetDesignerWorkbench({
   }, [mode])
 
   const activeWarehouse = draftScene?.warehouse || initialScene?.warehouse || null
-  const activeZones = draftScene?.zones || []
-  const activeRacks = draftScene?.racks || []
-  const activeLocations = draftScene?.locations || []
-  const activePrefabs = draftScene?.prefabs || []
-  const activeWalls = draftScene?.walls || []
-  const activeStructures = draftScene?.structures || []
+  const activeZones = useMemo(() => draftScene?.zones || [], [draftScene?.zones])
+  const activeRacks = useMemo(() => draftScene?.racks || [], [draftScene?.racks])
+  const activeLocations = useMemo(() => draftScene?.locations || [], [draftScene?.locations])
+  const activePrefabs = useMemo(() => draftScene?.prefabs || [], [draftScene?.prefabs])
+  const activeWalls = useMemo(() => draftScene?.walls || [], [draftScene?.walls])
+  const activeStructures = useMemo(() => draftScene?.structures || [], [draftScene?.structures])
 
   const persistableScene = useMemo(() => buildPersistedScene({
     sceneType,
@@ -459,12 +459,14 @@ export default function AssetDesignerWorkbench({
 
   const projectName = readValue(activeWarehouse, 'name') || '未命名项目'
   const sourceLabel = sourceContext?.label ? `${projectName} · ${sourceContext.label}` : projectName
-  const warehouseDimensionsMm = readValue(activeWarehouse, 'dimensions_mm', 'dimensionsMm') || {}
-  const workspaceDimensions = useMemo(() => ({
-    width: Number(readValue(warehouseDimensionsMm, 'width_mm', 'widthMm') || 24000) / 1000,
-    depth: Number(readValue(warehouseDimensionsMm, 'depth_mm', 'depthMm') || 18000) / 1000,
-    height: Number(readValue(warehouseDimensionsMm, 'height_mm', 'heightMm') || 9000) / 1000,
-  }), [warehouseDimensionsMm])
+  const workspaceDimensions = useMemo(() => {
+    const warehouseDimensionsMm = readValue(activeWarehouse, 'dimensions_mm', 'dimensionsMm') || {}
+    return {
+      width: Number(readValue(warehouseDimensionsMm, 'width_mm', 'widthMm') || 24000) / 1000,
+      depth: Number(readValue(warehouseDimensionsMm, 'depth_mm', 'depthMm') || 18000) / 1000,
+      height: Number(readValue(warehouseDimensionsMm, 'height_mm', 'heightMm') || 9000) / 1000,
+    }
+  }, [activeWarehouse])
   const wallPreviewLabel = useMemo(() => {
     if (!wallPreview?.start || !wallPreview?.end) return null
     return formatDistance(distance(wallPreview.start, wallPreview.end))

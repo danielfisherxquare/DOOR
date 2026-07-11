@@ -115,7 +115,7 @@ export default function ImportPage() {
     } finally {
       setLoading(false)
     }
-  }, [addFile, scopedOrgId, standardFields, uploadedFiles, useMappingMemory])
+  }, [addFile, role, scopedOrgId, standardFields, uploadedFiles, useMappingMemory])
 
   const persistMappings = useCallback(async () => {
     if (role === 'super_admin' && !scopedOrgId) return

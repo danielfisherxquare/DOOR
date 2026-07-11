@@ -100,7 +100,7 @@ function ScanPickup({ inventoryApi = appInventoryApi }) {
             setCameraState('idle')
             showError('未找到该物资')
         }
-    }, [selectedOrgId])
+    }, [selectedOrgId, unitApi])
 
     const startScanning = useCallback(async () => {
         const envError = detectCameraSupport()

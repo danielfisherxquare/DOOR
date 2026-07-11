@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { appInventoryApi } from '../../services/inventoryApi'
 import { showError, showSuccess } from '../../utils/toast'
@@ -26,7 +26,7 @@ export default function StocktakingManager({ onChange, inventoryApi = appInvento
     const [submitting, setSubmitting] = useState(false)
     const [newPlan, setNewPlan] = useState(INITIAL_PLAN)
 
-    const loadBaseData = async () => {
+    const loadBaseData = useCallback(async () => {
         setLoading(true)
         try {
             const params = selectedOrgId ? { orgId: selectedOrgId } : {}
@@ -41,11 +41,11 @@ export default function StocktakingManager({ onChange, inventoryApi = appInvento
         } finally {
             setLoading(false)
         }
-    }
+    }, [selectedOrgId, stocktakingApi, warehouseApi])
 
     useEffect(() => {
         loadBaseData()
-    }, [selectedOrgId])
+    }, [loadBaseData])
 
     useEffect(() => {
         if (loading || selectedPlanId || !plans.length) return
@@ -66,7 +66,7 @@ export default function StocktakingManager({ onChange, inventoryApi = appInvento
             .then((result) => setRecords(result.data || []))
             .catch((error) => showError(`加载盘点记录失败：${error.message}`))
             .finally(() => setRecordsLoading(false))
-    }, [selectedOrgId, selectedPlanId])
+    }, [selectedOrgId, selectedPlanId, stocktakingApi])
 
     const selectedPlan = useMemo(
         () => plans.find((plan) => String(plan.id) === String(selectedPlanId)) || plans[0] || null,

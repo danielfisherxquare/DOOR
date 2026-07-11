@@ -552,7 +552,7 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
     [requests, selectedId],
   )
 
-  const importItems = activeImport?.items || []
+  const importItems = useMemo(() => activeImport?.items || [], [activeImport?.items])
   const filteredImportItems = useMemo(() => {
     if (importFilter === 'all') return importItems
     if (importFilter === 'design') return importItems.filter((item) => item.needsDesign)

@@ -127,7 +127,7 @@ export default function TwinScanBindingPanel({ mode = 'space', inventoryApi = ap
     }, [locations])
     const isVideoVisible = cameraState === 'scanning'
 
-    async function loadBootstrap() {
+    const loadBootstrap = useCallback(async () => {
         try {
             const [warehouseRes, shapeRes] = await Promise.all([
                 twinApi.getWarehouses(selectedOrgId),
@@ -144,9 +144,9 @@ export default function TwinScanBindingPanel({ mode = 'space', inventoryApi = ap
         } catch (err) {
             showError(`加载绑定基础数据失败：${err.message}`)
         }
-    }
+    }, [searchParams, selectedOrgId, selectedWarehouseId, setSearchParams, twinApi])
 
-    async function loadContext(warehouseId) {
+    const loadContext = useCallback(async (warehouseId) => {
         if (!warehouseId) {
             setObjects([])
             setLocations([])
@@ -165,15 +165,15 @@ export default function TwinScanBindingPanel({ mode = 'space', inventoryApi = ap
         } catch (err) {
             showError(`加载仓库上下文失败：${err.message}`)
         }
-    }
+    }, [selectedBatchId, selectedOrgId, twinApi])
 
     useEffect(() => {
         loadBootstrap()
-    }, [selectedOrgId])
+    }, [loadBootstrap])
 
     useEffect(() => {
         loadContext(selectedWarehouseId)
-    }, [selectedWarehouseId, selectedOrgId, selectedBatchId])
+    }, [loadContext, selectedWarehouseId])
 
     useEffect(() => {
         const locationQr = searchParams.get('locationQr') || ''

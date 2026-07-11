@@ -63,7 +63,7 @@ export default function OutboundCenter() {
         workbenchApi.getOverview(selectedOrgId)
             .then((result) => setOverview(result.data))
             .catch((err) => showError(`加载出库中心失败：${err.message}`))
-    }, [selectedOrgId])
+    }, [selectedOrgId, workbenchApi])
 
     const pickupGroup = overview?.taskQueues?.find((group) => group.key === 'pickup') || { items: [] }
     const metricItems = useMemo(() => ([

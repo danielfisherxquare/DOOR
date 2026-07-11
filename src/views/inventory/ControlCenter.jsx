@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { appInventoryApi } from '../../services/inventoryApi'
 import { showError } from '../../utils/toast'
@@ -48,15 +48,15 @@ export default function ControlCenter() {
     const [controlData, setControlData] = useState(null)
     const [selectedItem, setSelectedItem] = useState(null)
 
-    const loadControlData = () => {
+    const loadControlData = useCallback(() => {
         workbenchApi.getControl(selectedOrgId)
             .then((result) => setControlData(result.data))
             .catch((err) => showError(`加载盘点与异常失败：${err.message}`))
-    }
+    }, [selectedOrgId, workbenchApi])
 
     useEffect(() => {
         loadControlData()
-    }, [selectedOrgId])
+    }, [loadControlData])
 
     const metricItems = useMemo(() => ([
         { key: 'inProgress', label: '进行中盘点', value: controlData?.stocktakingSummary?.inProgress || 0 },

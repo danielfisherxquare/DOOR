@@ -39,11 +39,11 @@ function SurfaceProtectedRoute({ surface, children }) {
   )
   const profileRefreshParams = useMemo(
     () => getWorkspaceProfileRefreshParams(routeSession),
-    [routeSession?.orgId, routeSession?.raceId, routeSession?.scopeType],
+    [routeSession],
   )
   const profileKey = useMemo(
     () => getWorkspaceProfileKey(routeSession),
-    [routeSession?.orgId, routeSession?.raceId, routeSession?.scopeType],
+    [routeSession],
   )
   const [profileRefresh, setProfileRefresh] = useState(EMPTY_PROFILE_REFRESH)
   const profileRefreshMatches = profileRefresh.key === profileKey && profileRefresh.userKey === userKey

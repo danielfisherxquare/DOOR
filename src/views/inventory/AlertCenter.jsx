@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { appInventoryApi } from '../../services/inventoryApi'
 import { showError, showSuccess } from '../../utils/toast'
@@ -31,7 +31,7 @@ export default function AlertCenter({ onChange, inventoryApi = appInventoryApi }
     const [actingId, setActingId] = useState(null)
     const [filter, setFilter] = useState('all')
 
-    const loadAlerts = async () => {
+    const loadAlerts = useCallback(async () => {
         setLoading(true)
         try {
             const params = { limit: 100 }
@@ -43,11 +43,11 @@ export default function AlertCenter({ onChange, inventoryApi = appInventoryApi }
         } finally {
             setLoading(false)
         }
-    }
+    }, [alertApi, selectedOrgId])
 
     useEffect(() => {
         loadAlerts()
-    }, [selectedOrgId])
+    }, [loadAlerts])
 
     const filteredAlerts = useMemo(() => {
         const alertList = [...alerts]

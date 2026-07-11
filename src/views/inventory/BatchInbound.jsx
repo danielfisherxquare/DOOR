@@ -39,7 +39,7 @@ function BatchInbound({ inventoryApi = appInventoryApi }) {
             batchApi.getBatches(params).then(res => setBatches(res.data || [])),
             warehouseApi.getWarehouses(selectedOrgId).then(res => setWarehouses(res.data || []))
         ]).finally(() => setLoading(false))
-    }, [selectedOrgId])
+    }, [batchApi, selectedOrgId, warehouseApi])
 
     useEffect(() => {
         if (!prefilledBatchId || batches.length === 0) return

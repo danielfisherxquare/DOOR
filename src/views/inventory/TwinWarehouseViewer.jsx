@@ -127,7 +127,7 @@ export default function TwinWarehouseViewer() {
         return () => {
             active = false
         }
-    }, [selectedOrgId])
+    }, [searchParams, selectedOrgId, selectedWarehouseId, setSearchParams])
 
     useEffect(() => {
         if (!selectedWarehouseId) {
@@ -179,7 +179,7 @@ export default function TwinWarehouseViewer() {
         warehouseName: readValue(warehouse, 'name') || '',
     }), [selectedOrgId, selectedWarehouseId, warehouse])
     const dimensions = readValue(warehouse, 'dimensions_mm', 'dimensionsMm')
-    const locations = scene?.locations || []
+    const locations = useMemo(() => scene?.locations || [], [scene?.locations])
     const selectedLocation = locations.find((location) => location.id === selectedLocationId) || null
     const occupiedLocations = locations.filter((location) => {
         const used = Number(readValue(location, 'used_capacity', 'usedCapacity') || 0)
@@ -231,7 +231,7 @@ export default function TwinWarehouseViewer() {
     useEffect(() => {
         if (!selectedLocationId) return
         if (!filteredLocations.some((location) => location.id === selectedLocationId)) {
-            setSelectedLocation(null)
+            setSelectedLocationId(null)
         }
     }, [filteredLocations, selectedLocationId])
 

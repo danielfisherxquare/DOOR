@@ -59,7 +59,7 @@ export default function InboundCenter() {
         workbenchApi.getOverview(selectedOrgId)
             .then((result) => setOverview(result.data))
             .catch((err) => showError(`加载入库中心摘要失败：${err.message}`))
-    }, [selectedOrgId])
+    }, [selectedOrgId, workbenchApi])
 
     const inboundGroup = overview?.taskQueues?.find((group) => group.key === 'inbound') || { items: [] }
     const metricItems = useMemo(() => ([

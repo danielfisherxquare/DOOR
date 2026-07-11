@@ -26,8 +26,8 @@ export default function ContextSquareEntry({
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
 
-  const organizations = contextOptions?.organizations || []
-  const races = contextOptions?.races || []
+  const organizations = useMemo(() => contextOptions?.organizations || [], [contextOptions?.organizations])
+  const races = useMemo(() => contextOptions?.races || [], [contextOptions?.races])
   const canSwitchOrg = Boolean(contextOptions?.canSwitchOrg)
   const canSwitchRace = Boolean(contextOptions?.canSwitchRace)
 

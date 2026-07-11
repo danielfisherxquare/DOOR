@@ -52,7 +52,10 @@ export default function StudioStructurePanel({
   const activeBuilding = hierarchy?.activeBuilding || null
   const activeLevel = hierarchy?.activeLevel || null
   const activeWarehouse = hierarchy?.activeWarehouse || null
-  const raceBindings = Array.isArray(snapshot?.raceBindings) ? snapshot.raceBindings : []
+  const raceBindings = useMemo(
+    () => Array.isArray(snapshot?.raceBindings) ? snapshot.raceBindings : [],
+    [snapshot?.raceBindings],
+  )
   const buildingCount = Array.isArray(snapshot?.buildings) ? snapshot.buildings.length : 0
   const levelCount = (snapshot?.buildings || []).reduce((sum, building) => sum + (building.levels?.length || 0), 0)
   const warehouseCount = (snapshot?.buildings || []).reduce(

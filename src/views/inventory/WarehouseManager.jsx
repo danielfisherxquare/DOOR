@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { warehouseApi, locationApi } from '../../services/inventoryApi'
 import { showSuccess, showError } from '../../utils/toast'
@@ -21,7 +21,7 @@ function WarehouseManager() {
     const [newLocation, setNewLocation] = useState({ code: '', zone: '', aisle: '', shelf: '', position: '', capacity: 100 })
     const [locationSearch, setLocationSearch] = useState('')
 
-    const loadWarehouses = async () => {
+    const loadWarehouses = useCallback(async () => {
         try {
             const result = await warehouseApi.getWarehouses(selectedOrgId)
             setWarehouses(result.data || [])
@@ -30,7 +30,7 @@ function WarehouseManager() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [selectedOrgId])
 
     const loadLocations = async (warehouseId) => {
         try {
@@ -43,7 +43,7 @@ function WarehouseManager() {
 
     useEffect(() => {
         loadWarehouses()
-    }, [selectedOrgId])
+    }, [loadWarehouses])
 
     const handleSelectWarehouse = (warehouse) => {
         setSelectedWarehouse(warehouse)

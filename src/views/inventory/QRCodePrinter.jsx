@@ -95,7 +95,7 @@ export default function QRCodePrinter({ inventoryApi = appInventoryApi }) {
             })
             .catch((err) => showError(`加载打印数据失败：${err.message}`))
             .finally(() => setLoading(false))
-    }, [selectedOrgId])
+    }, [batchApi, selectedOrgId, twinApi])
 
     useEffect(() => {
         if (!selectedTwinWarehouseId) {
@@ -105,7 +105,7 @@ export default function QRCodePrinter({ inventoryApi = appInventoryApi }) {
         twinApi.getLocations({ warehouseId: selectedTwinWarehouseId }, selectedOrgId)
             .then((res) => setTwinLocations(res.data || []))
             .catch((err) => showError(`加载库位二维码失败：${err.message}`))
-    }, [selectedTwinWarehouseId, selectedOrgId])
+    }, [selectedTwinWarehouseId, selectedOrgId, twinApi])
 
     const loadUnits = async (batchId) => {
         try {

@@ -75,7 +75,10 @@ export default function AdminLayout() {
     ) return
     switchWorkspace()
   }, [location.pathname, switchWorkspace])
-  const currentContext = { selectedOrgId, selectedRaceId }
+  const currentContext = useMemo(
+    () => ({ selectedOrgId, selectedRaceId }),
+    [selectedOrgId, selectedRaceId],
+  )
   const isNavItemActive = useCallback((item) => (
     item.path === ''
       ? location.pathname === '/admin'

@@ -22,7 +22,7 @@ export default function Reports() {
             .finally(() => setLoading(false))
     }, [selectedOrgId])
 
-    const trend = analytics?.trend || []
+    const trend = useMemo(() => analytics?.trend || [], [analytics?.trend])
     const totalInbound = useMemo(
         () => trend.reduce((sum, item) => sum + Number(item.inbound || 0), 0),
         [trend]

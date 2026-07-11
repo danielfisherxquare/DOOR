@@ -620,7 +620,6 @@ function BibExecution({ raceId, config, startZones, onReload, showMessage }) {
       scoreUpperSeconds: typeof zone.scoreUpperSeconds === "number" ? zone.scoreUpperSeconds : null
     }))
   }), [config, raceId, startZones]);
-  const eligibleStatuses = useMemo(() => Array.from(BIB_ELIGIBLE_STATUSES), []);
   const refreshSnapshotState = useCallback(async () => {
     try {
       const response = await bibApi.hasBibSnapshot(raceId);
@@ -661,7 +660,7 @@ function BibExecution({ raceId, config, startZones, onReload, showMessage }) {
       plan
     };
     return plan;
-  }, [config, eligibleStatuses, planSignature, raceId, startZones]);
+  }, [config, planSignature, raceId, startZones]);
   const handlePreview = async () => {
     setPreviewing(true);
     try {

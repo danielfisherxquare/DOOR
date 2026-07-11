@@ -307,6 +307,7 @@ export default function AMap3DView({ onBrowseStateChange, browseSyncToken, brows
   const [currentPitch, setCurrentPitch] = useState(clampPitchDeg(browseState.pitchDeg));
   const activeDrawConfig = activeDrawTool ? DRAW_TOOL_BY_ID[activeDrawTool] : null;
   const selectedFeatureNode = useMemo(() => findFeatureNode(treeNodes, selectedNodeId), [treeNodes, selectedNodeId]);
+  const initialBrowseState = useRef(browseState).current;
 
   // Calculate occlusion opacity based on pitch
   const occlusionOpacity = useMemo(() => {
@@ -315,10 +316,10 @@ export default function AMap3DView({ onBrowseStateChange, browseSyncToken, brows
   }, [currentPitch]);
 
   // Initial values
-  const initialGcjCenter = useMemo(() => wgs84ToGcj02(browseState.centerWgs84), []);
-  const initialZoom = useMemo(() => clampZoomForMode('3D', browseState.zoom), []);
-  const initialHeading = useMemo(() => normalizeHeadingDeg(browseState.headingDeg), []);
-  const initialPitch = useMemo(() => clampPitchDeg(browseState.pitchDeg), []);
+  const initialGcjCenter = wgs84ToGcj02(initialBrowseState.centerWgs84);
+  const initialZoom = clampZoomForMode('3D', initialBrowseState.zoom);
+  const initialHeading = normalizeHeadingDeg(initialBrowseState.headingDeg);
+  const initialPitch = clampPitchDeg(initialBrowseState.pitchDeg);
 
   const handleSelectFeature = useCallback((featureId: string | null) => {
     if (!featureId) return;
