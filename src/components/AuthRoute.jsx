@@ -24,8 +24,8 @@ function AuthRoute({ children }) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (user?.mustChangePassword && location.pathname !== '/app/settings') {
-    return <Navigate to="/app/settings" replace />
+  if (user?.mustChangePassword && location.pathname !== '/change-password') {
+    return <Navigate to="/change-password" replace />
   }
 
   return children

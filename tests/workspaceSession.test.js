@@ -12,6 +12,7 @@ import {
   PLATFORM_SCOPE_VALUE,
   PLATFORM_WORKSPACE_ID,
   parseWorkspaceSession,
+  resolveSurfaceWorkspaceSession,
   resolveWorkspaceSwitchRedirect,
   resolveWorkspaceFromLegacyContext,
   serializeWorkspaceSession,
@@ -298,6 +299,40 @@ describe('workspace session', () => {
       orgId: 'org-a',
       raceId: '',
     })), null)
+  })
+
+  it('treats an absent workspace session as unselected instead of throwing', () => {
+    const platformProfile = {
+      scopeType: 'platform',
+      surfaces: ['admin'],
+    }
+
+    assert.equal(getWorkspaceProfileRefreshParams(null), null)
+    assert.equal(getWorkspaceProfileKey(null), '')
+    assert.equal(canCommitWorkspaceProfile(platformProfile, null), false)
+  })
+
+  it('recovers a missing platform session only from a verified super admin profile', () => {
+    assert.deepEqual(resolveSurfaceWorkspaceSession({
+      user: {
+        role: 'super_admin',
+        authzProfile: { scopeType: 'platform', surfaces: ['admin'] },
+      },
+      session: null,
+      surface: 'admin',
+    }), createWorkspaceSession({ scopeType: 'platform', surface: 'admin' }))
+
+    assert.equal(resolveSurfaceWorkspaceSession({
+      user: { role: 'super_admin', authzProfile: null },
+      session: null,
+      surface: 'admin',
+    }), null)
+
+    assert.equal(resolveSurfaceWorkspaceSession({
+      user: { role: 'org_admin', authzProfile: { scopeType: 'platform', surfaces: ['admin'] } },
+      session: null,
+      surface: 'admin',
+    }), null)
   })
 
   it('uses stable workspace profile keys for route guard refresh attempts', () => {

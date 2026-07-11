@@ -4,6 +4,7 @@ import knex from './db/knex.js';
 import { requestId } from './middleware/request-id.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { requireAuth } from './middleware/require-auth.js';
+import { requirePasswordChanged } from './middleware/require-password-changed.js';
 import { requireAuthz } from './middleware/require-authz.js';
 import healthRoutes from './modules/health/health.routes.js';
 import jobRoutes from './modules/jobs/job.routes.js';
@@ -111,6 +112,7 @@ app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
 
 app.use(requireAuth);
+app.use(requirePasswordChanged);
 
 const organizationOrPlatformScope = (req) => (
   req.query?.orgId

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import Navbar from './components/Navbar'
+import AuthRoute from './components/AuthRoute'
 import SurfaceProtectedRoute from './components/SurfaceProtectedRoute'
 import CapabilityProtectedRoute from './components/CapabilityProtectedRoute'
 import useAuthStore from './stores/authStore'
@@ -11,6 +12,7 @@ import useWorkspaceStore from './features/workspace/workspaceStore'
 const Login = lazy(() => import('./views/Login'))
 const ForgotPassword = lazy(() => import('./views/ForgotPassword'))
 const ResetPassword = lazy(() => import('./views/ResetPassword'))
+const ChangePassword = lazy(() => import('./views/ChangePassword'))
 const AssessmentPublicPage = lazy(() => import('./views/assessment/AssessmentPublicPage'))
 const ToolDetail = lazy(() => import('./views/ToolDetail'))
 const WorkspaceSelectPage = lazy(() => import('./views/workspace/WorkspaceSelectPage'))
@@ -53,6 +55,10 @@ function RootRedirect() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  if (user?.mustChangePassword) {
+    return <Navigate to="/change-password" replace />
   }
 
   const hasPlatformScope = workspaceSession?.scopeType === 'platform'
@@ -127,6 +133,14 @@ function App() {
         <Route path="/login" element={withSuspense(<Login />)} />
         <Route path="/forgot-password" element={withSuspense(<ForgotPassword />)} />
         <Route path="/reset-password/:token" element={withSuspense(<ResetPassword />)} />
+        <Route
+          path="/change-password"
+          element={(
+            <AuthRoute>
+              {withSuspense(<ChangePassword />)}
+            </AuthRoute>
+          )}
+        />
         <Route
           path="/app/assessment/public/:campaignId"
           element={withSuspense(<AssessmentPublicPage />)}

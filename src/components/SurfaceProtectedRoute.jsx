@@ -7,6 +7,7 @@ import {
   canCommitWorkspaceProfile,
   getWorkspaceProfileKey,
   getWorkspaceProfileRefreshParams,
+  resolveSurfaceWorkspaceSession,
 } from '../features/workspace/workspaceSession'
 
 const EMPTY_PROFILE_REFRESH = {
@@ -32,13 +33,17 @@ function SurfaceProtectedRoute({ surface, children }) {
   const session = useWorkspaceStore((state) => state.session)
   const location = useLocation()
   const userKey = user?.id || user?.userId || user?.username || ''
+  const routeSession = useMemo(
+    () => resolveSurfaceWorkspaceSession({ user, session, surface }),
+    [session, surface, user],
+  )
   const profileRefreshParams = useMemo(
-    () => getWorkspaceProfileRefreshParams(session),
-    [session?.orgId, session?.raceId, session?.scopeType],
+    () => getWorkspaceProfileRefreshParams(routeSession),
+    [routeSession?.orgId, routeSession?.raceId, routeSession?.scopeType],
   )
   const profileKey = useMemo(
-    () => getWorkspaceProfileKey(session),
-    [session?.orgId, session?.raceId, session?.scopeType],
+    () => getWorkspaceProfileKey(routeSession),
+    [routeSession?.orgId, routeSession?.raceId, routeSession?.scopeType],
   )
   const [profileRefresh, setProfileRefresh] = useState(EMPTY_PROFILE_REFRESH)
   const profileRefreshMatches = profileRefresh.key === profileKey && profileRefresh.userKey === userKey
@@ -46,7 +51,7 @@ function SurfaceProtectedRoute({ surface, children }) {
     ? profileRefresh.profile
     : null
   const routeUser = refreshedProfile ? { ...user, authzProfile: refreshedProfile } : user
-  const hasWorkspaceProfile = canCommitWorkspaceProfile(routeUser?.authzProfile, session)
+  const hasWorkspaceProfile = canCommitWorkspaceProfile(routeUser?.authzProfile, routeSession)
   const isProfileRefreshPending = profileRefreshMatches && profileRefresh.status === 'pending'
   const didProfileRefreshFail = profileRefreshMatches && profileRefresh.status === 'failed'
   const shouldRefreshProfile = Boolean(
@@ -79,7 +84,7 @@ function SurfaceProtectedRoute({ surface, children }) {
           return {
             key: profileKey,
             userKey,
-            status: canCommitWorkspaceProfile(profile, session) ? 'ready' : 'failed',
+            status: canCommitWorkspaceProfile(profile, routeSession) ? 'ready' : 'failed',
             profile: profile || null,
           }
         })
@@ -103,7 +108,7 @@ function SurfaceProtectedRoute({ surface, children }) {
     profileKey,
     profileRefreshParams,
     refreshAuthzProfile,
-    session,
+    routeSession,
     shouldRefreshProfile,
     userKey,
   ])
@@ -116,15 +121,15 @@ function SurfaceProtectedRoute({ surface, children }) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (user?.mustChangePassword && location.pathname !== '/app/settings') {
-    return <Navigate to="/app/settings" replace />
+  if (user?.mustChangePassword) {
+    return <Navigate to="/change-password" replace />
   }
 
   if (shouldRefreshProfile || isProfileRefreshPending) {
     return <AccessLoadingState surface={surface} />
   }
 
-  if (!canAccessWorkspaceSurface({ user: routeUser, session, surface })) {
+  if (!canAccessWorkspaceSurface({ user: routeUser, session: routeSession, surface })) {
     return (
       <div className={`layout--${surface} tectonic-access-state`}>
         <div className="tectonic-access-state__content">

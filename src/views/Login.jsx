@@ -25,7 +25,7 @@ function Login() {
   useEffect(() => {
     if (isAuthenticated) {
       if (user?.mustChangePassword) {
-        navigate('/app/settings', { replace: true })
+        navigate('/change-password', { replace: true })
         return
       }
       const params = new URLSearchParams(location.search)

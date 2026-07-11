@@ -128,6 +128,13 @@ const useAuthStore = create(
               user: clearAuthzProfile(response.data),
               isAuthenticated: false,
             })
+            if (response.data?.mustChangePassword) {
+              set({
+                isBootstrapping: false,
+                isAuthenticated: true,
+              })
+              return
+            }
             const profile = await get().refreshAuthzProfile(
               response.data?.role === 'super_admin' ? { scopeType: 'platform' } : { raceId: '' },
             )
@@ -153,7 +160,7 @@ const useAuthStore = create(
       getDefaultLandingPath: () => {
         const user = get().user
         if (user?.mustChangePassword) {
-          return '/app/settings'
+          return '/change-password'
         }
         return getSurfacePath(user?.defaultSurface)
       },
@@ -197,6 +204,17 @@ const useAuthStore = create(
               isLoading: true,
               error: null,
             })
+            if (user.mustChangePassword) {
+              set({
+                isAuthenticated: true,
+                isLoading: false,
+              })
+              return {
+                success: true,
+                mustChangePassword: true,
+                defaultSurface: user.defaultSurface || 'app',
+              }
+            }
             const profile = await get().refreshAuthzProfile(user.role === 'super_admin' ? { scopeType: 'platform' } : { raceId: '' })
             if (!profile) {
               set({

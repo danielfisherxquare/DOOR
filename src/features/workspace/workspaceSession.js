@@ -69,6 +69,12 @@ export function parseWorkspaceSession(value) {
   }
 }
 
+export function resolveSurfaceWorkspaceSession({ user, session, surface } = {}) {
+  if (session) return session
+  if (user?.role !== 'super_admin' || user?.authzProfile?.scopeType !== 'platform') return null
+  return createWorkspaceSession({ scopeType: 'platform', surface })
+}
+
 export function getWorkspacePathKey(surface) {
   if (surface === 'ops') return 'lastOpsPath'
   if (surface === 'admin') return 'lastAdminPath'
@@ -87,7 +93,7 @@ function profileSurfaces(profile) {
 }
 
 export function canCommitWorkspaceProfile(profile, scope = {}) {
-  if (!profile) return false
+  if (!profile || !scope) return false
   const expectedScopeType = normalizeScopeType(scope.scopeType, scope.raceId)
 
   if (expectedScopeType === 'platform') {
@@ -104,6 +110,7 @@ export function canCommitWorkspaceProfile(profile, scope = {}) {
 }
 
 export function getWorkspaceProfileRefreshParams(scope = {}) {
+  if (!scope) return null
   const scopeType = normalizeScopeType(scope.scopeType, scope.raceId)
 
   if (scopeType === 'platform') {
