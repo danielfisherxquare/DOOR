@@ -244,4 +244,4 @@ app 单独重建后网关探测                20/20 通过，Nginx 容器未重
 4. 推送分支，远程 CI 全绿；
 5. 在远程候选环境重跑迁移、健康、备份恢复和镜像回退；
 6. 生产切换后验证 endpoint、静态 chunk、健康检查和关键业务抽样；
-7. 最终 HEAD 从全新检出重跑全部门禁。本次已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `03d88d4` 完成一次；当前 `5a75c87` 已在整改工作树完成 312/312、99/99、生产构建和 0 vulnerabilities，最终交付前仍需再做一次最新 HEAD 全新检出。
+7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `f62a7aa` 执行 fresh `npm ci`，并完成 312/312、99/99、生产构建、根与 server workspace 双审计 0 vulnerabilities；干净工作树无跟踪改动。
