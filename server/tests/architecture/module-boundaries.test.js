@@ -10,6 +10,7 @@ const ratchet = JSON.parse(
   await readFile(new URL('./module-boundaries.ratchet.json', import.meta.url), 'utf8'),
 )
 const moduleLineLimits = {
+  'src/modules/assessment/assessment.service.js': 950,
   'src/modules/design-requests/design-collaboration-import.service.js': 950,
   'src/modules/reimbursement/preview.service.js': 1200,
   'src/modules/reimbursement/reimbursement.controller.js': 1000,
@@ -202,5 +203,13 @@ describe('backend module boundaries', () => {
       'utf8',
     )
     assert.doesNotMatch(source, /from ['"]exceljs['"]/)
+  })
+
+  it('routes assessment default titles through the domain helper', async () => {
+    const source = await readFile(
+      path.join(serverRoot, 'src/modules/assessment/assessment.service.js'),
+      'utf8',
+    )
+    assert.equal(source.match(/\bgetDefaultTemplateTitle\(/g)?.length ?? 0, 2)
   })
 })
