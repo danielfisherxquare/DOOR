@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import bibTrackingApi from '../../../../api/app/bibTracking'
-import racesApi from '../../../../api/races'
+import appRacesApi from '../../../../api/appRaces'
 import useAuthStore from '../../../../stores/authStore'
 import useWorkspaceStore from '../../../../features/workspace/workspaceStore'
 import { resolveSurfaceOrgId, resolveSurfaceRaceId } from '../../../../utils/surfaceContext'
@@ -111,7 +111,7 @@ function BibTrackingPage() {
 
         const params = isSuperAdmin && selectedOrgId ? { orgId: selectedOrgId } : undefined
 
-        racesApi.getAll(params)
+        appRacesApi.getAll(params)
             .then((res) => {
                 if (cancelled || !res.success) return
 

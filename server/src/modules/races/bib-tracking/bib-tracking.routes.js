@@ -9,6 +9,10 @@ const requireBibAdmin = authorize({
     action: 'assume',
     resource: { kind: 'role', roles: ['org_admin', 'super_admin'] },
 });
+const requireBibReader = authorize({
+    action: 'assume',
+    resource: { kind: 'role', roles: ['race_admin', 'org_admin', 'super_admin'] },
+});
 const buildRequestContext = (req) => ({ ...req.authContext, requestId: req.id || null });
 
 router.post('/register/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
@@ -66,7 +70,7 @@ router.post(
     },
 );
 
-router.get('/items/:raceId', requireBibAdmin, requireRaceAccess('raceId'), async (req, res, next) => {
+router.get('/items/:raceId', requireBibReader, requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await service.listTrackingItems(buildRequestContext(req), req.params.raceId, req.query);
         res.json({ success: true, data });
@@ -75,7 +79,7 @@ router.get('/items/:raceId', requireBibAdmin, requireRaceAccess('raceId'), async
     }
 });
 
-router.get('/stats/:raceId', requireBibAdmin, requireRaceAccess('raceId'), async (req, res, next) => {
+router.get('/stats/:raceId', requireBibReader, requireRaceAccess('raceId'), async (req, res, next) => {
     try {
         const data = await service.getTrackingStats(buildRequestContext(req), req.params.raceId);
         res.json({ success: true, data });

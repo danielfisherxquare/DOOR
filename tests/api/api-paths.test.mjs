@@ -76,6 +76,7 @@ describe('API path ownership', () => {
       'src/views/app/events/processing/LotteryListsPanel.jsx',
       'src/views/app/events/lottery/LotteryPage.jsx',
       'src/views/app/events/lottery/CapacityPlanner.jsx',
+      'src/views/app/events/bib-tracking/BibTrackingPage.jsx',
     ]) {
       const viewSource = await source(relativePath)
       assert.doesNotMatch(viewSource, /api\/races/, relativePath)

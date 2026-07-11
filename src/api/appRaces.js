@@ -13,6 +13,9 @@ const BASE_PATH = '/app/races'
  */
 
 export const appRacesApi = {
+  /** @returns {Promise<{success: true, data: AppRaceDetail[]}>} */
+  getAll: (params) => request.get(BASE_PATH, { params }),
+
   /** @returns {Promise<{success: true, data: AppRaceDetail}>} */
   getById: (raceId) => request.get(`${BASE_PATH}/${raceId}`),
 

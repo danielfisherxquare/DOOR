@@ -129,12 +129,20 @@ describe('bib tracking routes', () => {
             userOrgId: orgId,
         });
         orgAdminUserId = orgAdmin.id;
-        await knex('user_module_access').insert({
-            user_id: orgAdmin.id,
-            org_id: orgId,
-            module_id: 'admin:bib-tracking',
-            granted_by: orgAdmin.id,
-        });
+        await knex('user_module_access').insert([
+            {
+                user_id: editor.id,
+                org_id: orgId,
+                module_id: 'app:events',
+                granted_by: orgAdmin.id,
+            },
+            {
+                user_id: orgAdmin.id,
+                org_id: orgId,
+                module_id: 'admin:bib-tracking',
+                granted_by: orgAdmin.id,
+            },
+        ]);
         await createUser({
             username: 'bib_super_admin',
             email: 'bib_super_admin@test.com',
@@ -438,6 +446,23 @@ describe('bib tracking routes', () => {
 
         const item = await knex('bib_tracking_items').where({ record_id: recordTwo.id }).first();
         assert.equal(item.status, 'finished');
+    });
+
+    it('lets app race operators read tracking stats and lists without admin mutations', async () => {
+        const stats = await api(`/api/app/bibs/stats/${raceId}`, {
+            headers: authHeader('editor'),
+        });
+        assert.equal(stats.status, 200);
+
+        const list = await api(`/api/app/bibs/items/${raceId}`, {
+            headers: authHeader('editor'),
+        });
+        assert.equal(list.status, 200);
+
+        const detail = await api(`/api/app/bibs/items/${raceId}/${trackedItemOneId}`, {
+            headers: authHeader('editor'),
+        });
+        assert.equal(detail.status, 403);
     });
 
     it('returns tracking stats and item list for org admin', async () => {

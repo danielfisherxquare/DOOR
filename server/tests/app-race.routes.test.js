@@ -61,9 +61,18 @@ test('app race API gives operators scoped read access and restricted workflow up
     events: JSON.stringify([{ name: '马拉松', targetCount: 3 }]),
     lottery_mode_default: 'lottery',
   }).returning('*');
+  await knex('races').insert({
+    org_id: userB.org_id,
+    name: '其他机构赛事',
+    date: '2026-11-01',
+  });
 
   const authA = { Authorization: `Bearer ${registrationA.body.data.accessToken}` };
   const authB = { Authorization: `Bearer ${registrationB.body.data.accessToken}` };
+
+  const list = await request('/api/app/races', { headers: authA });
+  assert.equal(list.status, 200);
+  assert.deepEqual(list.body.data.map((item) => item.name), ['App 端赛事']);
 
   const detail = await request(`/api/app/races/${race.id}`, { headers: authA });
   assert.equal(detail.status, 200);

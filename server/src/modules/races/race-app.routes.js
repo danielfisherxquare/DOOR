@@ -3,11 +3,24 @@ import { operationLog } from '../../middleware/operation-log.js';
 import { requireRaceAccess } from '../../middleware/require-race-access.js';
 import {
   parseRaceConflictRulePayload,
+  parseRaceListFilters,
   parseRaceLotteryModePayload,
 } from './race.schema.js';
 import { raceService } from './race.service.js';
 
 const router = Router();
+
+router.get('/', async (req, res, next) => {
+  try {
+    const races = await raceService.listRaces(
+      req.authContext,
+      parseRaceListFilters(req.query),
+    );
+    return res.json({ success: true, data: races });
+  } catch (error) {
+    return next(error);
+  }
+});
 
 router.get('/:raceId', requireRaceAccess('raceId'), async (req, res, next) => {
   try {
