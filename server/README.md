@@ -1,20 +1,20 @@
 # ArcSpro Server README（端口统一版）
 
-## Docker 镜像与容器命名
+## Docker 镜像与 Compose 服务
 
-为避免与其他项目的 Docker 资源冲突，所有容器均使用 `door-` 前缀：
+Compose 按项目名生成容器名；配置不声明全局 `container_name`，因此多个 worktree 可以并行启动。
 
-| 服务 | 镜像名称 | 容器名称 | 说明 |
+| 服务 | 镜像名称 | Compose 服务名 | 说明 |
 |------|----------|----------|------|
-| PostgreSQL | `postgres:16-alpine` | `door-postgres` | 主数据库 |
-| Redis | `redis:7-alpine` | `door-redis` | 缓存/限流 |
-| API 服务 | `arcspro-server-app:latest` | `arcspro-app` | Express API |
-| Worker | `arcspro-server-app:latest` | `door-worker` | 后台任务 |
-| Nginx | `nginx:alpine` | `door-nginx` | SSL 网关 |
-| 自动备份 | `postgres:16-alpine` | `door-pg-backup` | 每6小时 pg_dump |
+| PostgreSQL | `postgres:16-alpine` | `postgres` | 主数据库 |
+| Redis | `redis:7-alpine` | `redis` | 缓存/限流 |
+| API 服务 | `arcspro-server-app:latest` | `app` | Express API |
+| Worker | `arcspro-server-app:latest` | `worker` | 后台任务 |
+| Nginx | `nginx:alpine` | `nginx` | SSL 网关 |
+| 自动备份 | `arcspro-server-app:latest` | `pg-backup` | 每 6 小时运行 PostgreSQL 16 客户端 |
 
 > `app` 和 `worker` 共用同一个镜像 `arcspro-server-app:latest`，仅启动命令不同。
-> `pg-backup` 是轻量级 sidecar，复用 postgres 镜像仅执行 `pg_dump`。
+> `pg-backup` 复用后端镜像，确保 `pg_dump` 与数据库都固定在 PostgreSQL 16 主版本。
 
 ## 本地环境配置文件
 
@@ -72,8 +72,10 @@ curl http://localhost:3001/api/health/ready
 cd door/server
 cp .env.example .env
 docker compose up -d --build
-docker compose exec app npm run migrate
+docker compose ps -a migrate
 ```
+
+`migrate` 必须显示 `Exited (0)`；app 和 worker 只会在迁移成功后启动。
 
 健康检查：
 
@@ -114,38 +116,30 @@ postgres:
 
 - **频率**：每 6 小时执行一次 `pg_dump`
 - **保留**：最近 20 份，自动清理旧备份
-- **存储**：`server/backups/door_auto_YYYYMMDD_HHMMSS.sql`
-- **日志**：`docker logs door-pg-backup`
+- **存储**：`backups/door_backup_YYYYMMDD_HHMMSS.dump`（PostgreSQL custom archive）
+- **日志**：`docker compose logs -f pg-backup`
 
 ### 手动立即备份
 
 ```bash
-# 方式一：通过备份容器内的 pg_dump
-docker exec door-postgres pg_dump -U door -d door --no-owner --no-acl > backups/manual_backup.sql
-
-# 方式二：通过 app 容器内的脚本
+# 使用 app 容器内的版本固定脚本
 docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger manual
 ```
 
-### 从备份恢复
+### 恢复到隔离测试库
 
 ```bash
-# 1. 停止应用层（保留数据库运行）
-docker compose stop app worker
+mkdir -p backups/restores
+docker compose run --rm app bash scripts/run-postgres-restore.sh \
+  --input /backups/door_backup_XXXXXXXX_XXXXXX.dump \
+  --target-db door_restore_verification \
+  --result-file /backups/restores/manual-verification.json \
+  --env-file /backups/door_backup_XXXXXXXX_XXXXXX.env
 
-# 2. 恢复备份（含 .env）
-# 先恢复 .env 密钥文件！
-cp backups/door_backup_XXXXXXXX_XXXXXX.env .env
-# 再恢复数据库
-Get-Content backups/door_backup_XXXXXXXX_XXXXXX.sql.gz | docker exec -i door-postgres psql -U door -d door
-# Linux: zcat backups/door_backup_XXXXXXXX_XXXXXX.sql.gz | docker exec -i door-postgres psql -U door -d door
-
-# 3. 重启应用层
-docker compose up -d app worker
-
-# 4. 验证
-curl http://localhost:3001/api/health/ready
+jq . backups/restores/manual-verification.json
 ```
+
+脚本只创建新的测试库，不覆盖当前 `door` 数据库，也不会自动替换运行中的 `.env`。附带的 `.env` 只在结果中记录为密钥快照；生产切换必须停应用、人工核对密钥指纹并按独立回滚方案执行。
 
 ## 🔐 加密密钥保护 (Key Guard)
 
@@ -218,7 +212,7 @@ curl -s http://localhost:3001/api/health/ready | grep encryption
 
 ```bash
 # 仅在确认旧数据可丢弃时执行
-docker exec door-postgres psql -U door -d door \
+docker compose exec -T postgres psql -U door -d door \
   -c "DELETE FROM system_settings WHERE key IN ('pii_key_canary','pii_key_fingerprint');"
 docker compose restart app
 ```
@@ -254,7 +248,7 @@ docker compose exec \
    npm run migrate
 
    # Docker 模式
-   docker compose exec app npm run migrate
+   docker compose run --rm migrate
    ```
 2. **前后端同时重启部署**（前后端的 Event Tools 函数已解耦独立，但通信枚举已严格统一，必须一同上线以免 UI 异常）。
 
@@ -268,7 +262,7 @@ docker compose exec \
    npm run migrate
 
    # Docker 模式
-   docker compose exec app npm run migrate
+   docker compose run --rm migrate
    ```
 2. **验证创建**：
    在执行后，管理后台“项目计划”菜单应能正常打开并支持保存。
@@ -294,8 +288,8 @@ docker compose exec \
 
 | 层级 | 方式 | 频率 | 保留 | 位置 |
 |------|------|------|------|------|
-| **L1 自动** | `pg-backup` sidecar 容器 | 每 6 小时 | 最近 20 份 | `server/backups/door_auto_*.sql` |
-| **L2 手动** | `pg_dump` 或脚本 | 按需 | 不限 | `server/backups/` |
+| **L1 自动** | `pg-backup` sidecar 容器 | 每 6 小时 | 最近 20 份 | `backups/door_backup_*.dump` |
+| **L2 手动** | 版本固定脚本 | 按需 | 按配置保留 | `backups/` |
 | **L3 后台** | Web 管理界面 | 按需 | 可配置 | `/admin/db-backups` |
 
 ### 目录与挂载
@@ -304,8 +298,9 @@ docker compose exec \
 server/
 ├── pgdata/          ← PostgreSQL 数据文件（绑定挂载，不入 Git）
 ├── backups/         ← 所有备份文件（不入 Git）
-│   ├── door_auto_20260405_143425.sql    ← 自动备份
-│   ├── manual_backup.sql                ← 手动备份
+│   ├── door_backup_20260711_120000.dump  ← PostgreSQL custom 归档
+│   ├── door_backup_20260710_164631.meta.json ← 校验和与元数据
+│   ├── door_backup_20260710_164631.env   ← 同批密钥快照
 │   └── uploads/                         ← Web 上传恢复的临时目录
 ```
 
@@ -324,50 +319,40 @@ server/
 
 ```bash
 # 查看备份日志
-docker logs door-pg-backup
+docker compose logs -f pg-backup
 
 # 查看已有备份
-ls -lht server/backups/door_auto_*.sql
+ls -lht backups/door_backup_*.dump
 ```
 
 ### 手动备份（L2）
 
 ```bash
-# 方式一：直接 pg_dump
-docker exec door-postgres pg_dump -U door -d door --no-owner --no-acl > backups/manual_$(date +%Y%m%d).sql
-
-# 方式二：通过 app 容器脚本
+# 通过 app 容器脚本，输出 .dump、.meta.json 和可选 .env 快照
 docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger manual
 ```
 
 ### Web 后台（L3）
 
 - 路径：`/admin/db-backups`（仅 `super_admin`）
-- 支持：查看列表、生成备份、下载、上传恢复
+- 支持：查看列表、生成备份、下载、上传并恢复到隔离测试库
 
-### 恢复流程
+### 恢复演练
 
 ```bash
-# 1. 停应用层
-docker compose stop app worker
+docker compose run --rm app bash scripts/run-postgres-restore.sh \
+  --input /backups/door_backup_XXXXXXXX_XXXXXX.dump \
+  --target-db door_restore_verification \
+  --result-file /backups/restores/manual-verification.json
 
-# 2. 恢复（Windows PowerShell）
-Get-Content backups/door_auto_XXXXXXXX_XXXXXX.sql | docker exec -i door-postgres psql -U door -d door
-
-# 2. 恢复（Linux/macOS）
-cat backups/door_auto_XXXXXXXX_XXXXXX.sql | docker exec -i door-postgres psql -U door -d door
-
-# 3. 重启
-docker compose up -d app worker
-
-# 4. 验证
-curl http://localhost:3001/api/health/ready
+jq . backups/restores/manual-verification.json
 ```
 
 ### 恢复规则
 
-- Web 后台恢复只支持 `.sql.gz`，目标库命名 `door_restore_YYYYMMDD_HHMMSS`
-- 命令行恢复支持 `.sql`，可直接覆盖生产库
+- Web 后台恢复只支持 PostgreSQL custom `.dump`，目标库命名 `door_restore_YYYYMMDD_HHMMSS`
+- 命令行脚本同样只接受 `.dump`，先检查归档目录和危险对象类型，再创建新的目标库；不会直接覆盖生产库
+- 历史 `.sql.gz` 仍可在后台查看和下载，但不可直接恢复；先在受控环境转换并重新生成 `.dump`
 - 恢复成功后仍需人工校验核心表数据量
 
 详细说明见 `docs/backup-restore.md`。

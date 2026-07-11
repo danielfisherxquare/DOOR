@@ -58,17 +58,18 @@ VITE_API_BASE_URL=/api
 - 如果把 `VITE_API_BASE_URL` 写成线上地址，例如 `https://xquareliu.com/api`，那么本地前端会直接请求线上接口，不会走本地 `5173 -> 3001` 代理
 - 因此做本地联调时，应优先检查 `door/.env.local` 是否为 `/api`
 
-### Docker 镜像与容器命名
+### Docker 镜像与 Compose 服务
 
-为避免不同项目/环境的 Docker 资源冲突，所有镜像和容器均使用 `door-` 前缀：
+容器名由 Compose 项目名和服务名生成，不再声明全局 `container_name`，多个 worktree 可以并行运行：
 
-| 服务 | 镜像名称 | 容器名称 |
+| 服务 | 镜像名称 | Compose 服务名 |
 |------|----------|----------|
-| PostgreSQL | `postgres:16-alpine` (公共镜像) | `door-postgres` |
-| Redis | `redis:7-alpine` (公共镜像) | `door-redis` |
-| API 服务 | `arcspro-server-app:latest` (本地构建) | `arcspro-app` |
-| Worker | `arcspro-server-app:latest` (复用) | `door-worker` |
-| Nginx | `nginx:alpine` (公共镜像) | `door-nginx` |
+| PostgreSQL | `postgres:16-alpine` (公共镜像) | `postgres` |
+| Redis | `redis:7-alpine` (公共镜像) | `redis` |
+| API 服务 | `arcspro-server-app:latest` (本地构建) | `app` |
+| Worker | `arcspro-server-app:latest` (复用) | `worker` |
+| Nginx | `nginx:alpine` (公共镜像) | `nginx` |
+| 自动备份 | `arcspro-server-app:latest` (复用) | `pg-backup` |
 
 > [!IMPORTANT]
 > `app` 和 `worker` 共用同一个镜像 `arcspro-server-app:latest`，仅启动命令不同。
@@ -156,18 +157,16 @@ cd server
 docker compose up -d --build
 ```
 
-启动后的容器：
-- `door-postgres` - PostgreSQL 数据库 (端口 5432)
-- `door-redis` - Redis 缓存
-- `arcspro-app` - API 服务 (端口 3001)
-- `door-worker` - 后台任务处理
-- `door-nginx` - 反向代理 (端口 80)
+启动后的服务可用 `docker compose ps` 查看：`postgres`、`redis`、`app`、`worker`、`pg-backup`、`nginx`。
 
-#### 5. 执行数据库迁移
+#### 5. 确认数据库迁移
 
 ```bash
-docker compose exec app npm run migrate
+docker compose ps -a migrate
+# 预期：migrate 为 Exited (0)，app/worker 随后才会启动
 ```
+
+`docker compose up` 会先运行一次性 `migrate` 服务；迁移失败时 app 和 worker 不会启动。
 
 #### 6. 初始化超级管理员
 
@@ -451,7 +450,7 @@ cd server
 docker compose up -d --build
 
 # 4. 执行数据库迁移
-docker compose exec app npm run migrate
+docker compose run --rm migrate
 
 # 5. 创建超级管理员
 docker compose exec app node scripts/seed-super-admin.js
@@ -484,7 +483,7 @@ cd server
 docker compose up -d --build
 
 # 4. 执行数据库迁移（如有新迁移文件）
-docker compose exec app npm run migrate
+docker compose run --rm migrate
 
 # 5. 验证
 curl https://www.xquareliu.com/api/health/ready
@@ -516,9 +515,8 @@ sudo crontab -e
 docker compose ps
 docker compose logs -f app
 
-# 或直接使用容器名
-docker ps --filter "name=door-"
-docker logs -f arcspro-app
+docker compose logs -f worker
+docker compose logs -f pg-backup
 ```
 
 ### 进入容器调试
@@ -528,9 +526,6 @@ docker logs -f arcspro-app
 docker compose exec app sh
 docker compose exec postgres psql -U door -d door
 
-# 或直接使用容器名
-docker exec -it arcspro-app sh
-docker exec -it door-postgres psql -U door -d door
 ```
 
 ### 手动备份数据库
@@ -546,9 +541,6 @@ docker compose exec app bash scripts/run-postgres-backup.sh --trigger manual
 docker compose restart app
 docker compose restart nginx
 
-# 或直接使用容器名
-docker restart arcspro-app
-docker restart door-nginx
 ```
 
 ### 仅重启服务（不重新构建）
@@ -587,7 +579,7 @@ docker compose restart postgres
 
 **解决：**
 ```bash
-docker compose exec app npm run migrate
+docker compose run --rm migrate
 ```
 
 ### 3. 前端页面空白或 404
@@ -726,7 +718,7 @@ door/
 | `20260324000001` | 2026-03-24 | password_reset_tokens 表（忘记密码功能） |
 
 > [!IMPORTANT]
-> 每次部署后务必执行 `docker compose exec app npm run migrate`。
+> `docker compose up` 会先执行一次性 `migrate` 服务。发布后用 `docker compose ps -a migrate` 确认退出码为 0；需要手工重跑时使用 `docker compose run --rm migrate`。
 
 ---
 

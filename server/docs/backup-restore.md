@@ -4,7 +4,7 @@
 
 - 服务器本机保留最近 10 份 PostgreSQL 备份
 - 支持后台手动生成备份并下载到本地
-- 支持上传 `.sql.gz` 文件并恢复到新的测试数据库
+- 支持上传 PostgreSQL custom `.dump` 文件并恢复到新的测试数据库
 - 不提供页面内直接覆盖生产库的能力
 
 ## 目录与挂载
@@ -56,7 +56,7 @@ docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger manual
 
 ## 上传恢复
 
-后台页面支持上传 `.sql.gz` 文件并恢复到新的测试数据库。
+后台页面只接受由 `pg_dump --format=custom` 生成的 `.dump` 文件。恢复脚本会先读取归档目录并拒绝数据库、表空间、扩展、函数、触发器等高风险对象，再恢复到新的测试数据库。历史 `.sql.gz` 仅保留下载能力，不再直接执行。
 
 恢复目标库命名格式：
 
@@ -64,7 +64,7 @@ docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger manual
 
 恢复流程：
 
-1. 在 `/admin/db-backups` 上传本地备份文件
+1. 在 `/admin/db-backups` 上传 `.dump` 备份文件
 2. 点击“恢复到测试库”
 3. 记录目标数据库名
 4. 连接该数据库做人工校验
@@ -75,7 +75,7 @@ docker compose exec -T app bash scripts/run-postgres-backup.sh --trigger manual
 
 - 能连接目标数据库
 - `knex_migrations` 表存在
-- `users`、`orgs`、`races`、`records` 表存在
+- `users`、`organizations`、`races`、`records` 表存在
 - 关键业务数据条数基本合理
 
 查看恢复库：
@@ -88,5 +88,6 @@ docker compose exec -T postgres psql -U door -d door_restore_YYYYMMDD_HHMMSS
 ## 风险边界
 
 - 页面不会直接覆盖生产库
+- 恢复目标名必须匹配 `door_restore_*`；已存在的数据库不会被覆盖
 - 恢复成功不代表业务完全可用，仍需人工核验
 - 本机备份不是异地备份，下载到本地后应继续保存
