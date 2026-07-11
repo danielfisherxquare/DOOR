@@ -9,6 +9,10 @@ const modulesRoot = path.join(serverRoot, 'src/modules')
 const ratchet = JSON.parse(
   await readFile(new URL('./module-boundaries.ratchet.json', import.meta.url), 'utf8'),
 )
+const reimbursementServiceLineLimits = {
+  'src/modules/reimbursement/preview.service.js': 1200,
+  'src/modules/reimbursement/reimbursement.service.js': 1450,
+}
 
 async function listBoundaryFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
@@ -180,5 +184,13 @@ describe('backend module boundaries', () => {
     }
 
     assert.deepEqual(violations, [])
+  })
+
+  it('ratchets oversized reimbursement service facades', async () => {
+    for (const [file, lineLimit] of Object.entries(reimbursementServiceLineLimits)) {
+      const source = await readFile(path.join(serverRoot, file), 'utf8')
+      const lineCount = source.split('\n').length
+      assert.ok(lineCount <= lineLimit, `${file} has ${lineCount} lines; limit is ${lineLimit}`)
+    }
   })
 })

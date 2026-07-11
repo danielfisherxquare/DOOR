@@ -16,10 +16,17 @@ import {
 } from './reimbursement-llm-secret.js';
 import { isPlainObject, mergeRecordOcrMeta } from './reimbursement-ocr-meta.js';
 import { createPendingMatchWorkflow } from './reimbursement-pending-match.workflow.js';
+export {
+  clearProcessingRecords,
+  getDuplicateFiles,
+  getErrorFiles,
+  getProcessingJobs,
+  getProcessingStats,
+  startProcessingFile,
+} from './reimbursement-processing.service.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIRECT_PAYMENT_STORAGE_DIR = path.join(__dirname, '../../../storage/reimbursement-payments');
-const ACTIVE_PROCESSING_STATUSES = ['processing', 'completed'];
 
 async function ensureDir(dir) {
   await fs.promises.mkdir(dir, { recursive: true });
@@ -1241,61 +1248,6 @@ export async function getOrgStats(orgId) {
 // ==================== 处理记录管理 ====================
 
 /**
- * 记录处理开始（含去重检查）
- * @param {string} projectId - 项目ID
- * @param {string} userId - 用户ID
- * @param {Object} options - 选项
- * @param {string} options.fileName - 文件名
- * @param {string} options.fileType - 文件类型 (invoice/payment)
- * @param {string} options.fileHash - 文件哈希
- * @returns {Promise<{skipped: boolean, record?: Object, existing?: Object}>}
- */
-export async function startProcessingFile(projectId, userId, { fileName, fileType, fileHash }) {
-  return knex.transaction(async (trx) => {
-    const lockKey = `reimbursement-ocr:${projectId}:${fileType}:${fileHash}`;
-    await trx.raw('SELECT pg_advisory_xact_lock(hashtext(?)::bigint)', [lockKey]);
-
-    // 检查是否已有进行中或已完成的同内容文件；error/skipped 允许重新处理。
-    const existing = await trx('reimbursement_processed_files')
-      .where({
-        project_id: projectId,
-        file_hash: fileHash,
-        file_type: fileType,
-      })
-      .whereIn('status', ACTIVE_PROCESSING_STATUSES)
-      .first();
-
-    if (existing) {
-      const [record] = await trx('reimbursement_processed_files')
-        .insert({
-          project_id: projectId,
-          file_name: fileName,
-          file_type: fileType,
-          file_hash: fileHash,
-          status: 'skipped',
-          processed_at: trx.fn.now(),
-        })
-        .returning('*');
-
-      return { skipped: true, record, existing };
-    }
-
-    const [record] = await trx('reimbursement_processed_files')
-      .insert({
-        project_id: projectId,
-        file_name: fileName,
-        file_type: fileType,
-        file_hash: fileHash,
-        status: 'processing',
-        started_at: trx.fn.now(),
-      })
-      .returning('*');
-
-    return { skipped: false, record };
-  });
-}
-
-/**
  * 更新处理状态
  * @param {string} recordId - 处理记录ID
  * @param {string} status - 状态 (processing/completed/error/skipped)
@@ -1325,90 +1277,6 @@ export async function updateProcessingStatus(
   return knex('reimbursement_processed_files')
     .where({ id: recordId })
     .update(updateData);
-}
-
-/**
- * 获取处理统计
- * @param {string} projectId - 项目ID
- * @returns {Promise<{pending: number, processing: number, completed: number, skipped: number, errored: number}>}
- */
-export async function getProcessingStats(projectId) {
-  const stats = await knex('reimbursement_processed_files')
-    .where({ project_id: projectId })
-    .select('status')
-    .count('* as count')
-    .groupBy('status');
-
-  const result = {
-    pending: 0,
-    processing: 0,
-    completed: 0,
-    skipped: 0,
-    errored: 0,
-  };
-
-  for (const stat of stats) {
-    const status = stat.status;
-    const count = Number(stat.count);
-    if (status === 'pending') result.pending = count;
-    else if (status === 'processing') result.processing = count;
-    else if (status === 'completed') result.completed = count;
-    else if (status === 'skipped') result.skipped = count;
-    else if (status === 'error') result.errored = count;
-  }
-
-  return result;
-}
-
-/**
- * 获取处理记录列表
- * @param {string} projectId - 项目ID
- * @param {string} status - 可选的状态过滤
- * @returns {Promise<Array>}
- */
-export async function getProcessingJobs(projectId, status) {
-  let query = knex('reimbursement_processed_files')
-    .where({ project_id: projectId })
-    .orderBy('processed_at', 'desc')
-    .limit(100);
-
-  if (status) {
-    query = query.where({ status });
-  }
-
-  return query;
-}
-
-/**
- * 获取重复文件列表
- * @param {string} projectId - 项目ID
- * @returns {Promise<Array>}
- */
-export async function getDuplicateFiles(projectId) {
-  return knex('reimbursement_processed_files')
-    .where({ project_id: projectId, status: 'skipped' })
-    .orderBy('processed_at', 'desc');
-}
-
-/**
- * 获取错误文件列表
- * @param {string} projectId - 项目ID
- * @returns {Promise<Array>}
- */
-export async function getErrorFiles(projectId) {
-  return knex('reimbursement_processed_files')
-    .where({ project_id: projectId, status: 'error' })
-    .orderBy('processed_at', 'desc');
-}
-
-/**
- * 清空项目处理记录
- * @param {string} projectId - 项目ID
- */
-export async function clearProcessingRecords(projectId) {
-  return knex('reimbursement_processed_files')
-    .where({ project_id: projectId })
-    .del();
 }
 
 // ==================== 待匹配项管理 ====================
