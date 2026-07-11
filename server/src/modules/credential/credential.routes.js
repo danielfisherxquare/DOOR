@@ -96,7 +96,7 @@ router.post(
 )
 router.get(
   '/credentials/:raceId',
-  requireCredentialAdmin,
+  requireCredentialOperator,
   requireRaceAccess('raceId'),
   credentialController.getCredentials,
 )
@@ -140,7 +140,7 @@ router.post(
 )
 router.get(
   '/stats/:raceId',
-  requireCredentialAdmin,
+  requireCredentialOperator,
   requireRaceAccess('raceId'),
   credentialController.getStats,
 )

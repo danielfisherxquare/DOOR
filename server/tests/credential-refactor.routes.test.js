@@ -288,6 +288,21 @@ test('app race operators can list and review credential requests for their race'
         .select('access_code');
     assert.deepEqual(credentialAreas.map((item) => item.access_code), ['101']);
 
+    const credentialList = await api(`/api/app/credentials/credentials/${raceId}`, { headers: auth });
+    assert.equal(credentialList.status, 200);
+    assert.equal(
+        credentialList.body.data.some((item) => item.id === Number(credentials[0].id)),
+        true,
+    );
+
+    const credentialStats = await api(`/api/app/credentials/stats/${raceId}`, { headers: auth });
+    assert.equal(credentialStats.status, 200);
+    const generatedCount = Number((await knex('credential_credentials')
+        .where({ race_id: raceId, status: 'generated' })
+        .count('* as count')
+        .first()).count);
+    assert.equal(credentialStats.body.data.generated, generatedCount);
+
     const duplicateReview = await api(`/api/app/credentials/requests/${raceId}/${created.body.data.id}/review`, {
         method: 'POST',
         headers: auth,
@@ -302,6 +317,35 @@ test('app race operators can list and review credential requests for their race'
         Number((await knex('credential_credentials').where({ request_id: created.body.data.id }).count('* as count').first()).count),
         1,
     );
+
+    const issued = await api(`/api/app/credentials/credentials/${raceId}/${credentials[0].id}/issue`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({
+            recipientName: 'App Operator Request',
+            remark: 'Issued by acceptance operator',
+        }),
+    });
+    assert.equal(issued.status, 200);
+
+    const detail = await api(`/api/app/credentials/credentials/${raceId}/${credentials[0].id}`, { headers: auth });
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.data.status, 'issued');
+    assert.equal(detail.body.data.recentIssueLogs.length, 1);
+
+    const voided = await api(`/api/app/credentials/credentials/${raceId}/${credentials[0].id}/void`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({ voidReason: 'operator must not void' }),
+    });
+    assert.equal(voided.status, 403);
+
+    const reissued = await api(`/api/app/credentials/credentials/${raceId}/${credentials[0].id}/reissue`, {
+        method: 'POST',
+        headers: auth,
+        body: JSON.stringify({ reissueReason: 'operator must not reissue' }),
+    });
+    assert.equal(reissued.status, 403);
 });
 
 test('credential generation failure rolls the review back', async () => {
