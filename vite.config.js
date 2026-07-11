@@ -77,13 +77,12 @@ export default defineConfig({
             return 'vendor-ui'
           }
 
-          if (
-            id.includes('/xlsx/') ||
-            id.includes('/docxtemplater/') ||
-            id.includes('/pizzip/') ||
-            id.includes('/file-saver/')
-          ) {
-            return 'vendor-docs'
+          if (id.includes('/xlsx/')) {
+            return 'vendor-xlsx'
+          }
+
+          if (id.includes('/pizzip/')) {
+            return 'vendor-pizzip'
           }
 
           if (

@@ -49,3 +49,14 @@ test('workspace uses one lockfile and patched dependency releases', async () => 
   assert.equal(pkg.devDependencies['@vitejs/plugin-react'], '^6.0.3')
   assert.equal(pkg.overrides.exceljs.uuid, '^11.1.1')
 })
+
+test('document tooling keeps independent formats in independent chunks', async () => {
+  const pkg = await readPackageJson()
+  const viteConfig = await readFile(new URL('../../vite.config.js', import.meta.url), 'utf8')
+
+  assert.equal(pkg.dependencies.docxtemplater, undefined)
+  assert.equal(pkg.dependencies['file-saver'], undefined)
+  assert.match(viteConfig, /return 'vendor-xlsx'/)
+  assert.match(viteConfig, /return 'vendor-pizzip'/)
+  assert.doesNotMatch(viteConfig, /return 'vendor-docs'/)
+})
