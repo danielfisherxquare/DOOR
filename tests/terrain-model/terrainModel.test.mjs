@@ -1669,13 +1669,14 @@ test('TerrainModelPage persists model configuration and supports JSON import/exp
 
 test('TerrainModelPage exposes print-aware satellite colour controls and persists them with model configuration', () => {
   const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const configSource = readFileSync(new URL('../../src/views/app/terrain-model/terrainModelPageConfig.js', import.meta.url), 'utf8')
 
   assert.match(source, /satelliteColorStrategy/)
-  assert.match(source, /balanced/)
+  assert.match(configSource, /balanced/)
   assert.match(source, /satelliteTerrainColorLimit/)
   assert.match(source, /satelliteMinPatchAreaMm2/)
   assert.match(source, /satelliteColorSmoothing/)
-  assert.match(source, /平衡模式/)
+  assert.match(configSource, /平衡模式/)
   assert.match(source, /材料槽/)
   assert.match(source, /小色块/)
 })
@@ -1831,12 +1832,13 @@ test('TerrainModelPage blocks GLB exports while enabled satellite texture is not
 
 test('TerrainModelPage exposes Cesium ion and Google Maps texture credentials', () => {
   const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const configSource = readFileSync(new URL('../../src/views/app/terrain-model/terrainModelPageConfig.js', import.meta.url), 'utf8')
 
   assert.match(source, /createGoogleMapTilesSession/)
   assert.match(source, /fetchCesiumIonRasterSourceOptions/)
   assert.match(source, /VITE_GOOGLE_MAPS_TILE_API_KEY/)
   assert.match(source, /VITE_CESIUM_ION_TOKEN/)
-  assert.match(source, /DEFAULT_CESIUM_ION_ASSET_ID/)
+  assert.match(configSource, /DEFAULT_CESIUM_ION_ASSET_ID/)
   assert.match(source, /Google Maps Tiles API Key/)
   assert.match(source, /Cesium ion Asset ID/)
   assert.match(source, /Cesium ion URL 模板/)
@@ -1923,9 +1925,9 @@ test('TerrainModelPage surfaces Bambu print handoff slots in the delivery panel'
 })
 
 test('TerrainModelPage starts with a slicer-safe low raised track height', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const configSource = readFileSync(new URL('../../src/views/app/terrain-model/terrainModelPageConfig.js', import.meta.url), 'utf8')
 
-  assert.match(source, /trackHeightMm:\s*0\.6/)
+  assert.match(configSource, /trackHeightMm:\s*0\.6/)
 })
 
 test('TerrainModelPage falls back when WebGL preview cannot be created', () => {
