@@ -151,7 +151,7 @@ export default function StudioMapBridge({ workspaceKey, snapshot, placingBuildin
     return snapshot.buildings.find((b) => b.id === placingBuildingId) || null
   }, [placingBuildingId, snapshot?.buildings])
 
-  const handleMapPlacementClick = useCallback((e) => {
+  const handleMapPlacementClick = useCallback(() => {
     if (!placingBuildingId || !onBuildingPlaced) return
     // 从 mapStore 获取当前拐点的经纬度
     const mapState = useMapStore.getState()

@@ -17,7 +17,6 @@ export default function Sidebar({
   onLogout,
   features,
   shortcuts,
-  context,
 }) {
   const layerConfig = {
     admin: { name: '管理总后台', shortName: 'DG' },

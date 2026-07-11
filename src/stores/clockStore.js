@@ -28,12 +28,6 @@ const getBeijingTime = (offsetMs = 0) => {
 }
 
 /**
- * 将 { hours, minutes, seconds } 转为总秒数
- */
-const timeToTotalSeconds = ({ hours, minutes, seconds }) =>
-  hours * 3600 + minutes * 60 + seconds
-
-/**
  * 从总秒数解析时间部分（用于计时器模式）
  */
 const parseTimerParts = (totalSeconds) => {

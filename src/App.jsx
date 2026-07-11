@@ -2,7 +2,6 @@ import { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
-import Navbar from './components/Navbar'
 import AuthRoute from './components/AuthRoute'
 import SurfaceProtectedRoute from './components/SurfaceProtectedRoute'
 import CapabilityProtectedRoute from './components/CapabilityProtectedRoute'
@@ -73,22 +72,6 @@ function RootRedirect() {
   }
 
   return <Navigate to={getDefaultLandingPath()} replace />
-}
-
-/**
- * 公开页布局 — 仅顶部 Navbar + 内容
- */
-function PublicPageLayout({ children }) {
-  return (
-    <>
-      <Navbar />
-      <main className="main-content">
-        <Suspense fallback={<RouteLoader compact />}>
-          {children}
-        </Suspense>
-      </main>
-    </>
-  )
 }
 
 function App() {

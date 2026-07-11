@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { MapBrowseState, MapBrowseSyncSource, MapViewMode } from '../utils/map/browseState';
 import { areBrowseStatesEquivalent, normalizeMapBrowseState } from '../utils/map/browseState';
-import type { TileSourceConfig } from '../utils/map/tileLayer';
 
 export type TileStyle = string; // 图源ID，支持预设和自定义
 export type BuildingStyle = 'none' | 'osm' | 'google3d' | 'amap' | 'osmGeoJson';

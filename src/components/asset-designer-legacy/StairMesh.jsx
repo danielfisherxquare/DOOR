@@ -2,7 +2,6 @@
  * StairMesh — 楼梯渲染组件
  */
 import { useMemo } from 'react'
-import { Edges } from '@react-three/drei'
 import { getStructurePreset } from '../../data/structurePresets'
 
 export default function StairMesh({

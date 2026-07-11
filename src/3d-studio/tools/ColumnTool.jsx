@@ -3,7 +3,7 @@
  * 柱子放置工具 — 点击地面放置柱子
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useScene } from '@pascal-app/core'
 import { useThree } from '@react-three/fiber'
 import { nanoid } from 'nanoid'

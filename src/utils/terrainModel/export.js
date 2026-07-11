@@ -6,7 +6,7 @@ import {
 } from '../exportManifest.js'
 import { colorDistanceSq, hexToRgb } from './color.js'
 import { toPrintCoordinateVertex } from './coordinates.js'
-import { clamp, pickNumber, round } from './numeric.js'
+import { pickNumber, round } from './numeric.js'
 import {
   DEFAULT_FILAMENT_TYPE,
   FILAMENT_PROFILES,
@@ -420,7 +420,6 @@ function buildBambuProjectSettings(printableParts, extruderPlan = null, filament
     : printableParts
   const colors = filamentParts.map((part) => colorWithoutAlpha(part.displayColor))
   const filamentNames = filamentParts.map(() => profile.filamentSettingsId)
-  const filamentIndexes = filamentParts.map((_, index) => String(index + 1))
   const filamentValues = (value) => filamentParts.map(() => String(value))
   const filamentVariantValues = (value) => filamentParts.flatMap(() => [String(value), String(value)])
   const filamentVariantIndexes = filamentParts.flatMap((_, index) => [

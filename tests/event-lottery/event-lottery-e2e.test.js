@@ -61,19 +61,6 @@ async function waitAndScreenshot(page, name, fullPage = false) {
 }
 
 /**
- * 辅助函数：等待元素出现
- */
-async function waitForElement(page, selector, timeout = 10000) {
-    try {
-        await page.waitForSelector(selector, { state: 'visible', timeout });
-        return true;
-    } catch (error) {
-        console.log(`  ⏳ 等待元素超时：${selector}`);
-        return false;
-    }
-}
-
-/**
  * 测试 1：登录系统
  */
 async function testLogin(page) {
@@ -235,7 +222,6 @@ async function testUploadFile(page) {
         console.log(`  📄 测试文件大小：${(fileInfo.size / 1024).toFixed(2)} KB`);
         
         // 查找文件上传区域
-        const dropzone = page.locator('.import-dropzone, [class*="dropzone"]');
         const fileInput = page.locator('input[type="file"]');
         
         if (await fileInput.count() === 0) {

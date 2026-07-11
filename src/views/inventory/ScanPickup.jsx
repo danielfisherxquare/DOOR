@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { BrowserQRCodeReader } from '@zxing/browser'
 import { appInventoryApi } from '../../services/inventoryApi'
-import { showSuccess, showError, showWarning, showInfo } from '../../utils/toast'
+import { showSuccess, showError, showWarning } from '../../utils/toast'
 import StatusPill from '../../components/inventory/StatusPill'
 
 function extractToken(rawText) {
@@ -622,7 +622,7 @@ function formatSpec(spec) {
     if (!spec) return '-'
     try {
         const obj = typeof spec === 'string' ? JSON.parse(spec) : spec
-        return Object.entries(obj).map(([k, v]) => v).join(' / ') || '-'
+        return Object.values(obj).join(' / ') || '-'
     } catch {
         return String(spec)
     }

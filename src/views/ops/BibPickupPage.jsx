@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { BrowserQRCodeReader } from '@zxing/browser'
 import { opsBibTrackingApi as bibTrackingApi } from '../../api/bibTracking'
 
@@ -65,7 +65,6 @@ function BibPickupPage() {
   const controlsRef = useRef(null)
   const scanningRef = useRef(false)
   const lastDetectedRef = useRef({ token: '', at: 0 })
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [manualToken, setManualToken] = useState(searchParams.get('t') || '')
   const [cameraError, setCameraError] = useState('')

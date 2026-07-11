@@ -96,13 +96,6 @@ function bambuH2cFilamentVariantCount(projectSettings) {
   return projectSettings.filament_colour.length * BAMBU_H2C_FILAMENT_VARIANT_COUNT
 }
 
-function assertBambuProjectArraysMatchSlotCount(projectSettings, keys) {
-  const slotCount = projectSettings.filament_colour.length
-  for (const key of keys) {
-    assert.equal(projectSettings[key].length, slotCount, key + ' should match the material slot count')
-  }
-}
-
 function assertBambuProjectArraysMatchFilamentVariantCount(projectSettings, keys) {
   const variantCount = bambuH2cFilamentVariantCount(projectSettings)
   for (const key of keys) {

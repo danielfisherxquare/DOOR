@@ -21,14 +21,12 @@ const CheckIconSmall = () => (
     </svg>
 );
 
-const StepIndicator = ({ step, currentStatus, isLast }) => {
+const StepIndicator = ({ step, currentStatus }) => {
     const stepInfo = ProcessingSteps[step] || { label: step, order: 99 };
     const currentStepInfo = ProcessingSteps[currentStatus] || { order: -1 };
 
     const isCompleted = stepInfo.order < currentStepInfo.order;
     const isActive = step === currentStatus;
-    const isPending = stepInfo.order > currentStepInfo.order;
-
     return (
         <div className="step-indicator">
             <div className={`step-dot ${isCompleted ? 'completed' : isActive ? 'active' : 'pending'}`}>
@@ -101,8 +99,6 @@ function ProcessingStatusRail({ invoice, onUpdate }) {
         );
     }
 
-    const currentStepIndex = stepOrder.indexOf(status);
-
     return (
         <div className="processing-status-rail">
             <div className="status-rail-header">
@@ -124,12 +120,11 @@ function ProcessingStatusRail({ invoice, onUpdate }) {
             </div>
 
             <div className="status-rail-content">
-                {stepOrder.map((step, index) => (
+                {stepOrder.map((step) => (
                     <StepIndicator
                         key={step}
                         step={step}
                         currentStatus={status}
-                        isLast={index === stepOrder.length - 1}
                     />
                 ))}
             </div>

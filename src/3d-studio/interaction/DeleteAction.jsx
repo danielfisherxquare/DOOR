@@ -5,7 +5,6 @@
 
 import { useEffect } from 'react'
 import { useScene } from '@pascal-app/core'
-import { useThree } from '@react-three/fiber'
 import useViewer from '../../../node_modules/@pascal-app/viewer/dist/store/use-viewer.js'
 import useEditor from '../store/useEditor'
 
@@ -13,8 +12,6 @@ import useEditor from '../store/useEditor'
 const PROTECTED_TYPES = ['site', 'building', 'level']
 
 export default function DeleteAction() {
-  const gl = useThree((state) => state.gl)
-
   useEffect(() => {
     const handleKeyDown = (event) => {
       // 忽略输入框中的删除

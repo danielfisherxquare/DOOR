@@ -18,7 +18,6 @@ export async function captureScene(options, renderer, scene, camera) {
     height = 1080,
     format = 'png',
     quality = 95,
-    transparent = false,
   } = options
 
   // 保存原始状态

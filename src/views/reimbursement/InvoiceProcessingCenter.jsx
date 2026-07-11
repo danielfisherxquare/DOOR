@@ -210,7 +210,7 @@ function InvoiceProcessingCenter({ projectId, onImportToRecords }) {
                         ? { ...inv, imported: true }
                         : inv
                 ));
-            } catch (err) {
+            } catch (_err) {
                 failCount++;
             }
         }

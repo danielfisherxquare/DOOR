@@ -96,7 +96,6 @@ interface CustomTileSourceWizardProps {
 export default function CustomTileSourceWizard({ onClose, onComplete }: CustomTileSourceWizardProps) {
   const [state, setState] = useState<WizardState>(INITIAL_STATE);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [previewUrl, setPreviewUrl] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'failed' | null>(null);
@@ -173,7 +172,6 @@ export default function CustomTileSourceWizard({ onClose, onComplete }: CustomTi
 
   const handleTest = useCallback(async () => {
     const url = generatePreviewUrl();
-    setPreviewUrl(url);
     setTesting(true);
     setTestResult(null);
 

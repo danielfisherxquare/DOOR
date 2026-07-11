@@ -3,15 +3,10 @@
  * 预设配色方案列表组件 - 支持层级切换
  */
 
-import { useMemo } from 'react'
 import useColorSchemeStore from '../../../../stores/colorSchemeStore'
 
 function PresetSchemeList({ currentSchemeId, onSelect, orgId, surface }) {
-  const { presets, customSchemes, deleteScheme, isLoading } = useColorSchemeStore()
-
-  const allSchemes = useMemo(() => {
-    return [...presets, ...customSchemes]
-  }, [presets, customSchemes])
+  const { presets, customSchemes, deleteScheme } = useColorSchemeStore()
 
   const handleDelete = async (e, schemeId) => {
     e.stopPropagation()

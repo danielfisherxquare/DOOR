@@ -27,7 +27,7 @@ import {
   round,
   toFiniteElevation,
 } from './numeric.js'
-import { colorDistanceSq, hexToRgb, hexToRgbArray } from './color.js'
+import { hexToRgb, hexToRgbArray } from './color.js'
 import {
   DEFAULT_FILAMENT_TYPE,
   FILAMENT_TYPES,
@@ -526,10 +526,6 @@ function interpolateElevatedTrackElevation(elevatedTrack, x, z) {
     totalWeight += weight
   }
   return totalWeight > 0 ? weightedHeight / totalWeight : elevatedTrack[0].elevation
-}
-
-function interpolateTrackElevation(localTrack, x, z) {
-  return interpolateElevatedTrackElevation(buildElevatedTrack(localTrack), x, z)
 }
 
 function fillLinearElevationSeries(values) {
@@ -2009,81 +2005,6 @@ function createDisabledLowlandColorBand() {
   }
 }
 
-// ── k-means colour clustering (no external dependencies) ──────────────────
-function kMeansCluster(pixels, k, maxIterations = 10) {
-  const rgbPixels = pixels.map((pixel) => [pixel.r, pixel.g, pixel.b])
-  if (rgbPixels.length === 0 || k < 1) {
-    return { centers: [], assignments: [] }
-  }
-  if (k >= rgbPixels.length) {
-    const centers = rgbPixels.map((rgb) => ({ r: rgb[0], g: rgb[1], b: rgb[2], hex: rgbToHex(rgb[0], rgb[1], rgb[2]) }))
-    return { centers, assignments: rgbPixels.map((_, i) => i) }
-  }
-
-  // k-means++ initialisation
-  const centers = [rgbPixels[Math.floor(Math.random() * rgbPixels.length)]]
-  for (let i = 1; i < k; i += 1) {
-    const distances = rgbPixels.map((px) => {
-      let minDist = Infinity
-      for (const center of centers) {
-        const d = colorDistanceSq(px, center)
-        if (d < minDist) minDist = d
-      }
-      return minDist
-    })
-    const total = distances.reduce((sum, d) => sum + d, 0)
-    const threshold = Math.random() * total
-    let cumulative = 0
-    let chosen = 0
-    for (let j = 0; j < distances.length; j += 1) {
-      cumulative += distances[j]
-      if (cumulative >= threshold) { chosen = j; break }
-    }
-    centers.push(rgbPixels[chosen])
-  }
-
-  let assignments = new Array(rgbPixels.length).fill(0)
-  for (let iter = 0; iter < maxIterations; iter += 1) {
-    // Assignment step
-    let changed = false
-    for (let i = 0; i < rgbPixels.length; i += 1) {
-      let bestCluster = 0
-      let bestDist = Infinity
-      for (let c = 0; c < k; c += 1) {
-        const d = colorDistanceSq(rgbPixels[i], centers[c])
-        if (d < bestDist) { bestDist = d; bestCluster = c }
-      }
-      if (assignments[i] !== bestCluster) { assignments[i] = bestCluster; changed = true }
-    }
-    if (!changed) break
-    // Update step
-    const sums = Array.from({ length: k }, () => [0, 0, 0])
-    const counts = new Array(k).fill(0)
-    for (let i = 0; i < rgbPixels.length; i += 1) {
-      const c = assignments[i]
-      sums[c][0] += rgbPixels[i][0]
-      sums[c][1] += rgbPixels[i][1]
-      sums[c][2] += rgbPixels[i][2]
-      counts[c] += 1
-    }
-    for (let c = 0; c < k; c += 1) {
-      if (counts[c] > 0) {
-        centers[c] = [
-          Math.round(sums[c][0] / counts[c]),
-          Math.round(sums[c][1] / counts[c]),
-          Math.round(sums[c][2] / counts[c]),
-        ]
-      }
-    }
-  }
-
-  const resultCenters = centers.map((rgb) => ({
-    r: rgb[0], g: rgb[1], b: rgb[2],
-    hex: rgbToHex(rgb[0], rgb[1], rgb[2]),
-  }))
-  return { centers: resultCenters, assignments }
-}
-
 function rgbToHex(r, g, b) {
   return '#' + [r, g, b].map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('')
 }
@@ -2614,7 +2535,6 @@ function assignSatelliteFaceToPalette(faceInfo, palette, strategy, smoothing) {
 function buildElevationBandMeshes({
   terrainMesh,
   topVertexCount,
-  elevations,
   minElevation,
   maxElevation,
   options,
@@ -2926,62 +2846,6 @@ async function buildSatelliteColorBandMeshes({
     })),
     totalCoverageRatio: faceInfos.length > 0
       ? round(totalCovered / faceInfos.length, 4) : 0,
-  }
-}
-
-// Single-band fallback when terrain is flat (no elevation range to split)
-function buildSingleBandResult({
-  terrainMesh, topVertexCount, bandThicknessMm, overlapMm, anchorBottomY,
-  sortedCenters, bandCount, rawImageData, textureWidth, textureHeight, dimensions,
-}) {
-  const clusterVotes = new Array(bandCount).fill(0)
-  let sampledCount = 0
-  terrainMesh.faces.forEach((face, faceIndex) => {
-    if (!face.every((idx) => idx >= 0 && idx < topVertexCount)) return
-    if (sampledCount >= 60) return
-    sampledCount += 1
-    const polygon = face.map((idx) => terrainMesh.vertices[idx])
-    let centerU = 0; let centerV = 0
-    for (const vertex of polygon) { const uv = getTerrainSurfaceUv(vertex, dimensions); centerU += uv.u; centerV += uv.v }
-    centerU /= polygon.length; centerV /= polygon.length
-    const px = clamp(Math.floor(centerU * (textureWidth - 1)), 0, textureWidth - 1)
-    const py = clamp(Math.floor(centerV * (textureHeight - 1)), 0, textureHeight - 1)
-    const pixelIdx = (py * textureWidth + px) * 4
-    const pixelR = rawImageData.data[pixelIdx]
-    const pixelG = rawImageData.data[pixelIdx + 1]
-    const pixelB = rawImageData.data[pixelIdx + 2]
-    let bestC = 0; let bestD = Infinity
-    for (let c = 0; c < bandCount; c += 1) {
-      const d = colorDistanceSq([pixelR, pixelG, pixelB], [sortedCenters[c].r, sortedCenters[c].g, sortedCenters[c].b])
-      if (d < bestD) { bestD = d; bestC = c }
-    }
-    clusterVotes[bestC] += 1
-  })
-  let dominant = 0; let maxV = 0
-  for (let c = 0; c < bandCount; c += 1) { if (clusterVotes[c] > maxV) { maxV = clusterVotes[c]; dominant = c } }
-
-  const solidVertices = []; const solidFaces = []; let covered = 0
-  terrainMesh.faces.forEach((face) => {
-    if (!face.every((idx) => idx >= 0 && idx < topVertexCount)) return
-    const polygon = face.map((idx) => terrainMesh.vertices[idx])
-    if (polygon.length < 3) return
-    addSolidPolygon(solidVertices, solidFaces, polygon, bandThicknessMm, overlapMm, anchorBottomY)
-    covered += 1
-  })
-  const totalTop = terrainMesh.faces.filter((f) => f.every((idx) => idx >= 0 && idx < topVertexCount)).length
-  return {
-    bands: [{
-      name: 'satellite-band-1',
-      displayColor: sortedCenters[dominant].hex,
-      clusterCenter: sortedCenters[dominant],
-      thicknessMm: bandThicknessMm,
-      mesh: solidVertices.length ? { name: 'satellite-band-1', vertices: solidVertices, faces: solidFaces } : createEmptyMesh('satellite-band-1'),
-      coveredTriangleCount: covered,
-      totalTopTriangleCount: totalTop,
-      coverageRatio: totalTop > 0 ? round(covered / totalTop, 4) : 0,
-    }],
-    clusterCenters: sortedCenters,
-    totalCoverageRatio: totalTop > 0 ? round(covered / totalTop, 4) : 0,
   }
 }
 

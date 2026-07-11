@@ -25,7 +25,7 @@ function WarehouseManager() {
         try {
             const result = await warehouseApi.getWarehouses(selectedOrgId)
             setWarehouses(result.data || [])
-        } catch (err) {
+        } catch (_err) {
             showError('加载仓库失败')
         } finally {
             setLoading(false)
@@ -36,7 +36,7 @@ function WarehouseManager() {
         try {
             const result = await locationApi.getLocations(warehouseId, selectedOrgId)
             setLocations(result.data || [])
-        } catch (err) {
+        } catch (_err) {
             showError('加载库位失败')
         }
     }

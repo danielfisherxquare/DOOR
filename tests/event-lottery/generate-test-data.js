@@ -115,7 +115,7 @@ function generateEvent() {
 }
 
 // 生成服装尺码
-function generateSize(gender, event) {
+function generateSize(gender, _event) {
     const maleSizes = ['S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
     const femaleSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
     

@@ -8,7 +8,7 @@ import { createPreferredRenderer } from '../../utils/createPreferredRenderer'
 if (THREE.WebGPURenderer) {
     extend(THREE)
 }
-import { zoneColorPresets, floorMaterialPresets, rackFinishPresets, getZoneColor, outdoorGroundPresets } from '../../data/materialPresets'
+import { getZoneColor } from '../../data/materialPresets'
 import { getPrefabById } from '../../data/prefabRegistry'
 import PrefabMesh from './PrefabMesh'
 import { WallWithOpeningsBatch } from './WallWithOpenings'
@@ -372,7 +372,6 @@ export default function AssetDesignerCanvas({
     activeMaterialId,
     activeTemplateId,
     activePrefabId,
-    openingMode,
     activeOpeningPreset,
     activeStructurePreset,
     measurements = [],

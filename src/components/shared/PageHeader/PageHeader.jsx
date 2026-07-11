@@ -1,6 +1,6 @@
 import './PageHeader.css'
 
-export default function PageHeader({ groupLabel, groupCaption, routeMeta, user }) {
+export default function PageHeader({ groupLabel, routeMeta, user }) {
   const getRoleName = (user) => {
     if (!user) return '用户'
     if (user.role === 'super_admin') return '超级管理员'

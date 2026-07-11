@@ -35,7 +35,7 @@ export function exportToJSON(draftScene, options = {}) {
 /**
  * 导出场景数据为 Excel
  */
-export function exportToExcel(draftScene, options = {}) {
+export function exportToExcel(draftScene, _options = {}) {
   const workbook = XLSX.utils.book_new()
 
   // 仓库信息

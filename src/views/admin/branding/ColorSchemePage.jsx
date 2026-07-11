@@ -3,11 +3,11 @@
  * 配色方案管理页面 - 支持按层级（admin/app/ops）区分配色
  */
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import useAuthStore from '../../../stores/authStore'
 import useColorSchemeStore, { defaultConfigBySurface } from '../../../stores/colorSchemeStore'
-import { CommandPanel, CommandNotice, CommandEmptyState } from '../../../components/command/CommandPrimitives'
+import { CommandPanel, CommandNotice } from '../../../components/command/CommandPrimitives'
 import ColorPaletteEditor from './components/ColorPaletteEditor'
 import ColorPreviewPanel from './components/ColorPreviewPanel'
 import PresetSchemeList from './components/PresetSchemeList'
@@ -83,7 +83,6 @@ function ColorSchemePage() {
   const [newSchemeDescription, setNewSchemeDescription] = useState('')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [previewMode, setPreviewMode] = useState('default')
-  const [previewSurface, setPreviewSurface] = useState('admin')
 
   // 加载机构配色
   useEffect(() => {
@@ -113,7 +112,6 @@ function ColorSchemePage() {
   const handleSurfaceChange = (e) => {
     const newSurface = e.target.value
     setCurrentSurface(newSurface)
-    setPreviewSurface(newSurface)
     setHasUnsavedChanges(false)
   }
 

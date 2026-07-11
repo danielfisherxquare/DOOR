@@ -28,7 +28,7 @@ export async function generateShareLink(sceneData, options = {}) {
       embedCode: generateEmbedCode(result.id),
       expiresAt: result.expiresAt,
     }
-  } catch (error) {
+  } catch (_error) {
     console.warn('分享 API 不可用，使用本地模拟')
   }
 
@@ -148,7 +148,7 @@ async function compressSceneData(data) {
       }
 
       return btoa(String.fromCharCode(...compressed))
-    } catch (error) {
+    } catch (_error) {
       console.warn('压缩失败，使用未压缩数据')
     }
   }
@@ -193,7 +193,7 @@ async function decompressSceneData(compressed) {
 
       const decoder = new TextDecoder()
       return JSON.parse(decoder.decode(decompressed))
-    } catch (error) {
+    } catch (_error) {
       // 可能是未压缩的数据
     }
   }
@@ -211,7 +211,7 @@ export async function copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text)
       return true
-    } catch (error) {
+    } catch (_error) {
       console.warn('Clipboard API 失败，使用降级方案')
     }
   }

@@ -519,7 +519,7 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
   })
   const [deliverable, setDeliverable] = useState({ fileName: '', fileUrl: '', mimeType: 'image/png', note: '' })
   const [importFile, setImportFile] = useState(null)
-  const [imports, setImports] = useState([])
+  const [, setImports] = useState([])
   const [activeImport, setActiveImport] = useState(null)
   const [selectedImportItemId, setSelectedImportItemId] = useState('')
   const [importFilter, setImportFilter] = useState('all')
@@ -748,26 +748,6 @@ export default function DesignRequestWorkspace({ surface = 'app', mode = 'design
       if (created?.id) setSelectedId(created.id)
     } catch (err) {
       setError(err.message || '提交失败')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleReview = async (action) => {
-    if (!selectedRequest) return
-    setSaving(true)
-    setError('')
-    setNotice('')
-    try {
-      await designRequestApi.reviewRequest(surface, selectedRequest.id, {
-        action,
-        comment: reviewForm.comment,
-        assignedDesignerId: reviewForm.assignedDesignerId || undefined,
-      })
-      setNotice(action === 'approve' ? '审核已通过，设计师可以开始处理。' : action === 'reject' ? '需求已驳回。' : '已退回补充材料。')
-      await loadWorkspace()
-    } catch (err) {
-      setError(err.message || '审核失败')
     } finally {
       setSaving(false)
     }

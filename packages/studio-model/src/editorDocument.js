@@ -834,12 +834,6 @@ function cycleKey(vertexIds) {
   return cycleSequenceKey(normalizeCycleVertexIds(vertexIds), 3)
 }
 
-function profileMatchesCycle(document, vertexIds) {
-  const nextKey = cycleKey(vertexIds)
-  if (!nextKey) return null
-  return document.profiles.find((profile) => cycleKey(profile.vertexIds) === nextKey) || null
-}
-
 function buildAdjacency(document, excludedSegmentIds = new Set()) {
   const adjacency = new Map()
 

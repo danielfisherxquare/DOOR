@@ -3,7 +3,7 @@
  * 用于选择区域、配置下载参数、显示下载进度
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import {
   createTileArea,
@@ -13,7 +13,7 @@ import {
 import { bulkInsertTiles } from '../../utils/db/tileCacheStore';
 import { estimateDownload } from '../../utils/map/tileCoords';
 import { resolveTileUrl } from '../../utils/map/tileUrlResolver';
-import { PRESET_TILE_SOURCES, type TileSourceConfig } from '../../utils/map/tileLayer';
+import { PRESET_TILE_SOURCES } from '../../utils/map/tileLayer';
 import type { TileArea } from '../../utils/db/database';
 
 interface DownloadAreaPanelProps {
@@ -51,8 +51,6 @@ export default function DownloadAreaPanel({ areas, onDelete, onRefresh }: Downlo
     estimatedSizeMB: number;
   } | null>(null);
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [downloadingAreas, setDownloadingAreas] = useState<Set<string>>(new Set());
-
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const rectRef = useRef<L.Rectangle | null>(null);
@@ -175,13 +173,7 @@ export default function DownloadAreaPanel({ areas, onDelete, onRefresh }: Downlo
       await updateTileAreaStatus(areaId, 'downloading');
       setProgress((p) => p && { ...p, status: 'downloading' });
 
-      // 准备瓦片列表
       const tiles: Array<{ z: number; x: number; y: number }> = [];
-      for (let z = minZoom; z <= maxZoom; z++) {
-        const zTiles = estimate.perZoom.find((p) => p.zoom === z)?.count || 0;
-        // 简化：只处理有估算数据的层级
-      }
-
       // 实际计算瓦片坐标
       for (let z = minZoom; z <= maxZoom; z++) {
         const n = Math.pow(2, z);

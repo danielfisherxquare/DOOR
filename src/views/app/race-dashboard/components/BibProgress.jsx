@@ -22,7 +22,7 @@ function BibProgress({ data }) {
             {/* Overall progress bar */}
             <div className="race-dashboard__progress-bar-wrapper">
                 <div className="race-dashboard__progress-bar">
-                    {stages.map((stage, index) => {
+                    {stages.map((stage) => {
                         const percentage = totalTracked > 0
                             ? (stage.count / totalTracked) * 100
                             : 0;

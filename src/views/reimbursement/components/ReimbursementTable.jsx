@@ -377,7 +377,6 @@ function BatchEditModal({ visible, selectedRecords, onClose, onSave }) {
 function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null }) {
   const {
     records,
-    activeProject,
     defaultReporter,
     saveDefaultReporter,
     updateRecord,

@@ -3,11 +3,10 @@
  * 点工具 - 创建独立顶点
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useScene } from '@pascal-app/core'
 import { useThree } from '@react-three/fiber'
 import { nanoid } from 'nanoid'
-import * as THREE from 'three'
 import useEditor from '../store/useEditor'
 import { useWorkbenchPlane } from '../utils/workbenchPlane'
 

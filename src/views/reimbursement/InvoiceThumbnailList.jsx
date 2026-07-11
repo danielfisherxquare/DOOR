@@ -3,8 +3,6 @@
  * 发票缩略图列表组件
  */
 
-import { useState } from 'react';
-
 const statusConfig = {
     pending: { label: '待处理', className: 'invoice-status-badge--pending' },
     processing: { label: '处理中', className: 'invoice-status-badge--processing' },

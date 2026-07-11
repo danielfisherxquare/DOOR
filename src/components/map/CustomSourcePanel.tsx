@@ -6,13 +6,11 @@
 import { useState, useEffect } from 'react';
 import {
   listCustomSources,
-  createCustomSource,
   updateCustomSource,
   deleteCustomSource,
   toggleCustomSource,
   exportCustomSources,
   importCustomSources,
-  hasCustomSource,
 } from '../../utils/db/customSourceStore';
 import type { CustomSource } from '../../utils/db/database';
 import CustomTileSourceWizard from './CustomTileSourceWizard';

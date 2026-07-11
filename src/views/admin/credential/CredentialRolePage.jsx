@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { adminCredentialApi as credentialApi } from '../../../api/credential'
 import { useCredentialSurface } from './useCredentialSurface'
@@ -52,12 +52,6 @@ function CredentialRolePage() {
     useEffect(() => {
         void loadData()
     }, [raceId])
-
-    const accessAreaMap = useMemo(() => {
-        const map = new Map()
-        accessAreas.forEach((item) => map.set(item.id, item))
-        return map
-    }, [accessAreas])
 
     const resetForm = () => {
         setEditingCategory(null)

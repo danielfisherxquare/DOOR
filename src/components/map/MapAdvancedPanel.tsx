@@ -140,7 +140,7 @@ function computeEdgeLengths(coords: [number, number][]): number[] {
 }
 
 export default function MapAdvancedPanel({ nodeId }: MapAdvancedPanelProps) {
-  const { treeNodes, updateFeature } = useMapStore();
+  const { treeNodes } = useMapStore();
   const [elevationLoading, setElevationLoading] = useState(false);
   const [elevation, setElevation] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);

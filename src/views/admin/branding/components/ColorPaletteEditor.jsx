@@ -3,7 +3,6 @@
  * 调色盘编辑器组件
  */
 
-import { useMemo } from 'react'
 import ColorSwatch from './ColorSwatch'
 
 const COLOR_GROUPS = [

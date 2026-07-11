@@ -325,10 +325,6 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
     }
   }, [focusZone, orgId, requestedFocusZoneId, terrainPatchGenerating])
 
-  const hierarchy = useMemo(() => (
-    snapshot ? getStudioHierarchy(snapshot) : { activeBuilding: null, activeLevel: null, activeWarehouse: null }
-  ), [snapshot])
-
   const editableProjectOptions = useMemo(() => {
     const nextOptions = buildProjectOptions(project)
     if (!nextOptions.geoAnchor && focusZoneContext?.originWgs84) {

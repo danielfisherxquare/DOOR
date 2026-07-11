@@ -237,7 +237,7 @@ function getMissingExportFields(record) {
   return missing;
 }
 
-export function getRecordExportIssueLabels(record, index = 0, records = []) {
+export function getRecordExportIssueLabels(record, _index = 0, records = []) {
   const labels = [];
   const safeRecords = Array.isArray(records) && records.length > 0 ? records : [record];
   const reviewStatus = getOcrReviewStatus(record);

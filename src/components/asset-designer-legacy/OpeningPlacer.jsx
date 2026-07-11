@@ -4,7 +4,7 @@
  */
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { getWallLength, getWallAngle } from '../../utils/snapEngine'
-import { findValidPosition, openingsOverlap } from '../../utils/csgUtils'
+import { openingsOverlap } from '../../utils/csgUtils'
 import { ENTRY_OPENING_PRESETS, WINDOW_PRESETS } from '../../data/openingPresets'
 
 export default function OpeningPlacer({
@@ -163,8 +163,6 @@ function WallOpeningPreview({ wall, position, preset, type, warehouseOffset }) {
     const worldPos = useMemo(() => {
         const length = getWallLength(wall)
         const angle = getWallAngle(wall) * (Math.PI / 180)
-        const height = wall.height || 2.8
-
         // 计算局部坐标
         const localX = wall.start.x + position * length * Math.cos(angle)
         const localZ = wall.start.z + position * length * Math.sin(angle)

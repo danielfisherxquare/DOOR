@@ -37,14 +37,6 @@ function distance2D(left, right) {
   return Math.hypot(left[0] - right[0], left[1] - right[1])
 }
 
-function toPlanePoint(point) {
-  return [point[0], pointZ(point)]
-}
-
-function pointsMatch(left, right, tolerance = 0.2) {
-  return Math.hypot(left[0] - right[0], pointZ(left) - pointZ(right)) <= tolerance
-}
-
 function isHorizontalSegment(start, end) {
   return Math.abs(pointY(start) - pointY(end)) < 0.001
 }
@@ -376,8 +368,6 @@ export default function SketchTool() {
       const pointerPoint = [projection.pointer.x, projection.pointer.y]
       const nextPoint = isNearFirstScreenPoint(projection) ? pointsRef.current[0] : resolvePoint(projection, event)
       const currentPoints = pointsRef.current
-      const currentScreenPoints = screenPointsRef.current
-
       if (sketchModeRef.current === 'rect') {
         if (!currentPoints.length) {
           setPoints([nextPoint])

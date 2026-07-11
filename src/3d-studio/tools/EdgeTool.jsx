@@ -9,7 +9,6 @@ import { useThree } from '@react-three/fiber'
 import { nanoid } from 'nanoid'
 import * as THREE from 'three'
 import useEditor from '../store/useEditor'
-import useViewer from '../../../node_modules/@pascal-app/viewer/dist/store/use-viewer.js'
 
 const EDGE_COLOR = '#2563eb'
 const VERTEX_HIGHLIGHT_COLOR = '#f59e0b'

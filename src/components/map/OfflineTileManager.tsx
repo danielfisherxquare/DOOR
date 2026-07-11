@@ -10,8 +10,7 @@ import {
   clearAutoCache,
   runLRUCleanup,
 } from '../../utils/cache/lruManager';
-import { listTileAreas, deleteTileArea, getTotalAreaSize } from '../../utils/db/tileAreaStore';
-import { listCustomSources } from '../../utils/db/customSourceStore';
+import { listTileAreas, deleteTileArea } from '../../utils/db/tileAreaStore';
 import { checkStorageQuota } from '../../utils/cache/tileCacheApi';
 import DownloadAreaPanel from './DownloadAreaPanel';
 import CustomSourcePanel from './CustomSourcePanel';

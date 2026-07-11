@@ -2,7 +2,7 @@
  * 2D 平面图生成工具
  * 生成 SVG 或 PDF 格式的平面图
  */
-import { getWallLength, getWallAngle } from './snapEngine'
+import { getWallLength } from './snapEngine'
 
 /**
  * 生成 SVG 平面图
@@ -164,7 +164,6 @@ export async function generatePDFFloorPlan(draftScene, options = {}) {
 
   const {
     scale = 100,
-    includeDimensions = true,
     includeLabels = true,
     levelId = null,
   } = options

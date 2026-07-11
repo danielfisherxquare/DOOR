@@ -16,7 +16,7 @@ import {
   zoomFromCesiumRange,
   type MapBrowseState,
 } from '../../utils/map/browseState';
-import { createFixedFrameOrientation, createPlacementPose } from '../../utils/map/cesiumTransforms';
+import { createFixedFrameOrientation } from '../../utils/map/cesiumTransforms';
 import {
   PRESET_TILE_SOURCES,
   getTileSourceAvailabilityIssue,
@@ -50,7 +50,6 @@ const CAMERA_WHEEL_NOTIFY_DELAY_MS = 140;
 const CESIUM_TARGET_FRAME_RATE = 120;
 const FPS_SAMPLE_INTERVAL_MS = 500;
 const FPS_IDLE_RESET_DELAY_MS = FPS_SAMPLE_INTERVAL_MS * 3;
-const CESIUM_GLOBE_MAX_SCREEN_SPACE_ERROR = 4;
 const OSM_BUILDINGS_MAX_SCREEN_SPACE_ERROR = 16;
 const MAX_INSTANCING_PREVIEW_MODELS = 96;
 const MAX_TEMPLATE_FANOUT_MODELS = 48;

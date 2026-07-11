@@ -2,7 +2,7 @@
  * 下载区域元数据存储
  */
 
-import { withStore, getDatabase, type TileArea } from './database';
+import { withStore, type TileArea } from './database';
 
 /**
  * 插入/更新区域记录

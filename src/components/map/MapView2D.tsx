@@ -281,13 +281,6 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
 
   const recommendedTool = FEATURE_TYPE_TO_DRAW_TOOL[getSpatialObjectPreset(activeSpatialObjectType).featureType] || 'polygon';
   const activeDrawConfig = activeDrawTool ? DRAW_TOOL_BY_ID[activeDrawTool] : null;
-  const selectedFeature = selectedFeatureNode
-    ? drawnFeatures.find((feature) => {
-      const props = (feature.properties || {}) as Record<string, unknown>;
-      return feature.id === selectedFeatureNode.id || props.id === selectedFeatureNode.id || props.featureId === selectedFeatureNode.id;
-    }) || null
-    : null;
-
   function resetDrawingState(nextGuide = DEFAULT_DRAW_GUIDE) {
     activeDrawToolRef.current = null;
     setActiveDrawTool(null);

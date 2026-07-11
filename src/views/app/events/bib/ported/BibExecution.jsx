@@ -15,9 +15,7 @@ import { resolveEventDisplay } from "./eventUtils";
 const PREVIEW_LIMIT = 100;
 const UNKNOWN_STATUS_LABEL = "\u7A7A\u72B6\u6001";
 const DEFAULT_ZONE_LABEL = "\u672A\u5206\u533A";
-const DEFAULT_EVENT_KEY = "__unspecified_event__";
 const DEFAULT_EVENT_CN = "\u672A\u6307\u5B9A\u9879\u76EE";
-const DEFAULT_EVENT_EN = "Unspecified Event";
 const ELIGIBLE_STATUS_HINT = Array.from(BIB_ELIGIBLE_STATUSES).join(" / ");
 const GENDER_ALLOWED_HINT = "\u4EC5\u652F\u6301 M / F / MALE / FEMALE / \u7537 / \u5973";
 function normalizeText(v) {
@@ -30,9 +28,6 @@ function formatBagNoDisplay(v) {
   if (!match) return raw;
   const seq = match[1];
   return seq.length >= 3 ? seq.slice(-3) : seq.padStart(3, "0");
-}
-function normalizeEventKey(v) {
-  return normalizeText(v).toLowerCase();
 }
 function isSZone(zoneName) {
   return normalizeText(zoneName).toUpperCase() === "S";
@@ -708,16 +703,6 @@ function BibExecution({ raceId, config, startZones, onReload, showMessage }) {
           bibColor: r.bibColor || ""
         }));
         await bibApi.bulkAssignBib(raceId, assignments);
-        const localUpdates = assignments.map((a) => ({
-          id: a.recordId,
-          data: {
-            bibNumber: a.bibNumber,
-            bagWindowNo: a.bagWindowNo,
-            bagNo: a.bagNo,
-            expoWindowNo: a.expoWindowNo,
-            bibColor: a.bibColor
-          }
-        }));
       }
       setPreview(plan.preview);
       await refreshSnapshotState();

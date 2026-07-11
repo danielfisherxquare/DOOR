@@ -128,7 +128,7 @@ export function useNetworkRecovery(
 /**
  * 离线提示 Hook
  */
-export function useOfflineWarning(message: string = '当前处于离线状态'): {
+export function useOfflineWarning(_message: string = '当前处于离线状态'): {
   showWarning: boolean;
   dismissWarning: () => void;
 } {

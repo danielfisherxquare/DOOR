@@ -3,7 +3,6 @@
  * 显示半透明的预览墙体
  */
 import { useMemo } from 'react'
-import { Edges } from '@react-three/drei'
 
 export default function WallGhost({ start, end, height = 2.8, thickness = 0.2 }) {
     const { position, rotation, length } = useMemo(() => {

@@ -157,7 +157,7 @@ export default function FaceTool() {
             if (node.polygon.length !== polygon.length) return false
 
             // 检查是否匹配（可能顺序不同）
-            return polygon.every((point, i) => {
+            return polygon.every((point) => {
               return node.polygon.some((np) =>
                 Math.abs(np[0] - point[0]) < 0.001 &&
                 Math.abs(np[1] - point[1]) < 0.001

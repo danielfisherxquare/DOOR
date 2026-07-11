@@ -124,7 +124,7 @@ const useRaceStore = create((set, get) => ({
                 return res.data
             }
             set({ recordsLoading: false })
-        } catch (err) {
+        } catch (_err) {
             set({ recordsLoading: false })
         }
     },
@@ -140,7 +140,7 @@ const useRaceStore = create((set, get) => ({
                 set({ quickStats: res.data })
                 return res.data
             }
-        } catch (err) {
+        } catch (_err) {
             // 静默失败
         }
     },

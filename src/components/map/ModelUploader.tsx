@@ -7,9 +7,8 @@ import { useState, useCallback, useRef } from 'react';
 import {
   uploadModel,
   validateModelFile,
-  type UploadProgressCallback,
 } from '../../services/modelStorageService';
-import { useModelStore, formatModelSize } from '../../stores/modelStore';
+import { useModelStore } from '../../stores/modelStore';
 import type { ModelInfo } from '../../stores/modelStore';
 
 interface ModelUploaderProps {

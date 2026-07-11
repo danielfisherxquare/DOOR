@@ -36,7 +36,6 @@ const ChevronRightIcon = () => (
 function MatchingCenterModal({ visible, onClose }) {
   const {
     pendingMatches,
-    records,
     resolvePendingMatch,
     rejectPendingMatch,
     isLoading,

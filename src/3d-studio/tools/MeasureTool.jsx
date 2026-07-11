@@ -3,7 +3,7 @@
  * 测量工具 — 两点测距，显示距离标注
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import useEditor from '../store/useEditor'
@@ -203,7 +203,7 @@ function MeasureLine({ start, end, value, active = false }) {
 // 距离标签（Canvas Sprite）
 // ──────────────────────────────────────────────────
 
-function MeasureLabel({ distance, position, color }) {
+function MeasureLabel({ distance, position }) {
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas')
     canvas.width = 128

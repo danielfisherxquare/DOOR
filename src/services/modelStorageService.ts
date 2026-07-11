@@ -225,7 +225,7 @@ export function saveModelToLocal(model: ModelInfo): void {
  * 生成模型缩略图
  */
 export async function generateThumbnail(
-  file: File
+  _file: File
 ): Promise<string | null> {
   // 对于 glTF/GLB，需要解析文件生成缩略图
   // 这里简化处理，返回 null

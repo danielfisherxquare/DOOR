@@ -9,7 +9,7 @@ import {
   PerspectiveCamera,
 } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import useViewer from '../../node_modules/@pascal-app/viewer/dist/store/use-viewer.js'
 import { PerfMonitor } from '../../node_modules/@pascal-app/viewer/dist/components/viewer/perf-monitor.js'

@@ -2,7 +2,6 @@ import {
   createEmptyEditorDocument,
   extrudeProfileInDocument,
   insertCircleProfile,
-  insertRectangleProfile,
   insertSketchPath,
   normalizeEditorDocument,
 } from '../../3d-studio/model/editorDocument.js'

@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useScene } from '@pascal-app/core'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import useViewer from '../../../node_modules/@pascal-app/viewer/dist/store/use-viewer.js'
 import useEditor from '../store/useEditor'
@@ -248,8 +248,6 @@ export default function TransformGizmo() {
       if (axis === 'rotateY') {
         // 旋转：基于鼠标水平移动
         if (!nodeStartRot.current) return
-        const rect = canvas.getBoundingClientRect()
-        const rotationDelta = (event.clientX - rect.left - rect.width / 2) * 0.01
         const newRotY = nodeStartRot.current[1] + dx * 0.5
 
         updateNode(selectedNode.id, {

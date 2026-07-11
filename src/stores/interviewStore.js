@@ -113,11 +113,6 @@ function calculateTier(scores, scenarioScores = [0, 0, 0, 0]) {
     const eightDimTotal = baseScore + bonusScore; // 8维总分 (40分制)
     const grandTotal = eightDimTotal + scenarioTotal; // 综合总分 (60分制)
     
-    let hasRedLine = false;
-    for (let i = 0; i < 6; i++) {
-        if (scores[i] > 0 && scores[i] <= 2) hasRedLine = true;
-    }
-    
     // 基于60分综合总分评级
     if (grandTotal >= 50 && eightDimTotal >= 35 && scenarioTotal >= 12) return 'S';
     if (grandTotal >= 40 && eightDimTotal >= 28 && scenarioTotal >= 10) return 'A';

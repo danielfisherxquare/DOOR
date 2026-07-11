@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { useSoundConfig, DEFAULT_CONFIG } from '../../../hooks/useSoundConfig'
+import { useSoundConfig } from '../../../hooks/useSoundConfig'
 import useMechanicalSound from '../../../hooks/useMechanicalSound'
 import './sound-debugger.css'
 

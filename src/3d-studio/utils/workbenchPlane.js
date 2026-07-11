@@ -6,7 +6,6 @@ import useViewer from '../../../node_modules/@pascal-app/viewer/dist/store/use-v
 const WORKBENCH_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
 const POINTER = new THREE.Vector2()
 const INTERSECTION = new THREE.Vector3()
-const VERTICAL_AXIS = new THREE.Vector3(0, 1, 0)
 const RAY_ORIGIN_TO_AXIS = new THREE.Vector3()
 const SKETCH_PLANE_NORMAL = new THREE.Vector3()
 const SKETCH_PLANE_ORIGIN = new THREE.Vector3()

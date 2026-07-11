@@ -892,48 +892,10 @@ export default function TeamListPage() {
   )
 }
 
-const emptyStateStyle = {
-  padding: 24,
-  borderRadius: 0,
-  background: 'linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), var(--surface))',
-  border: '1px solid var(--border)',
-  color: 'var(--text-secondary)',
-}
-
-const headerRowStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  gap: 16,
-  flexWrap: 'wrap',
-}
-
-const cardStyle = {
-  background: 'linear-gradient(180deg, color-mix(in srgb, var(--surface) 97%, transparent), var(--surface))',
-  borderRadius: 0,
-  padding: 20,
-  border: '1px solid var(--border)',
-  boxShadow: 'var(--shadow-sm)',
-}
-
-const noticeStyle = {
-  padding: '12px 16px',
-  borderRadius: 0,
-  background: 'var(--info-soft)',
-  border: '1px solid color-mix(in srgb, var(--info) 28%, transparent)',
-  color: 'var(--info)',
-}
-
 const filterGridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
   gap: 12,
-}
-
-const loadingStateStyle = {
-  padding: 40,
-  textAlign: 'center',
-  color: 'var(--text-secondary)',
 }
 
 const tableHeadRowStyle = {

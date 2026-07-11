@@ -22,7 +22,7 @@ export default function ColumnMesh({
     const position = structure?.position || { x: 0, y: 0, z: 0 }
     const rotation = structure?.rotation || 0
 
-    const { x, y, z } = position
+    const { x, z } = position
     const { width, height, depth } = dimensions
 
     // 渲染不同类型的柱子

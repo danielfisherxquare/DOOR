@@ -69,7 +69,6 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
     const [isDragOver, setIsDragOver] = useState(false);
     const [importing, setImporting] = useState(false);
     const [stats, setStats] = useState({ total: 0, preview: 0, duplicates: 0, processing: 0 });
-    const [uploadType, setUploadType] = useState('invoice');
     const [importNotice, setImportNotice] = useState({ type: '', summary: '', duplicates: [] });
     const [batchProgress, setBatchProgress] = useState(null);
     const [highlightedPendingId, setHighlightedPendingId] = useState(null);
@@ -162,7 +161,6 @@ function PreviewWorkspace({ projectId, onOpenRecord }) {
 
     const openFilePicker = (type) => {
         uploadTypeRef.current = type;
-        setUploadType(type);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }

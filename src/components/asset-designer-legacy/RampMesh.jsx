@@ -17,7 +17,6 @@ export default function RampMesh({
         return null
     }, [structure?.presetId])
 
-    const rampWidth = structure?.rampWidth || preset?.rampWidth || 1.2
     const rampSlope = structure?.rampSlope || preset?.rampSlope || 8
     const dimensions = structure?.dimensions || preset?.dimensions || { width: 1.2, height: 0.7, depth: 5.0 }
     const rampType = structure?.rampType || preset?.rampType || 'wheelchair'
@@ -26,7 +25,7 @@ export default function RampMesh({
     const rotation = structure?.rotation || 0
 
     const { x, y, z } = position
-    const { width, height, depth } = dimensions
+    const { width, depth } = dimensions
 
     // 计算坡道形状
     const slopeRad = (rampSlope * Math.PI) / 180

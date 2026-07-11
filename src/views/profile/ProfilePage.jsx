@@ -7,7 +7,7 @@ import useAuthStore from '../../stores/authStore';
  * 个人页面组件
  */
 export default function ProfilePage() {
-  const { user, fetchCurrentUser } = useAuthStore();
+  const { fetchCurrentUser } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState(null);

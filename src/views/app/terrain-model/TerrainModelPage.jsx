@@ -466,6 +466,10 @@ function createPresetFootprintPolygon(bounds, shape, rotationDegrees = 0) {
   return rotateManualFootprintWgs84(footprint, rotationDegrees, center)
 }
 
+function applyManualTerrainBounds(bounds) {
+  return parseManualBoundsWgs84(bounds)
+}
+
 function toLeafletBounds(bounds) {
   if (!bounds) return null
   return L.latLngBounds([
@@ -1742,9 +1746,6 @@ export default function TerrainModelPage() {
   ), [generationOptions, track])
   const printRecommendation = reliefRecommendation?.printReadable || null
   const activeReliefRecommendation = reliefRecommendation?.active || null
-  const printStyleRecommendation = useMemo(() => (
-    track?.points?.length ? recommendTerrainPrintStyleOptions(track.points, generationOptions) : null
-  ), [generationOptions, track])
   const highPrecisionRecommendation = useMemo(() => (
     track?.points?.length
       ? recommendHighPrecisionTerrainOptions(track.points, generationOptions, demRaster || {
@@ -1926,7 +1927,7 @@ export default function TerrainModelPage() {
         ...current,
         [key]: value,
       }
-      const nextBounds = parseManualBoundsWgs84(next)
+      const nextBounds = applyManualTerrainBounds(next)
       if (nextBounds) {
         setManualFootprintShape('rectangle')
         setManualFootprintWgs84(createPresetFootprintPolygon(nextBounds, 'rectangle', manualFootprintRotationDegrees))
@@ -1951,11 +1952,6 @@ export default function TerrainModelPage() {
     resetGeneratedOutputs()
     setOpenTopoStatus({ tone: 'idle', label: '等待获取' })
   }, [manualFootprintShape, resetGeneratedOutputs])
-
-  const applyManualTerrainBounds = useCallback((bounds) => {
-    const nextBounds = parseManualBoundsWgs84(bounds)
-    applyManualTerrainFootprint(createPresetFootprintPolygon(nextBounds, 'rectangle', manualFootprintRotationDegrees), 'rectangle')
-  }, [applyManualTerrainFootprint, manualFootprintRotationDegrees])
 
   const applyCurrentTerrainBounds = useCallback(() => {
     if (!autoTerrainBounds) return
@@ -2231,65 +2227,6 @@ export default function TerrainModelPage() {
       satelliteTerrainColorLimit: 4,
     }))
   }, [track, generationOptions, demRaster, useSampledTerrain, resetGeneratedOutputs])
-
-  const applyPrintStylePreset = useCallback((preset) => {
-    setModel(null)
-    setSurfaceTexture(null)
-    setSurfaceTextureStatus({ tone: 'idle', label: '等待模型' })
-    setOptions((current) => {
-      if (preset === 'suggested') {
-        const recommendation = track?.points?.length
-          ? recommendTerrainPrintStyleOptions(track.points, {
-            ...current,
-            terrainBoundsWgs84: activeTerrainBoundsWgs84,
-            terrainFootprintWgs84: activeManualFootprintWgs84,
-            terrainFootprintRotationDegrees: terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
-          })
-          : printStyleRecommendation
-        if (!recommendation) return current
-        if (current.colorMode === 'satellite') {
-          return {
-            ...current,
-            terrainColorBandsEnabled: false,
-            snowlineEnabled: false,
-            snowlineElevationMeters: '',
-          }
-        }
-        return {
-          ...current,
-          terrainColorBandsEnabled: recommendation.terrainColorBandsEnabled,
-          lowlandPercentile: Math.round(recommendation.lowlandPercentile * 100),
-          lowlandCapThicknessMm: recommendation.lowlandCapThicknessMm,
-          snowlineEnabled: recommendation.snowlineEnabled,
-          snowlineElevationMeters: recommendation.snowlineElevationMeters ?? '',
-          snowlinePercentile: Math.round(recommendation.snowlinePercentile * 100),
-          snowCapThicknessMm: recommendation.snowCapThicknessMm,
-        }
-      }
-      if (preset === 'snow') {
-        return {
-          ...current,
-          terrainColorBandsEnabled: true,
-          lowlandPercentile: Math.min(Number(current.lowlandPercentile) || 35, 38),
-          lowlandCapThicknessMm: Math.max(Number(current.lowlandCapThicknessMm) || 0.45, 0.45),
-          snowlineEnabled: true,
-          snowlineElevationMeters: '',
-          snowlinePercentile: Math.min(Math.max(Number(current.snowlinePercentile) || 82, 76), 90),
-          snowCapThicknessMm: Math.max(Number(current.snowCapThicknessMm) || 0.5, 0.55),
-        }
-      }
-      if (preset === 'contour') {
-        return {
-          ...current,
-          contourEnabled: true,
-          contourIntervalMeters: Math.min(Math.max(Number(current.contourIntervalMeters) || 50, 20), 80),
-          contourWidthMm: Math.max(Number(current.contourWidthMm) || 0.45, 0.45),
-          contourHeightMm: Math.max(Number(current.contourHeightMm) || 0.35, 0.35),
-        }
-      }
-      return current
-    })
-  }, [activeManualFootprintWgs84, activeTerrainBoundsWgs84, manualFootprintRotationDegrees, printStyleRecommendation, terrainBoundsMode, track])
 
   const handleFileChange = useCallback(async (event) => {
     const file = event.target.files?.[0]
