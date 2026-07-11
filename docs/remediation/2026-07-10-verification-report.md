@@ -8,7 +8,7 @@
 
 **复验日期：** 2026-07-11
 
-**代码验收提交：** `c58f07d80a02559e23cd82be72380f93543900a6`
+**代码验收提交：** `7e07b04c3e6cffc0b6442f645bc0b38f20c56073`
 
 **当前完成度：** 98%
 
@@ -18,7 +18,7 @@
 
 | 问题 | 修复后的可观察结果 | 回归证据 |
 | --- | --- | --- |
-| 后端测试共享数据库，文件顺序变化会挂起或污染 | 每个 `*.test.js` 使用独立 `arcspro_test_<hash>` 数据库，执行后强制删除 | `npm test` 输出 `[isolated-db] PASS 100/100 files` |
+| 后端测试共享数据库，文件顺序变化会挂起或污染 | 每个 `*.test.js` 使用独立 `arcspro_test_<hash>` 数据库，执行后强制删除 | `npm test` 输出 `[isolated-db] PASS 101/101 files` |
 | race 权限继承、显式降权和共享赛事 profile 不一致 | owner、race_admin、组织授权和显式 viewer 降权按同一投影规则生效 | `org-race-permissions` 6/6；`permissions` 18/18 |
 | 姓名/电话/证件号搜索跨越加密边界 | 姓名保留模糊匹配；电话和证件号只走盲索引精确匹配；返回前按租户 AAD 解密 | `records-query` 18/18；`bib-tracking` 16/16 |
 | 已绑定库存对象可被重复绑定 | 重复绑定被拒绝，跨位置变更必须使用 move 流程 | `inventory-twin.integration` 通过 |
@@ -53,6 +53,7 @@
 | Cesium 3D 地图组件同时计算重点区运行策略和加载状态文案 | 运行策略、摘要和场景状态拆入 `terrainRuntimePolicy.ts`，`MapView3D.tsx` 由 2634 行降至 2413 行，架构上限收紧到 2450 行 | 新增策略单测 3/3；地图专项 6/6；根测试与生产构建通过 |
 | 设计协作工作台内联全部枚举、标签映射和格式化逻辑 | 静态配置与纯格式化拆入 `designRequestWorkspaceConfig.js`，页面由 1760 行降至 1527 行，并新增 1550 行架构门禁 | 新增配置与架构测试 5/5；根测试与生产构建通过 |
 | 库存空间导出文件同时负责 GLB 二进制编码、几何构建、路径管理和导出任务 | GLB 与实例化编码拆入 `inventory.spatial.glb.js`，公共数值辅助拆入 `inventory.spatial.export-utils.js`，主导出文件由 1660 行降至 1274 行并新增 1300 行门禁 | 原有 GLB 测试 4 项纳入根门禁；3D Studio 针对性 9/9；后端隔离测试 100/100 |
+| 报销主服务距离 1450 行门禁仅剩 8 行，仍混入记录字段归一化和处理状态写入 | 日期、金额、旧字段别名、排序与 OCR 审核数据拆入 `reimbursement-record-data.js`；处理状态归入 `reimbursement-processing.service.js`；主服务由 1442 行降至 1247 行，门禁收紧到 1250 行 | 记录数据单测 4/4；报销数据库集成 14/14；后端隔离测试 101/101 |
 
 ## 2. 自动化门禁
 
@@ -74,13 +75,13 @@ ECharts 已按需注册，`vendor-echarts` 从约 1.12 MB 降到 443.08 kB；文
 
 ### 2.2 后端
 
-专用 PostgreSQL 16 容器只用于测试连接。测试 runner 为 100 个测试文件逐一创建隔离数据库：
+专用 PostgreSQL 16 容器只用于测试连接。测试 runner 为 101 个测试文件逐一创建隔离数据库：
 
 ```text
 npm test
 ...
-[isolated-db 100/100] tests/test-isolation-runner.test.js
-[isolated-db] PASS 100/100 files
+[isolated-db 101/101] tests/test-isolation-runner.test.js
+[isolated-db] PASS 101/101 files
 
 npm audit --workspace=arcspro-server --audit-level=low
 found 0 vulnerabilities
@@ -251,4 +252,4 @@ app 单独重建后网关探测                20/20 通过，Nginx 容器未重
 4. 推送分支，远程 CI 全绿；
 5. 在远程候选环境重跑迁移、健康、备份恢复和镜像回退；
 6. 生产切换后验证 endpoint、静态 chunk、健康检查和关键业务抽样；
-7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `c58f07d` 执行 333/333、3D Studio 针对性测试、生产构建及边界检查；开发工作树使用专用 PostgreSQL 16 完成后端 100/100。该干净工作树在同一 lockfile 的上一代码节点执行 fresh `npm ci`，安装审计 0 vulnerabilities，且无跟踪改动。
+7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `7e07b04` 执行 333/333、报销纯逻辑与架构测试、生产构建及边界检查；开发工作树使用专用 PostgreSQL 16 完成报销数据库集成 14/14 和后端 101/101。该干净工作树在同一 lockfile 的上一代码节点执行 fresh `npm ci`，安装审计 0 vulnerabilities，且无跟踪改动。
