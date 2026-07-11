@@ -8,7 +8,7 @@
 
 **复验日期：** 2026-07-11
 
-**代码验收提交：** `1d53a21b2da75c46cc618d92f667eb8d5070f851`
+**代码验收提交：** `f7e2649d2fb6bef956dbf6d2bd20fd13800754ce`
 
 **当前完成度：** 98%
 
@@ -49,6 +49,7 @@
 | Excel、ZIP、Word 模板和下载工具被强制合并成一个 568 kB 文档包 | 移除未使用的 `docxtemplater`、`file-saver`，按实际格式拆为 XLSX 与 PizZip | `vendor-docs` 消失；`vendor-xlsx` 487.57 kB、`vendor-pizzip` 80.59 kB；构建门禁通过 |
 | 登录首屏因手工 React-Three vendor 分块预加载约 959 kB 3D 运行时 | 取消 React-Three 强制共享块，按地图和 Studio 动态路由自然分块；新增产物边界检查 | `dist/index.html` 不再 preload React-Three、Three Core 或 Studio；地图生产 E2E 3/3 |
 | 地形模型页面同时承载默认配置、保存配置归一化和范围几何转换 | 纯配置与几何转换拆入 `terrainModelPageConfig.js`，页面由 3612 行降至 3221 行，并把架构上限收紧到 3250 行 | 地形专项 128/128；新增配置单测 4/4；根测试与生产构建通过 |
+| 地形建模核心同时维护默认值、旧字段兼容和全部网格建模 | 选项归一化拆入 `modelOptions.js`，建模核心由 3548 行降至 3255 行，架构上限从 3900 收紧到 3300；修复默认值遮蔽 `shape`、`qualityPreset`、`maxTerrainReliefMm` 等旧字段别名 | 新增选项契约测试 3/3；地形专项 131/131；根测试与生产构建通过 |
 | Cesium 3D 地图组件同时计算重点区运行策略和加载状态文案 | 运行策略、摘要和场景状态拆入 `terrainRuntimePolicy.ts`，`MapView3D.tsx` 由 2634 行降至 2413 行，架构上限收紧到 2450 行 | 新增策略单测 3/3；地图专项 6/6；根测试与生产构建通过 |
 | 设计协作工作台内联全部枚举、标签映射和格式化逻辑 | 静态配置与纯格式化拆入 `designRequestWorkspaceConfig.js`，页面由 1760 行降至 1527 行，并新增 1550 行架构门禁 | 新增配置与架构测试 5/5；根测试与生产构建通过 |
 
@@ -62,7 +63,7 @@ npm run check:secrets                  PASS
 npm run lint                           PASS，0 error / 0 warning
 npm run typecheck                      PASS
 npm run format:check                   PASS
-npm test                               PASS，326/326
+npm test                               PASS，329/329
 npm run build                          PASS，Vite 8
 npm audit --audit-level=low            PASS，0 vulnerabilities
 git diff --check                       PASS
@@ -249,4 +250,4 @@ app 单独重建后网关探测                20/20 通过，Nginx 容器未重
 4. 推送分支，远程 CI 全绿；
 5. 在远程候选环境重跑迁移、健康、备份恢复和镜像回退；
 6. 生产切换后验证 endpoint、静态 chunk、健康检查和关键业务抽样；
-7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `1d53a21` 执行 fresh `npm ci`，并完成 326/326、地形专项 128/128、地图专项 6/6、99/99、生产构建及边界检查；fresh install 审计 0 vulnerabilities，根与 server workspace 显式审计在同一 lockfile 的上一代码节点均为 0 vulnerabilities。干净工作树无跟踪改动。
+7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `f7e2649` 执行 329/329、地形专项 131/131、地图专项 6/6、生产构建及边界检查；该工作树在同一 lockfile 的上一代码节点执行 fresh `npm ci`，安装审计 0 vulnerabilities，后端 99/99 未因本次纯前端拆分发生变化。干净工作树无跟踪改动。
