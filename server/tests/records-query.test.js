@@ -61,16 +61,13 @@ describe('Records Query', () => {
         orgId = regRes.body?.data?.user?.orgId;
 
         // 创建赛事
-        console.log('TOKEN GENERATED:', token);
         const raceRes = await api('/api/races', {
             method: 'POST',
             body: JSON.stringify({ name: '测试赛事', date: '2026-10-01', location: '测试地点' }),
             ...authed(token),
         });
-        console.log('CREATE RACE RESP:', JSON.stringify(raceRes));
         if (raceRes.status !== 201) console.log('CREATE RACE FAILED:', JSON.stringify(raceRes));
         raceId = raceRes.body?.data?.id;
-        console.log('CREATED RACE ID:', raceId);
 
         // 插入测试记录（直接入库）
         const records = [

@@ -180,7 +180,7 @@ describe('全链路加密测试', () => {
             assert.equal(dbRow.phone_hash, phoneBlindIndex('13812345678'));
             assert.equal(dbRow.id_number_hash, idNumberBlindIndex('110101199001011234'));
 
-            console.log(`[OK] Mapper 插入加密正确: phone_hash=${dbRow.phone_hash.substring(0, 16)}...`);
+            console.log('[OK] Mapper 插入加密正确');
         });
 
         it('应正确解密读取数据', () => {
@@ -201,7 +201,7 @@ describe('全链路加密测试', () => {
             assert.equal(decrypted.idNumber, '110101199001011234', 'idNumber 应正确解密');
             assert.equal(decrypted.name, '张三', 'name 应正确');
 
-            console.log(`[OK] Mapper 读取解密正确: phone=${decrypted.phone}`);
+            console.log('[OK] Mapper 读取解密正确');
         });
 
         it('应正确处理更新数据', () => {
@@ -232,7 +232,7 @@ describe('全链路加密测试', () => {
 
             assert.equal(decrypted.emergencyPhone, '13800001111', 'emergencyPhone 应正确解密');
 
-            console.log(`[OK] emergencyPhone 加密解密正确: ${decrypted.emergencyPhone}`);
+            console.log('[OK] emergencyPhone 加密解密正确');
         });
 
         it('应支持双读旧数据', () => {
@@ -292,7 +292,7 @@ describe('全链路加密测试', () => {
 
             assert.equal(decrypted.idNumber, '110101199001011234', 'idNumber 应正确解密');
 
-            console.log(`[OK] Lottery List 读取解密正确: ${decrypted.idNumber}`);
+            console.log('[OK] Lottery List 读取解密正确');
         });
     });
 
