@@ -8,7 +8,7 @@
 
 **复验日期：** 2026-07-11
 
-**代码验收提交：** `03d88d4cdb33c1aa7ed120d5b019d286082e5b10`
+**代码验收提交：** `5a75c879934dba9c272144bfd74217f896f7773c`
 
 **当前完成度：** 97%
 
@@ -41,6 +41,11 @@
 | React Hook 依赖缺失导致旧状态、重复订阅和资源泄漏 | Hook 依赖全部显式稳定化；事件解绑使用同一函数；Blob URL 按本次加载结果回收 | ESLint `react-hooks/exhaustive-deps` 0 warning；根测试和浏览器 E2E 通过 |
 | 地图和 DTO 边界保留 81 处显式 `any` | GeoJSON、Geoman、空间对象、地形工作区、场景导出任务均使用明确类型 | ESLint `@typescript-eslint/no-explicit-any` 0 warning；TypeScript 通过 |
 | Push/Pull 高度标签把建模文档当成浏览器 DOM | 高度标签只访问 `globalThis.document`，不再接收建模文档参数 | 新增架构回归测试；根测试通过 |
+| 同一 Knex 事务客户端通过 `Promise.all` 并发查询，升级 `pg` 9 将失败 | lottery V1/V2 事务查询改为串行执行，并新增全后端源码门禁禁止 `Promise.all` 内直接调用 `trx()` | `lottery-finalize-normalization`、`lottery-v2.service` 和架构测试通过；全量日志不再出现弃用警告 |
+| 报销 OCR 元数据合并在主服务和预览服务重复实现 | `isPlainObject` 与 `mergeRecordOcrMeta` 收敛到 `reimbursement-ocr-meta.js` | 元数据单测 3/3；报销服务与预览集成测试通过 |
+| 报销预览服务同时负责导出风险分析和 Excel 工作表渲染 | 214 行导出检查逻辑拆入 `reimbursement-export-checks.js`，预览服务由 1405 行降到 1193 行 | 导出检查单测 2/2；预览集成测试 14/14 |
+| 报销主服务同时维护处理队列、状态统计和业务记录 | 处理记录职责拆入 `reimbursement-processing.service.js`，主服务由 1574 行降到 1442 行，并增加 1450 行回退门禁 | 处理 API 门面测试、报销集成测试 14/14、架构测试通过 |
+| 赛事分布饼图导入完整 ECharts 和未使用的 React wrapper | 只注册 Pie、Legend、Tooltip、Canvas，并移除 `echarts-for-react` | `vendor-echarts` 由约 1118 kB 降至 443.08 kB；根测试 312/312；生产构建通过 |
 
 ## 2. 自动化门禁
 
@@ -52,23 +57,23 @@ npm run check:secrets                  PASS
 npm run lint                           PASS，0 error / 0 warning
 npm run typecheck                      PASS
 npm run format:check                   PASS
-npm test                               PASS，310/310
+npm test                               PASS，312/312
 npm run build                          PASS，Vite 8
 npm audit --audit-level=low            PASS，0 vulnerabilities
 git diff --check                       PASS
 ```
 
-构建产物仍有大 chunk 警告：`vendor-echarts` 约 1.12 MB、`vendor-react-three` 约 959 kB、`vendor-three-core` 约 635 kB。产物生成成功，但这些文件应继续按路由和编辑器能力拆分。
+ECharts 已按需注册，`vendor-echarts` 从约 1.12 MB 降到 443.08 kB，不再触发 500 kB 警告。构建产物仍有大 chunk 警告：`vendor-react-three` 约 959 kB、`vendor-three-core` 约 635 kB、`vendor-docs` 约 568 kB、`StudioProjectPage` 约 557 kB；这些文件应继续按编辑器能力和实际交互时机拆分。
 
 ### 2.2 后端
 
-专用 PostgreSQL 16 容器只用于测试连接。测试 runner 为 96 个测试文件逐一创建隔离数据库：
+专用 PostgreSQL 16 容器只用于测试连接。测试 runner 为 99 个测试文件逐一创建隔离数据库：
 
 ```text
 npm test
 ...
-[isolated-db 96/96] tests/test-isolation-runner.test.js
-[isolated-db] PASS 96/96 files
+[isolated-db 99/99] tests/test-isolation-runner.test.js
+[isolated-db] PASS 99/99 files
 
 npm audit --workspace=arcspro-server --audit-level=low
 found 0 vulnerabilities
@@ -76,7 +81,7 @@ found 0 vulnerabilities
 
 后端 workspace 没有独立 lockfile；仓库使用根 `package-lock.json`。因此 `npm audit --prefix server` 会返回 `ENOLOCK`，不作为门禁命令。有效命令是 `npm audit --workspace server --audit-level=low`，结果为 0 vulnerabilities。
 
-测试日志还有一条升级提示：lottery-v2 测试触发 `pg` 的并发 `client.query()` 弃用警告。当前用例全部通过；升级到 pg 9 前应改为串行 await 或独立 client。
+lottery V1/V2 原有的并发 `client.query()` 弃用警告已关闭；架构测试会阻止同一事务客户端再次在 `Promise.all` 中并发查询。
 
 ## 3. 容器、迁移和健康检查
 
@@ -239,4 +244,4 @@ app 单独重建后网关探测                20/20 通过，Nginx 容器未重
 4. 推送分支，远程 CI 全绿；
 5. 在远程候选环境重跑迁移、健康、备份恢复和镜像回退；
 6. 生产切换后验证 endpoint、静态 chunk、健康检查和关键业务抽样；
-7. 最终 HEAD 从全新检出重跑全部门禁。本次已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `03d88d4` 完成一次。
+7. 最终 HEAD 从全新检出重跑全部门禁。本次已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `03d88d4` 完成一次；当前 `5a75c87` 已在整改工作树完成 312/312、99/99、生产构建和 0 vulnerabilities，最终交付前仍需再做一次最新 HEAD 全新检出。
