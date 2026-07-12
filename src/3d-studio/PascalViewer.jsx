@@ -1,13 +1,5 @@
-import {
-  sceneRegistry,
-  useScene,
-} from '@pascal-app/core'
-import {
-  Bvh,
-  OrbitControls,
-  OrthographicCamera,
-  PerspectiveCamera,
-} from '@react-three/drei'
+import { sceneRegistry, useScene } from '@pascal-app/core'
+import { Bvh, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
@@ -55,7 +47,7 @@ function GPUDeviceWatcher() {
 
     device.lost.then((info) => {
       console.error(
-        `[viewer] WebGPU device lost: reason="${info.reason}", message="${info.message}". The page must be reloaded to recover the GPU context.`,
+        `[viewer] WebGPU device lost: reason="${info.reason}", message="${info.message}". The page must be reloaded to recover the GPU context.`
       )
     })
 
@@ -67,7 +59,10 @@ function GPUDeviceWatcher() {
 
 function ViewerEffects() {
   const gl = useThree((state) => state.gl)
-  const renderBackend = gl?.userData?.renderBackend || gl?.domElement?.dataset?.rendererBackend || (gl?.isWebGPURenderer ? 'webgpu' : 'unknown')
+  const renderBackend =
+    gl?.userData?.renderBackend ||
+    gl?.domElement?.dataset?.rendererBackend ||
+    (gl?.isWebGPURenderer ? 'webgpu' : 'unknown')
 
   if (renderBackend !== 'webgpu') return null
 
@@ -183,7 +178,8 @@ function ViewerDiagnostics() {
       window.__ARCSPRO_VIEWER_STATE__ = {
         frameAt: new Date().toISOString(),
         elapsed: now,
-        rendererBackend: gl?.userData?.renderBackend || gl?.domElement?.dataset?.rendererBackend || 'unknown',
+        rendererBackend:
+          gl?.userData?.renderBackend || gl?.domElement?.dataset?.rendererBackend || 'unknown',
         sceneChildren: scene.children.length,
         meshCount,
         lightCount,
@@ -274,20 +270,21 @@ function MajorMinorGrid() {
     return helper
   }, [])
 
-  useEffect(() => () => {
+  useEffect(
+    () => () => {
     minorGrid.geometry?.dispose?.()
     if (Array.isArray(minorGrid.material)) {
       minorGrid.material.forEach((material) => material.dispose?.())
     } else {
       minorGrid.material?.dispose?.()
     }
-  }, [minorGrid])
+    },
+    [minorGrid]
+  )
 
   if (!showGrid) return null
 
-  return (
-    <primitive object={minorGrid} />
-  )
+  return <primitive object={minorGrid} />
 }
 
 function WorldAxesAtOrigin({ enabled = true }) {
@@ -324,16 +321,10 @@ function OriginDisc({ enabled = true }) {
 
 function AxisRod({ axis, color, length }) {
   const isY = axis === 'y'
-  const rotation = axis === 'x'
-    ? [0, 0, -Math.PI / 2]
-    : axis === 'z'
-      ? [Math.PI / 2, 0, 0]
-      : [0, 0, 0]
-  const position = axis === 'x'
-    ? [length / 2, 0.18, 0]
-    : axis === 'z'
-      ? [0, 0.18, length / 2]
-      : [0, length / 2, 0]
+  const rotation =
+    axis === 'x' ? [0, 0, -Math.PI / 2] : axis === 'z' ? [Math.PI / 2, 0, 0] : [0, 0, 0]
+  const position =
+    axis === 'x' ? [length / 2, 0.18, 0] : axis === 'z' ? [0, 0.18, length / 2] : [0, length / 2, 0]
 
   return (
     <group position={position} rotation={rotation}>
@@ -369,9 +360,12 @@ function SiteBoundary() {
     return nextGeometry
   }, [nodes])
 
-  useEffect(() => () => {
+  useEffect(
+    () => () => {
     geometry?.dispose()
-  }, [geometry])
+    },
+    [geometry]
+  )
 
   if (!showSiteBoundary || !geometry) return null
 
@@ -396,13 +390,30 @@ function EditorReferenceFrame({ showGroundPlane = true, showWorldAxes = true }) 
 
 function ViewerCameras({ sceneBounds }) {
   const cameraMode = useViewer((state) => state.cameraMode)
-  const span = Math.max(sceneBounds?.width || 24, sceneBounds?.depth || 18, sceneBounds?.height || 9, 16)
+  const span = Math.max(
+    sceneBounds?.width || 24,
+    sceneBounds?.depth || 18,
+    sceneBounds?.height || 9,
+    16
+  )
   const far = Math.max(1600, span * 4)
 
   return (
     <>
-      <PerspectiveCamera makeDefault={cameraMode === 'perspective'} far={far} fov={46} near={0.1} position={[16, 12, 16]} />
-      <OrthographicCamera makeDefault={cameraMode === 'orthographic'} far={far} near={-far} position={[16, 12, 16]} zoom={24} />
+      <PerspectiveCamera
+        makeDefault={cameraMode === 'perspective'}
+        far={far}
+        fov={46}
+        near={0.1}
+        position={[16, 12, 16]}
+      />
+      <OrthographicCamera
+        makeDefault={cameraMode === 'orthographic'}
+        far={far}
+        near={-far}
+        position={[16, 12, 16]}
+        zoom={24}
+      />
     </>
   )
 }
@@ -417,9 +428,15 @@ function SceneViewportController({ lightweight = false, sceneBounds, referenceMo
   const target = useMemo(() => {
     const width = Math.max(sceneBounds?.width || 24, 8)
     const depth = Math.max(sceneBounds?.depth || 18, 8)
-    const centerX = Number.isFinite(Number(sceneBounds?.centerX)) ? Number(sceneBounds.centerX) : null
-    const centerY = Number.isFinite(Number(sceneBounds?.centerY)) ? Number(sceneBounds.centerY) : null
-    const centerZ = Number.isFinite(Number(sceneBounds?.centerZ)) ? Number(sceneBounds.centerZ) : null
+    const centerX = Number.isFinite(Number(sceneBounds?.centerX))
+      ? Number(sceneBounds.centerX)
+      : null
+    const centerY = Number.isFinite(Number(sceneBounds?.centerY))
+      ? Number(sceneBounds.centerY)
+      : null
+    const centerZ = Number.isFinite(Number(sceneBounds?.centerZ))
+      ? Number(sceneBounds.centerZ)
+      : null
 
     if (referenceMode === 'bounded') {
       return {
@@ -430,9 +447,21 @@ function SceneViewportController({ lightweight = false, sceneBounds, referenceMo
     }
 
     return { x: centerX ?? 0, y: centerY ?? 0, z: centerZ ?? 0 }
-  }, [referenceMode, sceneBounds?.centerX, sceneBounds?.centerY, sceneBounds?.centerZ, sceneBounds?.depth, sceneBounds?.width])
+  }, [
+    referenceMode,
+    sceneBounds?.centerX,
+    sceneBounds?.centerY,
+    sceneBounds?.centerZ,
+    sceneBounds?.depth,
+    sceneBounds?.width,
+  ])
 
-  const span = Math.max(sceneBounds?.width || 24, sceneBounds?.depth || 18, sceneBounds?.height || 9, 16)
+  const span = Math.max(
+    sceneBounds?.width || 24,
+    sceneBounds?.depth || 18,
+    sceneBounds?.height || 9,
+    16
+  )
 
   useFrame(() => {
     if (viewPreset !== 'top') return
@@ -528,15 +557,15 @@ export default function PascalViewer({
   lightweight = false,
   showAxisGizmo = true,
   showGroundPlane = true,
+  backdrop = null,
 }) {
   const theme = useViewer((state) => state.theme)
   const canvasGl = lightweight
     ? { alpha: false, antialias: false, powerPreference: 'low-power', preserveDrawingBuffer: false }
-    : ((props) => (
+    : (props) =>
       preferWebGpu
         ? createWebGpuRenderer({ ...props, preserveDrawingBuffer: true })
         : createWebGlRenderer({ ...props, preserveDrawingBuffer: true })
-    ))
 
   useEffect(() => {
     const previousTheme = useViewer.getState().theme
@@ -563,7 +592,9 @@ export default function PascalViewer({
       onCreated={({ gl }) => {
         gl.setClearColor(LIGHT_BG, 1)
         gl.userData = gl.userData || {}
-        gl.userData.renderBackend = gl.userData.renderBackend || (gl.isWebGLRenderer ? 'webgl2' : (gl.isWebGPURenderer ? 'webgpu' : 'unknown'))
+        gl.userData.renderBackend =
+          gl.userData.renderBackend ||
+          (gl.isWebGLRenderer ? 'webgl2' : gl.isWebGPURenderer ? 'webgpu' : 'unknown')
         if (gl.domElement) gl.domElement.dataset.rendererBackend = gl.userData.renderBackend
         if (typeof window !== 'undefined') {
           window.__ARCSPRO_RENDERERS__ = {
@@ -576,11 +607,21 @@ export default function PascalViewer({
     >
       <color attach="background" args={[LIGHT_BG]} />
       <ViewerCameras sceneBounds={sceneBounds} />
-      <SceneViewportController lightweight={lightweight} referenceMode={referenceMode} sceneBounds={sceneBounds} />
+      <SceneViewportController
+        lightweight={lightweight}
+        referenceMode={referenceMode}
+        sceneBounds={sceneBounds}
+      />
       {lightweight ? null : <AnimatedBackground />}
       <StudioLights enableShadows={enableShadows} />
-      {lightweight ? null : <EditorReferenceFrame showGroundPlane={showGroundPlane} showWorldAxes={showAxisGizmo} />}
+      {lightweight ? null : (
+        <EditorReferenceFrame
+          showGroundPlane={showGroundPlane && !backdrop}
+          showWorldAxes={showAxisGizmo}
+        />
+      )}
       <DevDebugMarker sceneBounds={sceneBounds} referenceMode={referenceMode} />
+      {backdrop}
       {enableBvh ? <Bvh>{children}</Bvh> : children}
       {toolOverlays}
       {lightweight ? null : <StudioLevelSystem />}

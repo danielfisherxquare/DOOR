@@ -9,6 +9,7 @@ import * as sceneJobService from '../inventory/inventory.spatial.scene-job.servi
 import * as spatialOsmService from '../inventory/inventory.spatial.osm.service.js';
 import * as spatialTerrainService from '../inventory/inventory.spatial.terrain.service.js';
 import * as generatedSceneService from '../inventory/inventory.spatial.generated-scene.service.js';
+import * as siteBakeService from '../inventory/inventory.spatial.site-bake.service.js';
 
 const router = express.Router();
 
@@ -28,7 +29,8 @@ function resolveTargetOrgId(req) {
 function orgIdRequiredResponse(req, res) {
     return res.status(400).json({
         success: false,
-        message: req.authContext?.role === 'super_admin'
+        message:
+            req.authContext?.role === 'super_admin'
             ? '请先选择要导入的机构'
             : '当前账号未关联机构，无法导入仓库场景',
     });
@@ -73,12 +75,18 @@ function rewriteTilesetJsonUris(tilesetJson, req, zoneId) {
         }
 
         if (node.extras?.doorContentUri) {
-            const nextRelativePath = path.posix.join(parentRelativePath, String(node.extras.doorContentUri));
+            const nextRelativePath = path.posix.join(
+                parentRelativePath,
+                String(node.extras.doorContentUri)
+            );
             node.extras.doorContentUri = buildArtifactUrl(req, zoneId, nextRelativePath);
         }
 
         if (node.extras?.doorContentIndexUri) {
-            const nextRelativePath = path.posix.join(parentRelativePath, String(node.extras.doorContentIndexUri));
+            const nextRelativePath = path.posix.join(
+                parentRelativePath,
+                String(node.extras.doorContentIndexUri)
+            );
             node.extras.doorContentIndexUri = buildArtifactUrl(req, zoneId, nextRelativePath);
         }
 
@@ -91,7 +99,9 @@ function rewriteTilesetJsonUris(tilesetJson, req, zoneId) {
     return cloned;
 }
 
-router.use(requirePermission({ surface: 'app', capability: { scope: 'inventory', name: '3d_studio' } }));
+router.use(
+    requirePermission({ surface: 'app', capability: { scope: 'inventory', name: '3d_studio' } })
+);
 
 router.get('/projects', async (req, res, next) => {
     try {
@@ -112,7 +122,11 @@ router.post('/projects', async (req, res, next) => {
         if (!scope.orgId && req.authContext?.role !== 'super_admin') {
             return orgIdRequiredResponse(req, res);
         }
-        const data = await studioService.createStudioProject(scope, req.authContext.userId, req.body);
+        const data = await studioService.createStudioProject(
+            scope,
+            req.authContext.userId,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -121,7 +135,11 @@ router.post('/projects', async (req, res, next) => {
 
 router.get('/projects/:id', async (req, res, next) => {
     try {
-        const data = await studioService.getStudioProject(buildProjectScope(req), req.params.id, req.authContext.userId);
+        const data = await studioService.getStudioProject(
+            buildProjectScope(req),
+            req.params.id,
+            req.authContext.userId
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -130,7 +148,12 @@ router.get('/projects/:id', async (req, res, next) => {
 
 router.put('/projects/:id', async (req, res, next) => {
     try {
-        const data = await studioService.updateStudioProject(buildProjectScope(req), req.authContext.userId, req.params.id, req.body);
+        const data = await studioService.updateStudioProject(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -148,7 +171,11 @@ router.delete('/projects/:id', async (req, res, next) => {
 
 router.post('/projects/:id/duplicate', async (req, res, next) => {
     try {
-        const data = await studioService.duplicateStudioProject(buildProjectScope(req), req.authContext.userId, req.params.id);
+        const data = await studioService.duplicateStudioProject(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -161,7 +188,7 @@ router.post('/projects/:id/primary-asset', async (req, res, next) => {
             buildProjectScope(req),
             req.authContext.userId,
             req.params.id,
-            req.body,
+            req.body
         );
         res.json({ success: true, data });
     } catch (error) {
@@ -171,7 +198,10 @@ router.post('/projects/:id/primary-asset', async (req, res, next) => {
 
 router.get('/projects/:id/snapshot', async (req, res, next) => {
     try {
-        const data = await studioService.getStudioProjectSnapshot(buildProjectScope(req), req.params.id);
+        const data = await studioService.getStudioProjectSnapshot(
+            buildProjectScope(req),
+            req.params.id
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -180,7 +210,12 @@ router.get('/projects/:id/snapshot', async (req, res, next) => {
 
 router.put('/projects/:id/snapshot', async (req, res, next) => {
     try {
-        const data = await studioService.updateStudioProjectSnapshot(buildProjectScope(req), req.authContext.userId, req.params.id, req.body.snapshotJson);
+        const data = await studioService.updateStudioProjectSnapshot(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id,
+            req.body.snapshotJson
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -189,7 +224,10 @@ router.put('/projects/:id/snapshot', async (req, res, next) => {
 
 router.get('/projects/:id/buildings', async (req, res, next) => {
     try {
-        const data = await studioService.listProjectBuildings(buildProjectScope(req), req.params.id);
+        const data = await studioService.listProjectBuildings(
+            buildProjectScope(req),
+            req.params.id
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -198,7 +236,12 @@ router.get('/projects/:id/buildings', async (req, res, next) => {
 
 router.post('/projects/:id/buildings', async (req, res, next) => {
     try {
-        const data = await studioService.createProjectBuilding(buildProjectScope(req), req.authContext.userId, req.params.id, req.body);
+        const data = await studioService.createProjectBuilding(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -207,7 +250,13 @@ router.post('/projects/:id/buildings', async (req, res, next) => {
 
 router.put('/projects/:id/buildings/:buildingId', async (req, res, next) => {
     try {
-        const data = await studioService.updateProjectBuilding(buildProjectScope(req), req.authContext.userId, req.params.id, req.params.buildingId, req.body);
+        const data = await studioService.updateProjectBuilding(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id,
+            req.params.buildingId,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -216,7 +265,13 @@ router.put('/projects/:id/buildings/:buildingId', async (req, res, next) => {
 
 router.post('/projects/:id/buildings/:buildingId/levels', async (req, res, next) => {
     try {
-        const data = await studioService.createProjectLevel(buildProjectScope(req), req.authContext.userId, req.params.id, req.params.buildingId, req.body);
+        const data = await studioService.createProjectLevel(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id,
+            req.params.buildingId,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -225,25 +280,48 @@ router.post('/projects/:id/buildings/:buildingId/levels', async (req, res, next)
 
 router.put('/projects/:id/buildings/:buildingId/levels/:levelId', async (req, res, next) => {
     try {
-        const data = await studioService.updateProjectLevel(buildProjectScope(req), req.authContext.userId, req.params.id, req.params.buildingId, req.params.levelId, req.body);
+        const data = await studioService.updateProjectLevel(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id,
+            req.params.buildingId,
+            req.params.levelId,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
     }
 });
 
-router.post('/projects/:id/buildings/:buildingId/levels/:levelId/warehouses', async (req, res, next) => {
+router.post(
+    '/projects/:id/buildings/:buildingId/levels/:levelId/warehouses',
+    async (req, res, next) => {
     try {
-        const data = await studioService.createProjectWarehouse(buildProjectScope(req), req.authContext.userId, req.params.id, req.params.buildingId, req.params.levelId, req.body);
+            const data = await studioService.createProjectWarehouse(
+                buildProjectScope(req),
+                req.authContext.userId,
+                req.params.id,
+                req.params.buildingId,
+                req.params.levelId,
+                req.body
+            );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
     }
-});
+    }
+);
 
 router.put('/projects/:id/warehouses/:warehouseId', async (req, res, next) => {
     try {
-        const data = await studioService.updateProjectWarehouse(buildProjectScope(req), req.authContext.userId, req.params.id, req.params.warehouseId, req.body);
+        const data = await studioService.updateProjectWarehouse(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id,
+            req.params.warehouseId,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -252,7 +330,11 @@ router.put('/projects/:id/warehouses/:warehouseId', async (req, res, next) => {
 
 router.get('/projects/:id/warehouses/:warehouseId/scene', async (req, res, next) => {
     try {
-        const data = await studioService.getProjectWarehouseScene(buildProjectScope(req), req.params.id, req.params.warehouseId);
+        const data = await studioService.getProjectWarehouseScene(
+            buildProjectScope(req),
+            req.params.id,
+            req.params.warehouseId
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -261,7 +343,13 @@ router.get('/projects/:id/warehouses/:warehouseId/scene', async (req, res, next)
 
 router.put('/projects/:id/warehouses/:warehouseId/scene', async (req, res, next) => {
     try {
-        const data = await studioService.updateProjectWarehouseScene(buildProjectScope(req), req.authContext.userId, req.params.id, req.params.warehouseId, req.body.sceneSnapshot);
+        const data = await studioService.updateProjectWarehouseScene(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id,
+            req.params.warehouseId,
+            req.body.sceneSnapshot
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -270,7 +358,10 @@ router.put('/projects/:id/warehouses/:warehouseId/scene', async (req, res, next)
 
 router.get('/projects/:id/race-bindings', async (req, res, next) => {
     try {
-        const data = await studioService.listProjectRaceBindings(buildProjectScope(req), req.params.id);
+        const data = await studioService.listProjectRaceBindings(
+            buildProjectScope(req),
+            req.params.id
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -279,7 +370,13 @@ router.get('/projects/:id/race-bindings', async (req, res, next) => {
 
 router.post('/projects/:id/race-bindings', async (req, res, next) => {
     try {
-        const data = await studioService.upsertProjectRaceBinding(buildProjectScope(req), req.authContext.userId, req.authContext, req.params.id, req.body);
+        const data = await studioService.upsertProjectRaceBinding(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.authContext,
+            req.params.id,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -288,7 +385,10 @@ router.post('/projects/:id/race-bindings', async (req, res, next) => {
 
 router.get('/projects/:id/map-layers', async (req, res, next) => {
     try {
-        const data = await studioService.listProjectMapLayers(buildProjectScope(req), req.params.id);
+        const data = await studioService.listProjectMapLayers(
+            buildProjectScope(req),
+            req.params.id
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -297,7 +397,12 @@ router.get('/projects/:id/map-layers', async (req, res, next) => {
 
 router.post('/projects/:id/map-layers', async (req, res, next) => {
     try {
-        const data = await studioService.createProjectMapLayer(buildProjectScope(req), req.authContext.userId, req.params.id, req.body);
+        const data = await studioService.createProjectMapLayer(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -306,7 +411,11 @@ router.post('/projects/:id/map-layers', async (req, res, next) => {
 
 router.get('/projects/:id/spatial-objects', async (req, res, next) => {
     try {
-        const data = await spatialService.listProjectSpatialObjects(buildProjectScope(req), req.params.id, req.query);
+        const data = await spatialService.listProjectSpatialObjects(
+            buildProjectScope(req),
+            req.params.id,
+            req.query
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -315,7 +424,12 @@ router.get('/projects/:id/spatial-objects', async (req, res, next) => {
 
 router.post('/projects/:id/spatial-objects', async (req, res, next) => {
     try {
-        const data = await spatialService.createProjectSpatialObject(buildProjectScope(req), req.authContext.userId, req.params.id, req.body);
+        const data = await spatialService.createProjectSpatialObject(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -324,7 +438,12 @@ router.post('/projects/:id/spatial-objects', async (req, res, next) => {
 
 router.put('/spatial-objects/:objectId', async (req, res, next) => {
     try {
-        const data = await spatialService.updateProjectSpatialObject(buildProjectScope(req), req.authContext.userId, req.params.objectId, req.body);
+        const data = await spatialService.updateProjectSpatialObject(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.objectId,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -333,7 +452,10 @@ router.put('/spatial-objects/:objectId', async (req, res, next) => {
 
 router.delete('/spatial-objects/:objectId', async (req, res, next) => {
     try {
-        const data = await spatialService.deleteProjectSpatialObject(buildProjectScope(req), req.params.objectId);
+        const data = await spatialService.deleteProjectSpatialObject(
+            buildProjectScope(req),
+            req.params.objectId
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -342,7 +464,11 @@ router.delete('/spatial-objects/:objectId', async (req, res, next) => {
 
 router.get('/projects/:id/terrain-work-zones', async (req, res, next) => {
     try {
-        const data = await spatialService.listProjectTerrainWorkZones(buildProjectScope(req), req.params.id, req.query);
+        const data = await spatialService.listProjectTerrainWorkZones(
+            buildProjectScope(req),
+            req.params.id,
+            req.query
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -351,7 +477,12 @@ router.get('/projects/:id/terrain-work-zones', async (req, res, next) => {
 
 router.post('/projects/:id/terrain-work-zones', async (req, res, next) => {
     try {
-        const data = await spatialService.createProjectTerrainWorkZone(buildProjectScope(req), req.authContext.userId, req.params.id, req.body);
+        const data = await spatialService.createProjectTerrainWorkZone(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -360,7 +491,10 @@ router.post('/projects/:id/terrain-work-zones', async (req, res, next) => {
 
 router.get('/terrain-work-zones/:zoneId', async (req, res, next) => {
     try {
-        const data = await spatialService.getProjectTerrainWorkZone(buildProjectScope(req), req.params.zoneId);
+        const data = await spatialService.getProjectTerrainWorkZone(
+            buildProjectScope(req),
+            req.params.zoneId
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -369,7 +503,12 @@ router.get('/terrain-work-zones/:zoneId', async (req, res, next) => {
 
 router.put('/terrain-work-zones/:zoneId', async (req, res, next) => {
     try {
-        const data = await spatialService.updateProjectTerrainWorkZone(buildProjectScope(req), req.authContext.userId, req.params.zoneId, req.body);
+        const data = await spatialService.updateProjectTerrainWorkZone(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.zoneId,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -378,7 +517,11 @@ router.put('/terrain-work-zones/:zoneId', async (req, res, next) => {
 
 router.post('/terrain-work-zones/:zoneId/publish-manifest', async (req, res, next) => {
     try {
-        const data = await spatialService.generateTerrainWorkZonePublishManifest(buildProjectScope(req), req.authContext.userId, req.params.zoneId);
+        const data = await spatialService.generateTerrainWorkZonePublishManifest(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.zoneId
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -387,7 +530,11 @@ router.post('/terrain-work-zones/:zoneId/publish-manifest', async (req, res, nex
 
 router.post('/terrain-work-zones/:zoneId/export-package', async (req, res, next) => {
     try {
-        const data = await spatialService.generateTerrainWorkZoneExportPackage(buildProjectScope(req), req.authContext.userId, req.params.zoneId);
+        const data = await spatialService.generateTerrainWorkZoneExportPackage(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.zoneId
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -396,7 +543,11 @@ router.post('/terrain-work-zones/:zoneId/export-package', async (req, res, next)
 
 router.post('/terrain-work-zones/:zoneId/execute-export', async (req, res, next) => {
     try {
-        const data = await spatialService.executeTerrainWorkZoneExport(buildProjectScope(req), req.authContext.userId, req.params.zoneId);
+        const data = await spatialService.executeTerrainWorkZoneExport(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.zoneId
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -409,7 +560,7 @@ router.post('/terrain-work-zones/:zoneId/osm-buildings/sync', async (req, res, n
             buildProjectScope(req),
             req.authContext.userId,
             req.params.zoneId,
-            req.body,
+            req.body
         );
         res.json({ success: true, data });
     } catch (error) {
@@ -423,7 +574,7 @@ router.post('/terrain-work-zones/:zoneId/terrain-patch/sync', async (req, res, n
             buildProjectScope(req),
             req.authContext.userId,
             req.params.zoneId,
-            req.body,
+            req.body
         );
         res.json({ success: true, data });
     } catch (error) {
@@ -431,24 +582,30 @@ router.post('/terrain-work-zones/:zoneId/terrain-patch/sync', async (req, res, n
     }
 });
 
-router.post('/projects/:projectId/terrain-work-zones/:zoneId/scene-export-jobs', async (req, res, next) => {
+router.post(
+    '/projects/:projectId/terrain-work-zones/:zoneId/scene-export-jobs',
+    async (req, res, next) => {
     try {
         const data = await sceneJobService.createTerrainWorkZoneSceneExportJob(
             buildProjectScope(req),
             req.authContext.userId,
             req.params.projectId,
             req.params.zoneId,
-            req.body,
+                req.body
         );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
     }
-});
+    }
+);
 
 router.get('/scene-export-jobs/:jobId', async (req, res, next) => {
     try {
-        const data = await sceneJobService.getSceneExportJob(buildProjectScope(req), req.params.jobId);
+        const data = await sceneJobService.getSceneExportJob(
+            buildProjectScope(req),
+            req.params.jobId
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -457,8 +614,34 @@ router.get('/scene-export-jobs/:jobId', async (req, res, next) => {
 
 router.get('/generated-scenes/:sceneId', async (req, res, next) => {
     try {
-        const data = await generatedSceneService.getGeneratedScene(buildProjectScope(req), req.params.sceneId);
+        const data = await generatedSceneService.getGeneratedScene(
+            buildProjectScope(req),
+            req.params.sceneId
+        );
         res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 场地模式：从 bbox 同步烘焙「卫星正射底图 + 地形 + OSM 白模」为 focusZone 场景包
+router.post('/site-bake', async (req, res, next) => {
+    try {
+        const bbox = siteBakeService.parseSiteBakeBbox(req.body);
+        if (!bbox) {
+            return res.status(400).json({
+                success: false,
+                message: 'bbox 无效：需提供合法 WGS84 边界，且经纬跨度均不得超过 0.25°',
+            });
+        }
+        const result = await siteBakeService.bakeSiteScene(bbox, {
+            name: typeof req.body?.name === 'string' ? req.body.name : undefined,
+            orthophoto: {
+                zoom: req.body?.zoom,
+                maxTiles: req.body?.maxTiles,
+            },
+        });
+        res.json({ success: true, data: result });
     } catch (error) {
         next(error);
     }
@@ -469,7 +652,7 @@ router.get('/generated-scenes/:sceneId/download', async (req, res, next) => {
         const resolved = await generatedSceneService.resolveGeneratedSceneDownload(
             buildProjectScope(req),
             req.params.sceneId,
-            req.query.asset,
+            req.query.asset
         );
         res.type(resolved.contentType);
         res.download(resolved.absolutePath, resolved.filename);
@@ -488,7 +671,7 @@ router.post('/generated-scenes/:sceneId/import-to-studio', async (req, res, next
             buildProjectScope(req),
             req.authContext.userId,
             req.params.sceneId,
-            req.body,
+            req.body
         );
         res.json({ success: true, data });
     } catch (error) {
@@ -498,7 +681,10 @@ router.post('/generated-scenes/:sceneId/import-to-studio', async (req, res, next
 
 router.get('/terrain-work-zones/:zoneId/runtime-preview', async (req, res, next) => {
     try {
-        const data = await spatialService.getTerrainWorkZoneRuntimePreview(buildProjectScope(req), req.params.zoneId);
+        const data = await spatialService.getTerrainWorkZoneRuntimePreview(
+            buildProjectScope(req),
+            req.params.zoneId
+        );
         res.json({
             success: true,
             data: {
@@ -507,7 +693,7 @@ router.get('/terrain-work-zones/:zoneId/runtime-preview', async (req, res, next)
                     ...data.preview,
                     artifactBasePath: appendOrgIdQuery(
                         `${req.baseUrl}/terrain-work-zones/${req.params.zoneId}/export-artifacts`,
-                        resolveTargetOrgId(req),
+                        resolveTargetOrgId(req)
                     ),
                     sources: (data.preview?.sources || []).map((source) => ({
                         ...source,
@@ -519,17 +705,31 @@ router.get('/terrain-work-zones/:zoneId/runtime-preview', async (req, res, next)
                             ? {
                                 ...source.instancing,
                                 planUrl: source.instancing.planRelativePath
-                                    ? buildArtifactUrl(req, req.params.zoneId, source.instancing.planRelativePath)
+                                      ? buildArtifactUrl(
+                                            req,
+                                            req.params.zoneId,
+                                            source.instancing.planRelativePath
+                                        )
                                     : null,
                                 instancedUrl: source.instancing.instancedRelativePath
-                                    ? buildArtifactUrl(req, req.params.zoneId, source.instancing.instancedRelativePath)
+                                      ? buildArtifactUrl(
+                                            req,
+                                            req.params.zoneId,
+                                            source.instancing.instancedRelativePath
+                                        )
                                     : null,
-                                templates: (source.instancing.templates || []).map((template) => ({
+                                  templates: (source.instancing.templates || []).map(
+                                      (template) => ({
                                     ...template,
                                     url: template.templateRelativePath
-                                        ? buildArtifactUrl(req, req.params.zoneId, template.templateRelativePath)
+                                              ? buildArtifactUrl(
+                                                    req,
+                                                    req.params.zoneId,
+                                                    template.templateRelativePath
+                                                )
                                         : null,
-                                })),
+                                      })
+                                  ),
                             }
                             : null,
                     })),
@@ -544,11 +744,17 @@ router.get('/terrain-work-zones/:zoneId/runtime-preview', async (req, res, next)
 router.get('/terrain-work-zones/:zoneId/export-artifacts/*', async (req, res, next) => {
     try {
         const artifactPath = req.params[0];
-        const resolved = await spatialService.resolveTerrainWorkZoneExportArtifact(buildProjectScope(req), req.params.zoneId, artifactPath);
+        const resolved = await spatialService.resolveTerrainWorkZoneExportArtifact(
+            buildProjectScope(req),
+            req.params.zoneId,
+            artifactPath
+        );
 
         if (resolved.relativePath.endsWith('.tileset.json')) {
             const raw = await fs.readFile(resolved.absolutePath, 'utf8');
-            res.type('application/json').send(JSON.stringify(rewriteTilesetJsonUris(JSON.parse(raw), req, req.params.zoneId)));
+            res.type('application/json').send(
+                JSON.stringify(rewriteTilesetJsonUris(JSON.parse(raw), req, req.params.zoneId))
+            );
             return;
         }
 
@@ -570,7 +776,10 @@ router.get('/terrain-work-zones/:zoneId/export-artifacts/*', async (req, res, ne
 
 router.delete('/terrain-work-zones/:zoneId', async (req, res, next) => {
     try {
-        const data = await spatialService.deleteProjectTerrainWorkZone(buildProjectScope(req), req.params.zoneId);
+        const data = await spatialService.deleteProjectTerrainWorkZone(
+            buildProjectScope(req),
+            req.params.zoneId
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -591,7 +800,11 @@ router.post('/asset-templates', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
-        const data = await studioService.createStudioAssetTemplate(orgId, req.authContext.userId, req.body);
+        const data = await studioService.createStudioAssetTemplate(
+            orgId,
+            req.authContext.userId,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -600,7 +813,10 @@ router.post('/asset-templates', async (req, res, next) => {
 
 router.get('/races', async (req, res, next) => {
     try {
-        const data = await studioService.listAvailableRaces(buildProjectScope(req), req.authContext);
+        const data = await studioService.listAvailableRaces(
+            buildProjectScope(req),
+            req.authContext
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -633,7 +849,12 @@ router.post('/placements/:id/bind-inventory', async (req, res, next) => {
     try {
         const scope = buildProjectScope(req);
         if (!scope.orgId) return orgIdRequiredResponse(req, res);
-        const data = await studioService.bindInventoryToPlacement(scope, req.authContext.userId, req.params.id, req.body);
+        const data = await studioService.bindInventoryToPlacement(
+            scope,
+            req.authContext.userId,
+            req.params.id,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -675,17 +896,26 @@ router.get('/assets', async (req, res, next) => {
  * POST /api/app/3d-studio/assets
  * 创建资产（含文件上传）
  */
-router.post('/assets', assetService.assetUploadMiddleware.single('file'), async (req, res, next) => {
+router.post(
+    '/assets',
+    assetService.assetUploadMiddleware.single('file'),
+    async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
         if (!orgId) return orgIdRequiredResponse(req, res);
 
-        const data = await assetService.createAsset(orgId, req.authContext.userId, req.body, req.file);
+            const data = await assetService.createAsset(
+                orgId,
+                req.authContext.userId,
+                req.body,
+                req.file
+            );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
     }
-});
+    }
+);
 
 /**
  * GET /api/app/3d-studio/assets/:id
@@ -708,7 +938,12 @@ router.get('/assets/:id', async (req, res, next) => {
 router.put('/assets/:id', async (req, res, next) => {
     try {
         const orgId = resolveTargetOrgId(req);
-        const data = await assetService.updateAsset(req.params.id, orgId, req.authContext.userId, req.body);
+        const data = await assetService.updateAsset(
+            req.params.id,
+            orgId,
+            req.authContext.userId,
+            req.body
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -743,7 +978,10 @@ router.get('/assets/:id/file', async (req, res, next) => {
         }
 
         res.setHeader('Content-Type', fileData.mimeType);
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileData.fileName)}"`);
+        res.setHeader(
+            'Content-Disposition',
+            `attachment; filename="${encodeURIComponent(fileData.fileName)}"`
+        );
         res.send(fileData.buffer);
     } catch (error) {
         next(error);

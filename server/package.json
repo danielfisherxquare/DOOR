@@ -5,15 +5,15 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node --env-file-if-exists=.env src/index.js",
-    "dev": "node --env-file-if-exists=.env --watch src/index.js",
-    "worker": "node --env-file-if-exists=.env src/worker.js",
-    "worker:dev": "node --env-file-if-exists=.env --watch src/worker.js",
+    "start": "node --import ./scripts/load-env.mjs src/index.js",
+    "dev": "node --import ./scripts/load-env.mjs --watch src/index.js",
+    "worker": "node --import ./scripts/load-env.mjs src/worker.js",
+    "worker:dev": "node --import ./scripts/load-env.mjs --watch src/worker.js",
     "migrate": "node node_modules/knex/bin/cli.js migrate:latest --knexfile knexfile.js",
     "migrate:make": "node node_modules/knex/bin/cli.js migrate:make --knexfile knexfile.js",
-    "seed:demo": "node --env-file-if-exists=.env scripts/seed-demo-data.mjs",
-    "test": "node --env-file-if-exists=.env --test --test-concurrency=1",
-    "load:bib-tracking": "node --env-file-if-exists=.env scripts/load-bib-tracking.mjs"
+    "seed:demo": "node --import ./scripts/load-env.mjs scripts/seed-demo-data.mjs",
+    "test": "node --import ./scripts/load-env.mjs --test --test-concurrency=1",
+    "load:bib-tracking": "node --import ./scripts/load-env.mjs scripts/load-bib-tracking.mjs"
   },
   "dependencies": {
     "@openfga/sdk": "^0.9.6",
@@ -36,9 +36,12 @@
     "sharp": "^0.34.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
-    "uuid": "^9.0.1"
+    "uuid": "^11.1.1"
   },
   "devDependencies": {
     "supertest": "^7.2.2"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }

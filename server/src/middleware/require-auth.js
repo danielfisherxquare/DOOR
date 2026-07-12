@@ -36,8 +36,10 @@ export async function requireAuth(req, res, next) {
 
         // 映射纠正旧 token 带来的旧版角色名称
         if (ROLE_MIGRATION_MAP[decoded.role]) {
-            console.warn(`[DEPRECATED] Legacy role "${decoded.role}" detected for user ${decoded.userId}. ` +
-                         `Mapped to "${ROLE_MIGRATION_MAP[decoded.role]}". User should re-login to get updated token.`);
+            console.warn(
+                `[DEPRECATED] Legacy role "${decoded.role}" detected for user ${decoded.userId}. ` +
+                    `Mapped to "${ROLE_MIGRATION_MAP[decoded.role]}". User should re-login to get updated token.`
+            );
         }
         const normalizedRole = ROLE_MIGRATION_MAP[decoded.role] || decoded.role;
 
@@ -48,11 +50,16 @@ export async function requireAuth(req, res, next) {
             strictSurfaceModules: Boolean(decoded.preferences?.strictSurfaceModules),
         };
 
-        // 兼容遗留代码 (原本的 tenantContext 设置)
+        // DEPRECATED: req.tenantContext is a legacy alias for req.authContext.
+        // New code must use req.authContext exclusively.
         req.tenantContext = req.authContext;
+
+        // DEPRECATED: req.user is a legacy alias carrying the raw JWT payload.
+        // New code must use req.authContext for authenticated user context.
         req.user = decoded;
 
-        // 兼容 inventory 模块的 orgAccess
+        // DEPRECATED: req.orgAccess is a legacy alias for inventory module compatibility.
+        // New code must use req.authContext for org/user context.
         req.orgAccess = {
             orgId: decoded.orgId || null,
             userId: decoded.userId,

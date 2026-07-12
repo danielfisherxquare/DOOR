@@ -39,12 +39,19 @@ import {
   resolveSurfaceTextureSource,
   SURFACE_TEXTURE_SOURCES,
 } from '../../src/utils/terrainModel/surfaceTexture.js'
-import { createTerrainSampleBatches } from '../../src/utils/terrainModel/arcgisTerrainSampler.js'
-import { removeLocalElevationSpikes, prepareElevationGrid } from '../../src/utils/terrainModel/elevation.js'
+import {
+  createTerrainSampleBatches,
+  sampleTerrainBatches,
+} from '../../src/utils/terrainModel/arcgisTerrainSampler.js'
+import {
+  removeLocalElevationSpikes,
+  prepareElevationGrid,
+} from '../../src/utils/terrainModel/elevation.js'
 
 function parseAsciiStlVertices(stlText) {
-  return Array.from(String(stlText).matchAll(/vertex\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/g))
-    .map((match) => ({
+  return Array.from(
+    String(stlText).matchAll(/vertex\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)/g)
+  ).map((match) => ({
       x: Number(match[1]),
       y: Number(match[2]),
       z: Number(match[3]),
@@ -53,15 +60,24 @@ function parseAsciiStlVertices(stlText) {
 
 function boundsForVertices(vertices) {
   return {
-    x: [Math.min(...vertices.map((vertex) => vertex.x)), Math.max(...vertices.map((vertex) => vertex.x))],
-    y: [Math.min(...vertices.map((vertex) => vertex.y)), Math.max(...vertices.map((vertex) => vertex.y))],
-    z: [Math.min(...vertices.map((vertex) => vertex.z)), Math.max(...vertices.map((vertex) => vertex.z))],
+    x: [
+      Math.min(...vertices.map((vertex) => vertex.x)),
+      Math.max(...vertices.map((vertex) => vertex.x)),
+    ],
+    y: [
+      Math.min(...vertices.map((vertex) => vertex.y)),
+      Math.max(...vertices.map((vertex) => vertex.y)),
+    ],
+    z: [
+      Math.min(...vertices.map((vertex) => vertex.z)),
+      Math.max(...vertices.map((vertex) => vertex.z)),
+    ],
   }
 }
 
 function rotateWgs84Polygon(points, degrees, center) {
-  const cosLatitude = Math.max(0.000001, Math.cos(center.latitude * Math.PI / 180))
-  const radians = degrees * Math.PI / 180
+  const cosLatitude = Math.max(0.000001, Math.cos((center.latitude * Math.PI) / 180))
+  const radians = (degrees * Math.PI) / 180
   const sin = Math.sin(radians)
   const cos = Math.cos(radians)
   return points.map((point) => {
@@ -99,19 +115,30 @@ function bambuH2cFilamentVariantCount(projectSettings) {
 function assertBambuProjectArraysMatchSlotCount(projectSettings, keys) {
   const slotCount = projectSettings.filament_colour.length
   for (const key of keys) {
-    assert.equal(projectSettings[key].length, slotCount, key + ' should match the material slot count')
+    assert.equal(
+      projectSettings[key].length,
+      slotCount,
+      key + ' should match the material slot count'
+    )
   }
 }
 
 function assertBambuProjectArraysMatchFilamentVariantCount(projectSettings, keys) {
   const variantCount = bambuH2cFilamentVariantCount(projectSettings)
   for (const key of keys) {
-    assert.equal(projectSettings[key].length, variantCount, key + ' should match the material slot x H2C variant count')
+    assert.equal(
+      projectSettings[key].length,
+      variantCount,
+      key + ' should match the material slot x H2C variant count'
+    )
   }
 }
 
 function bambuH2cFilamentVariantSelfIndexes(projectSettings) {
-  return projectSettings.filament_colour.flatMap((_, index) => [String(index + 1), String(index + 1)])
+  return projectSettings.filament_colour.flatMap((_, index) => [
+    String(index + 1),
+    String(index + 1),
+  ])
 }
 
 function assertBambuFlushSettingsMatchH2cVariants(projectSettings) {
@@ -120,19 +147,20 @@ function assertBambuFlushSettingsMatchH2cVariants(projectSettings) {
   assert.equal(
     projectSettings.flush_volumes_matrix.length,
     slotCount * variantCount,
-    'flush_volumes_matrix should cover material slots x H2C nozzle variants',
+    'flush_volumes_matrix should cover material slots x H2C nozzle variants'
   )
   assert.equal(projectSettings.flush_volumes_vector.length, variantCount)
   assert.deepEqual(projectSettings.flush_multiplier, ['1', '1'])
 }
 
 function parseThreeMfObjectVertices(modelXml, objectName) {
-  const objectMatch = String(modelXml).match(new RegExp(
-    '<object[^>]*name="' + objectName + '"[\\s\\S]*?<vertices>([\\s\\S]*?)<\\/vertices>',
-  ))
+  const objectMatch = String(modelXml).match(
+    new RegExp('<object[^>]*name="' + objectName + '"[\\s\\S]*?<vertices>([\\s\\S]*?)<\\/vertices>')
+  )
   assert.ok(objectMatch, objectName + ' object exists in 3MF model')
-  return Array.from(objectMatch[1].matchAll(/<vertex\s+x="([^"]+)"\s+y="([^"]+)"\s+z="([^"]+)"\s*\/>/g))
-    .map((match) => ({
+  return Array.from(
+    objectMatch[1].matchAll(/<vertex\s+x="([^"]+)"\s+y="([^"]+)"\s+z="([^"]+)"\s*\/>/g)
+  ).map((match) => ({
       x: Number(match[1]),
       y: Number(match[2]),
       z: Number(match[3]),
@@ -148,9 +176,7 @@ function createModelTerrainHeightAt(model) {
   const centerZ = (bounds.minZ + bounds.maxZ) / 2
   const stepX = (bounds.maxX - bounds.minX) / Math.max(cols - 1, 1)
   const stepZ = (bounds.maxZ - bounds.minZ) / Math.max(rows - 1, 1)
-  const topHeights = model.meshes.terrain.vertices
-    .slice(0, rows * cols)
-    .map((vertex) => vertex.y)
+  const topHeights = model.meshes.terrain.vertices.slice(0, rows * cols).map((vertex) => vertex.y)
 
   return (vertex) => {
     const localX = vertex.x / scale + centerX
@@ -172,11 +198,17 @@ function createModelTerrainHeightAt(model) {
 }
 
 function maxFloatingClearance(vertices, supportHeightAt) {
-  return vertices.reduce((maximum, vertex) => Math.max(maximum, vertex.y - supportHeightAt(vertex)), -Infinity)
+  return vertices.reduce(
+    (maximum, vertex) => Math.max(maximum, vertex.y - supportHeightAt(vertex)),
+    -Infinity
+  )
 }
 
 function maxSurfacePenetration(vertices, supportHeightAt) {
-  return vertices.reduce((maximum, vertex) => Math.max(maximum, supportHeightAt(vertex) - vertex.y), -Infinity)
+  return vertices.reduce(
+    (maximum, vertex) => Math.max(maximum, supportHeightAt(vertex) - vertex.y),
+    -Infinity
+  )
 }
 
 function createSatelliteImageData(width, height, resolveRgb) {
@@ -241,7 +273,8 @@ test('summarizeTrack ignores zero elevation voids on high-altitude tracks', () =
 })
 
 test('parseArcAsciiGrid samples high resolution DEM cells without using GPX interpolation', () => {
-  const raster = parseArcAsciiGrid(`ncols 4
+  const raster = parseArcAsciiGrid(
+    `ncols 4
 nrows 3
 xllcorner 103.570
 yllcorner 30.900
@@ -249,7 +282,9 @@ cellsize 0.001
 NODATA_value -9999
 100 110 130 160
 90 -9999 120 150
-80 95 115 140`, { sourceName: 'synthetic-arcgrid', resolutionMeters: 30 })
+80 95 115 140`,
+    { sourceName: 'synthetic-arcgrid', resolutionMeters: 30 }
+  )
 
   assert.equal(raster.cols, 4)
   assert.equal(raster.rows, 3)
@@ -269,14 +304,17 @@ NODATA_value -9999
 })
 
 test('parseArcAsciiGrid estimates DEM resolution from AAIGrid cell size when metadata is absent', () => {
-  const raster = parseArcAsciiGrid(`ncols 2
+  const raster = parseArcAsciiGrid(
+    `ncols 2
 nrows 2
 xllcorner 103.570
 yllcorner 30.900
 cellsize 0.0001
 NODATA_value -9999
 100 110
-90 95`, { sourceName: 'opentopography-cop30' })
+90 95`,
+    { sourceName: 'opentopography-cop30' }
+  )
 
   assert.equal(raster.sourceName, 'opentopography-cop30')
   assert.ok(raster.resolutionMeters > 9)
@@ -344,10 +382,13 @@ NODATA_value -9999
 })
 
 test('buildBufferedWgs84Bounds pads uploaded GPX bounds for DEM API requests', () => {
-  const bounds = buildBufferedWgs84Bounds([
+  const bounds = buildBufferedWgs84Bounds(
+    [
     { latitude: 30.9, longitude: 103.57 },
     { latitude: 30.92, longitude: 103.61 },
-  ], { paddingMeters: 300 })
+    ],
+    { paddingMeters: 300 }
+  )
 
   assert.ok(bounds.south < 30.9)
   assert.ok(bounds.north > 30.92)
@@ -364,22 +405,27 @@ test('buildBufferedWgs84Bounds can use a manual WGS84 terrain range for DEM requ
     west: 103.56,
     east: 103.62,
   }
-  const bounds = buildBufferedWgs84Bounds([
+  const bounds = buildBufferedWgs84Bounds(
+    [
     { latitude: 30.9, longitude: 103.57 },
     { latitude: 30.92, longitude: 103.61 },
-  ], {
+    ],
+    {
     paddingMeters: 1200,
     terrainBoundsWgs84: manualBounds,
-  })
+    }
+  )
 
   assert.deepEqual(bounds, manualBounds)
 })
 
 test('buildBufferedWgs84Bounds ignores incomplete manual WGS84 bounds', () => {
-  const bounds = buildBufferedWgs84Bounds([
+  const bounds = buildBufferedWgs84Bounds(
+    [
     { latitude: 30.9, longitude: 103.57 },
     { latitude: 30.92, longitude: 103.61 },
-  ], {
+    ],
+    {
     paddingMeters: 0,
     terrainBoundsWgs84: {
       south: '',
@@ -387,7 +433,8 @@ test('buildBufferedWgs84Bounds ignores incomplete manual WGS84 bounds', () => {
       west: 103.56,
       east: 103.62,
     },
-  })
+    }
+  )
 
   assert.ok(bounds.south > 30.89)
   assert.ok(bounds.north < 30.93)
@@ -403,9 +450,51 @@ test('createTerrainSampleBatches caps high precision terrain requests into stabl
 
   const batches = createTerrainSampleBatches(points, { chunkSize: 9000 })
 
-  assert.deepEqual(batches.map((batch) => batch.length), [9000, 9000, 7005])
+  assert.deepEqual(
+    batches.map((batch) => batch.length),
+    [9000, 9000, 7005]
+  )
   assert.equal(batches[0][0], points[0])
   assert.equal(batches[2][7004], points[25004])
+})
+
+test('sampleTerrainBatches runs bounded concurrent batches while preserving sample order', async () => {
+  const points = Array.from({ length: 900 }, (_, index) => ({
+    id: index,
+    latitude: 30.9 + index * 0.0001,
+    longitude: 103.57,
+  }))
+  let active = 0
+  let maxActive = 0
+  const progress = []
+
+  const heights = await sampleTerrainBatches(
+    points,
+    async (batch) => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      await new Promise((resolve) => setTimeout(resolve, batch[0].id > 300 ? 1 : 4))
+      active -= 1
+      return batch.map((point) => point.id)
+    },
+    {
+      chunkSize: 256,
+      concurrency: 3,
+      onProgress: (event) => progress.push(event),
+    }
+  )
+
+  assert.deepEqual(
+    heights,
+    points.map((point) => point.id)
+  )
+  assert.equal(maxActive, 3)
+  assert.deepEqual(progress.at(-1), {
+    completedBatches: 4,
+    totalBatches: 4,
+    completedSamples: 900,
+    totalSamples: 900,
+  })
 })
 
 test('buildTerrainModel creates printable terrain and raised route meshes', async () => {
@@ -419,9 +508,8 @@ test('buildTerrainModel creates printable terrain and raised route meshes', asyn
     verticalScale: 0.25,
     trackWidthMm: 2.4,
     trackHeightMm: 1.2,
-    sampleElevations: async (samples) => samples.map((sample, index) => (
-      700 + (sample.latitude - 30.9) * 11000 + (index % 3)
-    )),
+    sampleElevations: async (samples) =>
+      samples.map((sample, index) => 700 + (sample.latitude - 30.9) * 11000 + (index % 3)),
   })
 
   assert.equal(model.kind, 'door-terrain-track-model')
@@ -500,6 +588,59 @@ test('buildTerrainModel merges ultra terrain grids without overflowing the call 
   assert.equal(model.terrain.cols, 320)
   assert.ok(model.meshes.combined.vertices.length > 200000)
   assert.ok(model.meshes.combined.faces.length > model.meshes.terrain.faces.length)
+})
+
+test('ultra multi-part export plans do not materialize a duplicate combined mesh', async () => {
+  const points = Array.from({ length: 96 }, (_, index) => ({
+    latitude: 34.6 + Math.sin(index / 8) * 0.01 + index * 0.00008,
+    longitude: 100.2 + Math.cos(index / 7) * 0.01 + index * 0.00006,
+    elevation: 3880 + Math.sin(index / 5) * 160,
+  }))
+
+  const model = await buildTerrainModel(points, {
+    gridRows: 96,
+    gridCols: 96,
+    terrainQuality: 'high',
+    modelWidthMm: 145.9,
+    modelDepthMm: 260,
+    frameWidthMm: 8,
+    basePlateHeightMm: 3,
+    colorMode: 'elevation',
+    terrainColorBandsEnabled: true,
+    elevationSmoothingPasses: 0,
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 3900 + Math.sin(index / 37) * 180),
+  })
+
+  assert.equal(model.meshes.combined.kind, 'composite-mesh')
+  assert.ok(model.meshes.combined.sourceMeshes.length >= 4)
+  assert.equal(model.meshes.combined.materialized, false)
+
+  const plan = terrainModelModule.buildTerrainModelExportPlan(model, { baseName: 'ultra-plan' })
+
+  assert.ok(plan.files.some((file) => file.name === 'ultra-plan-print-kit.stl'))
+  assert.equal(model.meshes.combined.materialized, false)
+})
+
+test('high face count STL exports use binary STL instead of giant ASCII strings', () => {
+  const mesh = {
+    name: 'large-binary-stl',
+    vertices: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+      { x: 0, y: 1, z: 0 },
+    ],
+    faces: Array.from({ length: 20_001 }, () => [0, 1, 2]),
+  }
+
+  const file = terrainModelModule.meshToStl(mesh, 'large_binary_stl')
+
+  assert.ok(file instanceof Uint8Array)
+  assert.equal(
+    new DataView(file.buffer, file.byteOffset + 80, 4).getUint32(0, true),
+    mesh.faces.length
+  )
+  assert.equal(file.byteLength, 84 + mesh.faces.length * 50)
 })
 
 test('print exports convert internal Three Y-up vertices to slicer Z-up coordinates without mirroring east or north', () => {
@@ -583,16 +724,17 @@ test('non-rectangular terrain footprints expand enough to keep route corners pri
     modelDepthMm: 120,
     frameWidthMm: 0,
     basePlateHeightMm: 0,
-    sampleElevations: async (samples) => samples.map((sample) => (
-      100 + (sample.latitude - 30) * 1000 + (sample.longitude - 103) * 1000
-    )),
+    sampleElevations: async (samples) =>
+      samples.map(
+        (sample) => 100 + (sample.latitude - 30) * 1000 + (sample.longitude - 103) * 1000
+      ),
   })
 
   assert.ok(model.stats.terrainWidthMm <= 120)
   assert.ok(model.stats.terrainDepthMm <= 120)
   assert.ok(
     model.route.localPoints.every((point) => routePointInsideHexFootprint(model, point)),
-    'all GPX route points should remain inside the generated hexagon footprint',
+    'all GPX route points should remain inside the generated hexagon footprint'
   )
 })
 
@@ -610,12 +752,14 @@ test('buildTerrainModel preserves high precision DEM grids and writes source pre
     verticalScale: 0.08,
     maxReliefMm: 34,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((sample, index) => (
-      800
-        + Math.sin((sample.latitude - 30.9) * 9000) * 22
-        + Math.cos((sample.longitude - 103.57) * 7000) * 16
-        + (index % 7)
-    )),
+    sampleElevations: async (samples) =>
+      samples.map(
+        (sample, index) =>
+          800 +
+          Math.sin((sample.latitude - 30.9) * 9000) * 22 +
+          Math.cos((sample.longitude - 103.57) * 7000) * 16 +
+          (index % 7)
+      ),
   })
 
   assert.equal(model.terrain.rows, 128)
@@ -671,10 +815,18 @@ test('buildTerrainModel samples and exports a manual WGS84 terrain range', async
   assert.deepEqual(model.terrain.requestedBoundsWgs84, manualBounds)
   assert.deepEqual(model.terrain.boundsWgs84, manualBounds)
   assert.equal(sampledPoints.length, 36)
-  assert.ok(Math.min(...sampledPoints.map((sample) => sample.latitude)) <= manualBounds.south + 0.000001)
-  assert.ok(Math.max(...sampledPoints.map((sample) => sample.latitude)) >= manualBounds.north - 0.000001)
-  assert.ok(Math.min(...sampledPoints.map((sample) => sample.longitude)) <= manualBounds.west + 0.000001)
-  assert.ok(Math.max(...sampledPoints.map((sample) => sample.longitude)) >= manualBounds.east - 0.000001)
+  assert.ok(
+    Math.min(...sampledPoints.map((sample) => sample.latitude)) <= manualBounds.south + 0.000001
+  )
+  assert.ok(
+    Math.max(...sampledPoints.map((sample) => sample.latitude)) >= manualBounds.north - 0.000001
+  )
+  assert.ok(
+    Math.min(...sampledPoints.map((sample) => sample.longitude)) <= manualBounds.west + 0.000001
+  )
+  assert.ok(
+    Math.max(...sampledPoints.map((sample) => sample.longitude)) >= manualBounds.east - 0.000001
+  )
 
   const files = buildTerrainModelExportFiles(model, { baseName: 'manual-bounds' })
   const manifest = JSON.parse(files.at(-1).content)
@@ -705,15 +857,19 @@ test('buildTerrainModel clips terrain and base to a manual WGS84 footprint polyg
     basePlateHeightMm: 3,
     paddingMeters: 0,
     terrainFootprintWgs84: footprint,
-    sampleElevations: async (samples) => samples.map((sample) => 900 + (sample.latitude - 30.895) * 120),
+    sampleElevations: async (samples) =>
+      samples.map((sample) => 900 + (sample.latitude - 30.895) * 120),
   })
 
   assert.equal(model.print.shapeType, 'custom')
   assert.equal(model.terrain.boundsSource, 'manual-footprint-wgs84')
-  assert.deepEqual(model.terrain.requestedFootprintWgs84, footprint.map((point) => ({
+  assert.deepEqual(
+    model.terrain.requestedFootprintWgs84,
+    footprint.map((point) => ({
     latitude: Number(point.latitude.toFixed(7)),
     longitude: Number(point.longitude.toFixed(7)),
-  })))
+    }))
+  )
   assert.ok(model.meshes.terrain.faces.length > 0)
   assert.ok(model.meshes.base.faces.length > 0)
   assert.ok(model.meshes.base.vertices.length >= 6)
@@ -728,13 +884,14 @@ test('buildTerrainModel clips terrain and base to a manual WGS84 footprint polyg
     basePlateHeightMm: 3,
     paddingMeters: 0,
     terrainBoundsWgs84: model.terrain.boundsWgs84,
-    sampleElevations: async (samples) => samples.map((sample) => 900 + (sample.latitude - 30.895) * 120),
+    sampleElevations: async (samples) =>
+      samples.map((sample) => 900 + (sample.latitude - 30.895) * 120),
   })
 
   assert.equal(model.meshes.base.vertices.length, 6)
   assert.ok(
     model.meshes.terrain.faces.length < rectangleModel.meshes.terrain.faces.length,
-    'triangle footprint should remove terrain faces outside the selected polygon',
+    'triangle footprint should remove terrain faces outside the selected polygon'
   )
 })
 
@@ -775,17 +932,20 @@ test('buildTerrainModel can straighten a rotated manual footprint for print expo
 })
 
 test('buildSurfaceTextureTilePlan caps satellite tiles and records real texture coverage', () => {
-  const plan = buildSurfaceTextureTilePlan({
+  const plan = buildSurfaceTextureTilePlan(
+    {
     west: 103.57,
     east: 103.62,
     south: 30.9,
     north: 30.94,
-  }, {
+    },
+    {
     sourceKey: 'esriWorldImagery',
     zoom: 13,
     maxTiles: 16,
     maxTextureSize: 1024,
-  })
+    }
+  )
 
   assert.equal(plan.source.key, 'esriWorldImagery')
   assert.equal(plan.zoom, 13)
@@ -799,17 +959,20 @@ test('buildSurfaceTextureTilePlan caps satellite tiles and records real texture 
 })
 
 test('buildSurfaceTextureTilePlan treats requested zoom as a budgeted upper bound', () => {
-  const plan = buildSurfaceTextureTilePlan({
+  const plan = buildSurfaceTextureTilePlan(
+    {
     west: 102.75,
     east: 103.35,
     south: 29.75,
     north: 30.25,
-  }, {
+    },
+    {
     sourceKey: 'esriWorldImagery',
     zoom: 15,
     maxTiles: 16,
     maxTextureSize: 1024,
-  })
+    }
+  )
 
   assert.equal(plan.source.key, 'esriWorldImagery')
   assert.equal(plan.requestedZoom, 15)
@@ -845,12 +1008,14 @@ test('buildSurfaceTextureDataUrl loads tiles concurrently and keeps partial imag
   let maxActiveLoads = 0
   let attemptedLoads = 0
   try {
-    const texture = await buildSurfaceTextureDataUrl({
+    const texture = await buildSurfaceTextureDataUrl(
+      {
       west: 103.57,
       east: 103.62,
       south: 30.9,
       north: 30.94,
-    }, {
+      },
+      {
       sourceKey: 'esriWorldImagery',
       zoom: 13,
       maxTiles: 16,
@@ -870,7 +1035,8 @@ test('buildSurfaceTextureDataUrl loads tiles concurrently and keeps partial imag
         }
         return { url }
       },
-    })
+      }
+    )
 
     assert.equal(texture.tileCount, 6)
     assert.equal(texture.missingTileCount, 1)
@@ -905,25 +1071,36 @@ test('Google Maps Tiles texture source uses the official session-token tile flow
   })
 
   assert.equal(
-    buildGoogleMapTileUrl({ apiKey: 'google key', session: 'session token', z: 13, x: 6454, y: 3384 }),
-    'https://tile.googleapis.com/v1/2dtiles/13/6454/3384?session=session%20token&key=google%20key',
+    buildGoogleMapTileUrl({
+      apiKey: 'google key',
+      session: 'session token',
+      z: 13,
+      x: 6454,
+      y: 3384,
+    }),
+    'https://tile.googleapis.com/v1/2dtiles/13/6454/3384?session=session%20token&key=google%20key'
   )
 
-  const plan = buildSurfaceTextureTilePlan({
+  const plan = buildSurfaceTextureTilePlan(
+    {
     west: 103.57,
     east: 103.58,
     south: 30.9,
     north: 30.91,
-  }, {
+    },
+    {
     sourceKey: 'googleSatellite',
     sourceOptions: { apiKey: 'google key', session: 'session token' },
     zoom: 13,
     maxTextureSize: 1024,
-  })
+    }
+  )
 
   assert.equal(plan.source.key, 'googleSatellite')
   assert.ok(plan.tiles.length > 0)
-  assert.ok(plan.tiles.every((tile) => tile.url.startsWith('https://tile.googleapis.com/v1/2dtiles/13/')))
+  assert.ok(
+    plan.tiles.every((tile) => tile.url.startsWith('https://tile.googleapis.com/v1/2dtiles/13/'))
+  )
   assert.ok(plan.tiles.every((tile) => tile.url.includes('session=session%20token')))
   assert.ok(plan.tiles.every((tile) => tile.url.includes('key=google%20key')))
 })
@@ -980,24 +1157,28 @@ test('Cesium ion texture source resolves configured raster XYZ templates without
       x: 6454,
       y: 3384,
     }),
-    'https://assets.cesium.com/12345/13/6454/3384.png?access_token=ion%20token',
+    'https://assets.cesium.com/12345/13/6454/3384.png?access_token=ion%20token'
   )
 
-  const plan = buildSurfaceTextureTilePlan({
+  const plan = buildSurfaceTextureTilePlan(
+    {
     west: 103.57,
     east: 103.58,
     south: 30.9,
     north: 30.91,
-  }, {
+    },
+    {
     sourceKey: 'cesiumIonRaster',
     sourceOptions: {
       accessToken: 'ion token',
       assetId: '12345',
-      urlTemplate: 'https://assets.cesium.com/{assetId}/{z}/{x}/{y}.png?access_token={accessToken}',
+        urlTemplate:
+          'https://assets.cesium.com/{assetId}/{z}/{x}/{y}.png?access_token={accessToken}',
     },
     zoom: 13,
     maxTextureSize: 1024,
-  })
+    }
+  )
 
   assert.equal(plan.source.key, 'cesiumIonRaster')
   assert.ok(plan.tiles.length > 0)
@@ -1026,7 +1207,10 @@ test('fetchCesiumIonRasterSourceOptions extracts raster templates from Cesium io
     },
   })
 
-  assert.equal(requestUrl, 'https://api.cesium.com/v1/assets/12345/endpoint?access_token=ion%20token')
+  assert.equal(
+    requestUrl,
+    'https://api.cesium.com/v1/assets/12345/endpoint?access_token=ion%20token'
+  )
   assert.deepEqual(sourceOptions, {
     accessToken: 'ion token',
     assetId: '12345',
@@ -1057,19 +1241,24 @@ test('fetchCesiumIonRasterSourceOptions resolves Cesium ion Bing aerial endpoint
       }
       assert.equal(
         url,
-        'https://dev.virtualearth.net/REST/v1/Imagery/Metadata/Aerial?output=json&include=ImageryProviders&key=bing%20key',
+        'https://dev.virtualearth.net/REST/v1/Imagery/Metadata/Aerial?output=json&include=ImageryProviders&key=bing%20key'
       )
       return {
         ok: true,
         json: async () => ({
-          resourceSets: [{
-            resources: [{
-              imageUrl: 'https://ecn.{subdomain}.tiles.virtualearth.net/tiles/a{quadkey}.jpeg?g=129&mkt={culture}',
+          resourceSets: [
+            {
+              resources: [
+                {
+                  imageUrl:
+                    'https://ecn.{subdomain}.tiles.virtualearth.net/tiles/a{quadkey}.jpeg?g=129&mkt={culture}',
               imageUrlSubdomains: ['t0', 't1'],
               zoomMin: 1,
               zoomMax: 19,
-            }],
-          }],
+                },
+              ],
+            },
+          ],
         }),
       }
     },
@@ -1081,27 +1270,37 @@ test('fetchCesiumIonRasterSourceOptions resolves Cesium ion Bing aerial endpoint
       mapStyle: 'Aerial',
       key: 'bing key',
     }),
-    'https://dev.virtualearth.net/REST/v1/Imagery/Metadata/Aerial?output=json&include=ImageryProviders&key=bing%20key',
+    'https://dev.virtualearth.net/REST/v1/Imagery/Metadata/Aerial?output=json&include=ImageryProviders&key=bing%20key'
   )
   assert.equal(sourceOptions.externalType, 'BING')
-  assert.equal(sourceOptions.urlTemplate, 'https://ecn.{subdomain}.tiles.virtualearth.net/tiles/a{quadkey}.jpeg?g=129&mkt={culture}')
+  assert.equal(
+    sourceOptions.urlTemplate,
+    'https://ecn.{subdomain}.tiles.virtualearth.net/tiles/a{quadkey}.jpeg?g=129&mkt={culture}'
+  )
   assert.deepEqual(sourceOptions.subdomains, ['t0', 't1'])
   assert.equal(sourceOptions.maxZoom, 19)
 
-  const plan = buildSurfaceTextureTilePlan({
+  const plan = buildSurfaceTextureTilePlan(
+    {
     west: 103.57,
     east: 103.58,
     south: 30.9,
     north: 30.91,
-  }, {
+    },
+    {
     sourceKey: 'cesiumIonRaster',
     sourceOptions,
     zoom: 13,
     maxTextureSize: 1024,
-  })
+    }
+  )
 
   assert.equal(plan.source.key, 'cesiumIonRaster')
-  assert.ok(plan.tiles.every((tile) => /https:\/\/ecn\.t[01]\.tiles\.virtualearth\.net\/tiles\/a[0-3]+\.jpeg/.test(tile.url)))
+  assert.ok(
+    plan.tiles.every((tile) =>
+      /https:\/\/ecn\.t[01]\.tiles\.virtualearth\.net\/tiles\/a[0-3]+\.jpeg/.test(tile.url)
+    )
+  )
   assert.ok(plan.tiles.every((tile) => tile.url.includes('mkt=zh-CN')))
   assert.ok(plan.tiles.every((tile) => !tile.url.includes('access_token=')))
 })
@@ -1116,17 +1315,21 @@ test('getTerrainSurfaceUv maps west/east and north/south without mirroring the t
 
 test('recommendHighPrecisionTerrainOptions targets printable surface spacing for DEM-backed models', () => {
   const { points } = parseGpxTrack(gpx)
-  const recommendation = recommendHighPrecisionTerrainOptions(points, {
+  const recommendation = recommendHighPrecisionTerrainOptions(
+    points,
+    {
     modelWidthMm: 120,
     modelDepthMm: 90,
     frameWidthMm: 8,
     basePlateHeightMm: 3,
     shapeType: 'hexagon',
-  }, {
+    },
+    {
     sourceName: 'OpenTopography COP30',
     resolutionMeters: 30,
     targetModelGridMm: 0.4,
-  })
+    }
+  )
 
   assert.equal(recommendation.terrainQuality, 'ultra')
   assert.equal(recommendation.elevationSmoothingPasses, 0)
@@ -1152,20 +1355,26 @@ test('buildTerrainModel allows near-real relief by lowering max relief below pri
     maxReliefMm: 6,
     reliefMode: 'realistic',
     trackHeightMm: 1,
-    sampleElevations: async (samples) => samples.map((_, index) => (
-      1000 + Math.floor(index / 8) * 100
-    )),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 1000 + Math.floor(index / 8) * 100),
   })
 
   assert.equal(model.stats.maxReliefMm, 6)
   assert.ok(model.stats.reliefMm > 0)
   assert.ok(model.stats.reliefMm <= 6)
-  assert.equal(model.stats.reliefMm, Number((model.stats.elevationGainMeters * model.stats.effectiveVerticalScale).toFixed(2)))
+  assert.equal(
+    model.stats.reliefMm,
+    Number((model.stats.elevationGainMeters * model.stats.effectiveVerticalScale).toFixed(2))
+  )
   assert.ok(model.stats.maxHeightMm <= 9.1)
   assert.ok(model.stats.realScaleReliefMm > 0)
   assert.ok(model.stats.verticalExaggeration > 0)
   assert.equal(model.stats.reliefMode, 'realistic')
-  assert.ok(Math.abs(model.stats.verticalExaggeration - (model.stats.reliefMm / model.stats.realScaleReliefMm)) < 0.02)
+  assert.ok(
+    Math.abs(
+      model.stats.verticalExaggeration - model.stats.reliefMm / model.stats.realScaleReliefMm
+    ) < 0.02
+  )
 })
 
 test('recommendTerrainReliefOptions exposes a dramatic terrain-forward tier above print-readable', () => {
@@ -1186,11 +1395,11 @@ test('recommendTerrainReliefOptions exposes a dramatic terrain-forward tier abov
   // Taller + more exaggerated than the conservative print-readable tier
   assert.ok(
     rec.terrainForward.maxReliefMm > rec.printReadable.maxReliefMm,
-    'dramatic relief should be taller than print-readable',
+    'dramatic relief should be taller than print-readable'
   )
   assert.ok(
     rec.terrainForward.verticalExaggeration > rec.printReadable.verticalExaggeration,
-    'dramatic exaggeration should exceed print-readable',
+    'dramatic exaggeration should exceed print-readable'
   )
   // Stays within the cartographic norm (<=10x) and the footprint stability cap
   assert.ok(rec.terrainForward.verticalExaggeration <= 10)
@@ -1215,7 +1424,10 @@ test('removeLocalElevationSpikes preserves sharp ridges in ridge mode but still 
 
   // Default (aggressive) despike flattens the genuine ridge.
   const aggressive = removeLocalElevationSpikes(values, rows, cols)
-  assert.ok(aggressive.values[ridgeIndex] < 1200, 'aggressive despike flattens the ridge (baseline behaviour)')
+  assert.ok(
+    aggressive.values[ridgeIndex] < 1200,
+    'aggressive despike flattens the ridge (baseline behaviour)'
+  )
 
   // Ridge-preserving mode keeps the ridge but still removes the isolated spike.
   const preserved = removeLocalElevationSpikes(values, rows, cols, { preserveRidges: true })
@@ -1236,9 +1448,15 @@ test('prepareElevationGrid forwards preserveRidges to the spike filter', () => {
   }
   const gridOptions = { smoothingPasses: 0, localThresholdMeters: 100 }
   const flattened = prepareElevationGrid(values.slice(), rows, cols, [], gridOptions)
-  const preserved = prepareElevationGrid(values.slice(), rows, cols, [], { ...gridOptions, preserveRidges: true })
+  const preserved = prepareElevationGrid(values.slice(), rows, cols, [], {
+    ...gridOptions,
+    preserveRidges: true,
+  })
   const ridgeIndex = 2 * cols + 2
-  assert.ok(preserved.values[ridgeIndex] > flattened.values[ridgeIndex] + 50, 'preserveRidges keeps the ridge taller')
+  assert.ok(
+    preserved.values[ridgeIndex] > flattened.values[ridgeIndex] + 50,
+    'preserveRidges keeps the ridge taller'
+  )
 })
 
 test('print-readable relief keeps at least ~50 printable layers at 0.15mm', () => {
@@ -1301,18 +1519,24 @@ test('buildTerrainModel reports calculated relief instead of copying the max rel
     verticalScale: 0.02,
     maxReliefMm: 42,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => (
-      500 + Math.floor(index / 8) * 50
-    )),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 500 + Math.floor(index / 8) * 50),
   })
 
   assert.equal(model.stats.maxReliefMm, 42)
   assert.equal(model.stats.effectiveVerticalScale, 0.02)
-  assert.equal(model.stats.reliefMm, Number((model.stats.elevationGainMeters * model.stats.effectiveVerticalScale).toFixed(2)))
+  assert.equal(
+    model.stats.reliefMm,
+    Number((model.stats.elevationGainMeters * model.stats.effectiveVerticalScale).toFixed(2))
+  )
   assert.ok(model.stats.reliefMm > 0)
   assert.ok(model.stats.reliefMm < model.stats.maxReliefMm)
   assert.notEqual(model.stats.reliefMm, model.stats.maxReliefMm)
-  assert.ok(Math.abs(model.stats.verticalExaggeration - (model.stats.reliefMm / model.stats.realScaleReliefMm)) < 0.02)
+  assert.ok(
+    Math.abs(
+      model.stats.verticalExaggeration - model.stats.reliefMm / model.stats.realScaleReliefMm
+    ) < 0.02
+  )
 })
 
 test('recommendModelDimensionsForTrack locks print size to the buffered GPX aspect ratio', () => {
@@ -1331,7 +1555,9 @@ test('recommendModelDimensionsForTrack locks print size to the buffered GPX aspe
   assert.equal(dimensions.modelWidthMm, 120)
   assert.ok(dimensions.modelDepthMm < 120)
   assert.ok(dimensions.aspectRatio > 1.8)
-  assert.ok(Math.abs((dimensions.modelWidthMm / dimensions.modelDepthMm) - dimensions.aspectRatio) < 0.03)
+  assert.ok(
+    Math.abs(dimensions.modelWidthMm / dimensions.modelDepthMm - dimensions.aspectRatio) < 0.03
+  )
 })
 
 test('recommendModelDimensionsForTrack sizes print footprint from a manual WGS84 terrain range', () => {
@@ -1418,7 +1644,10 @@ test('recommendModelDimensionsForTrack treats long side as the total print size 
 })
 
 test('TerrainModelPage shows generated relief, real-scale relief, and vertical exaggeration stats', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /模型起伏/)
   assert.match(source, /真实比例起伏/)
@@ -1440,7 +1669,10 @@ test('TerrainModelPage shows generated relief, real-scale relief, and vertical e
 })
 
 test('TerrainModelPage exposes printable snowline controls and preview mesh', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /snowlineEnabled/)
   assert.match(source, /snowlineElevationMeters/)
@@ -1452,7 +1684,10 @@ test('TerrainModelPage exposes printable snowline controls and preview mesh', ()
 })
 
 test('TerrainModelPage exposes printable terrain color-band controls and preview mesh', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /terrainColorBandsEnabled/)
   assert.match(source, /lowlandPercentile/)
@@ -1469,7 +1704,10 @@ test('TerrainModelPage exposes printable terrain color-band controls and preview
 })
 
 test('TerrainModelPage wires uploaded high precision DEM rasters into generation', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /parseArcAsciiGrid/)
   assert.match(source, /sampleRasterElevations/)
@@ -1480,7 +1718,10 @@ test('TerrainModelPage wires uploaded high precision DEM rasters into generation
 })
 
 test('TerrainModelPage exposes OpenTopography DEM fetch controls for free API keys', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /fetchOpenTopographyGlobalAsciiGrid/)
   assert.match(source, /buildBufferedWgs84Bounds/)
@@ -1490,7 +1731,10 @@ test('TerrainModelPage exposes OpenTopography DEM fetch controls for free API ke
 })
 
 test('TerrainModelPage exposes DEM padding and locks model dimensions to GPX aspect', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /paddingMeters/)
   assert.match(source, /自动外扩/)
@@ -1499,16 +1743,31 @@ test('TerrainModelPage exposes DEM padding and locks model dimensions to GPX asp
   assert.match(source, /自动宽深/)
   assert.match(source, /recommendModelDimensionsForTrack/)
   assert.match(source, /buildTerrainModelOptions/)
-  assert.match(source, /buildBufferedWgs84Bounds\(track\.points, \{ paddingMeters: options\.paddingMeters \}\)/)
-  assert.doesNotMatch(source, /<span>宽度 mm<\/span>\s*<input type="number" value=\{options\.modelWidthMm\}/)
-  assert.doesNotMatch(source, /<span>深度 mm<\/span>\s*<input type="number" value=\{options\.modelDepthMm\}/)
+  assert.match(
+    source,
+    /buildBufferedWgs84Bounds\(track\.points, \{ paddingMeters: options\.paddingMeters \}\)/
+  )
+  assert.doesNotMatch(
+    source,
+    /<span>宽度 mm<\/span>\s*<input type="number" value=\{options\.modelWidthMm\}/
+  )
+  assert.doesNotMatch(
+    source,
+    /<span>深度 mm<\/span>\s*<input type="number" value=\{options\.modelDepthMm\}/
+  )
 })
 
 test('TerrainModelPage shows the buffered terrain collection bounds on the route map', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /terrainBounds/)
-  assert.match(source, /TerrainRouteMap\s+points=\{track\?\.points \|\| \[\]\}\s+terrainBounds=\{terrainBounds\}/s)
+  assert.match(
+    source,
+    /TerrainRouteMap\s+points=\{track\?\.points \|\| \[\]\}\s+terrainBounds=\{terrainBounds\}/s
+  )
   assert.match(source, /L\.rectangle/)
   assert.match(source, /terrain-model-map-legend/)
   assert.match(source, /地形采集范围/)
@@ -1516,7 +1775,11 @@ test('TerrainModelPage shows the buffered terrain collection bounds on the route
 })
 
 test('TerrainModelPage exposes a manual terrain collection range that flows into DEM and model generation', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const compactSource = source.replace(/\s+/g, ' ')
 
   assert.match(source, /@geoman-io\/leaflet-geoman-free/)
   assert.match(source, /@geoman-io\/leaflet-geoman-free\/dist\/leaflet-geoman\.css/)
@@ -1536,12 +1799,18 @@ test('TerrainModelPage exposes a manual terrain collection range that flows into
   assert.match(source, /map\.pm\.enableDraw\('Rectangle'/)
   assert.match(source, /manualFootprintWgs84/)
   assert.match(source, /terrainFootprintWgs84: activeManualFootprintWgs84/)
-  assert.match(source, /terrainFootprintRotationDegrees: terrainBoundsMode === 'manual' \? manualFootprintRotationDegrees : 0/)
+  assert.match(
+    compactSource,
+    /terrainFootprintRotationDegrees: terrainBoundsMode === 'manual' \? manualFootprintRotationDegrees : 0/
+  )
   assert.match(source, /createPresetFootprintPolygon/)
   assert.match(source, /map\.pm\.enableDraw\('Polygon'/)
   assert.match(source, /handleManualFootprintContextUndo/)
   assert.match(source, /map\.on\('contextmenu', handleManualFootprintContextUndo\)/)
-  assert.match(source, /container\.addEventListener\('contextmenu', handleManualFootprintContextUndo, true\)/)
+  assert.match(
+    source,
+    /container\.addEventListener\('contextmenu', handleManualFootprintContextUndo, true\)/
+  )
   assert.match(source, /map\.pm\?\.Draw\?\.Polygon\?\._removeLastVertex\?\.\(\)/)
   assert.match(source, /六边形/)
   assert.match(source, /三角形/)
@@ -1549,21 +1818,38 @@ test('TerrainModelPage exposes a manual terrain collection range that flows into
   assert.match(source, /manualFootprintRotationDegrees/)
   assert.match(source, /框选旋转/)
   assert.match(source, /onManualFootprintRotationChange/)
-  assert.match(source, /createPresetFootprintPolygon\(baseBounds, manualFootprintShape, manualFootprintRotationDegrees\)/)
-  assert.match(source, /createPresetFootprintPolygon\(nextBounds, 'rectangle', manualFootprintRotationDegrees\)/)
+  assert.match(
+    compactSource,
+    /createPresetFootprintPolygon\(\s*baseBounds,\s*manualFootprintShape,\s*manualFootprintRotationDegrees\s*\)/
+  )
+  assert.match(
+    compactSource,
+    /createPresetFootprintPolygon\(\s*nextBounds,\s*'rectangle',\s*manualFootprintRotationDegrees\s*\)/
+  )
   assert.match(source, /map\.on\('pm:create'/)
   assert.match(source, /pm:edit/)
   assert.match(source, /pm:dragend/)
   assert.match(source, /pm\.enableLayerDrag/)
   assert.match(source, /terrainBoundsWgs84: activeTerrainBoundsWgs84/)
-  assert.match(source, /buildBufferedWgs84Bounds\(track\.points, \{[\s\S]*terrainBoundsWgs84: activeTerrainBoundsWgs84/)
+  assert.match(
+    source,
+    /buildBufferedWgs84Bounds\(track\.points, \{[\s\S]*terrainBoundsWgs84: activeTerrainBoundsWgs84/
+  )
 })
 
 test('TerrainModelPage allows manual terrain bounds that do not cover the whole GPX track', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
-  const readiness = source.match(/const manualTerrainBoundsReady = useMemo\(\(\) => \(([\s\S]*?)\n  \), \[/)?.[1] || ''
-  const applyManual = source.match(/const applyManualTerrainFootprint = useCallback\(\(footprint[\s\S]*?\n  \}, \[/)?.[0] || ''
-  const rotateManual = source.match(/const updateManualFootprintRotation = useCallback\(\(value\) => \{([\s\S]*?)\n  \}, \[/)?.[0] || ''
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const readiness =
+    source.match(/const manualTerrainBoundsReady[\s\S]*?const autoTerrainBounds/)?.[0] || ''
+  const applyManual =
+    source.match(/const applyManualTerrainFootprint[\s\S]*?const applyManualTerrainBounds/)?.[0] ||
+    ''
+  const rotateManual =
+    source.match(/const updateManualFootprintRotation[\s\S]*?const updateManualBoundsWgs84/)?.[0] ||
+    ''
 
   assert.match(readiness, /terrainBoundsMode !== 'manual'[\s\S]*activeTerrainBoundsWgs84/)
   assert.doesNotMatch(readiness, /boundsContainTrackPoints/)
@@ -1575,8 +1861,12 @@ test('TerrainModelPage allows manual terrain bounds that do not cover the whole 
 })
 
 test('TerrainModelPage enables map-side resizing for preset footprints and vertex editing for custom footprints', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
-  const routeMap = source.match(/function TerrainRouteMap\([\s\S]*?\n}\n\nfunction TerrainPreview/)?.[0] || ''
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const routeMap =
+    source.match(/function TerrainRouteMap\([\s\S]*?\n}\n\nfunction TerrainPreview/)?.[0] || ''
 
   assert.match(routeMap, /const isCustomFootprint = manualFootprintShape === 'custom'/)
   assert.match(routeMap, /allowEditing: isCustomFootprint/)
@@ -1590,8 +1880,14 @@ test('TerrainModelPage enables map-side resizing for preset footprints and verte
 })
 
 test('TerrainModelPage presents terrain collection range as a map-side control panel', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
-  const css = readFileSync(new URL('../../src/views/app/terrain-model/terrain-model.css', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const css = readFileSync(
+    new URL('../../src/views/app/terrain-model/terrain-model.css', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /function TerrainBoundsControlPanel/)
   assert.match(source, /terrain-model-bounds-panel/)
@@ -1606,23 +1902,40 @@ test('TerrainModelPage presents terrain collection range as a map-side control p
 })
 
 test('TerrainModelPage starts manual bounds drawing on the first manual-adjust click', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
-  const handler = source.match(/const startManualTerrainBoundsDraw = useCallback\(\(\) => \{([\s\S]*?)\n  \}, \[/)?.[1] || ''
-  const firstSwitchBranch = handler.match(/if \(terrainBoundsMode !== 'manual' \|\| !activeTerrainBoundsWgs84\) \{([\s\S]*?)\n    \}/)?.[1] || ''
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const handler =
+    source.match(/const startManualTerrainBoundsDraw[\s\S]*?const applyManualTerrainFootprint/)?.[0] ||
+    ''
+  const firstSwitchBranch = handler.replace(/\s+/g, ' ')
 
   assert.match(firstSwitchBranch, /setTerrainBoundsMode\('manual'\)/)
-  assert.match(firstSwitchBranch, /const initialFootprint = createPresetFootprintPolygon\(baseBounds, 'rectangle', manualFootprintRotationDegrees\)/)
-  assert.match(firstSwitchBranch, /const initialBounds = manualFootprintToBoundsWgs84\(initialFootprint\) \|\| baseBounds/)
+  assert.match(
+    firstSwitchBranch,
+    /const initialFootprint = createPresetFootprintPolygon\(\s*baseBounds,\s*'rectangle',\s*manualFootprintRotationDegrees\s*\)/
+  )
+  assert.match(
+    firstSwitchBranch,
+    /const initialBounds = manualFootprintToBoundsWgs84\(initialFootprint\) \|\| baseBounds/
+  )
   assert.match(firstSwitchBranch, /setManualBoundsWgs84\(boundsToInputValues\(initialBounds\)\)/)
   assert.match(firstSwitchBranch, /setManualFootprintWgs84\(initialFootprint\)/)
   assert.match(firstSwitchBranch, /setManualDrawRequest\(\(current\) => current \+ 1\)/)
 })
 
 test('TerrainModelPage clears generated outputs when model-affecting controls change', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /const updateUseSampledTerrain = useCallback/)
-  assert.match(source, /onChange=\{\(event\) => updateUseSampledTerrain\(event\.target\.checked\)\}/)
+  assert.match(
+    source,
+    /onChange=\{\(event\) => updateUseSampledTerrain\(event\.target\.checked\)\}/
+  )
 
   for (const handlerName of [
     'updateUseSampledTerrain',
@@ -1633,13 +1946,23 @@ test('TerrainModelPage clears generated outputs when model-affecting controls ch
     'updateOptionalNumberOption',
     'applyHighPrecisionRecommendation',
   ]) {
-    const handler = source.match(new RegExp('const ' + handlerName + ' = useCallback\\([\\s\\S]*?\\n  \\}, \\['))?.[0] || ''
-    assert.match(handler, /resetGeneratedOutputs\(\)/, handlerName + ' should clear stale model, preview, and delivery outputs')
+    const handler =
+      source.match(
+        new RegExp('const ' + handlerName + ' = useCallback\\([\\s\\S]*?\\n  \\}, \\[')
+      )?.[0] || ''
+    assert.match(
+      handler,
+      /resetGeneratedOutputs\(\)/,
+      handlerName + ' should clear stale model, preview, and delivery outputs'
+    )
   }
 })
 
 test('TerrainModelPage persists OpenTopography API keys only after local opt in', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /OPENTOPOGRAPHY_API_KEY_STORAGE_KEY/)
   assert.match(source, /rememberOpenTopoApiKey/)
@@ -1649,7 +1972,10 @@ test('TerrainModelPage persists OpenTopography API keys only after local opt in'
 })
 
 test('TerrainModelPage persists model configuration and supports JSON import/export without credentials', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /TERRAIN_MODEL_CONFIG_STORAGE_KEY/)
   assert.match(source, /door-terrain-model:config:v1/)
@@ -1658,20 +1984,27 @@ test('TerrainModelPage persists model configuration and supports JSON import/exp
   assert.match(source, /buildTerrainModelConfigSnapshot/)
   assert.match(source, /storedTerrainModelConfig/)
   assert.match(source, /useState\(\(\) => storedTerrainModelConfig\.options\)/)
-  assert.match(source, /useEffect\(\(\) => \{[\s\S]*storeTerrainModelConfig\(buildTerrainModelConfigSnapshot/s)
+  assert.match(
+    source,
+    /useEffect\(\(\) => \{[\s\S]*storeTerrainModelConfig\(\s*buildTerrainModelConfigSnapshot/s
+  )
   assert.match(source, /handleExportConfig/)
   assert.match(source, /handleImportConfigFile/)
   assert.match(source, /application\/json,\.json/)
   assert.match(source, /导出配置/)
   assert.match(source, /导入配置/)
-  const snapshotBuilder = source.match(/function buildTerrainModelConfigSnapshot\([\s\S]*?\n\}/)?.[0] || ''
+  const snapshotBuilder =
+    source.match(/function buildTerrainModelConfigSnapshot\([\s\S]*?\n\}/)?.[0] || ''
   assert.doesNotMatch(snapshotBuilder, /surfaceTextureGoogleApiKey/)
   assert.doesNotMatch(snapshotBuilder, /openTopoApiKey/)
   assert.doesNotMatch(snapshotBuilder, /surfaceTextureCesiumAccessToken/)
 })
 
 test('TerrainModelPage exposes print-aware satellite colour controls and persists them with model configuration', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /satelliteColorStrategy/)
   assert.match(source, /balanced/)
@@ -1684,16 +2017,28 @@ test('TerrainModelPage exposes print-aware satellite colour controls and persist
 })
 
 test('TerrainModelPage isolates satellite colour mode from default lowland and snow overlays', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
-  assert.match(source, /colorMode: 'satellite'[\s\S]*terrainColorBandsEnabled: false[\s\S]*snowlineEnabled: false/)
+  assert.match(
+    source,
+    /colorMode: 'satellite'[\s\S]*terrainColorBandsEnabled: false[\s\S]*snowlineEnabled: false/
+  )
   assert.match(source, /terrainColorBandsEnabled: mode === 'satellite' \? false : true/)
   assert.match(source, /snowlineEnabled: mode === 'satellite' \? false : current\.snowlineEnabled/)
-  assert.match(source, /disabled=\{options\.colorMode === 'satellite' \|\| !options\.terrainColorBandsEnabled\}/)
+  assert.match(
+    source,
+    /disabled=\{\s*options\.colorMode === 'satellite' \|\| !options\.terrainColorBandsEnabled\s*\}/
+  )
 })
 
 test('TerrainModelPage shows a DEM request status after OpenTopography fetches', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /openTopoStatus/)
   assert.match(source, /DEM 状态/)
@@ -1702,7 +2047,10 @@ test('TerrainModelPage shows a DEM request status after OpenTopography fetches',
 })
 
 test('TerrainModelPage exposes satellite surface texture generation for GLB preview', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /buildSurfaceTextureDataUrl/)
   assert.match(source, /buildSurfaceTextureTilePlan/)
@@ -1714,7 +2062,10 @@ test('TerrainModelPage exposes satellite surface texture generation for GLB prev
 })
 
 test('TerrainModelPage reports satellite texture progress instead of freezing behind a generic loading label', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /getSurfaceTextureProgressLabel/)
   assert.match(source, /onProgress/)
@@ -1724,8 +2075,14 @@ test('TerrainModelPage reports satellite texture progress instead of freezing be
 })
 
 test('TerrainModelPage surfaces partial satellite texture warnings', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
-  const css = readFileSync(new URL('../../src/views/app/terrain-model/terrain-model.css', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const css = readFileSync(
+    new URL('../../src/views/app/terrain-model/terrain-model.css', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /qualityWarnings/)
   assert.match(source, /missingTileCount/)
@@ -1735,18 +2092,27 @@ test('TerrainModelPage surfaces partial satellite texture warnings', () => {
 })
 
 test('TerrainModelPage applies satellite imagery only to the terrain top surface', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /splitTerrainMeshForSurfaceTexture/)
   assert.match(source, /terrainTopGeometry/)
   assert.match(source, /terrainSideGeometry/)
   assert.match(source, /map: surfaceTextureMap/)
   assert.match(source, /terrainSideMaterial/)
-  assert.doesNotMatch(source, /meshToGeometry\(model\.meshes\.terrain, \{\s*vertexColors: !surfaceTextureMap,\s*surfaceTextureDimensions: surfaceTextureMap \? model\.stats : null,/s)
+  assert.doesNotMatch(
+    source,
+    /meshToGeometry\(model\.meshes\.terrain, \{\s*vertexColors: !surfaceTextureMap,\s*surfaceTextureDimensions: surfaceTextureMap \? model\.stats : null,/s
+  )
 })
 
 test('TerrainModelPage avoids rebuilding printable satellite shells when textured preview is available', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /renderPrintableColorBands/)
   assert.match(source, /PREVIEW_COLOR_BAND_FACE_BUDGET/)
@@ -1756,7 +2122,10 @@ test('TerrainModelPage avoids rebuilding printable satellite shells when texture
 })
 
 test('TerrainModelPage renders preview and GLB meshes with right-handed Three coordinates', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /toThreeYUpCoordinateVertex/)
   assert.match(source, /const displayVertex = toThreeYUpCoordinateVertex\(vertex\)/)
@@ -1768,8 +2137,14 @@ test('TerrainModelPage renders preview and GLB meshes with right-handed Three co
 })
 
 test('TerrainModelPage exposes preview orientation and GLB coordinate metadata', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
-  const css = readFileSync(new URL('../../src/views/app/terrain-model/terrain-model.css', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const css = readFileSync(
+    new URL('../../src/views/app/terrain-model/terrain-model.css', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /group\.userData\.coordinateSystem/)
   assert.match(source, /trackMesh\.name = 'track-red'/)
@@ -1783,8 +2158,14 @@ test('TerrainModelPage exposes preview orientation and GLB coordinate metadata',
 })
 
 test('TerrainModelPage keeps preview orbit controls predictable and exposes camera presets', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
-  const css = readFileSync(new URL('../../src/views/app/terrain-model/terrain-model.css', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const css = readFileSync(
+    new URL('../../src/views/app/terrain-model/terrain-model.css', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /controls\.mouseButtons\s*=\s*\{/)
   assert.match(source, /LEFT:\s*THREE\.MOUSE\.ROTATE/)
@@ -1807,7 +2188,10 @@ test('TerrainModelPage keeps preview orbit controls predictable and exposes came
 })
 
 test('TerrainModelPage exposes configurable satellite texture quality budgets', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /SURFACE_TEXTURE_QUALITY_PRESETS/)
   assert.match(source, /surfaceTextureQuality/)
@@ -1818,7 +2202,10 @@ test('TerrainModelPage exposes configurable satellite texture quality budgets', 
 })
 
 test('TerrainModelPage blocks GLB exports while enabled satellite texture is not ready', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /exportBlockedBySurfaceTexture/)
   assert.match(source, /surfaceTextureEnabled && \(!surfaceTexture \|\| buildingSurfaceTexture\)/)
@@ -1833,7 +2220,10 @@ test('TerrainModelPage blocks GLB exports while enabled satellite texture is not
 })
 
 test('TerrainModelPage exposes Cesium ion and Google Maps texture credentials', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /createGoogleMapTilesSession/)
   assert.match(source, /fetchCesiumIonRasterSourceOptions/)
@@ -1846,7 +2236,10 @@ test('TerrainModelPage exposes Cesium ion and Google Maps texture credentials', 
 })
 
 test('TerrainModelPage maps satellite textures onto terrain UVs instead of vertex colors', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /getTerrainSurfaceUv/)
   assert.match(source, /geometry\.setAttribute\('uv'/)
@@ -1857,7 +2250,10 @@ test('TerrainModelPage maps satellite textures onto terrain UVs instead of verte
 })
 
 test('TerrainModelPage surfaces production readiness checks before export', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /evaluateTerrainModelReadiness/)
   assert.match(source, /printReadiness/)
@@ -1866,7 +2262,10 @@ test('TerrainModelPage surfaces production readiness checks before export', () =
 })
 
 test('TerrainModelPage groups dense terrain controls into workflow sections and a delivery panel', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /TerrainWorkflowStrip/)
   assert.match(source, /ControlSection/)
@@ -1881,8 +2280,14 @@ test('TerrainModelPage groups dense terrain controls into workflow sections and 
 })
 
 test('TerrainModelPage surfaces Bambu print handoff slots in the delivery panel', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
-  const styles = readFileSync(new URL('../../src/views/app/terrain-model/terrain-model.css', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const styles = readFileSync(
+    new URL('../../src/views/app/terrain-model/terrain-model.css', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /getBambuHandoffFromManifest/)
   assert.match(source, /BambuHandoffCard/)
@@ -1916,13 +2321,19 @@ test('TerrainModelPage surfaces Bambu print handoff slots in the delivery panel'
 })
 
 test('TerrainModelPage starts with a slicer-safe low raised track height', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /trackHeightMm:\s*0\.6/)
 })
 
 test('TerrainModelPage falls back when WebGL preview cannot be created', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /previewError/)
   assert.match(source, /WebGL 预览不可用/)
@@ -1940,7 +2351,8 @@ test('buildTerrainModel filters isolated sampled DEM spikes and voids before sca
     baseHeightMm: 2,
     verticalScale: 0.18,
     trackHeightMm: 1,
-    sampleElevations: async (samples) => samples.map((_, index) => {
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => {
       if (index === 18) return 2500
       if (index === 37) return null
       return 700 + (index % 5)
@@ -1990,13 +2402,20 @@ test('recommendTerrainReliefOptions separates true-scale and print-readable reli
   assert.equal(recommendation.realistic.mode, 'realistic')
   assert.equal(recommendation.printReadable.mode, 'print-readable')
   assert.ok(recommendation.realistic.maxReliefMm <= recommendation.printReadable.maxReliefMm)
-  assert.ok(recommendation.realistic.verticalExaggeration <= recommendation.printReadable.verticalExaggeration)
+  assert.ok(
+    recommendation.realistic.verticalExaggeration <=
+      recommendation.printReadable.verticalExaggeration
+  )
   assert.ok(recommendation.realistic.maxReliefMm >= 3)
   assert.ok(recommendation.printReadable.maxReliefMm >= 6)
   assert.ok(recommendation.printReadable.verticalScale > 0.18)
   assert.equal(
     recommendation.printReadable.verticalScale,
-    Number((recommendation.printReadable.maxReliefMm / recommendation.printReadable.elevationRangeMeters).toFixed(6)),
+    Number(
+      (
+        recommendation.printReadable.maxReliefMm / recommendation.printReadable.elevationRangeMeters
+      ).toFixed(6)
+    )
   )
 
   const printMode = recommendTerrainReliefOptions(points, {
@@ -2022,7 +2441,10 @@ test('recommendTerrainReliefOptions separates true-scale and print-readable reli
 })
 
 test('TerrainModelPage applies relief targets to vertical scale instead of only changing the cap', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /resolveVerticalScaleForReliefTarget/)
   assert.match(source, /verticalScale: recommendation\.verticalScale/)
@@ -2129,9 +2551,9 @@ test('buildTerrainModel creates real contour geometry when contour export is ena
   assert.equal(withContours.stats.contourTriangles, withContours.meshes.contours.faces.length)
   assert.equal(
     withContours.meshes.combined.faces.length,
-    withContours.meshes.terrain.faces.length
-      + withContours.meshes.contours.faces.length
-      + withContours.meshes.track.faces.length,
+    withContours.meshes.terrain.faces.length +
+      withContours.meshes.contours.faces.length +
+      withContours.meshes.track.faces.length
   )
 })
 
@@ -2150,7 +2572,8 @@ test('buildTerrainModel creates a printable snow-cap mesh above the configured s
     snowlineElevationMeters: 660,
     snowCapThicknessMm: 0.5,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
   })
 
   assert.equal(model.snowline.enabled, true)
@@ -2161,12 +2584,18 @@ test('buildTerrainModel creates a printable snow-cap mesh above the configured s
   assert.ok(model.meshes.snow.vertices.length > 0)
   assert.ok(model.meshes.snow.faces.length > 0)
   assert.equal(model.stats.snowTriangles, model.meshes.snow.faces.length)
-  assert.ok(model.meshes.combined.faces.length > model.meshes.terrain.faces.length + model.meshes.track.faces.length)
+  assert.ok(
+    model.meshes.combined.faces.length >
+      model.meshes.terrain.faces.length + model.meshes.track.faces.length
+  )
 
   const snowYs = model.meshes.snow.vertices.map((vertex) => vertex.y)
   const minSnowY = Math.min(...snowYs)
   const maxSnowY = Math.max(...snowYs)
-  const snowlineY = model.stats.baseHeightMm + (660 - model.terrain.minElevationMeters) * model.stats.effectiveVerticalScale - 0.1
+  const snowlineY =
+    model.stats.baseHeightMm +
+    (660 - model.terrain.minElevationMeters) * model.stats.effectiveVerticalScale -
+    0.1
   assert.ok(maxSnowY >= snowlineY)
   assert.ok(minSnowY <= -0.2)
 })
@@ -2186,7 +2615,8 @@ test('buildTerrainModel creates a printable green lowland paint shell below the 
     lowlandPercentile: 35,
     lowlandCapThicknessMm: 0.45,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
   })
 
   assert.equal(model.colorBands.enabled, true)
@@ -2200,7 +2630,10 @@ test('buildTerrainModel creates a printable green lowland paint shell below the 
   assert.ok(model.meshes.lowland.vertices.length > 0)
   assert.ok(model.meshes.lowland.faces.length > 0)
   assert.equal(model.stats.lowlandTriangles, model.meshes.lowland.faces.length)
-  assert.ok(model.meshes.combined.faces.length > model.meshes.terrain.faces.length + model.meshes.track.faces.length)
+  assert.ok(
+    model.meshes.combined.faces.length >
+      model.meshes.terrain.faces.length + model.meshes.track.faces.length
+  )
 })
 
 test('buildTerrainModel treats an empty snowline elevation as automatic percentile mode', async () => {
@@ -2214,7 +2647,8 @@ test('buildTerrainModel treats an empty snowline elevation as automatic percenti
     snowlinePercentile: 82,
     snowCapThicknessMm: 0.5,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
   })
 
   assert.equal(model.snowline.thresholdSource, 'percentile')
@@ -2232,7 +2666,8 @@ test('buildTerrainModel draws snowline segments across descending elevation edge
     snowlineElevationMeters: 650,
     snowCapThicknessMm: 0.5,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => 690 - Math.floor(index / 10) * 10),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 690 - Math.floor(index / 10) * 10),
   })
 
   assert.equal(model.snowline.thresholdSource, 'manual')
@@ -2268,7 +2703,8 @@ test('buildTerrainModel embeds raised multi-material overlays into supporting so
     trackWidthMm: 6,
     trackHeightMm: 1,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => {
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => {
       const row = Math.floor(index / gridCols)
       const col = index % gridCols
       return 600 + col * 18 + row * 6
@@ -2278,7 +2714,9 @@ test('buildTerrainModel embeds raised multi-material overlays into supporting so
   const trackBottomVertices = model.meshes.track.vertices.filter((_, index) => index % 4 >= 2)
   const contourBottomVertices = model.meshes.contours.vertices.filter((_, index) => index % 8 < 4)
   const snowlineBottomVertices = model.meshes.snowline.vertices.filter((_, index) => index % 8 < 4)
-  const terrainBottomVertices = model.meshes.terrain.vertices.slice(model.terrain.rows * model.terrain.cols)
+  const terrainBottomVertices = model.meshes.terrain.vertices.slice(
+    model.terrain.rows * model.terrain.cols
+  )
 
   assert.ok(trackBottomVertices.length > 0)
   assert.ok(contourBottomVertices.length > 0)
@@ -2287,23 +2725,23 @@ test('buildTerrainModel embeds raised multi-material overlays into supporting so
   assert.ok(model.meshes.text.vertices.length > 0)
   assert.ok(
     Math.min(...terrainBottomVertices.map((vertex) => vertex.y)) <= -0.2,
-    'terrain body should overlap the base plate by at least one slicer layer',
+    'terrain body should overlap the base plate by at least one slicer layer'
   )
   assert.ok(
     maxFloatingClearance(trackBottomVertices, supportHeightAt) <= -0.2,
-    'track bottom should embed into the terrain by at least one slicer layer',
+    'track bottom should embed into the terrain by at least one slicer layer'
   )
   assert.ok(
     maxFloatingClearance(contourBottomVertices, supportHeightAt) <= -0.2,
-    'contour bottoms should embed into the terrain by at least one slicer layer',
+    'contour bottoms should embed into the terrain by at least one slicer layer'
   )
   assert.ok(
     maxFloatingClearance(snowlineBottomVertices, supportHeightAt) <= -0.2,
-    'snowline bottom should embed into the terrain by at least one slicer layer',
+    'snowline bottom should embed into the terrain by at least one slicer layer'
   )
   assert.ok(
     Math.min(...model.meshes.text.vertices.map((vertex) => vertex.y)) <= -0.2,
-    'raised label should overlap the base plate by at least one slicer layer',
+    'raised label should overlap the base plate by at least one slicer layer'
   )
 })
 
@@ -2321,12 +2759,15 @@ test('meshToAsciiStl and export files produce named printable artifacts', async 
   assert.match(stl, /endsolid terrain_route\n$/)
 
   const files = buildTerrainModelExportFiles(model, { baseName: 'qingcheng-12k' })
-  assert.deepEqual(files.map((file) => file.name), [
+  assert.deepEqual(
+    files.map((file) => file.name),
+    [
     'qingcheng-12k-terrain-track.stl',
     'qingcheng-12k-terrain.stl',
     'qingcheng-12k-track.stl',
     'qingcheng-12k-manifest.json',
-  ])
+    ]
+  )
   assert.match(files[3].content, /"kind": "door-terrain-track-model"/)
 })
 
@@ -2421,19 +2862,31 @@ test('buildTerrainModelExportFiles embeds satellite texture coordinates into pri
   const modelXml = archive.file('3D/3dmodel.model').asText()
 
   assert.ok(archive.file('3D/Textures/qingcheng-textured-print-surface-texture.png'))
-  assert.match(modelXml, /<m:texture2d id="\d+" path="\/3D\/Textures\/qingcheng-textured-print-surface-texture\.png" contenttype="image\/png"/)
+  assert.match(
+    modelXml,
+    /<m:texture2d id="\d+" path="\/3D\/Textures\/qingcheng-textured-print-surface-texture\.png" contenttype="image\/png"/
+  )
   assert.match(modelXml, /<m:texture2dgroup id="\d+" texid="\d+">/)
   assert.match(modelXml, /<m:tex2coord u="0\.00000" v="1\.00000"\/>/)
   assert.match(modelXml, /<triangle[^>]*pid="\d+"[^>]*p1="\d+"[^>]*p2="\d+"[^>]*p3="\d+"/)
-  const resourceIds = Array.from(modelXml.matchAll(/(?:<m:(?:basematerials|texture2d|texture2dgroup)\b[^>]*\bid|<object\b[^>]*\bid)="(\d+)"/g))
-    .map((match) => match[1])
+  const resourceIds = Array.from(
+    modelXml.matchAll(
+      /(?:<m:(?:basematerials|texture2d|texture2dgroup)\b[^>]*\bid|<object\b[^>]*\bid)="(\d+)"/g
+    )
+  ).map((match) => match[1])
   assert.equal(new Set(resourceIds).size, resourceIds.length)
 
   const manifest = JSON.parse(files.at(-1).content)
   assert.equal(manifest.surfaceTexture.enabled, true)
   assert.equal(manifest.surfaceTexture.threeMfEmbedded, true)
-  assert.equal(manifest.surfaceTexture.threeMfTexturePath, '/3D/Textures/qingcheng-textured-print-surface-texture.png')
-  assert.equal(manifest.surfaceTexture.printWorkflow, '3mf-texture-exchange; fdm-printing-requires slicer texture support or color quantization')
+  assert.equal(
+    manifest.surfaceTexture.threeMfTexturePath,
+    '/3D/Textures/qingcheng-textured-print-surface-texture.png'
+  )
+  assert.equal(
+    manifest.surfaceTexture.printWorkflow,
+    '3mf-texture-exchange; fdm-printing-requires slicer texture support or color quantization'
+  )
 })
 
 test('buildTerrainModelExportFiles includes a Bambu-compatible multi-color 3MF package', async () => {
@@ -2470,13 +2923,31 @@ test('buildTerrainModelExportFiles includes a Bambu-compatible multi-color 3MF p
 
   const modelSettings = archive.file('Metadata/model_settings.config').asText()
   assert.equal((modelSettings.match(/<object id="/g) || []).length, 1)
-  assert.match(modelSettings, /<object id="5">[\s\S]*?<metadata key="name" value="qingcheng-bambu-print"\/>/)
-  assert.match(modelSettings, /<part id="1" subtype="normal_part">[\s\S]*?<metadata key="name" value="terrain"\/>[\s\S]*?<metadata key="extruder" value="1"\/>/)
-  assert.match(modelSettings, /<part id="2" subtype="normal_part">[\s\S]*?<metadata key="name" value="track-red"\/>[\s\S]*?<metadata key="extruder" value="2"\/>/)
-  assert.match(modelSettings, /<part id="3" subtype="normal_part">[\s\S]*?<metadata key="name" value="base-black"\/>[\s\S]*?<metadata key="extruder" value="3"\/>/)
-  assert.match(modelSettings, /<part id="4" subtype="normal_part">[\s\S]*?<metadata key="name" value="label-white"\/>[\s\S]*?<metadata key="extruder" value="4"\/>/)
+  assert.match(
+    modelSettings,
+    /<object id="5">[\s\S]*?<metadata key="name" value="qingcheng-bambu-print"\/>/
+  )
+  assert.match(
+    modelSettings,
+    /<part id="1" subtype="normal_part">[\s\S]*?<metadata key="name" value="terrain"\/>[\s\S]*?<metadata key="extruder" value="1"\/>/
+  )
+  assert.match(
+    modelSettings,
+    /<part id="2" subtype="normal_part">[\s\S]*?<metadata key="name" value="track-red"\/>[\s\S]*?<metadata key="extruder" value="2"\/>/
+  )
+  assert.match(
+    modelSettings,
+    /<part id="3" subtype="normal_part">[\s\S]*?<metadata key="name" value="base-black"\/>[\s\S]*?<metadata key="extruder" value="3"\/>/
+  )
+  assert.match(
+    modelSettings,
+    /<part id="4" subtype="normal_part">[\s\S]*?<metadata key="name" value="label-white"\/>[\s\S]*?<metadata key="extruder" value="4"\/>/
+  )
   assert.equal((modelSettings.match(/<model_instance>/g) || []).length, 1)
-  assert.match(modelSettings, /<model_instance>[\s\S]*?<metadata key="object_id" value="5"\/>[\s\S]*?<metadata key="identify_id" value="1"\/>[\s\S]*?<\/model_instance>/)
+  assert.match(
+    modelSettings,
+    /<model_instance>[\s\S]*?<metadata key="object_id" value="5"\/>[\s\S]*?<metadata key="identify_id" value="1"\/>[\s\S]*?<\/model_instance>/
+  )
   assert.match(modelSettings, /<assemble>[\s\S]*?<assemble_item object_id="5" instance_id="0"/)
 
   const projectSettings = JSON.parse(archive.file('Metadata/project_settings.config').asText())
@@ -2493,13 +2964,36 @@ test('buildTerrainModelExportFiles includes a Bambu-compatible multi-color 3MF p
     'Bambu PLA Basic @BBL H2C',
   ])
   assert.deepEqual(projectSettings.filament_ids.slice(0, 4), ['GFA00', 'GFA00', 'GFA00', 'GFA00'])
-  assert.deepEqual(projectSettings.filament_vendor.slice(0, 4), ['Bambu Lab', 'Bambu Lab', 'Bambu Lab', 'Bambu Lab'])
+  assert.deepEqual(projectSettings.filament_vendor.slice(0, 4), [
+    'Bambu Lab',
+    'Bambu Lab',
+    'Bambu Lab',
+    'Bambu Lab',
+  ])
   assert.deepEqual(projectSettings.nozzle_volume_type, ['Standard', 'Standard'])
   assert.deepEqual(projectSettings.default_nozzle_volume_type, ['Standard', 'Standard'])
   assert.deepEqual(projectSettings.eng_plate_temp, ['55', '55', '55', '55'])
   assert.deepEqual(projectSettings.eng_plate_temp_initial_layer, ['55', '55', '55', '55'])
-  assert.deepEqual(projectSettings.nozzle_temperature, ['220', '220', '220', '220', '220', '220', '220', '220'])
-  assert.deepEqual(projectSettings.nozzle_temperature_initial_layer, ['220', '220', '220', '220', '220', '220', '220', '220'])
+  assert.deepEqual(projectSettings.nozzle_temperature, [
+    '220',
+    '220',
+    '220',
+    '220',
+    '220',
+    '220',
+    '220',
+    '220',
+  ])
+  assert.deepEqual(projectSettings.nozzle_temperature_initial_layer, [
+    '220',
+    '220',
+    '220',
+    '220',
+    '220',
+    '220',
+    '220',
+    '220',
+  ])
   assert.deepEqual(projectSettings.filament_self_index, ['1', '1', '2', '2', '3', '3', '4', '4'])
   assertBambuFlushSettingsMatchH2cVariants(projectSettings)
   assert.deepEqual(projectSettings.extruder_nozzle_stats, ['Standard#1', 'Standard#4'])
@@ -2519,11 +3013,16 @@ test('buildTerrainModelExportFiles includes a Bambu-compatible multi-color 3MF p
   const sliceInfo = archive.file('Metadata/slice_info.config').asText()
   assert.match(sliceInfo, /<plate>/)
   assert.match(sliceInfo, /<metadata key="printer_model_id" value="O1C2"\/>/)
-  assert.match(sliceInfo, /<object identify_id="1" name="qingcheng-bambu-print" skipped="false" \/>/)
+  assert.match(
+    sliceInfo,
+    /<object identify_id="1" name="qingcheng-bambu-print" skipped="false" \/>/
+  )
   assert.match(sliceInfo, /<filament id="1" tray_info_idx="GFA00" type="PLA" color="#C79435"/)
   assert.match(sliceInfo, /<filament id="4" tray_info_idx="GFA00" type="PLA" color="#F5F5F4"/)
 
-  const printGuide = files.find((file) => file.name === 'qingcheng-bambu-print-bambu-print-guide.txt')
+  const printGuide = files.find(
+    (file) => file.name === 'qingcheng-bambu-print-bambu-print-guide.txt'
+  )
   assert.ok(printGuide, 'Bambu print guide exists')
   assert.match(printGuide.content, /Open: qingcheng-bambu-print-bambu-print\.3mf/)
   assert.match(printGuide.content, /Print preflight/)
@@ -2539,30 +3038,58 @@ test('buildTerrainModelExportFiles includes a Bambu-compatible multi-color 3MF p
   assert.equal(manifest.print.bambu.materialSlotCount, 4)
   assert.equal(manifest.print.bambu.geometryStrategy.colorBodies, 'anchored-to-base')
   assert.equal(manifest.print.bambu.geometryStrategy.layerLockOverlapMm, 0.22)
-  assert.equal(manifest.print.bambu.geometryStrategy.route.strategy, 'print-scale-simplified-ribbon')
+  assert.equal(
+    manifest.print.bambu.geometryStrategy.route.strategy,
+    'print-scale-simplified-ribbon'
+  )
   assert.equal(manifest.route.printGeometry.strategy, 'print-scale-simplified-ribbon')
-  assert.ok(manifest.route.printGeometry.printablePointCount <= manifest.route.printGeometry.sourcePointCount)
+  assert.ok(
+    manifest.route.printGeometry.printablePointCount <=
+      manifest.route.printGeometry.sourcePointCount
+  )
   assert.ok(Number.isFinite(manifest.route.printGeometry.simplifyToleranceMm))
   assert.equal(manifest.print.bambu.printerProfile.printerSettingsId, 'Bambu Lab H2C 0.4 nozzle')
   assert.equal(manifest.print.bambu.printerProfile.filamentSettingsId, 'Bambu PLA Basic @BBL H2C')
-  assert.deepEqual(manifest.print.bambu.materialSlots.map((slot) => slot.color), [
-    '#C79435',
-    '#D63B2E',
-    '#171717',
-    '#F5F5F4',
-  ])
+  assert.deepEqual(
+    manifest.print.bambu.materialSlots.map((slot) => slot.color),
+    ['#C79435', '#D63B2E', '#171717', '#F5F5F4']
+  )
   assert.deepEqual(manifest.print.bambu.materialSlots.at(-1).parts, ['label-white'])
   assert.equal(manifest.print.preflight.status, manifest.readiness.status)
   assert.equal(manifest.print.bambu.preflight.status, manifest.readiness.status)
   assert.deepEqual(
     manifest.print.preflight.checks.map((check) => check.key),
-    ['production-readiness', 'bambu-package', 'material-slots', 'build-size', 'relief-scale', 'color-separation', 'print-geometry', 'surface-texture'],
+    [
+      'production-readiness',
+      'bambu-package',
+      'material-slots',
+      'build-size',
+      'relief-scale',
+      'color-separation',
+      'print-geometry',
+      'surface-texture',
+    ]
   )
-  assert.match(manifest.print.preflight.checks.find((check) => check.key === 'print-geometry').detail, /0\.22 mm/)
-  assert.equal(manifest.print.preflight.checks.find((check) => check.key === 'bambu-package').status, 'ok')
-  assert.match(manifest.print.preflight.checks.find((check) => check.key === 'material-slots').detail, /Slot 1 #C79435/)
-  assert.match(manifest.print.preflight.checks.find((check) => check.key === 'build-size').detail, /mm/)
-  assert.match(manifest.print.preflight.checks.find((check) => check.key === 'surface-texture').detail, /FDM/)
+  assert.match(
+    manifest.print.preflight.checks.find((check) => check.key === 'print-geometry').detail,
+    /0\.22 mm/
+  )
+  assert.equal(
+    manifest.print.preflight.checks.find((check) => check.key === 'bambu-package').status,
+    'ok'
+  )
+  assert.match(
+    manifest.print.preflight.checks.find((check) => check.key === 'material-slots').detail,
+    /Slot 1 #C79435/
+  )
+  assert.match(
+    manifest.print.preflight.checks.find((check) => check.key === 'build-size').detail,
+    /mm/
+  )
+  assert.match(
+    manifest.print.preflight.checks.find((check) => check.key === 'surface-texture').detail,
+    /FDM/
+  )
 })
 
 test('buildTerrainModelExportFiles writes Bambu overlays as one assembled object', async () => {
@@ -2585,7 +3112,8 @@ test('buildTerrainModelExportFiles writes Bambu overlays as one assembled object
     lowlandPercentile: 35,
     lowlandCapThicknessMm: 0.45,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
   })
 
   const files = buildTerrainModelExportFiles(model, { baseName: 'qingcheng-bambu-assembly' })
@@ -2604,13 +3132,22 @@ test('buildTerrainModelExportFiles writes Bambu overlays as one assembled object
   for (const [index, assignment] of partAssignments.entries()) {
     assert.match(
       modelSettings,
-      new RegExp('<part id="' + (index + 1) + '" subtype="normal_part">[\\s\\S]*?<metadata key="name" value="' + assignment.name + '"\\/>[\\s\\S]*?<metadata key="extruder" value="' + assignment.slot + '"\\/>'),
+      new RegExp(
+        '<part id="' +
+          (index + 1) +
+          '" subtype="normal_part">[\\s\\S]*?<metadata key="name" value="' +
+          assignment.name +
+          '"\\/>[\\s\\S]*?<metadata key="extruder" value="' +
+          assignment.slot +
+          '"\\/>'
+      )
     )
   }
 })
 
 test('buildTerrainPrintPreflight marks build size for review when dimensions are unavailable', () => {
-  const preflight = buildTerrainPrintPreflight({
+  const preflight = buildTerrainPrintPreflight(
+    {
     stats: {
       maxHeightMm: 16,
       basePlateHeightMm: 3,
@@ -2631,7 +3168,8 @@ test('buildTerrainPrintPreflight marks build size for review when dimensions are
       enabled: false,
       segmentCount: 0,
     },
-  }, {
+    },
+    {
     package3mf: 'qingcheng-bambu-print.3mf',
     guideFile: 'qingcheng-bambu-print-guide.txt',
     materialSlots: [
@@ -2641,7 +3179,8 @@ test('buildTerrainPrintPreflight marks build size for review when dimensions are
         parts: ['terrain'],
       },
     ],
-  }, {
+    },
+    {
     status: 'ready',
     label: '可打印',
     warnings: [],
@@ -2665,7 +3204,8 @@ test('buildTerrainPrintPreflight marks build size for review when dimensions are
         detail: '当前路线不强制需要雪线实体。',
       },
     ],
-  })
+    }
+  )
 
   const buildSize = preflight.checks.find((check) => check.key === 'build-size')
 
@@ -2681,7 +3221,8 @@ test('buildTerrainPrintPreflight flags relief that is too tall for the footprint
     printablePointCount: 51,
     simplifyToleranceMm: 0.5,
   }
-  const preflight = buildTerrainPrintPreflight({
+  const preflight = buildTerrainPrintPreflight(
+    {
     route: { printGeometry: routeGeometry },
     stats: {
       modelWidthMm: 120,
@@ -2707,12 +3248,14 @@ test('buildTerrainPrintPreflight flags relief that is too tall for the footprint
       quality: { totalCount: 4, validSampleCount: 4 },
       maxElevationMeters: 2000,
     },
-  }, {
+    },
+    {
     package3mf: 'too-tall-bambu.3mf',
     guideFile: 'too-tall-guide.txt',
     materialSlots: [{ slot: 1, color: '#C79435', parts: ['terrain'] }],
     geometryStrategy: { route: routeGeometry },
-  })
+    }
+  )
 
   const geometryCheck = preflight.checks.find((check) => check.key === 'print-geometry')
   assert.equal(geometryCheck.status, 'review')
@@ -2740,7 +3283,8 @@ test('buildTerrainModelExportFiles writes Bambu filament setting arrays per mate
     lowlandPercentile: 35,
     lowlandCapThicknessMm: 0.45,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
   })
 
   const files = buildTerrainModelExportFiles(model, { baseName: 'qingcheng-filament-slots' })
@@ -2770,7 +3314,11 @@ test('buildTerrainModelExportFiles writes Bambu filament setting arrays per mate
     'eng_plate_temp_initial_layer',
     'long_retractions_when_cut',
   ]) {
-    assert.equal(projectSettings[key].length, slotCount, key + ' should match the material slot count')
+    assert.equal(
+      projectSettings[key].length,
+      slotCount,
+      key + ' should match the material slot count'
+    )
   }
   assertBambuProjectArraysMatchFilamentVariantCount(projectSettings, [
     'filament_self_index',
@@ -2792,7 +3340,10 @@ test('buildTerrainModelExportFiles writes Bambu filament setting arrays per mate
     'nozzle_temperature',
     'nozzle_temperature_initial_layer',
   ])
-  assert.deepEqual(projectSettings.filament_self_index, bambuH2cFilamentVariantSelfIndexes(projectSettings))
+  assert.deepEqual(
+    projectSettings.filament_self_index,
+    bambuH2cFilamentVariantSelfIndexes(projectSettings)
+  )
   assertBambuFlushSettingsMatchH2cVariants(projectSettings)
   for (const key of [
     'nozzle_temperature',
@@ -2800,7 +3351,10 @@ test('buildTerrainModelExportFiles writes Bambu filament setting arrays per mate
     'eng_plate_temp',
     'eng_plate_temp_initial_layer',
   ]) {
-    assert.ok(projectSettings[key].every((value) => typeof value === 'string'), key + ' values should be strings for Bambu JSON parsing')
+    assert.ok(
+      projectSettings[key].every((value) => typeof value === 'string'),
+      key + ' values should be strings for Bambu JSON parsing'
+    )
   }
 })
 
@@ -2843,7 +3397,8 @@ test('buildTerrainModelExportFiles writes slicer-compatible Bambu H2C nozzle met
     terrainColorBandsEnabled: true,
     lowlandPercentile: 35,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => 620 + Math.floor(index / 6) * 10),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 620 + Math.floor(index / 6) * 10),
   })
 
   const files = buildTerrainModelExportFiles(model, { baseName: 'qingcheng-h2c-profile' })
@@ -2893,14 +3448,29 @@ test('buildTerrainModelExportFiles writes slicer-compatible Bambu H2C nozzle met
     'Bambu Lab H2D Pro 0.4 nozzle',
   ])
   assert.deepEqual(projectSettings.physical_extruder_map, ['1', '0'])
-  assert.deepEqual(projectSettings.filament_map, Array.from({ length: slotCount }, () => '1'))
-  assert.deepEqual(projectSettings.filament_map_2, Array.from({ length: slotCount }, () => '1'))
-  assert.deepEqual(projectSettings.filament_nozzle_map, Array.from({ length: slotCount }, () => '0'))
+  assert.deepEqual(
+    projectSettings.filament_map,
+    Array.from({ length: slotCount }, () => '1')
+  )
+  assert.deepEqual(
+    projectSettings.filament_map_2,
+    Array.from({ length: slotCount }, () => '1')
+  )
+  assert.deepEqual(
+    projectSettings.filament_nozzle_map,
+    Array.from({ length: slotCount }, () => '0')
+  )
   assert.deepEqual(
     projectSettings.filament_extruder_variant,
-    Array.from({ length: slotCount }).flatMap(() => ['Direct Drive Standard', 'Direct Drive High Flow']),
+    Array.from({ length: slotCount }).flatMap(() => [
+      'Direct Drive Standard',
+      'Direct Drive High Flow',
+    ])
   )
-  assert.deepEqual(projectSettings.filament_self_index, bambuH2cFilamentVariantSelfIndexes(projectSettings))
+  assert.deepEqual(
+    projectSettings.filament_self_index,
+    bambuH2cFilamentVariantSelfIndexes(projectSettings)
+  )
   assertBambuProjectArraysMatchFilamentVariantCount(projectSettings, [
     'nozzle_temperature',
     'nozzle_temperature_initial_layer',
@@ -2930,7 +3500,8 @@ test('buildTerrainModelExportFiles keeps Bambu filament arrays slot-aligned when
     contourEnabled: true,
     contourIntervalMeters: 50,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => {
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => {
       const row = Math.floor(index / 36)
       const col = index % 36
       return 3800 + row * 18 + Math.sin(col / 3) * 80 + (col > 22 ? 250 : 0)
@@ -2959,7 +3530,11 @@ test('buildTerrainModelExportFiles keeps Bambu filament arrays slot-aligned when
     'cool_plate_temp',
     'cool_plate_temp_initial_layer',
   ].forEach((key) => {
-    assert.equal(projectSettings[key].length, slotCount, `${key} should describe filament slots, not printable parts`)
+    assert.equal(
+      projectSettings[key].length,
+      slotCount,
+      `${key} should describe filament slots, not printable parts`
+    )
   })
   assertBambuProjectArraysMatchFilamentVariantCount(projectSettings, [
     'filament_flow_ratio',
@@ -3006,15 +3581,25 @@ test('buildTerrainModelExportPlan omits dense dynamic color bands from the Bambu
 
   assert.ok(plan.files.some((file) => file.name === 'dense-bambu-satellite-band-1.stl'))
   assert.ok(!bambuParts.includes('dense satellite shell'))
-  assert.deepEqual(plan.manifest.print.bambu.omittedDynamicColorParts.map((part) => part.name), ['dense satellite shell'])
-  assert.ok(plan.manifest.print.bambu.geometryBudget.packageFaceCount < plan.manifest.print.bambu.geometryBudget.fullFaceCount)
+  assert.deepEqual(
+    plan.manifest.print.bambu.omittedDynamicColorParts.map((part) => part.name),
+    ['dense satellite shell']
+  )
+  assert.ok(
+    plan.manifest.print.bambu.geometryBudget.packageFaceCount <
+      plan.manifest.print.bambu.geometryBudget.fullFaceCount
+  )
 })
 
 test('buildTerrainModelExportArchive packs large exports without using the browser Blob zip path', () => {
   assert.equal(typeof terrainModelModule.buildTerrainModelExportArchive, 'function')
 
   const archive = terrainModelModule.buildTerrainModelExportArchive([
-    { name: 'large-terrain.stl', content: 'solid terrain\n' + 'facet normal 0 0 1\n'.repeat(160_000), mimeType: 'model/stl' },
+    {
+      name: 'large-terrain.stl',
+      content: 'solid terrain\n' + 'facet normal 0 0 1\n'.repeat(160_000),
+      mimeType: 'model/stl',
+    },
     { name: 'manifest.json', content: JSON.stringify({ ok: true }), mimeType: 'application/json' },
   ])
 
@@ -3026,7 +3611,10 @@ test('buildTerrainModelExportArchive packs large exports without using the brows
 })
 
 test('TerrainModelPage builds terrain export zip from Uint8Array bytes instead of PizZip blob output', () => {
-  const source = readFileSync(new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/views/app/terrain-model/TerrainModelPage.jsx', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /buildTerrainModelExportArchive/)
   assert.match(source, /new Blob\(\[zipBytes\], \{ type: 'application\/zip' \}\)/)
@@ -3060,7 +3648,8 @@ test('balanced satellite colour mapping respects the H2C material slot budget', 
     textureWidth: 32,
     textureHeight: 32,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => {
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => {
       const row = Math.floor(index / 12)
       const col = index % 12
       return 620 + row * 12 + Math.sin(col / 2) * 16
@@ -3070,7 +3659,10 @@ test('balanced satellite colour mapping respects the H2C material slot budget', 
   assert.equal(model.colorBands.satelliteBands.strategy, 'balanced')
   assert.ok(model.colorBands.satelliteBands.materialBudget.terrainColorLimit >= 3)
   assert.ok(model.colorBands.satelliteBands.materialBudget.terrainColorLimit <= 4)
-  assert.ok(model.colorBands.satelliteBands.bandCount <= model.colorBands.satelliteBands.materialBudget.terrainColorLimit)
+  assert.ok(
+    model.colorBands.satelliteBands.bandCount <=
+      model.colorBands.satelliteBands.materialBudget.terrainColorLimit
+  )
 
   const files = buildTerrainModelExportFiles(model, { baseName: 'balanced-satellite-slots' })
   const bambu3mf = files.find((file) => file.name === 'balanced-satellite-slots-bambu-print.3mf')
@@ -3096,7 +3688,8 @@ test('satellite colour mode does not fall back to legacy lowland paint when imag
     lowlandPercentile: 45,
     lowlandCapThicknessMm: 0.8,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => 680 + Math.floor(index / 10) * 18 + (index % 10) * 4),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 680 + Math.floor(index / 10) * 18 + (index % 10) * 4),
   })
 
   assert.equal(model.colorBands.mode, 'satellite')
@@ -3106,7 +3699,10 @@ test('satellite colour mode does not fall back to legacy lowland paint when imag
 })
 
 test('satellite colour generation yields between heavy browser work phases', () => {
-  const source = readFileSync(new URL('../../src/utils/terrainModel/model.js', import.meta.url), 'utf8')
+  const source = readFileSync(
+    new URL('../../src/utils/terrainModel/model.js', import.meta.url),
+    'utf8'
+  )
 
   assert.match(source, /function yieldTerrainModelWork/)
   assert.match(source, /async function buildSatelliteColorBandMeshes/)
@@ -3139,13 +3735,17 @@ test('balanced satellite colour mapping merges patches below the printable area 
     textureWidth: 32,
     textureHeight: 32,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => 680 + Math.floor(index / 14) * 9 + (index % 14) * 2),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 680 + Math.floor(index / 14) * 9 + (index % 14) * 2),
   })
 
   const cleanup = model.colorBands.satelliteBands.cleanup
   assert.ok(cleanup.mergedPatchCount > 0)
   assert.ok(cleanup.mergedTriangleCount > 0)
-  assert.equal(model.colorBands.satelliteBands.bands.some((band) => band.coveredTriangleCount < 4), false)
+  assert.equal(
+    model.colorBands.satelliteBands.bands.some((band) => band.coveredTriangleCount < 4),
+    false
+  )
 })
 
 test('balanced satellite colour meshes are thin terrain-surface shells instead of anchored solid slabs', async () => {
@@ -3174,7 +3774,8 @@ test('balanced satellite colour meshes are thin terrain-surface shells instead o
     textureWidth: 32,
     textureHeight: 32,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => {
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => {
       const row = Math.floor(index / 12)
       const col = index % 12
       return 610 + row * 14 + col * 4
@@ -3205,7 +3806,8 @@ test('buildTerrainModelExportFiles exports snow cap as a white printable part an
     snowlineElevationMeters: 660,
     snowCapThicknessMm: 0.5,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
   })
 
   const files = buildTerrainModelExportFiles(model, { baseName: 'qingcheng-snowline' })
@@ -3217,7 +3819,11 @@ test('buildTerrainModelExportFiles exports snow cap as a white printable part an
   const manifest = JSON.parse(files.at(-1).content)
   assert.equal(manifest.snowline.enabled, true)
   assert.equal(manifest.snowline.elevationMeters, 660)
-  assert.ok(manifest.print.parts.some((part) => part.key === 'snow' && part.file === 'qingcheng-snowline-snow-white.stl'))
+  assert.ok(
+    manifest.print.parts.some(
+      (part) => part.key === 'snow' && part.file === 'qingcheng-snowline-snow-white.stl'
+    )
+  )
 
   const printKit = files.find((file) => file.name === 'qingcheng-snowline-print-kit.3mf')
   const printKitArchive = new PizZip(printKit.content)
@@ -3232,16 +3838,17 @@ test('buildTerrainModelExportFiles exports snow cap as a white printable part an
   assert.match(modelSettings, /name" value="snow-white"[\s\S]*?key="extruder" value="4"/)
 
   const projectSettings = JSON.parse(bambuArchive.file('Metadata/project_settings.config').asText())
-  assert.deepEqual(projectSettings.filament_colour, [
-    '#C79435',
-    '#D63B2E',
-    '#171717',
-    '#F5F5F4',
-  ])
+  assert.deepEqual(projectSettings.filament_colour, ['#C79435', '#D63B2E', '#171717', '#F5F5F4'])
   assert.equal(projectSettings.filament_type.length, projectSettings.filament_colour.length)
   assert.equal(projectSettings.filament_printable.length, projectSettings.filament_colour.length)
-  assert.equal(projectSettings.nozzle_temperature.length, bambuH2cFilamentVariantCount(projectSettings))
-  assert.equal(projectSettings.nozzle_temperature_initial_layer.length, bambuH2cFilamentVariantCount(projectSettings))
+  assert.equal(
+    projectSettings.nozzle_temperature.length,
+    bambuH2cFilamentVariantCount(projectSettings)
+  )
+  assert.equal(
+    projectSettings.nozzle_temperature_initial_layer.length,
+    bambuH2cFilamentVariantCount(projectSettings)
+  )
   assertBambuFlushSettingsMatchH2cVariants(projectSettings)
 })
 
@@ -3265,7 +3872,8 @@ test('buildTerrainModelExportFiles exports green lowland as a separate printable
     lowlandPercentile: 35,
     lowlandCapThicknessMm: 0.45,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 620 + Math.floor(index / 10) * 10),
   })
 
   const files = buildTerrainModelExportFiles(model, { baseName: 'qingcheng-color-bands' })
@@ -3277,7 +3885,11 @@ test('buildTerrainModelExportFiles exports green lowland as a separate printable
   assert.equal(manifest.colorBands.enabled, true)
   assert.equal(manifest.colorBands.lowland.percentile, 0.35)
   assert.ok(manifest.colorBands.lowland.coveredTriangleCount > 0)
-  assert.ok(manifest.print.parts.some((part) => part.key === 'lowland' && part.file === 'qingcheng-color-bands-lowland-green.stl'))
+  assert.ok(
+    manifest.print.parts.some(
+      (part) => part.key === 'lowland' && part.file === 'qingcheng-color-bands-lowland-green.stl'
+    )
+  )
 
   const printKit = files.find((file) => file.name === 'qingcheng-color-bands-print-kit.3mf')
   const printKitArchive = new PizZip(printKit.content)
@@ -3292,7 +3904,10 @@ test('buildTerrainModelExportFiles exports green lowland as a separate printable
   assert.match(modelSettings, /name" value="lowland-green"[\s\S]*?key="extruder" value="2"/)
   assert.match(modelSettings, /name" value="track-red"[\s\S]*?key="extruder" value="3"/)
   assert.match(modelSettings, /name" value="snow-white"[\s\S]*?key="extruder" value="5"/)
-  assert.match(modelSettings, /<part id="2" subtype="normal_part">[\s\S]*?<metadata key="name" value="lowland-green"\/>[\s\S]*?<metadata key="extruder" value="2"\/>/)
+  assert.match(
+    modelSettings,
+    /<part id="2" subtype="normal_part">[\s\S]*?<metadata key="name" value="lowland-green"\/>[\s\S]*?<metadata key="extruder" value="2"\/>/
+  )
   assert.match(modelSettings, /<metadata key="filament_maps" value="[0-9 ]*"\/>/)
 
   const projectSettings = JSON.parse(bambuArchive.file('Metadata/project_settings.config').asText())
@@ -3316,7 +3931,11 @@ test('buildTerrainModelExportFiles exports green lowland as a separate printable
     'cool_plate_temp',
     'cool_plate_temp_initial_layer',
   ].forEach((key) => {
-    assert.equal(projectSettings[key].length, filamentSlotCount, `${key} should describe filament slots, not printable parts`)
+    assert.equal(
+      projectSettings[key].length,
+      filamentSlotCount,
+      `${key} should describe filament slots, not printable parts`
+    )
   })
   assertBambuProjectArraysMatchFilamentVariantCount(projectSettings, [
     'filament_flow_ratio',
@@ -3327,14 +3946,20 @@ test('buildTerrainModelExportFiles exports green lowland as a separate printable
   assertBambuFlushSettingsMatchH2cVariants(projectSettings)
 
   const sliceInfo = bambuArchive.file('Metadata/slice_info.config').asText()
-  assert.match(sliceInfo, /<object identify_id="1" name="qingcheng-color-bands" skipped="false" \/>/)
+  assert.match(
+    sliceInfo,
+    /<object identify_id="1" name="qingcheng-color-bands" skipped="false" \/>/
+  )
   assert.equal((sliceInfo.match(/<object identify_id="/g) || []).length, 1)
   assert.match(sliceInfo, /<filament id="2" tray_info_idx="GFA00" type="PLA" color="#1F9F72"/)
   assert.match(sliceInfo, /<filament id="5" tray_info_idx="GFA00" type="PLA" color="#F5F5F4"/)
 
   const manifestBambu = manifest.print.bambu
   assert.equal(manifestBambu.materialSlotCount, 5)
-  assert.deepEqual(manifestBambu.materialSlots.map((slot) => slot.slot), [1, 2, 3, 4, 5])
+  assert.deepEqual(
+    manifestBambu.materialSlots.map((slot) => slot.slot),
+    [1, 2, 3, 4, 5]
+  )
   assert.deepEqual(manifestBambu.materialSlots.at(4).parts, [
     'contours-white',
     'snowline-white',
@@ -3352,7 +3977,7 @@ test('buildTerrainModelExportFiles exports green lowland as a separate printable
       ['snow-white', 5],
       ['base-black', 4],
       ['label-white', 5],
-    ],
+    ]
   )
 })
 
@@ -3404,7 +4029,10 @@ test('buildTerrainModel creates a print-ready kit with shaped base, magnet holes
   assert.ok(model.meshes.base.faces.length > 0)
   assert.ok(model.meshes.text.vertices.length > 0)
   assert.ok(model.meshes.text.faces.length > 0)
-  assert.ok(model.meshes.combined.faces.length > model.meshes.terrain.faces.length + model.meshes.track.faces.length)
+  assert.ok(
+    model.meshes.combined.faces.length >
+      model.meshes.terrain.faces.length + model.meshes.track.faces.length
+  )
 
   const baseMinY = Math.min(...model.meshes.base.vertices.map((vertex) => vertex.y))
   const baseMaxY = Math.max(...model.meshes.base.vertices.map((vertex) => vertex.y))
@@ -3412,7 +4040,9 @@ test('buildTerrainModel creates a print-ready kit with shaped base, magnet holes
   assert.equal(baseMaxY, 0)
 
   const files = buildTerrainModelExportFiles(model, { baseName: 'qingcheng-print-kit' })
-  assert.deepEqual(files.map((file) => file.name), [
+  assert.deepEqual(
+    files.map((file) => file.name),
+    [
     'qingcheng-print-kit-print-kit.3mf',
     'qingcheng-print-kit-bambu-print.3mf',
     'qingcheng-print-kit-bambu-print-guide.txt',
@@ -3422,19 +4052,23 @@ test('buildTerrainModel creates a print-ready kit with shaped base, magnet holes
     'qingcheng-print-kit-base-black.stl',
     'qingcheng-print-kit-label-white.stl',
     'qingcheng-print-kit-manifest.json',
-  ])
+    ]
+  )
 
   const manifest = JSON.parse(files.at(-1).content)
   assert.equal(manifest.print.shapeType, 'hexagon')
   assert.equal(manifest.print.magnetHoles.length, 6)
   assert.equal(manifest.print.package3mf, 'qingcheng-print-kit-print-kit.3mf')
   assert.equal(manifest.print.bambuPackage3mf, 'qingcheng-print-kit-bambu-print.3mf')
-  assert.deepEqual(manifest.print.parts.map((part) => part.file), [
+  assert.deepEqual(
+    manifest.print.parts.map((part) => part.file),
+    [
     'qingcheng-print-kit-terrain.stl',
     'qingcheng-print-kit-track-red.stl',
     'qingcheng-print-kit-base-black.stl',
     'qingcheng-print-kit-label-white.stl',
-  ])
+    ]
+  )
 
   const threeMf = files.find((file) => file.name.endsWith('.3mf'))
   assert.equal(threeMf.mimeType, 'model/3mf')
@@ -3450,9 +4084,9 @@ test('buildTerrainModel creates a print-ready kit with shaped base, magnet holes
 
 test('print exports use slicer Z-up axes without mirroring an asymmetric route', async () => {
   const lShapeTrack = [
-    { latitude: 30.0000, longitude: 103.0000, elevation: 100 },
-    { latitude: 30.0000, longitude: 103.0010, elevation: 110 },
-    { latitude: 30.0010, longitude: 103.0010, elevation: 120 },
+    { latitude: 30.0, longitude: 103.0, elevation: 100 },
+    { latitude: 30.0, longitude: 103.001, elevation: 110 },
+    { latitude: 30.001, longitude: 103.001, elevation: 120 },
   ]
   const model = await buildTerrainModel(lShapeTrack, {
     gridRows: 8,
@@ -3466,11 +4100,10 @@ test('print exports use slicer Z-up axes without mirroring an asymmetric route',
     trackWidthMm: 2,
     trackHeightMm: 1,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((sample) => (
-      100
-        + (sample.longitude - 103) * 10000
-        + (sample.latitude - 30) * 5000
-    )),
+    sampleElevations: async (samples) =>
+      samples.map(
+        (sample) => 100 + (sample.longitude - 103) * 10000 + (sample.latitude - 30) * 5000
+      ),
   })
 
   assert.ok(model.route.localPoints[1].x > model.route.localPoints[0].x)
@@ -3490,8 +4123,12 @@ test('print exports use slicer Z-up axes without mirroring an asymmetric route',
   const northMidpoint = (stlBounds.y[0] + stlBounds.y[1]) / 2
   const eastMidpoint = (stlBounds.x[0] + stlBounds.x[1]) / 2
   const northernVertices = stlVertices.filter((vertex) => vertex.y > northMidpoint)
-  const northernMeanX = northernVertices.reduce((total, vertex) => total + vertex.x, 0) / northernVertices.length
-  assert.ok(northernMeanX > eastMidpoint, 'northbound leg should stay on the east side after export')
+  const northernMeanX =
+    northernVertices.reduce((total, vertex) => total + vertex.x, 0) / northernVertices.length
+  assert.ok(
+    northernMeanX > eastMidpoint,
+    'northbound leg should stay on the east side after export'
+  )
 
   const threeMf = files.find((file) => file.name === 'axis-check-print-kit.3mf')
   const archive = new PizZip(threeMf.content)
@@ -3524,7 +4161,8 @@ test('buildTerrainModelExportFiles includes contour STL and 3MF parts when conto
     contourWidthMm: 0.5,
     contourHeightMm: 0.35,
     labelText: '23.40KM',
-    sampleElevations: async (samples) => samples.map((_, index) => 620 + Math.floor(index / 10) * 6),
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => 620 + Math.floor(index / 10) * 6),
   })
 
   const files = buildTerrainModelExportFiles(model, { baseName: 'qingcheng-contours' })
@@ -3540,7 +4178,11 @@ test('buildTerrainModelExportFiles includes contour STL and 3MF parts when conto
   const manifest = JSON.parse(files.at(-1).content)
   assert.equal(manifest.contours.enabled, true)
   assert.ok(manifest.contours.segmentCount > 0)
-  assert.ok(manifest.print.parts.some((part) => part.key === 'contours' && part.file === 'qingcheng-contours-contours-white.stl'))
+  assert.ok(
+    manifest.print.parts.some(
+      (part) => part.key === 'contours' && part.file === 'qingcheng-contours-contours-white.stl'
+    )
+  )
 
   const threeMf = files.find((file) => file.name.endsWith('.3mf'))
   const archive = new PizZip(threeMf.content)
@@ -3564,7 +4206,8 @@ test('buildTerrainModel filters DEM holes and caps printable relief height', asy
     baseHeightMm: 2,
     verticalScale: 0.18,
     maxReliefMm: 42,
-    sampleElevations: async (samples) => samples.map((_, index) => {
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => {
       if (index === 9 || index === 10) return 0
       if (index === 36) return 9000
       return 3920 + (index % 8) * 24 + Math.floor(index / 8) * 14
@@ -3593,7 +4236,8 @@ test('buildTerrainModel treats null DEM samples as missing on low elevation rout
     verticalScale: 0.18,
     maxReliefMm: 42,
     elevationSmoothingPasses: 0,
-    sampleElevations: async (samples) => samples.map((_, index) => {
+    sampleElevations: async (samples) =>
+      samples.map((_, index) => {
       if (index === 27) return null
       return 118 + (index % 8) * 0.9 + Math.floor(index / 8) * 0.7
     }),
@@ -3689,12 +4333,14 @@ test('evaluateTerrainModelReadiness approves high precision multi-part print kit
     snowlinePercentile: 78,
     snowCapThicknessMm: 0.5,
     labelText: '54.38KM',
-    sampleElevations: async (samples) => samples.map((sample, index) => (
-      3860
-        + (sample.latitude - 34.62) * 90000
-        + Math.sin(index / 9) * 24
-        + Math.floor(index / 240) * 3
-    )),
+    sampleElevations: async (samples) =>
+      samples.map(
+        (sample, index) =>
+          3860 +
+          (sample.latitude - 34.62) * 90000 +
+          Math.sin(index / 9) * 24 +
+          Math.floor(index / 240) * 3
+      ),
   })
 
   const readiness = evaluateTerrainModelReadiness(model)

@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom'
 import useAuthStore from '../stores/authStore'
 import useWorkspaceStore from '../features/workspace/workspaceStore'
 import { createWorkspaceSession } from '../features/workspace/workspaceSession'
+import '../styles/login.css'
 
 function Login() {
   const [username, setUsername] = useState('')
@@ -11,7 +12,8 @@ function Login() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const { login, isAuthenticated, isLoading, error, clearError, user, getDefaultLandingPath } = useAuthStore()
+  const { login, isAuthenticated, isLoading, error, clearError, user, getDefaultLandingPath } =
+    useAuthStore()
   const setWorkspaceSession = useWorkspaceStore((state) => state.setWorkspaceSession)
 
   useEffect(() => {
@@ -22,12 +24,16 @@ function Login() {
       }
       const params = new URLSearchParams(location.search)
       const redirect = params.get('redirect')
-      const hasPlatformProfile = user?.role === 'super_admin' && user?.authzProfile?.scopeType === 'platform'
+      const hasPlatformProfile =
+        user?.role === 'super_admin' && user?.authzProfile?.scopeType === 'platform'
       if (hasPlatformProfile) {
         setWorkspaceSession(createWorkspaceSession({ scopeType: 'platform', surface: 'admin' }))
       }
       const platformLanding = hasPlatformProfile ? getDefaultLandingPath() : '/workspaces'
-      const from = location.state?.from?.pathname || (redirect && redirect.startsWith('/') ? redirect : null) || platformLanding
+      const from =
+        location.state?.from?.pathname ||
+        (redirect && redirect.startsWith('/') ? redirect : null) ||
+        platformLanding
       navigate(from, { replace: true })
     }
   }, [getDefaultLandingPath, isAuthenticated, navigate, location, setWorkspaceSession, user])
@@ -35,7 +41,7 @@ function Login() {
   useEffect(() => () => clearError(), [clearError])
 
   useEffect(() => {
-    const savedUsername = localStorage.getItem('rememberedUsername')
+    const savedUsername = window.localStorage.getItem('rememberedUsername')
     if (savedUsername) {
       setUsername(savedUsername)
       setRememberMe(true)
@@ -46,8 +52,8 @@ function Login() {
     event.preventDefault()
     if (!username.trim() || !password.trim()) return
 
-    if (rememberMe) localStorage.setItem('rememberedUsername', username)
-    else localStorage.removeItem('rememberedUsername')
+    if (rememberMe) window.localStorage.setItem('rememberedUsername', username)
+    else window.localStorage.removeItem('rememberedUsername')
 
     await login(username, password, rememberMe)
   }
@@ -101,7 +107,9 @@ function Login() {
             {error ? <div className="login-error">{error}</div> : null}
 
             <div className="login-field">
-              <label htmlFor="username" className="login-field__label">账号</label>
+              <label htmlFor="username" className="login-field__label">
+                账号
+              </label>
               <div className="login-field__wrapper">
                 <input
                   id="username"
@@ -118,7 +126,9 @@ function Login() {
             </div>
 
             <div className="login-field">
-              <label htmlFor="password" className="login-field__label">密码</label>
+              <label htmlFor="password" className="login-field__label">
+                密码
+              </label>
               <div className="login-field__wrapper">
                 <input
                   id="password"
@@ -149,9 +159,7 @@ function Login() {
             </div>
 
             <button type="submit" className="login-submit" disabled={isLoading}>
-              <span className="login-submit__text">
-                {isLoading ? '正在登录...' : '登录'}
-              </span>
+              <span className="login-submit__text">{isLoading ? '正在登录...' : '登录'}</span>
               <span className="login-submit__icon material-symbols-outlined">arrow_forward</span>
             </button>
 

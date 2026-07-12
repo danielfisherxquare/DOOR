@@ -10,7 +10,8 @@ const colorSchemeApi = {
    * 获取系统预设配色方案
    * @param {string} surface - 层级（admin/app/ops）
    */
-  getPresets: (surface = 'admin') => request.get(`/admin/color-schemes/presets?surface=${surface}`),
+  getPresets: (surface = 'admin') =>
+    request.get('/admin/color-schemes/presets', { params: { surface } }),
 
   /**
    * 获取所有配色方案（含预设和自定义）
@@ -35,7 +36,7 @@ const colorSchemeApi = {
    * @param {string} surface - 层级（admin/app/ops）
    */
   createScheme: (data, orgId, surface = 'admin') => {
-    return request.post(`/admin/color-schemes?orgId=${orgId}&surface=${surface}`, data)
+    return request.post('/admin/color-schemes', data, { params: { orgId, surface } })
   },
 
   /**
@@ -46,7 +47,7 @@ const colorSchemeApi = {
    * @param {string} surface - 层级（admin/app/ops）
    */
   updateScheme: (schemeId, data, orgId, surface = 'admin') => {
-    return request.patch(`/admin/color-schemes/${schemeId}?orgId=${orgId}&surface=${surface}`, data)
+    return request.patch(`/admin/color-schemes/${schemeId}`, data, { params: { orgId, surface } })
   },
 
   /**
@@ -56,7 +57,7 @@ const colorSchemeApi = {
    * @param {string} surface - 层级（admin/app/ops）
    */
   deleteScheme: (schemeId, orgId, surface = 'admin') => {
-    return request.delete(`/admin/color-schemes/${schemeId}?orgId=${orgId}&surface=${surface}`)
+    return request.delete(`/admin/color-schemes/${schemeId}`, { params: { orgId, surface } })
   },
 
   /**
@@ -64,7 +65,8 @@ const colorSchemeApi = {
    * @param {string} orgId - 机构 ID
    * @param {string} surface - 层级（admin/app/ops）
    */
-  getOrgScheme: (orgId, surface = 'admin') => request.get(`/admin/color-schemes/orgs/${orgId}/color-scheme?surface=${surface}`),
+  getOrgScheme: (orgId, surface = 'admin') =>
+    request.get(`/admin/color-schemes/orgs/${orgId}/color-scheme`, { params: { surface } }),
 
   /**
    * 设置机构配色
@@ -74,7 +76,11 @@ const colorSchemeApi = {
    * @param {Object} customConfig - 自定义配置覆盖
    */
   setOrgScheme: (orgId, surface, schemeId, customConfig = null) =>
-    request.put(`/admin/color-schemes/orgs/${orgId}/color-scheme?surface=${surface}`, { schemeId, customConfig }),
+    request.put(
+      `/admin/color-schemes/orgs/${orgId}/color-scheme`,
+      { schemeId, customConfig },
+      { params: { surface } }
+    ),
 
   /**
    * 重置机构配色为默认
@@ -82,7 +88,7 @@ const colorSchemeApi = {
    * @param {string} surface - 层级（admin/app/ops）
    */
   resetOrgScheme: (orgId, surface = 'admin') =>
-    request.delete(`/admin/color-schemes/orgs/${orgId}/color-scheme?surface=${surface}`),
+    request.delete(`/admin/color-schemes/orgs/${orgId}/color-scheme`, { params: { surface } }),
 
   /**
    * 导出配色方案
@@ -97,7 +103,7 @@ const colorSchemeApi = {
    * @param {string} surface - 层级（admin/app/ops）
    */
   importScheme: (data, orgId, surface = 'admin') => {
-    return request.post(`/admin/color-schemes/import?orgId=${orgId}&surface=${surface}`, data)
+    return request.post('/admin/color-schemes/import', data, { params: { orgId, surface } })
   },
 }
 

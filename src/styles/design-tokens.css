@@ -11,7 +11,7 @@
 
 :root {
    /* === Public / default Tectonic layer === */
-   --layer-accent: #D8262C;
+  --layer-accent: #d8262c;
    --layer-accent-hover: #b30018;
    --layer-accent-active: #930011;
    --layer-accent-soft: rgba(216, 38, 44, 0.08);
@@ -86,19 +86,19 @@
    /* === 状态色系（跨层级统一）=== */
    --success: #059669;
    --success-soft: rgba(5, 150, 105, 0.1);
-   --success-light: #D1FAE5;
+  --success-light: #d1fae5;
 
-   --warning: #D97706;
+  --warning: #d97706;
    --warning-soft: rgba(217, 119, 6, 0.1);
-   --warning-light: #FEF3C7;
+  --warning-light: #fef3c7;
 
-   --danger: #DC2626;
+  --danger: #dc2626;
    --danger-soft: rgba(220, 38, 38, 0.1);
-   --danger-light: #FEE2E2;
+  --danger-light: #fee2e2;
 
-   --info: #2563EB;
+  --info: #2563eb;
    --info-soft: rgba(37, 99, 235, 0.1);
-   --info-light: #DBEAFE;
+  --info-light: #dbeafe;
 
    /* === 阴影系统 === */
    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -115,7 +115,9 @@
    --radius-full: 0px;
 
    /* === 字体系统 === */
-   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-family:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
    --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
    --font-headline: 'Space Grotesk', sans-serif;
    --font-body: 'Inter', sans-serif;
@@ -189,10 +191,12 @@
    --z-max: 9999;
 
    /* === 网格背景 === */
-   --grid-pattern: linear-gradient(var(--border-subtle) 1px, transparent 1px),
+  --grid-pattern:
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
       linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
 
-   /* === Legacy soft-design aliases === */
+  /* === Legacy soft-design aliases (DEPRECATED — use new tokens above) === */
+  /* Do not use these in new code. They exist for backward compatibility only. */
    --color-bg-primary: var(--bg-primary);
    --color-bg-secondary: var(--bg-secondary);
    --color-bg: var(--bg-primary);
@@ -249,7 +253,7 @@
    --radius-xl: 0px;
 
    /* 核心强调色 - 公司红 #D8262C */
-   --layer-accent: #D8262C;
+  --layer-accent: #d8262c;
    --layer-accent-hover: #b30018;
    --layer-accent-active: #930011;
    --layer-accent-soft: rgba(216, 38, 44, 0.08);
@@ -355,12 +359,12 @@
    --radius-xl: 0px;
 
    /* 核心强调色 — 琥珀黄 #D4A017 */
-   --layer-accent: #D4A017;
-   --layer-accent-hover: #B8890E;
-   --layer-accent-active: #9A7209;
+  --layer-accent: #d4a017;
+  --layer-accent-hover: #b8890e;
+  --layer-accent-active: #9a7209;
    --layer-accent-soft: rgba(212, 160, 23, 0.08);
    --layer-accent-muted: rgba(212, 160, 23, 0.15);
-   --layer-accent-light: #FDE68A;
+  --layer-accent-light: #fde68a;
 
    /* 背景色系 — 暖白底 */
    --layer-bg-primary: #faf9f7;
@@ -439,7 +443,7 @@
    --radius-xl: 0px;
 
    /* 核心强调色 — 工业蓝 #2563EB */
-   --layer-accent: #2563EB;
+  --layer-accent: #2563eb;
    --layer-accent-hover: #1d4ed8;
    --layer-accent-active: #1e40af;
    --layer-accent-soft: rgba(37, 99, 235, 0.08);

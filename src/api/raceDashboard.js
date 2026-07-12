@@ -1,4 +1,4 @@
-import request from '../utils/request';
+import request from '../utils/request'
 
 /**
  * Race Dashboard API - aggregates data for race dashboard display
@@ -9,7 +9,8 @@ export const raceDashboardApi = {
      * @param {string} raceId - Race ID
      * @param {boolean} masked - If true, sensitive data will be masked
      */
-    getOverview: (raceId, masked = false) => request.get(`/races/dashboard/${raceId}/overview`, {
+  getOverview: (raceId, masked = false) =>
+    request.get(`/races/dashboard/${raceId}/overview`, {
         params: masked ? { masked: true } : {},
     }),
 
@@ -44,9 +45,10 @@ export const raceDashboardApi = {
      * @param {boolean} options.masked - If true, names will be masked
      * @param {number} options.limit - Max activities to return
      */
-    getActivities: (raceId, options = {}) => request.get(`/races/dashboard/${raceId}/activities`, {
+  getActivities: (raceId, options = {}) =>
+    request.get(`/races/dashboard/${raceId}/activities`, {
         params: options,
     }),
-};
+}
 
-export default raceDashboardApi;
+export default raceDashboardApi

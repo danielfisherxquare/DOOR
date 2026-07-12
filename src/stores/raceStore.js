@@ -71,7 +71,7 @@ const useRaceStore = create((set, get) => ({
             const res = await racesApi.update(raceId, data)
             if (res.success) {
                 // 更新本地缓存
-                const races = get().races.map(r => r.id === raceId ? res.data : r)
+        const races = get().races.map((r) => (r.id === raceId ? res.data : r))
                 const currentRace = get().currentRace?.id === raceId ? res.data : get().currentRace
                 set({ races, currentRace })
                 return { success: true, data: res.data }
@@ -87,8 +87,8 @@ const useRaceStore = create((set, get) => ({
         try {
             const res = await racesApi.remove(raceId)
             if (res.success) {
-                const races = get().races.filter(r => r.id !== raceId)
-                const currentRace = get().currentRace?.id === raceId ? (races[0] || null) : get().currentRace
+        const races = get().races.filter((r) => r.id !== raceId)
+        const currentRace = get().currentRace?.id === raceId ? races[0] || null : get().currentRace
                 set({ races, currentRace })
                 return { success: true }
             }

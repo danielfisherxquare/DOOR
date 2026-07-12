@@ -1,6 +1,9 @@
 import axios from 'axios'
 import useAuthStore from '../stores/authStore'
 
+// TECH DEBT: This function rewrites frontend API paths to match backend routes.
+// New API modules should use the correct backend path directly instead of relying on this.
+// Do not add new remapping rules. See agent.md "Frontend API Rules" for details.
 function remapApiPath(url) {
   if (typeof url !== 'string' || !url.startsWith('/')) return url
 
@@ -22,29 +25,19 @@ function remapApiPath(url) {
   return url
 }
 
-const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 30000
-})
-
 function isInvalidAuthResponse(error) {
   const status = error.response?.status
   const message = error.response?.data?.message || error.response?.data?.error || ''
-  return status === 401 || (
-    status === 404 &&
-    typeof message === 'string' &&
-    (message.includes('用户不存在') || message.includes('令牌'))
+  return (
+    status === 401 ||
+    (status === 404 &&
+      typeof message === 'string' &&
+      (message.includes('用户不存在') || message.includes('令牌')))
   )
 }
 
 function forceLocalLogout() {
-  useAuthStore.setState({
-    user: null,
-    token: null,
-    refreshToken: null,
-    isAuthenticated: false,
-    error: null,
-  })
+  useAuthStore.getState().clearSession()
 
   try {
     window.localStorage.removeItem('auth-storage')
@@ -57,102 +50,75 @@ function forceLocalLogout() {
   }
 }
 
-// 用于 OCR 识别等长时间请求的 axios 实例（10 分钟超时）
-export const requestWithLongTimeout = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  timeout: 600000
-})
-
-/**
- * 获取认证 Token（从 request 默认头或 localStorage）
- */
-function getAuthToken() {
-  // 优先从 request 默认头获取
-  const storeToken = request.defaults?.headers?.common?.Authorization
-  if (storeToken) {
-    return String(storeToken).replace(/^Bearer\s+/i, '')
-  }
-
-  // 回退到 localStorage
-  try {
-    const persisted = JSON.parse(window.localStorage.getItem('auth-storage') || '{}')
-    return persisted?.state?.token || ''
-  } catch {
-    return ''
-  }
+function extractErrorMessage(error) {
+  const responseData = error.response?.data
+  const isHtmlError = typeof responseData === 'string' && responseData.trim().startsWith('<')
+  return (
+    responseData?.message ||
+    responseData?.error ||
+    (isHtmlError ? 'API 返回了 HTML 错误页，请检查后端服务或 Nginx /api 反代配置' : null) ||
+    error.message ||
+    '请求失败'
+  )
 }
 
-// 为长超时实例添加相同的请求拦截器和响应拦截器
-requestWithLongTimeout.interceptors.request.use(
-  (config) => {
-    config.url = remapApiPath(config.url)
-    const token = getAuthToken()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+function normalizeRequestError(error) {
+  const normalized = new Error(extractErrorMessage(error))
+  normalized.name = 'RequestError'
+  normalized.status = error.response?.status
+  normalized.code = error.code
+  normalized.response = error.response
+  normalized.cause = error
+  return normalized
+}
+
+/**
+ * 为 axios 实例安装统一的请求/响应拦截器
+ */
+function installInterceptors(instance, tokenSource) {
+  instance.interceptors.request.use(
+    (config) => {
+      config.url = remapApiPath(config.url)
+      const token = tokenSource()
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
+      if (!(config.data instanceof FormData) && !config.headers['Content-Type']) {
+        config.headers['Content-Type'] = 'application/json'
+      }
+      return config
+    },
+    (error) => Promise.reject(error)
+  )
+
+  instance.interceptors.response.use(
+    (response) => response.data,
+    (error) => {
+      if (isInvalidAuthResponse(error)) {
+        forceLocalLogout()
+      }
+      return Promise.reject(normalizeRequestError(error))
     }
-    // FormData 不需要设置 Content-Type，让浏览器自动设置
-    if (!(config.data instanceof FormData) && !config.headers['Content-Type']) {
-      config.headers['Content-Type'] = 'application/json'
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
+  )
+
+  return instance
+}
+
+const request = installInterceptors(
+  axios.create({
+    baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+    timeout: 30000,
+  }),
+  () => useAuthStore.getState().token
 )
 
-// 为长超时实例添加响应拦截器，处理 401 错误
-requestWithLongTimeout.interceptors.response.use(
-  (response) => response.data,
-  (error) => {
-    if (isInvalidAuthResponse(error)) {
-      forceLocalLogout()
-    }
-
-    const responseData = error.response?.data
-    const isHtmlError = typeof responseData === 'string' && responseData.trim().startsWith('<')
-    const message =
-      responseData?.message ||
-      responseData?.error ||
-      (isHtmlError ? 'API 返回了 HTML 错误页，请检查后端服务或 Nginx /api 反代配置' : null) ||
-      error.message ||
-      '请求失败'
-
-    return Promise.reject(new Error(message))
-  }
-)
-
-request.interceptors.request.use(
-  (config) => {
-    config.url = remapApiPath(config.url)
-    const token = useAuthStore.getState().token
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    if (!(config.data instanceof FormData) && !config.headers['Content-Type']) {
-      config.headers['Content-Type'] = 'application/json'
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-request.interceptors.response.use(
-  (response) => response.data,
-  (error) => {
-    if (isInvalidAuthResponse(error)) {
-      forceLocalLogout()
-    }
-
-    const responseData = error.response?.data
-    const isHtmlError = typeof responseData === 'string' && responseData.trim().startsWith('<')
-    const message =
-      responseData?.message ||
-      responseData?.error ||
-      (isHtmlError ? 'API 返回了 HTML 错误页，请检查后端服务或 Nginx /api 反代配置' : null) ||
-      error.message ||
-      '请求失败'
-
-    return Promise.reject(new Error(message))
-  }
+// 用于 OCR 识别等长时间请求的 axios 实例（10 分钟超时）
+export const requestWithLongTimeout = installInterceptors(
+  axios.create({
+    baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+    timeout: 600000,
+  }),
+  () => useAuthStore.getState().token
 )
 
 export default request

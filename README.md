@@ -55,7 +55,7 @@ VITE_API_BASE_URL=/api
 
 - `door/.env` 可以保留云端或正式环境地址
 - `door/.env.local` 只用于本地开发，优先级更高
-- 如果把 `VITE_API_BASE_URL` 写成线上地址，例如 `https://xquareliu.com/api`，那么本地前端会直接请求线上接口，不会走本地 `5173 -> 3001` 代理
+- 如果把 `VITE_API_BASE_URL` 写成线上地址，例如 `https://door.example.com/api`，本地前端会直接请求线上接口，不会走本地 `5173 -> 3001` 代理
 - 因此做本地联调时，应优先检查 `door/.env.local` 是否为 `/api`
 
 ### Docker 镜像与容器命名
@@ -306,10 +306,8 @@ docker compose up -d postgres redis
 
 ### 云端部署配置
 
-中奥致远赛事管理系统部署在服务器上，使用 HTTPS 对外服务。
-
-- 主入口（域名）：`https://www.xquareliu.com` / `https://xquareliu.com`
-- IP 入口：`http://47.251.107.41`（自动跳转到 HTTPS）
+生产域名和证书由环境变量提供。下面用 `door.example.com` 和文档专用 IP
+`203.0.113.10` 演示；部署时必须替换成实际地址。
 
 ---
 
@@ -348,10 +346,16 @@ NODE_ENV=production
 PORT=3001
 
 # 公网访问地址
-PUBLIC_BASE_URL=https://www.xquareliu.com
+PUBLIC_BASE_URL=https://door.example.com
+FRONTEND_URL=https://door.example.com
 
-# CORS 允许的域名（逗号分隔，不要带端口号）
-CORS_ORIGIN=https://www.xquareliu.com,https://xquareliu.com,http://47.251.107.41
+# CORS 允许的完整 origin（逗号分隔；非默认端口必须保留端口号）
+CORS_ORIGIN=https://door.example.com,http://203.0.113.10
+
+# Nginx 模板变量
+NGINX_SERVER_NAME=door.example.com
+NGINX_SSL_CERT=door.example.com.pem
+NGINX_SSL_KEY=door.example.com.key
 
 # 禁止公开注册
 DISABLE_REGISTRATION=true
@@ -371,8 +375,8 @@ DASHSCOPE_BASE_URL=https://coding.dashscope.aliyuncs.com/v1
 ```
 
 > [!CAUTION]
-> **CORS_ORIGIN 中的域名不要带端口号**（80 端口在 HTTP 中是默认的，浏览器 origin 不会包含 `:80`）。
-> 错误示例：`http://www.xquareliu.com:8080` ← 会导致浏览器报 Network Error。
+> `CORS_ORIGIN` 必须和浏览器地址栏的 origin 完全一致。例如页面从
+> `https://door.example.com:8443` 打开，就应填写 `https://door.example.com:8443`。
 
 ---
 
@@ -388,13 +392,13 @@ sudo chown -R 1000:1000 /var/backups/door
 ### 4. 配置 SSL 证书
 
 证书文件存放在服务器 `/etc/nginx/ssl/` 目录：
-- `xquareliu.com.pem` — 证书文件
-- `xquareliu.com.key` — 私钥文件
+- `door.example.com.pem` — 证书文件
+- `door.example.com.key` — 私钥文件
 
 ```bash
 sudo mkdir -p /etc/nginx/ssl
-sudo cp your-cert.pem /etc/nginx/ssl/xquareliu.com.pem
-sudo cp your-key.pem /etc/nginx/ssl/xquareliu.com.key
+sudo cp your-cert.pem /etc/nginx/ssl/door.example.com.pem
+sudo cp your-key.pem /etc/nginx/ssl/door.example.com.key
 ```
 
 > [!NOTE]
@@ -413,9 +417,9 @@ return 301 https://$host$request_uri;
 
 # HTTPS 主配置
 listen 443 ssl;
-server_name www.xquareliu.com xquareliu.com;
-ssl_certificate     /etc/nginx/ssl/xquareliu.com.pem;
-ssl_certificate_key /etc/nginx/ssl/xquareliu.com.key;
+server_name ${NGINX_SERVER_NAME};
+ssl_certificate     /etc/nginx/ssl/${NGINX_SSL_CERT};
+ssl_certificate_key /etc/nginx/ssl/${NGINX_SSL_KEY};
 ```
 
 Docker 端口映射（`docker-compose.yml`）：
@@ -426,6 +430,7 @@ nginx:
     - "80:80"
     - "443:443"
   volumes:
+    - ./nginx.conf:/etc/nginx/templates/default.conf.template:ro
     - ../dist:/usr/share/nginx/html:ro
     - /etc/nginx/ssl:/etc/nginx/ssl:ro
 ```
@@ -460,7 +465,7 @@ docker compose exec app node scripts/seed-super-admin.js
 健康检查：
 
 ```bash
-curl https://www.xquareliu.com/api/health/ready
+curl https://door.example.com/api/health/ready
 # 期望: {"status":"ok","database":"connected"}
 ```
 
@@ -487,7 +492,7 @@ docker compose up -d --build
 docker compose exec app npm run migrate
 
 # 5. 验证
-curl https://www.xquareliu.com/api/health/ready
+curl https://door.example.com/api/health/ready
 ```
 
 ---

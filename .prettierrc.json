@@ -1,0 +1,16 @@
+{
+  "semi": false,
+  "singleQuote": true,
+  "tabWidth": 2,
+  "trailingComma": "es5",
+  "printWidth": 100,
+  "overrides": [
+    {
+      "files": "server/**/*.js",
+      "options": {
+        "semi": true,
+        "tabWidth": 4
+      }
+    }
+  ]
+}

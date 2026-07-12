@@ -15,18 +15,18 @@ import './modules/lottery-v2/lottery-v2.job-handler.js';
 const WORKER_ID = `worker-${randomUUID().slice(0, 8)}`;
 let running = true;
 
-console.log(`🔧 Worker ${WORKER_ID} 启动中…`);
-console.log(`📋 已注册 handler: ${getRegisteredTypes().join(', ') || '(无)'}`);
-console.log(`⏱️  轮询间隔: ${env.WORKER_POLL_INTERVAL_MS}ms`);
-console.log(`🔒 租约时长: ${env.JOB_LEASE_DURATION_MS}ms`);
-console.log(`💓 心跳间隔: ${env.JOB_HEARTBEAT_INTERVAL_MS}ms`);
+console.log(`[Worker] ${WORKER_ID} 启动中...`);
+console.log(`[Worker] 已注册 handler: ${getRegisteredTypes().join(', ') || '(无)'}`);
+console.log(`[Worker] 轮询间隔: ${env.WORKER_POLL_INTERVAL_MS}ms`);
+console.log(`[Worker] 租约时长: ${env.JOB_LEASE_DURATION_MS}ms`);
+console.log(`[Worker] 心跳间隔: ${env.JOB_HEARTBEAT_INTERVAL_MS}ms`);
 
 // ── 主轮询循环 ───────────────────────────────────────────
 async function pollLoop() {
     // 启动时先回收一次过期 Job
     const recoveredOnStart = await jobRepo.recoverExpired();
     if (recoveredOnStart > 0) {
-        console.log(`♻️  启动时回收 ${recoveredOnStart} 个过期 Job`);
+        console.log(`[Worker] 启动时回收 ${recoveredOnStart} 个过期 Job`);
     }
 
     while (running) {
@@ -34,17 +34,17 @@ async function pollLoop() {
             // 1. 回收过期 Job
             const recovered = await jobRepo.recoverExpired();
             if (recovered > 0) {
-                console.log(`♻️  回收 ${recovered} 个过期 Job`);
+                console.log(`[Worker] 回收 ${recovered} 个过期 Job`);
             }
 
             // 2. 尝试领取一个 Job
             const job = await jobRepo.claim(WORKER_ID, env.JOB_LEASE_DURATION_MS);
             if (job) {
-                console.log(`🚀 领取 Job [${job.id}] type=${job.type}`);
+                console.log(`[Worker] 领取 Job [${job.id}] type=${job.type}`);
                 await executeJob(job);
             }
         } catch (err) {
-            console.error('轮询出错:', err.message);
+            console.error('[Worker] 轮询出错:', err.message);
         }
 
         // 等待下一轮
@@ -56,7 +56,7 @@ async function pollLoop() {
 async function executeJob(job) {
     const handler = getHandler(job.type);
     if (!handler) {
-        console.error(`❌ 未找到 handler: ${job.type}`);
+        console.error(`[Worker] 未找到 handler: ${job.type}`);
         await jobRepo.fail(job.id, WORKER_ID, {
             code: 'UNKNOWN_HANDLER',
             message: `No handler registered for type: ${job.type}`,
@@ -69,7 +69,7 @@ async function executeJob(job) {
         try {
             await jobRepo.heartbeat(job.id, WORKER_ID, env.JOB_LEASE_DURATION_MS);
         } catch (err) {
-            console.error(`💓 心跳失败 [${job.id}]:`, err.message);
+            console.error(`[Worker] 心跳失败 [${job.id}]:`, err.message);
         }
     }, env.JOB_HEARTBEAT_INTERVAL_MS);
 
@@ -77,14 +77,20 @@ async function executeJob(job) {
         const result = await handler(job, {
             knex,
             heartbeat: async (progress, message) => {
-                await jobRepo.heartbeat(job.id, WORKER_ID, env.JOB_LEASE_DURATION_MS, progress, message);
+                await jobRepo.heartbeat(
+                    job.id,
+                    WORKER_ID,
+                    env.JOB_LEASE_DURATION_MS,
+                    progress,
+                    message
+                );
             },
         });
 
         await jobRepo.succeed(job.id, WORKER_ID, result);
-        console.log(`✅ Job 完成 [${job.id}]`);
+        console.log(`[Worker] Job 完成 [${job.id}]`);
     } catch (err) {
-        console.error(`❌ Job 失败 [${job.id}]:`, err.message);
+        console.error(`[Worker] Job 失败 [${job.id}]:`, err.message);
         await jobRepo.fail(job.id, WORKER_ID, {
             code: err.code || 'HANDLER_ERROR',
             message: err.message,
@@ -97,15 +103,15 @@ async function executeJob(job) {
 
 // ── Graceful Shutdown ───────────────────────────────────
 async function shutdown(signal) {
-    console.log(`\n⏳ Worker 收到 ${signal}，等待当前 Job 完成…`);
+    console.log(`\n[Worker] 收到 ${signal}，等待当前 Job 完成...`);
     running = false;
 
     // 给最多 30 秒完成当前 Job
     setTimeout(async () => {
-        console.error('⚠️ Worker 强制退出（超时 30 秒）');
+        console.error('[Worker] 强制退出（超时 30 秒）');
         await knex.destroy();
         process.exit(1);
-    }, 30_000);
+    }, 30_000).unref();
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
@@ -119,12 +125,12 @@ function sleep(ms) {
 // ── 启动 ─────────────────────────────────────────────────
 pollLoop()
     .then(async () => {
-        console.log('🛑 Worker 已停止');
+        console.log('[Worker] 已停止');
         await knex.destroy();
         process.exit(0);
     })
     .catch(async (err) => {
-        console.error('💥 Worker 异常退出:', err);
+        console.error('[Worker] 异常退出:', err);
         await knex.destroy();
         process.exit(1);
     });

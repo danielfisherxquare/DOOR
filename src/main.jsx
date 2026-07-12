@@ -4,8 +4,6 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './styles/design-tokens.css'
 import './styles/tectonic-primitives.css'
-import './styles/login.css'
-import './styles/command-console.css'
 import './registerPwa'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -13,5 +11,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <App />
     </BrowserRouter>
-  </React.StrictMode>,
+  </React.StrictMode>
 )

@@ -26,25 +26,59 @@ export default function useSurfaceWorkspace(surface) {
   useEffect(() => {
     if (!legacyOrgId && !legacyRaceId) return
 
-    setWorkspaceSession(createWorkspaceSession({
+    const nextSession = createWorkspaceSession({
       ...session,
       orgId: legacyOrgId || session?.orgId || '',
       raceId: legacyRaceId || session?.raceId || '',
+      scopeType: legacyRaceId ? 'race' : session?.scopeType,
       surface,
-    }))
+    })
+    const sessionAlreadyMatches =
+      session?.orgId === nextSession.orgId &&
+      session?.raceId === nextSession.raceId &&
+      session?.scopeType === nextSession.scopeType &&
+      session?.surface === nextSession.surface
+
+    if (!sessionAlreadyMatches) setWorkspaceSession(nextSession)
     setSearchParams(cleanLegacySearch(searchParams), { replace: true })
-  }, [legacyOrgId, legacyRaceId, searchParams, session, setSearchParams, setWorkspaceSession, surface])
+  }, [
+    legacyOrgId,
+    legacyRaceId,
+    searchParams,
+    session,
+    setSearchParams,
+    setWorkspaceSession,
+    surface,
+  ])
 
   useEffect(() => {
-    const hasPlatformProfile = user?.role === 'super_admin' && user?.authzProfile?.scopeType === 'platform'
-    if (surface !== 'admin' || !hasPlatformProfile || session?.scopeType === 'platform' || legacyOrgId || legacyRaceId) return
+    const hasPlatformProfile =
+      user?.role === 'super_admin' && user?.authzProfile?.scopeType === 'platform'
+    if (
+      surface !== 'admin' ||
+      !hasPlatformProfile ||
+      session?.scopeType === 'platform' ||
+      legacyOrgId ||
+      legacyRaceId
+    )
+      return
 
-    setWorkspaceSession(createWorkspaceSession({
+    setWorkspaceSession(
+      createWorkspaceSession({
       scopeType: 'platform',
       surface: 'admin',
       lastAdminPath: location.pathname || '/admin',
-    }))
-  }, [legacyOrgId, legacyRaceId, location.pathname, session?.scopeType, setWorkspaceSession, surface, user])
+      })
+    )
+  }, [
+    legacyOrgId,
+    legacyRaceId,
+    location.pathname,
+    session?.scopeType,
+    setWorkspaceSession,
+    surface,
+    user,
+  ])
 
   useEffect(() => {
     if (!session?.orgId && session?.scopeType !== 'platform') return
@@ -55,13 +89,16 @@ export default function useSurfaceWorkspace(surface) {
   const selectedRaceId = session?.raceId || legacyRaceId || ''
   const isPlatformScope = session?.scopeType === 'platform'
 
-  const currentContext = useMemo(() => ({
+  const currentContext = useMemo(
+    () => ({
     orgId: selectedOrgId,
     raceId: selectedRaceId,
     selectedOrgId,
     selectedRaceId,
-    scopeType: isPlatformScope ? 'platform' : (selectedRaceId ? 'race' : 'org'),
-  }), [isPlatformScope, selectedOrgId, selectedRaceId])
+      scopeType: isPlatformScope ? 'platform' : selectedRaceId ? 'race' : 'org',
+    }),
+    [isPlatformScope, selectedOrgId, selectedRaceId]
+  )
 
   const switchWorkspace = useCallback(() => {
     const target = resolveWorkspaceSwitchRedirect({ currentPath: location.pathname, user })

@@ -47,9 +47,7 @@ export async function findAllAllowed(orgId, userId, role, options = {}) {
 
 // kept for internal calls
 export async function findAll(orgId) {
-    const rows = await knex('races')
-        .where({ org_id: orgId })
-        .orderBy('created_at', 'desc');
+    const rows = await knex('races').where({ org_id: orgId }).orderBy('created_at', 'desc');
     return rows.map(raceMapper.fromDbRow);
 }
 
@@ -69,12 +67,14 @@ export async function update(orgId, raceId, data) {
 }
 
 export async function remove(orgId, raceId) {
-    const recordQuery = knex('records').where({ race_id: raceId });
+    return knex.transaction(async (trx) => {
+        const recordQuery = trx('records').where({ race_id: raceId });
     if (orgId) recordQuery.andWhere({ org_id: orgId });
     await recordQuery.delete();
 
-    const raceQuery = knex('races').where({ id: raceId });
+        const raceQuery = trx('races').where({ id: raceId });
     if (orgId) raceQuery.andWhere({ org_id: orgId });
     const deleted = await raceQuery.delete();
     return deleted > 0;
+    });
 }

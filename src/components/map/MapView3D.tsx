@@ -1672,7 +1672,10 @@ function emitBrowseState(
   }
 }
 
-Cesium.Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_ION_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiIxNmYwNDUwNi0wOWViLTRhMGEtOWFjNi1iOGU2ZDU3NDgyNDciLCJpZCI6Mzk0MDQ1LCJpYXQiOjE3NzE5OTg4NTR9.A9e7l27WYfUgfYVRL4Nt7kxcDzzqg1h-O9cOv6Lk3_o';
+const cesiumIonToken = import.meta.env.VITE_CESIUM_ION_TOKEN
+if (cesiumIonToken) {
+  Cesium.Ion.defaultAccessToken = cesiumIonToken
+}
 
 export default function MapView3D({ onBrowseStateChange, browseSyncToken, browseSyncSource }: MapView3DProps) {
   const shellRef = useRef<HTMLDivElement>(null);

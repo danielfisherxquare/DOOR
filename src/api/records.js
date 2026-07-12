@@ -2,10 +2,13 @@ import request from '../utils/request'
 import { resolveSurfacePrefix } from '../utils/surfaceApi'
 
 function getBasePath() {
-  return resolveSurfacePrefix({
+  return resolveSurfacePrefix(
+    {
     admin: '/admin/records',
     app: '/app/records',
-  }, 'app')
+    },
+    'app'
+  )
 }
 
 /**
@@ -79,7 +82,8 @@ export const recordsApi = {
     /**
      * 校验成绩导入
      */
-    importVerification: (raceId, results) => request.post(`${getBasePath()}/import-verification/${raceId}`, results),
+  importVerification: (raceId, results) =>
+    request.post(`${getBasePath()}/import-verification/${raceId}`, results),
 }
 
 /**

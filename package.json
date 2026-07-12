@@ -6,17 +6,21 @@
   "scripts": {
     "dev": "vite",
     "check:encoding": "node scripts/check-encoding.mjs",
+    "lint": "eslint src/ --ext .js,.jsx,.ts,.tsx",
+    "lint:fix": "eslint src/ --ext .js,.jsx,.ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css}\"",
     "build": "vite build",
     "preview": "vite preview",
     "test:branding": "node --test tests/branding/branding.test.mjs",
-    "test:map": "node --test tests/map/map-utils.test.mjs tests/map/map-e2e.test.mjs",
+    "test:map": "node --test tests/map/map-utils.test.mjs tests/map/map-e2e.test.mjs tests/map/geometryBbox.test.mjs tests/map/siteBakeCache.test.mjs",
     "test:map:unit": "node --test tests/map/map-utils.test.mjs",
     "test:map:e2e": "node --test tests/map/map-e2e.test.mjs",
     "test:terrain-model": "node --test tests/terrain-model/terrainModel.test.mjs",
-    "test:surfaces": "node --test tests/surfaceContext.test.js tests/workspaceSession.test.js tests/moduleAccess.test.js tests/surfaceBoundaries.test.js",
-    "test:3d-studio": "node --test tests/3d-studio/editorDocument.test.js tests/3d-studio/focusZoneStudioScene.test.js tests/3d-studio/studioExport.test.js",
+    "test:surfaces": "node --test tests/surfaceContext.test.js tests/workspaceSession.test.js tests/moduleAccess.test.js tests/surfaceBoundaries.test.js tests/auditApiSurface.test.mjs",
+    "test:3d-studio": "node --test tests/3d-studio/editorDocument.test.js tests/3d-studio/focusZoneStudioScene.test.js tests/3d-studio/siteBackdrop.test.js tests/3d-studio/studioExport.test.js",
     "test:reimbursement": "node tests/reimbursement/reimbursement-e2e.test.js",
-    "test:reimbursement:headless": "cross-env HEADLESS=true node tests/reimbursement/reimbursement-e2e.test.js"
+    "test:reimbursement:headless": "cross-env HEADLESS=true node tests/reimbursement/reimbursement-e2e.test.js",
+    "test": "node --test tests/surfaceContext.test.js tests/workspaceSession.test.js tests/moduleAccess.test.js tests/surfaceBoundaries.test.js tests/auditApiSurface.test.mjs tests/security/source-secrets.test.mjs tests/3d-studio/editorDocument.test.js tests/3d-studio/focusZoneStudioScene.test.js tests/3d-studio/siteBackdrop.test.js tests/3d-studio/studioExport.test.js tests/terrain-model/terrainModel.test.mjs tests/map/map-utils.test.mjs tests/map/geometryBbox.test.mjs tests/map/siteBakeCache.test.mjs tests/branding/branding.test.mjs"
   },
   "dependencies": {
     "@geoman-io/leaflet-geoman-free": "^2.19.2",
@@ -65,18 +69,25 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.1",
     "@tailwindcss/vite": "^4.2.1",
-    "@types/react": "^18.2.55",
-    "@types/react-dom": "^18.2.19",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.27",
     "cross-env": "^7.0.3",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.37.5",
     "exceljs": "^4.4.0",
     "playwright": "^1.52.0",
     "postcss": "^8.5.8",
+    "prettier": "^3.3.3",
     "tailwindcss": "^4.2.1",
+    "typescript": "^5.6.0",
     "vite": "^5.1.0"
   },
   "overrides": {
-    "lodash": "^4.18.1"
+    "lodash": "^4.17.21",
+    "uuid": "^11.1.1"
   }
 }

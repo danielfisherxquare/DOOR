@@ -51,10 +51,7 @@ function getProfileOrgId(user, overrideOrgId, scopeType) {
   if (user?.role === 'super_admin') return ''
 
   const userOrgId = getUserOrgId(user)
-  if (
-    workspaceSession?.orgId
-    && (!userOrgId || userOrgId === workspaceSession.orgId)
-  ) {
+  if (workspaceSession?.orgId && (!userOrgId || userOrgId === workspaceSession.orgId)) {
     return workspaceSession.orgId
   }
 
@@ -66,10 +63,7 @@ function getProfileRaceId(user, overrideRaceId, targetOrgId, scopeType) {
   if (overrideRaceId !== undefined && overrideRaceId !== null) return toId(overrideRaceId)
 
   const workspaceSession = readPersistedWorkspaceSession()
-  if (
-    workspaceSession?.raceId
-    && (!targetOrgId || workspaceSession.orgId === toId(targetOrgId))
-  ) {
+  if (workspaceSession?.raceId && (!targetOrgId || workspaceSession.orgId === toId(targetOrgId))) {
     return workspaceSession.raceId
   }
 
@@ -82,7 +76,7 @@ function mergeAuthzProfile(user, profile) {
   const surfaces = Array.isArray(profile.surfaces) ? profile.surfaces : []
   const defaultSurface = surfaces.includes(user.defaultSurface)
     ? user.defaultSurface
-    : (surfaces[0] || user.defaultSurface || 'app')
+    : surfaces[0] || user.defaultSurface || 'app'
 
   return {
     ...user,
@@ -128,14 +122,26 @@ const useAuthStore = create(
               isAuthenticated: false,
             })
             const profile = await get().refreshAuthzProfile(
-              response.data?.role === 'super_admin' ? { scopeType: 'platform' } : { raceId: '' },
+              response.data?.role === 'super_admin' ? { scopeType: 'platform' } : { raceId: '' }
             )
             set({ isBootstrapping: false, isAuthenticated: Boolean(profile) })
           } else {
-            set({ isBootstrapping: false, isAuthenticated: false, user: null, token: null, refreshToken: null })
+            set({
+              isBootstrapping: false,
+              isAuthenticated: false,
+              user: null,
+              token: null,
+              refreshToken: null,
+            })
           }
         } catch {
-          set({ isBootstrapping: false, isAuthenticated: false, user: null, token: null, refreshToken: null })
+          set({
+            isBootstrapping: false,
+            isAuthenticated: false,
+            user: null,
+            token: null,
+            refreshToken: null,
+          })
         }
       },
 
@@ -169,7 +175,9 @@ const useAuthStore = create(
         try {
           const response = await authApi.getAuthzProfile({
             orgId: usesPlatformScope ? undefined : targetOrgId,
-            raceId: usesPlatformScope ? undefined : getProfileRaceId(user, raceId, targetOrgId, scopeType),
+            raceId: usesPlatformScope
+              ? undefined
+              : getProfileRaceId(user, raceId, targetOrgId, scopeType),
           })
           if (response.success) {
             const nextUser = mergeAuthzProfile(get().user, response.data)
@@ -196,7 +204,9 @@ const useAuthStore = create(
               isLoading: true,
               error: null,
             })
-            const profile = await get().refreshAuthzProfile(user.role === 'super_admin' ? { scopeType: 'platform' } : { raceId: '' })
+            const profile = await get().refreshAuthzProfile(
+              user.role === 'super_admin' ? { scopeType: 'platform' } : { raceId: '' }
+            )
             if (!profile) {
               set({
                 user: null,
@@ -255,6 +265,15 @@ const useAuthStore = create(
         }
       },
 
+      clearSession: () =>
+        set({
+          user: null,
+          token: null,
+          refreshToken: null,
+          isAuthenticated: false,
+          error: null,
+        }),
+
       logout: async () => {
         try {
           const { refreshToken } = get()
@@ -263,13 +282,7 @@ const useAuthStore = create(
           // ignore
         }
 
-        set({
-          user: null,
-          token: null,
-          refreshToken: null,
-          isAuthenticated: false,
-          error: null,
-        })
+        get().clearSession()
       },
 
       fetchCurrentUser: async () => {
@@ -362,8 +375,8 @@ const useAuthStore = create(
         refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
-    },
-  ),
+    }
+  )
 )
 
 export default useAuthStore

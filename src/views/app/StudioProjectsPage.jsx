@@ -36,11 +36,14 @@ export default function StudioProjectsPage() {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const orgId = resolveSurfaceOrgId(searchParams, user)
-  const buildStudioNewHref = useCallback((projectType, sceneType) => {
+  const buildStudioNewHref = useCallback(
+    (projectType, sceneType) => {
     const baseHref = buildAppHref('/3d-studio/new', { orgId })
     const joiner = baseHref.includes('?') ? '&' : '?'
     return `${baseHref}${joiner}projectType=${projectType}&sceneType=${sceneType}`
-  }, [orgId])
+    },
+    [orgId]
+  )
 
   const loadProjects = useCallback(async () => {
     setLoading(true)
@@ -113,21 +116,40 @@ export default function StudioProjectsPage() {
           <div className="studio-projects__eyebrow">空间工作台</div>
           <h2 className="studio-projects__title">直接打开的 3D 白模编辑器</h2>
           <p className="studio-projects__summary">
-            现在新项目会直接进入 3D 编辑器，不再要求先走地图放置、建筑结构或仓库前置流程。旧项目和导入项目也可以继续在同一个编辑器里打开。
+            现在新项目会直接进入 3D
+            编辑器，不再要求先走地图放置、建筑结构或仓库前置流程。旧项目和导入项目也可以继续在同一个编辑器里打开。
           </p>
         </div>
         <div className="studio-projects__actions">
-          <Link to={buildStudioNewHref('warehouse', 'warehouse')} className="studio-projects__primary-action">
+          <Link
+            to={buildStudioNewHref('warehouse', 'warehouse')}
+            className="studio-projects__primary-action"
+          >
             新建仓储白模
           </Link>
-          <Link to={buildStudioNewHref('asset', 'outdoor-event')} className="studio-projects__secondary-action">
+          <Link
+            to={buildStudioNewHref('asset', 'outdoor-event')}
+            className="studio-projects__secondary-action"
+          >
             新建3D资产
           </Link>
-          <Link to={buildStudioNewHref('venue', 'outdoor-event')} className="studio-projects__secondary-action">
+          <Link
+            to={buildStudioNewHref('venue', 'outdoor-event')}
+            className="studio-projects__secondary-action"
+          >
             新建场馆白模
           </Link>
-          <Link to={buildStudioNewHref('site', 'outdoor-event')} className="studio-projects__secondary-action">
+          <Link
+            to={buildStudioNewHref('site', 'outdoor-event')}
+            className="studio-projects__secondary-action"
+          >
             新建场地白模
+          </Link>
+          <Link
+            to={buildAppHref('/3d-studio/site', { orgId })}
+            className="studio-projects__primary-action"
+          >
+            卫星场地模式
           </Link>
         </div>
       </section>
@@ -170,10 +192,19 @@ export default function StudioProjectsPage() {
           <div className="studio-projects__grid">
             {projects.map((project) => (
               <article key={project.id} className="studio-projects__card">
-                <button type="button" className="studio-projects__card-hit" onClick={() => navigate(buildAppHref(`/3d-studio/${project.id}`, { orgId }))} aria-label={`打开 ${project.name}`} />
+                <button
+                  type="button"
+                  className="studio-projects__card-hit"
+                  onClick={() => navigate(buildAppHref(`/3d-studio/${project.id}`, { orgId }))}
+                  aria-label={`打开 ${project.name}`}
+                />
                 <div className="studio-projects__card-top">
-                  <span className="studio-projects__card-badge">{getProjectTypeLabel(project.projectType || project.sceneType)}</span>
-                  <span className="studio-projects__card-source">{project.sourceType === 'warehouse-import' ? '仓库导入' : '空白项目'}</span>
+                  <span className="studio-projects__card-badge">
+                    {getProjectTypeLabel(project.projectType || project.sceneType)}
+                  </span>
+                  <span className="studio-projects__card-source">
+                    {project.sourceType === 'warehouse-import' ? '仓库导入' : '空白项目'}
+                  </span>
                 </div>
                 <h4>{project.name}</h4>
                 <p>
@@ -188,9 +219,22 @@ export default function StudioProjectsPage() {
                   <span>最近打开 {formatDate(project.lastOpenedAt)}</span>
                 </div>
                 <div className="studio-projects__card-actions">
-                  <button type="button" onClick={() => navigate(buildAppHref(`/3d-studio/${project.id}`, { orgId }))}>打开</button>
-                  <button type="button" onClick={() => handleDuplicate(project.id)}>复制</button>
-                  <button type="button" className="is-danger" onClick={() => handleDelete(project.id)}>删除</button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(buildAppHref(`/3d-studio/${project.id}`, { orgId }))}
+                  >
+                    打开
+                  </button>
+                  <button type="button" onClick={() => handleDuplicate(project.id)}>
+                    复制
+                  </button>
+                  <button
+                    type="button"
+                    className="is-danger"
+                    onClick={() => handleDelete(project.id)}
+                  >
+                    删除
+                  </button>
                 </div>
               </article>
             ))}

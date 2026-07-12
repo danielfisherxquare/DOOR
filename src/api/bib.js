@@ -3,10 +3,13 @@ import { unwrapData } from '../utils/apiResponse'
 import { resolveSurfacePrefix } from '../utils/surfaceApi'
 
 function getBasePath() {
-    return resolveSurfacePrefix({
+  return resolveSurfacePrefix(
+    {
         admin: '/admin/bib',
         app: '/app/bib',
-    }, 'app')
+    },
+    'app'
+  )
 }
 
 /**
@@ -16,22 +19,17 @@ function getBasePath() {
  */
 export const bibApi = {
     // ── Overview ──────────────────────────────────────────────
-    getBibOverview: (raceId) =>
-        request.get(`${getBasePath()}/overview/${raceId}`).then(unwrapData),
+  getBibOverview: (raceId) => request.get(`${getBasePath()}/overview/${raceId}`).then(unwrapData),
 
     // ── Templates CRUD ───────────────────────────────────────
-    getBibTemplates: (raceId) =>
-        request.get(`${getBasePath()}/templates/${raceId}`).then(unwrapData),
+  getBibTemplates: (raceId) => request.get(`${getBasePath()}/templates/${raceId}`).then(unwrapData),
 
-    saveBibTemplate: (data) =>
-        request.post(`${getBasePath()}/templates`, data).then(unwrapData),
+  saveBibTemplate: (data) => request.post(`${getBasePath()}/templates`, data).then(unwrapData),
 
-    deleteBibTemplate: (id) =>
-        request.delete(`${getBasePath()}/templates/${id}`).then(unwrapData),
+  deleteBibTemplate: (id) => request.delete(`${getBasePath()}/templates/${id}`).then(unwrapData),
 
     // ── Dataset ──────────────────────────────────────────────
-    getBibDataset: (raceId) =>
-        request.get(`${getBasePath()}/dataset/${raceId}`).then(unwrapData),
+  getBibDataset: (raceId) => request.get(`${getBasePath()}/dataset/${raceId}`).then(unwrapData),
 
     getBibExecutionDataset: (raceId) =>
         request.get(`${getBasePath()}/execution-dataset/${raceId}`).then(unwrapData),
@@ -41,18 +39,19 @@ export const bibApi = {
         request.post(`${getBasePath()}/snapshot/${raceId}`).then(unwrapData),
 
     hasBibSnapshot: (raceId) =>
-        request.get(`${getBasePath()}/has-snapshot/${raceId}`).then(unwrapData).then(d => d.hasSnapshot),
+    request
+      .get(`${getBasePath()}/has-snapshot/${raceId}`)
+      .then(unwrapData)
+      .then((d) => d.hasSnapshot),
 
-    rollbackBib: (raceId) =>
-        request.post(`${getBasePath()}/rollback/${raceId}`).then(unwrapData),
+  rollbackBib: (raceId) => request.post(`${getBasePath()}/rollback/${raceId}`).then(unwrapData),
 
     // ── Bulk Assign ─────────────────────────────────────────
     bulkAssignBib: (raceId, assignments) =>
         request.post(`${getBasePath()}/bulk-assign/${raceId}`, { assignments }).then(unwrapData),
 
     // ── Clear ────────────────────────────────────────────────
-    clearBib: (raceId) =>
-        request.post(`${getBasePath()}/clear/${raceId}`).then(unwrapData),
+  clearBib: (raceId) => request.post(`${getBasePath()}/clear/${raceId}`).then(unwrapData),
 }
 
 export default bibApi

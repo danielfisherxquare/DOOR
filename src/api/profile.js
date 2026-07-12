@@ -1,4 +1,4 @@
-import request from '../utils/request';
+import request from '../utils/request'
 
 const profileApi = {
   /**
@@ -18,16 +18,9 @@ const profileApi = {
    * @param {File} file - 图片文件
    */
   uploadAvatar: async (file) => {
-    const formData = new FormData();
-    formData.append('avatar', file);
-    const response = await fetch('/api/profile/avatar', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('auth-storage') ? JSON.parse(localStorage.getItem('auth-storage'))?.state?.token : ''}`,
-      },
-      body: formData,
-    });
-    return response.json();
+    const formData = new FormData()
+    formData.append('avatar', file)
+    return request.post('/profile/avatar', formData)
   },
 
   /**
@@ -35,16 +28,9 @@ const profileApi = {
    * @param {File} file - 图片文件
    */
   uploadCredentialPhoto: async (file) => {
-    const formData = new FormData();
-    formData.append('photo', file);
-    const response = await fetch('/api/profile/credential-photo', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('auth-storage') ? JSON.parse(localStorage.getItem('auth-storage'))?.state?.token : ''}`,
-      },
-      body: formData,
-    });
-    return response.json();
+    const formData = new FormData()
+    formData.append('photo', file)
+    return request.post('/profile/credential-photo', formData)
   },
 
   /**
@@ -52,6 +38,6 @@ const profileApi = {
    * @param {string} userId - 用户ID
    */
   getUser: (userId) => request.get(`/profile/${userId}`),
-};
+}
 
-export default profileApi;
+export default profileApi

@@ -10,16 +10,20 @@ import useSurfaceWorkspace from '../../features/workspace/useSurfaceWorkspace'
 import useSidebarMotion from '../shared/useSidebarMotion'
 import { showInfo } from '../../utils/toast'
 import './app-layout.css'
+import '../../styles/command-console.css'
 
 const Home = lazy(() => import('../../views/Home'))
 const ReimbursementTool = lazy(() => import('../../views/reimbursement/ReimbursementTool'))
 const ChangePassword = lazy(() => import('../../views/ChangePassword'))
 const StudioProjectsPage = lazy(() => import('../../views/app/StudioProjectsPage'))
 const StudioProjectPage = lazy(() => import('../../views/app/StudioProjectPage'))
+const SiteModePage = lazy(() => import('../../views/app/SiteModePage'))
 const TerrainModelPage = lazy(() => import('../../views/app/terrain-model/TerrainModelPage'))
 const ProfilePage = lazy(() => import('../../views/profile/ProfilePage'))
 const ImportPage = lazy(() => import('../../views/app/events/import/ImportPage'))
-const ProcessingCenterPage = lazy(() => import('../../views/app/events/processing/ProcessingCenterPage'))
+const ProcessingCenterPage = lazy(
+  () => import('../../views/app/events/processing/ProcessingCenterPage')
+)
 const RecordsPage = lazy(() => import('../../views/app/events/records/RecordsPage'))
 const LotteryPage = lazy(() => import('../../views/app/events/lottery/LotteryPage'))
 const BibPage = lazy(() => import('../../views/app/events/bib/BibPage'))
@@ -30,9 +34,15 @@ const OutboundCenter = lazy(() => import('../../views/inventory/OutboundCenter')
 const SpaceCenter = lazy(() => import('../../views/inventory/SpaceCenter'))
 const ControlCenter = lazy(() => import('../../views/inventory/ControlCenter'))
 const Reports = lazy(() => import('../../views/inventory/Reports'))
-const CredentialCenterPage = lazy(() => import('../../features/credential/app/CredentialCenterPage'))
-const CredentialApplicationPage = lazy(() => import('../../features/credential/app/CredentialApplicationPage'))
-const CredentialReviewPage = lazy(() => import('../../features/credential/app/CredentialReviewPage'))
+const CredentialCenterPage = lazy(
+  () => import('../../features/credential/app/CredentialCenterPage')
+)
+const CredentialApplicationPage = lazy(
+  () => import('../../features/credential/app/CredentialApplicationPage')
+)
+const CredentialReviewPage = lazy(
+  () => import('../../features/credential/app/CredentialReviewPage')
+)
 const MechanicalClock = lazy(() => import('../tools/MechanicalClock'))
 const MechanicalClock3D = lazy(() => import('../tools/MechanicalClock3D'))
 const InterviewList = lazy(() => import('../../views/interview/InterviewList'))
@@ -40,11 +50,17 @@ const InterviewCompare = lazy(() => import('../../views/interview/InterviewCompa
 const InterviewForm = lazy(() => import('../../views/interview/InterviewForm'))
 const ProjectListPage = lazy(() => import('../../views/app/projects/ProjectListPage'))
 const ProjectDetailPage = lazy(() => import('../../views/app/projects/ProjectDetailPage'))
-const AssessmentCampaignListPage = lazy(() => import('../../views/app/assessment/AssessmentCampaignListPage'))
-const AssessmentCampaignDetailPage = lazy(() => import('../../views/app/assessment/AssessmentCampaignDetailPage'))
+const AssessmentCampaignListPage = lazy(
+  () => import('../../views/app/assessment/AssessmentCampaignListPage')
+)
+const AssessmentCampaignDetailPage = lazy(
+  () => import('../../views/app/assessment/AssessmentCampaignDetailPage')
+)
 const BibTrackingPage = lazy(() => import('../../views/app/events/bib-tracking/BibTrackingPage'))
 const RaceDashboardPage = lazy(() => import('../../views/app/race-dashboard/RaceDashboardPage'))
-const DesignRequestWorkspace = lazy(() => import('../../views/design-requests/DesignRequestWorkspace'))
+const DesignRequestWorkspace = lazy(
+  () => import('../../views/design-requests/DesignRequestWorkspace')
+)
 
 function AppRouteLoader() {
   return (
@@ -58,27 +74,13 @@ function AppRouteLoader() {
 }
 
 export default function AppLayout() {
-
-// === 布局类验证 (自动添加) ===
-useEffect(() => {
-  // 确保body有正确的布局类
-  document.body.classList.add('layout--app');
-
-  // 验证CSS变量是否加载
-  const requiredVars = ['--designer-shell', '--designer-panel', '--designer-text'];
-  const missing = requiredVars.filter(v =>
-    !getComputedStyle(document.documentElement).getPropertyValue(v)
-  );
-
-  if (missing.length > 0) {
-    console.warn('[3D Studio] 缺少CSS变量:', missing);
-  }
-
-  return () => {
-    // 清理（如果需要）
-    // document.body.classList.remove('layout--app');
-  };
-}, []);
+  // === 布局类验证 ===
+  useEffect(() => {
+    document.body.classList.add('layout--app')
+    return () => {
+      document.body.classList.remove('layout--app')
+    }
+  }, [])
 
   const { user, logout } = useAuthStore()
   const hasCapability = useAuthStore((state) => state.hasCapability)
@@ -93,7 +95,14 @@ useEffect(() => {
     promptEvent: null,
   })
   const navRef = useRef(null)
-  const { session, selectedOrgId, selectedRaceId, currentContext, switchWorkspace, workspaceMissing } = useSurfaceWorkspace('app')
+  const {
+    session,
+    selectedOrgId,
+    selectedRaceId,
+    currentContext,
+    switchWorkspace,
+    workspaceMissing,
+  } = useSurfaceWorkspace('app')
 
   useEffect(() => {
     setMobileDrawerOpen(false)
@@ -105,9 +114,9 @@ useEffect(() => {
     const displayModeQuery = window.matchMedia?.('(display-mode: standalone)')
     const detectInstallState = () => {
       const isStandalone = Boolean(
-        displayModeQuery?.matches
-          || window.navigator.standalone
-          || window.matchMedia?.('(display-mode: fullscreen)')?.matches,
+        displayModeQuery?.matches ||
+        window.navigator.standalone ||
+        window.matchMedia?.('(display-mode: fullscreen)')?.matches
       )
       const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent || '')
       setInstallPromptState((state) => ({
@@ -158,8 +167,11 @@ useEffect(() => {
   }, [currentContext, navigate])
 
   const isMapRoute = location.pathname === '/app/map' || location.pathname.startsWith('/app/map/')
-  const isStudioImmersiveRoute = location.pathname === '/app/3d-studio/new'
-    || /^\/app\/3d-studio\/[^/]+$/.test(location.pathname)
+  const isSiteModeRoute = location.pathname === '/app/3d-studio/site'
+  const isStudioImmersiveRoute =
+    !isSiteModeRoute &&
+    (location.pathname === '/app/3d-studio/new' ||
+      /^\/app\/3d-studio\/[^/]+$/.test(location.pathname))
   const studioProjectMatch = useMatch('/app/3d-studio/:projectId')
   const immersiveToolComponent = useMemo(() => {
     if (location.pathname === '/app/tools/mechanical-clock') return MechanicalClock
@@ -169,13 +181,13 @@ useEffect(() => {
 
   const navGroups = useMemo(
     () => getAppNavGroups({ user, hasCapability, raceId: selectedRaceId }),
-    [hasCapability, selectedRaceId, user],
+    [hasCapability, selectedRaceId, user]
   )
   const routeMeta = useMemo(() => getAppRouteMeta(location.pathname), [location.pathname])
 
   const currentGroup = useMemo(
     () => navGroups.find((group) => group.key === routeMeta.groupKey) || navGroups[0],
-    [navGroups, routeMeta.groupKey],
+    [navGroups, routeMeta.groupKey]
   )
 
   const handleLogout = async () => {
@@ -198,9 +210,11 @@ useEffect(() => {
       return
     }
 
-    showInfo(installPromptState.isIos
+    showInfo(
+      installPromptState.isIos
       ? '在 Safari 中点分享按钮，然后选择“添加到主屏幕”。'
-      : '在浏览器菜单中选择“添加到主屏幕”或“安装应用”。')
+        : '在浏览器菜单中选择“添加到主屏幕”或“安装应用”。'
+    )
   }, [installPromptState])
 
   const roleName = useMemo(() => {
@@ -213,7 +227,8 @@ useEffect(() => {
   }, [user])
 
   const groupTitle = currentGroup?.label || '应用层'
-  const requireAppModule = useCallback((moduleId, element, options = {}) => {
+  const requireAppModule = useCallback(
+    (moduleId, element, options = {}) => {
     if (options.needsRace && !selectedRaceId) {
       const redirect = encodeURIComponent(`${location.pathname}${location.search}`)
       return <Navigate to={`/workspaces?redirect=${redirect}`} replace />
@@ -224,15 +239,24 @@ useEffect(() => {
         {element}
       </ModuleProtectedRoute>
     )
-  }, [location.pathname, location.search, selectedRaceId])
-  const isNavItemActive = useCallback((item) => {
+    },
+    [location.pathname, location.search, selectedRaceId]
+  )
+  const isNavItemActive = useCallback(
+    (item) => {
     return item.path === ''
       ? location.pathname === '/app'
-      : location.pathname === '/app' + item.path || location.pathname.startsWith('/app' + item.path + '/')
-  }, [location.pathname])
+        : location.pathname === '/app' + item.path ||
+            location.pathname.startsWith('/app' + item.path + '/')
+    },
+    [location.pathname]
+  )
   const flatNavItems = useMemo(
-    () => navGroups.flatMap((group) => group.items.map((item) => ({ ...item, groupLabel: group.label }))),
-    [navGroups],
+    () =>
+      navGroups.flatMap((group) =>
+        group.items.map((item) => ({ ...item, groupLabel: group.label }))
+      ),
+    [navGroups]
   )
   const mobileDockItems = useMemo(() => {
     const primaryKeys = ['dashboard', 'reimbursement', 'import', 'inventory-workbench']
@@ -262,8 +286,18 @@ useEffect(() => {
     <>
       {isMapRoute ? (
         requireAppModule('map', <AppMapLayout context={currentContext} />)
+      ) : isSiteModeRoute ? (
+        requireAppModule(
+          '3d-studio',
+          <Suspense fallback={<AppRouteLoader />}>
+            <CapabilityProtectedRoute scope="inventory" capability="3d_studio">
+              <SiteModePage />
+            </CapabilityProtectedRoute>
+          </Suspense>
+        )
       ) : isStudioImmersiveRoute ? (
-        requireAppModule('3d-studio', (
+        requireAppModule(
+          '3d-studio',
           <Suspense fallback={<AppRouteLoader />}>
             <CapabilityProtectedRoute scope="inventory" capability="3d_studio">
               <StudioProjectPage
@@ -272,7 +306,7 @@ useEffect(() => {
               />
             </CapabilityProtectedRoute>
           </Suspense>
-        ))
+        )
       ) : immersiveToolComponent ? (
         <main className="command-tool-fullscreen" aria-label="沉浸式工具视图">
           <button
@@ -282,7 +316,16 @@ useEffect(() => {
             title="返回工作台"
             aria-label="返回工作台"
           >
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <line x1="19" y1="12" x2="5" y2="12" />
               <polyline points="12 19 5 12 12 5" />
             </svg>
@@ -295,7 +338,9 @@ useEffect(() => {
           </Suspense>
         </main>
       ) : (
-        <div className={`layout--app workspace-layout ${sidebarCollapsed ? 'workspace-layout--collapsed' : ''} ${sidebarMotionClass}`.trim()}>
+        <div
+          className={`layout--app workspace-layout ${sidebarCollapsed ? 'workspace-layout--collapsed' : ''} ${sidebarMotionClass}`.trim()}
+        >
           {/* ═══════════ 侧边栏 ═══════════ */}
           <aside className="workspace-sidebar">
         {/* ── 品牌区 ── */}
@@ -337,9 +382,15 @@ useEffect(() => {
                   const active = isNavItemActive(item)
 
                   return (
-                    <Link key={item.key} to={href} className={`workspace-nav-item ${active ? 'workspace-nav-item--active' : ''}`}>
+                        <Link
+                          key={item.key}
+                          to={href}
+                          className={`workspace-nav-item ${active ? 'workspace-nav-item--active' : ''}`}
+                        >
                       <span className="workspace-nav-item__icon">
-                        <span className="material-symbols-outlined">{item.icon || 'circle'}</span>
+                            <span className="material-symbols-outlined">
+                              {item.icon || 'circle'}
+                            </span>
                       </span>
                       <span className="workspace-nav-item__title">{item.label}</span>
                     </Link>
@@ -353,7 +404,9 @@ useEffect(() => {
         {/* ── 底部 ── */}
         <div className="workspace-sidebar__footer">
           <div className="workspace-sidebar__user-card">
-            <span className="workspace-sidebar__avatar">{user?.username?.slice(0, 2)?.toUpperCase() || 'U'}</span>
+                <span className="workspace-sidebar__avatar">
+                  {user?.username?.slice(0, 2)?.toUpperCase() || 'U'}
+                </span>
             <span className="workspace-sidebar__user-meta">
               <span className="workspace-sidebar__user-name">{user?.username || '用户'}</span>
               <span className="workspace-sidebar__user-role">{roleName}</span>
@@ -394,8 +447,16 @@ useEffect(() => {
                 type="button"
                 className="workspace-main__install-btn"
                 onClick={handleInstallClick}
-                title={installPromptState.isIos ? '在 Safari 分享菜单中选择“添加到主屏幕”' : '添加到桌面'}
-                aria-label={installPromptState.isIos ? '在 Safari 分享菜单中选择添加到主屏幕' : installCopy}
+                    title={
+                      installPromptState.isIos
+                        ? '在 Safari 分享菜单中选择“添加到主屏幕”'
+                        : '添加到桌面'
+                    }
+                    aria-label={
+                      installPromptState.isIos
+                        ? '在 Safari 分享菜单中选择添加到主屏幕'
+                        : installCopy
+                    }
               >
                 <span className="material-symbols-outlined">add_to_home_screen</span>
                 <span className="workspace-main__install-text">
@@ -415,7 +476,9 @@ useEffect(() => {
               onSwitch={switchWorkspace}
             />
             <div className="workspace-main__topbar-user">
-              <span className="workspace-main__topbar-avatar">{user?.username?.slice(0, 2)?.toUpperCase() || 'U'}</span>
+                  <span className="workspace-main__topbar-avatar">
+                    {user?.username?.slice(0, 2)?.toUpperCase() || 'U'}
+                  </span>
             </div>
           </div>
         </header>
@@ -424,7 +487,9 @@ useEffect(() => {
         <section className="workspace-main__page-header">
           <div className="workspace-main__page-header-inner">
             <div className="workspace-main__eyebrow-row">
-              <span className="workspace-kicker">{routeMeta.sectionLabel || currentGroup?.label || '应用层'}</span>
+                  <span className="workspace-kicker">
+                    {routeMeta.sectionLabel || currentGroup?.label || '应用层'}
+                  </span>
               <span className="workspace-role-pill">{roleName}</span>
               <span className="workspace-kicker">{routeMeta.surfaceCode || 'APP'}</span>
             </div>
@@ -440,135 +505,273 @@ useEffect(() => {
           <Suspense fallback={<AppRouteLoader />}>
             <Routes>
               <Route index element={<Home />} />
-              <Route path="events/import" element={requireAppModule('events', <ImportPage />, { needsRace: true })} />
-              <Route path="events/processing" element={requireAppModule('events', <ProcessingCenterPage />, { needsRace: true })} />
-              <Route path="events/records" element={requireAppModule('events', <RecordsPage />, { needsRace: true })} />
-              <Route path="events/lottery" element={requireAppModule('events', <LotteryPage />, { needsRace: true })} />
-              <Route path="events/bib" element={requireAppModule('events', <BibPage />, { needsRace: true })} />
-              <Route path="events/clothing" element={requireAppModule('events', <ClothingPage />, { needsRace: true })} />
-              <Route path="design-requests" element={
+                  <Route
+                    path="events/import"
+                    element={requireAppModule('events', <ImportPage />, { needsRace: true })}
+                  />
+                  <Route
+                    path="events/processing"
+                    element={requireAppModule('events', <ProcessingCenterPage />, {
+                      needsRace: true,
+                    })}
+                  />
+                  <Route
+                    path="events/records"
+                    element={requireAppModule('events', <RecordsPage />, { needsRace: true })}
+                  />
+                  <Route
+                    path="events/lottery"
+                    element={requireAppModule('events', <LotteryPage />, { needsRace: true })}
+                  />
+                  <Route
+                    path="events/bib"
+                    element={requireAppModule('events', <BibPage />, { needsRace: true })}
+                  />
+                  <Route
+                    path="events/clothing"
+                    element={requireAppModule('events', <ClothingPage />, { needsRace: true })}
+                  />
+                  <Route
+                    path="design-requests"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="design-requests">
                   <DesignRequestWorkspace surface="app" mode="designer" />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="credential-center" element={
+                    }
+                  />
+                  <Route
+                    path="credential-center"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="credentials">
                   <CredentialCenterPage />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="credential" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/select-race" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/zones" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/roles" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/access-areas" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/categories" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/styles" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="credential/applications" element={<Navigate to={buildAppHref('/credential/requests', currentContext)} replace />} />
-              <Route path="credential/requests" element={
+                    }
+                  />
+                  <Route
+                    path="credential"
+                    element={
+                      <Navigate to={buildAppHref('/credential-center', currentContext)} replace />
+                    }
+                  />
+                  <Route
+                    path="credential/select-race"
+                    element={
+                      <Navigate to={buildAppHref('/credential-center', currentContext)} replace />
+                    }
+                  />
+                  <Route
+                    path="credential/zones"
+                    element={
+                      <Navigate to={buildAppHref('/credential-center', currentContext)} replace />
+                    }
+                  />
+                  <Route
+                    path="credential/roles"
+                    element={
+                      <Navigate to={buildAppHref('/credential-center', currentContext)} replace />
+                    }
+                  />
+                  <Route
+                    path="credential/access-areas"
+                    element={
+                      <Navigate to={buildAppHref('/credential-center', currentContext)} replace />
+                    }
+                  />
+                  <Route
+                    path="credential/categories"
+                    element={
+                      <Navigate to={buildAppHref('/credential-center', currentContext)} replace />
+                    }
+                  />
+                  <Route
+                    path="credential/styles"
+                    element={
+                      <Navigate to={buildAppHref('/credential-center', currentContext)} replace />
+                    }
+                  />
+                  <Route
+                    path="credential/applications"
+                    element={
+                      <Navigate to={buildAppHref('/credential/requests', currentContext)} replace />
+                    }
+                  />
+                  <Route
+                    path="credential/requests"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="credentials">
                   <CredentialApplicationPage />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="credential/review" element={
+                    }
+                  />
+                  <Route
+                    path="credential/review"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="credentials">
                   <CredentialReviewPage />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="credential/issue" element={<Navigate to={buildAppHref('/credential-center', currentContext)} replace />} />
-              <Route path="inventory" element={
+                    }
+                  />
+                  <Route
+                    path="credential/issue"
+                    element={
+                      <Navigate to={buildAppHref('/credential-center', currentContext)} replace />
+                    }
+                  />
+                  <Route
+                    path="inventory"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="inventory">
                   <WmsDashboard />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="inventory/inbound" element={
+                    }
+                  />
+                  <Route
+                    path="inventory/inbound"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="inventory">
                   <InboundCenter />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="inventory/outbound" element={
+                    }
+                  />
+                  <Route
+                    path="inventory/outbound"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="inventory">
                   <OutboundCenter />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="inventory/space" element={
+                    }
+                  />
+                  <Route
+                    path="inventory/space"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="inventory">
                   <SpaceCenter />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="inventory/control" element={
+                    }
+                  />
+                  <Route
+                    path="inventory/control"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="inventory">
                   <ControlCenter />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="inventory/analytics" element={
+                    }
+                  />
+                  <Route
+                    path="inventory/analytics"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="inventory">
                   <Reports />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="inventory/twin/designer" element={<Navigate to={`/asset-designer${location.search}`} replace />} />
+                    }
+                  />
+                  <Route
+                    path="inventory/twin/designer"
+                    element={<Navigate to={`/asset-designer${location.search}`} replace />}
+                  />
               <Route path="tools/mechanical-clock" element={<MechanicalClock />} />
               <Route path="tools/mechanical-clock-3d" element={<MechanicalClock3D />} />
-              <Route path="interview" element={
+                  <Route
+                    path="interview"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="interview">
                   <InterviewForm />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="interview/records" element={
+                    }
+                  />
+                  <Route
+                    path="interview/records"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="interview">
                   <InterviewList />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="interview/compare" element={
+                    }
+                  />
+                  <Route
+                    path="interview/compare"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="interview">
                   <InterviewCompare />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="reimbursements/*" element={
+                    }
+                  />
+                  <Route
+                    path="reimbursements/*"
+                    element={
                 <ModuleProtectedRoute surface="app" moduleId="reimbursements">
                   <ReimbursementTool />
                 </ModuleProtectedRoute>
-              } />
-              <Route path="downloads" element={<Navigate to={buildAppHref('', currentContext)} replace />} />
+                    }
+                  />
+                  <Route
+                    path="downloads"
+                    element={<Navigate to={buildAppHref('', currentContext)} replace />}
+                  />
               <Route
                 path="3d-studio"
-                element={(
-                  requireAppModule('3d-studio', (
+                    element={requireAppModule(
+                      '3d-studio',
                     <CapabilityProtectedRoute scope="inventory" capability="3d_studio">
                       <StudioProjectsPage />
                     </CapabilityProtectedRoute>
-                  ))
                 )}
               />
-              <Route path="terrain-model" element={requireAppModule('3d-studio', <TerrainModelPage />)} />
+                  <Route
+                    path="terrain-model"
+                    element={requireAppModule('3d-studio', <TerrainModelPage />)}
+                  />
               <Route
                 path="3d-studio/new"
-                element={(
-                  requireAppModule('3d-studio', (
+                    element={requireAppModule(
+                      '3d-studio',
                     <CapabilityProtectedRoute scope="inventory" capability="3d_studio">
                       <StudioProjectPage mode="new" />
                     </CapabilityProtectedRoute>
-                  ))
                 )}
               />
               <Route
                 path="3d-studio/:projectId"
-                element={(
-                  requireAppModule('3d-studio', (
+                    element={requireAppModule(
+                      '3d-studio',
                     <CapabilityProtectedRoute scope="inventory" capability="3d_studio">
                       <StudioProjectPage mode="existing" />
                     </CapabilityProtectedRoute>
-                  ))
                 )}
               />
-              <Route path="projects" element={requireAppModule('events', <ProjectListPage />, { needsRace: true })} />
-              <Route path="projects/:id" element={requireAppModule('events', <ProjectDetailPage />, { needsRace: true })} />
-              <Route path="assessment" element={requireAppModule('events', <AssessmentCampaignListPage />, { needsRace: true })} />
-              <Route path="assessment/:id" element={requireAppModule('events', <AssessmentCampaignDetailPage />, { needsRace: true })} />
-              <Route path="bib-tracking" element={requireAppModule('events', <BibTrackingPage />, { needsRace: true })} />
-              <Route path="race-dashboard" element={requireAppModule('events', <RaceDashboardPage />, { needsRace: true })} />
+                  <Route
+                    path="projects"
+                    element={requireAppModule('events', <ProjectListPage />, { needsRace: true })}
+                  />
+                  <Route
+                    path="projects/:id"
+                    element={requireAppModule('events', <ProjectDetailPage />, { needsRace: true })}
+                  />
+                  <Route
+                    path="assessment"
+                    element={requireAppModule('events', <AssessmentCampaignListPage />, {
+                      needsRace: true,
+                    })}
+                  />
+                  <Route
+                    path="assessment/:id"
+                    element={requireAppModule('events', <AssessmentCampaignDetailPage />, {
+                      needsRace: true,
+                    })}
+                  />
+                  <Route
+                    path="bib-tracking"
+                    element={requireAppModule('events', <BibTrackingPage />, { needsRace: true })}
+                  />
+                  <Route
+                    path="race-dashboard"
+                    element={requireAppModule('events', <RaceDashboardPage />, { needsRace: true })}
+                  />
               <Route path="settings" element={<ChangePassword />} />
               <Route path="profile" element={<ProfilePage />} />
-              <Route path="*" element={<Navigate to={buildAppHref('', currentContext)} replace />} />
+                  <Route
+                    path="*"
+                    element={<Navigate to={buildAppHref('', currentContext)} replace />}
+                  />
             </Routes>
           </Suspense>
         </section>
@@ -606,7 +809,11 @@ useEffect(() => {
                 <span className="material-symbols-outlined">add_to_home_screen</span>
                 <span>
                   <strong>{installCopy}</strong>
-                  <small>{installPromptState.isIos ? 'Safari 分享菜单 -> 添加到主屏幕' : `${installHint} · 保存成主屏幕 H5 app`}</small>
+                      <small>
+                        {installPromptState.isIos
+                          ? 'Safari 分享菜单 -> 添加到主屏幕'
+                          : `${installHint} · 保存成主屏幕 H5 app`}
+                      </small>
                 </span>
               </button>
             )}
@@ -622,9 +829,14 @@ useEffect(() => {
                         <Link
                           key={item.key}
                           to={buildAppHref(item.path, currentContext)}
-                          className={'workspace-mobile-menu__link ' + (active ? 'workspace-mobile-menu__link--active' : '')}
+                              className={
+                                'workspace-mobile-menu__link ' +
+                                (active ? 'workspace-mobile-menu__link--active' : '')
+                              }
                         >
-                          <span className="material-symbols-outlined">{item.icon || 'circle'}</span>
+                              <span className="material-symbols-outlined">
+                                {item.icon || 'circle'}
+                              </span>
                           <span>{item.label}</span>
                         </Link>
                       )
@@ -635,8 +847,12 @@ useEffect(() => {
             </nav>
 
             <div className="workspace-mobile-menu__footer">
-              <span>{user?.username || '用户'} · {roleName}</span>
-              <button type="button" onClick={handleLogout}>退出登录</button>
+                  <span>
+                    {user?.username || '用户'} · {roleName}
+                  </span>
+                  <button type="button" onClick={handleLogout}>
+                    退出登录
+                  </button>
             </div>
           </aside>
         </div>
@@ -649,7 +865,10 @@ useEffect(() => {
             <Link
               key={item.key}
               to={buildAppHref(item.path, currentContext)}
-              className={'workspace-mobile-dock__item ' + (active ? 'workspace-mobile-dock__item--active' : '')}
+                  className={
+                    'workspace-mobile-dock__item ' +
+                    (active ? 'workspace-mobile-dock__item--active' : '')
+                  }
             >
               <span className="material-symbols-outlined">{item.icon || 'circle'}</span>
               <span>{item.label}</span>

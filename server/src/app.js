@@ -46,37 +46,50 @@ import authzRoutes from './modules/authz/authz.routes.js';
 import colorSchemeRoutes from './modules/color-scheme/color-scheme.routes.js';
 import operationLogRoutes from './modules/operation-log/operation-log.routes.js';
 import sysJobRoutes from './modules/sys-job/sys-job.routes.js';
-import { publicRoutes as dictPublicRoutes, adminRoutes as dictAdminRoutes } from './modules/dictionary/dictionary.routes.js';
+import {
+    publicRoutes as dictPublicRoutes,
+    adminRoutes as dictAdminRoutes,
+} from './modules/dictionary/dictionary.routes.js';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './docs/swagger.js';
+import { env } from './config/env.js';
 
 const app = express();
 app.disable('x-powered-by');
 app.locals.knex = knex;
 
 function getCorsOrigin() {
-    const cloudOrigins = ['http://47.251.107.41', 'http://www.xquareliu.com', 'http://xquareliu.com'];
+    const cloudOrigins = env.CORS_CLOUD_ORIGINS.split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean);
 
-    if (process.env.NODE_ENV !== 'production') {
+    if (env.NODE_ENV !== 'production') {
         // Keep local dev origins and allow cloud endpoints for remote testing.
         // Note: localhost and 127.0.0.1 are different origins in CORS
         return [
-            'http://localhost:5173', 'http://127.0.0.1:5173',
-            'http://localhost:5174', 'http://127.0.0.1:5174',
-            'http://localhost:3000', 'http://127.0.0.1:3000',
-            'http://localhost', 'http://127.0.0.1',
+            'http://localhost:5173',
+            'http://127.0.0.1:5173',
+            'http://localhost:5174',
+            'http://127.0.0.1:5174',
+            'http://localhost:3000',
+            'http://127.0.0.1:3000',
+            'http://localhost',
+            'http://127.0.0.1',
             /^http:\/\/192\.168\.\d+\.\d+(:\d+)?$/,
             /^http:\/\/10\.\d+\.\d+\.\d+(:\d+)?$/,
             /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+(:\d+)?$/,
-            ...cloudOrigins
+            ...cloudOrigins,
         ];
     }
 
     // Production supports comma-separated origins: "https://a.com,https://b.com"
-    const raw = process.env.CORS_ORIGIN;
+    const raw = env.CORS_ORIGIN;
     if (!raw) return false;
 
-    const list = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    const list = raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
     if (list.length === 0) return false;
     return list.length === 1 ? list[0] : list;
 }
@@ -90,11 +103,13 @@ app.use((_req, res, next) => {
     res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
     next();
 });
-app.use(cors({
+app.use(
+    cors({
     origin: getCorsOrigin(),
     credentials: true,
-}));
-app.use(express.json({ limit: '50mb' }));
+    })
+);
+app.use(express.json({ limit: '10mb' }));
 
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
@@ -104,15 +119,22 @@ app.use('/api/public/assessment', assessmentPublicRoutes);
 app.use('/api/public/dict', dictPublicRoutes);
 
 // API Documentation
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+app.use(
+    '/api/docs',
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
   customSiteTitle: 'ArcSpro API Documentation',
-}));
+    })
+);
 app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
 
 app.use(requireAuth);
 
-const appEventsPermission = requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'events' } });
+const appEventsPermission = requirePermission({
+    surface: 'app',
+    module: { surface: 'app', moduleId: 'events' },
+});
 
 app.use('/api/app/jobs', requirePermission({ surface: 'app' }), jobRoutes);
 app.use('/api/app/records', appEventsPermission, recordRoutes);
@@ -125,21 +147,61 @@ app.use('/api/app/clothing', appEventsPermission, clothingRoutes);
 app.use('/api/app/pipeline', appEventsPermission, pipelineRoutes);
 app.use('/api/app/bib', appEventsPermission, bibRoutes);
 app.use('/api/app/bibs', appEventsPermission, bibTrackingRoutes);
-app.use('/api/app/reimbursements', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'reimbursements' } }), appReimbursementRoutes);
-app.use('/api/app/credentials', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'credentials' } }), appCredentialRoutes);
-app.use('/api/app/3d-studio', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: '3d-studio' } }), appThreeStudioRoutes);
-app.use('/api/app/interviews', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'interview' } }), interviewRoutes);
-app.use('/api/app/warehouse', requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'inventory' } }), inventoryRoutes);
-app.use('/api/app/design-requests', requireAuthz({ surface: 'app', moduleId: 'design-requests' }), createDesignRequestRoutes('app'));
+app.use(
+    '/api/app/reimbursements',
+    requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'reimbursements' } }),
+    appReimbursementRoutes
+);
+app.use(
+    '/api/app/credentials',
+    requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'credentials' } }),
+    appCredentialRoutes
+);
+app.use(
+    '/api/app/3d-studio',
+    requirePermission({ surface: 'app', module: { surface: 'app', moduleId: '3d-studio' } }),
+    appThreeStudioRoutes
+);
+app.use(
+    '/api/app/interviews',
+    requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'interview' } }),
+    interviewRoutes
+);
+app.use(
+    '/api/app/warehouse',
+    requirePermission({ surface: 'app', module: { surface: 'app', moduleId: 'inventory' } }),
+    inventoryRoutes
+);
+app.use(
+    '/api/app/design-requests',
+    requireAuthz({ surface: 'app', moduleId: 'design-requests' }),
+    createDesignRequestRoutes('app')
+);
 app.use('/api/app/approvals', requirePermission({ surface: 'app' }), approvalRoutes);
 
-app.use('/api/ops/warehouse', requirePermission({ surface: 'ops', module: { surface: 'ops', moduleId: 'warehouse' } }), inventoryRoutes);
-app.use('/api/ops/credentials', requirePermission({ surface: 'ops', module: { surface: 'ops', moduleId: 'credentials' } }), credentialRoutes);
+app.use(
+    '/api/ops/warehouse',
+    requirePermission({ surface: 'ops', module: { surface: 'ops', moduleId: 'warehouse' } }),
+    inventoryRoutes
+);
+app.use(
+    '/api/ops/credentials',
+    requirePermission({ surface: 'ops', module: { surface: 'ops', moduleId: 'credentials' } }),
+    credentialRoutes
+);
 app.use('/api/ops/bibs', requirePermission({ surface: 'ops' }), bibTrackingRoutes);
-app.use('/api/ops/design-requests', requireAuthz({ surface: 'ops', moduleId: 'design-requests' }), createDesignRequestRoutes('ops'));
+app.use(
+    '/api/ops/design-requests',
+    requireAuthz({ surface: 'ops', moduleId: 'design-requests' }),
+    createDesignRequestRoutes('ops')
+);
 
 app.use('/api/admin/jobs', requirePermission({ surface: 'admin' }), jobRoutes);
-app.use('/api/admin/design-requests', requireAuthz({ surface: 'admin', moduleId: 'design-requests' }), createDesignRequestRoutes('admin'));
+app.use(
+    '/api/admin/design-requests',
+    requireAuthz({ surface: 'admin', moduleId: 'design-requests' }),
+    createDesignRequestRoutes('admin')
+);
 app.use('/api/admin/approvals', requirePermission({ surface: 'admin' }), approvalRoutes);
 app.use('/api/admin/races', requirePermission({ surface: 'admin' }), raceRoutes);
 app.use('/api/admin/records', requirePermission({ surface: 'admin' }), recordRoutes);
@@ -154,7 +216,11 @@ app.use('/api/admin/bib', requirePermission({ surface: 'admin' }), bibRoutes);
 app.use('/api/admin/bibs', requirePermission({ surface: 'admin' }), bibTrackingRoutes);
 app.use('/api/admin/assessment', requirePermission({ surface: 'admin' }), assessmentAdminRoutes);
 app.use('/api/admin/system', requirePermission({ surface: 'admin' }), systemBackupRoutes);
-app.use('/api/admin/reimbursements', requirePermission({ surface: 'admin' }), adminReimbursementRoutes);
+app.use(
+    '/api/admin/reimbursements',
+    requirePermission({ surface: 'admin' }),
+    adminReimbursementRoutes
+);
 app.use('/api/admin/org', requirePermission({ surface: 'admin' }), orgRoutes);
 // Team routes are also accessible under /api/admin/org for frontend compatibility
 app.use('/api/admin/org', requirePermission({ surface: 'admin' }), teamRoutes);
@@ -162,10 +228,26 @@ app.use('/api/admin/team', requirePermission({ surface: 'admin' }), teamRoutes);
 app.use('/api/admin/projects', requirePermission({ surface: 'admin' }), projectsRoutes);
 app.use('/api/admin/calendar', requirePermission({ surface: 'admin' }), calendarRoutes);
 app.use('/api/admin/interviews', requirePermission({ surface: 'admin' }), interviewRoutes);
-app.use('/api/admin/warehouse', requirePermission({ surface: 'admin', module: { surface: 'admin', moduleId: 'inventory' } }), inventoryRoutes);
-app.use('/api/admin/ocr', requirePermission({ surface: 'admin', module: { surface: 'admin', moduleId: 'finance' } }), ocrRoutes);
-app.use('/api/admin/credentials', requirePermission({ surface: 'admin', module: { surface: 'admin', moduleId: 'credentials' } }), credentialRoutes);
-app.use('/api/admin/identity-center', requireAuthz({ surface: 'admin', moduleId: 'identity-center' }), identityCenterRoutes);
+app.use(
+    '/api/admin/warehouse',
+    requirePermission({ surface: 'admin', module: { surface: 'admin', moduleId: 'inventory' } }),
+    inventoryRoutes
+);
+app.use(
+    '/api/admin/ocr',
+    requirePermission({ surface: 'admin', module: { surface: 'admin', moduleId: 'finance' } }),
+    ocrRoutes
+);
+app.use(
+    '/api/admin/credentials',
+    requirePermission({ surface: 'admin', module: { surface: 'admin', moduleId: 'credentials' } }),
+    credentialRoutes
+);
+app.use(
+    '/api/admin/identity-center',
+    requireAuthz({ surface: 'admin', moduleId: 'identity-center' }),
+    identityCenterRoutes
+);
 app.use('/api/authz', authzRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/admin/color-schemes', requirePermission({ surface: 'admin' }), colorSchemeRoutes);

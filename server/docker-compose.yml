@@ -34,7 +34,7 @@ services:
       - "3001:3001"
     environment:
       DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
-      JWT_SECRET: ${JWT_SECRET:-dev_secret}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
       NODE_ENV: ${NODE_ENV:-development}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       # PII 加密密钥（key-guard 启动时验证一致性）
@@ -44,7 +44,7 @@ services:
       # Optional runtime config (recommended in production)
       CORS_ORIGIN: ${CORS_ORIGIN:-}
       DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-false}
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://www.xquareliu.com}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
       BACKUP_DIR: ${BACKUP_DIR:-/backups}
       BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-10}
       RESTORE_UPLOAD_DIR: ${RESTORE_UPLOAD_DIR:-/backups/uploads}
@@ -71,15 +71,16 @@ services:
     command: [ "node", "src/worker.js" ]
     environment:
       DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
-      JWT_SECRET: ${JWT_SECRET:-dev_secret}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
       NODE_ENV: ${NODE_ENV:-development}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      ARCSPRO_PROCESS_TYPE: worker
       # PII 加密密钥（名单导入 worker 会生成盲索引）
       PII_ACTIVE_KEY_VERSION: ${PII_ACTIVE_KEY_VERSION:-v1}
       PII_ENCRYPTION_KEY_V1: ${PII_ENCRYPTION_KEY_V1:-}
       PII_HMAC_KEY_V1: ${PII_HMAC_KEY_V1:-}
       DISABLE_REGISTRATION: ${DISABLE_REGISTRATION:-false}
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://www.xquareliu.com}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
       REIMBURSEMENT_OCR_PROVIDER: ${REIMBURSEMENT_OCR_PROVIDER:-qwen}
       REIMBURSEMENT_OCR_BASE_URL: ${REIMBURSEMENT_OCR_BASE_URL:-}
       REIMBURSEMENT_OCR_API_KEY: ${REIMBURSEMENT_OCR_API_KEY:-}
@@ -132,8 +133,12 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      NGINX_SERVER_NAME: ${NGINX_SERVER_NAME:-localhost}
+      NGINX_SSL_CERT: ${NGINX_SSL_CERT:-server.pem}
+      NGINX_SSL_KEY: ${NGINX_SSL_KEY:-server.key}
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx.conf:/etc/nginx/templates/default.conf.template:ro
       - ../dist:/usr/share/nginx/html:ro
       - /etc/nginx/ssl:/etc/nginx/ssl:ro
     depends_on:

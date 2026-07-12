@@ -116,15 +116,18 @@ const useAssetDesignerStore = create((set, get) => ({
         })
     },
 
-    setMode: (mode) => set({
+  setMode: (mode) =>
+    set({
         mode,
         paintMode: mode === 'paint' ? get().paintMode || 'zoneColor' : null,
         placeMode: mode === 'place' ? get().placeMode : null,
     }),
     setPaintMode: (paintMode) => set({ paintMode, mode: 'paint' }),
     setActiveMaterial: (materialId) => set({ activeMaterialId: materialId }),
-    setPlaceMode: (templateId) => set({ mode: 'place', placeMode: 'rack', activeTemplateId: templateId }),
-    setPrefabPlaceMode: (prefabId) => set({ mode: 'place', placeMode: 'prefab', activePrefabId: prefabId }),
+  setPlaceMode: (templateId) =>
+    set({ mode: 'place', placeMode: 'rack', activeTemplateId: templateId }),
+  setPrefabPlaceMode: (prefabId) =>
+    set({ mode: 'place', placeMode: 'prefab', activePrefabId: prefabId }),
     setSceneType: (sceneType) => set({ sceneType }),
     selectEntity: (type, id = null) => set({ selection: { type, id }, inspectorOpen: !!id }),
     toggleAdvancedJson: () => set((state) => ({ showAdvancedJson: !state.showAdvancedJson })),
@@ -134,54 +137,66 @@ const useAssetDesignerStore = create((set, get) => ({
     toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
 
     // 墙面绘制 actions
-    startWallDraw: (point) => set({
+  startWallDraw: (point) =>
+    set({
         wallDrawState: {
             isDrawing: true,
             startPoint: point,
             currentPoint: point,
             chainMode: true,
-        }
+      },
     }),
-    updateWallPreview: (point) => set((state) => ({
+  updateWallPreview: (point) =>
+    set((state) => ({
         wallDrawState: {
             ...state.wallDrawState,
             currentPoint: point,
-        }
+      },
     })),
-    commitWallDraw: () => set({
+  commitWallDraw: () =>
+    set({
         wallDrawState: {
             isDrawing: true,
             startPoint: null,
             currentPoint: null,
             chainMode: true,
-        }
+      },
     }),
-    cancelWallDraw: () => set({
-        wallDrawState: initialWallDrawState
+  cancelWallDraw: () =>
+    set({
+      wallDrawState: initialWallDrawState,
     }),
-    setWallChainMode: (chainMode) => set((state) => ({
-        wallDrawState: { ...state.wallDrawState, chainMode }
+  setWallChainMode: (chainMode) =>
+    set((state) => ({
+      wallDrawState: { ...state.wallDrawState, chainMode },
     })),
 
     // 门窗放置 actions
     setOpeningMode: (mode) => set({ openingMode: mode }),
     setActiveOpeningPreset: (preset) => set({ activeOpeningPreset: preset }),
-    setDoorMode: (preset = null) => set({ mode: 'door', openingMode: 'door', activeOpeningPreset: preset }),
-    setWindowMode: (preset = null) => set({ mode: 'window', openingMode: 'window', activeOpeningPreset: preset }),
+  setDoorMode: (preset = null) =>
+    set({ mode: 'door', openingMode: 'door', activeOpeningPreset: preset }),
+  setWindowMode: (preset = null) =>
+    set({ mode: 'window', openingMode: 'window', activeOpeningPreset: preset }),
 
     // 结构元素放置 actions
     setStructureMode: (mode) => set({ structureMode: mode }),
     setActiveStructurePreset: (preset) => set({ activeStructurePreset: preset }),
-    setColumnMode: (preset = null) => set({ mode: 'column', structureMode: 'column', activeStructurePreset: preset }),
-    setBeamMode: (preset = null) => set({ mode: 'beam', structureMode: 'beam', activeStructurePreset: preset }),
-    setStairMode: (preset = null) => set({ mode: 'stair', structureMode: 'stair', activeStructurePreset: preset }),
-    setRampMode: (preset = null) => set({ mode: 'ramp', structureMode: 'ramp', activeStructurePreset: preset }),
+  setColumnMode: (preset = null) =>
+    set({ mode: 'column', structureMode: 'column', activeStructurePreset: preset }),
+  setBeamMode: (preset = null) =>
+    set({ mode: 'beam', structureMode: 'beam', activeStructurePreset: preset }),
+  setStairMode: (preset = null) =>
+    set({ mode: 'stair', structureMode: 'stair', activeStructurePreset: preset }),
+  setRampMode: (preset = null) =>
+    set({ mode: 'ramp', structureMode: 'ramp', activeStructurePreset: preset }),
 
     // 楼层管理 actions
     setActiveLevel: (levelId) => set({ activeLevelId: levelId }),
     setViewMode: (mode) => set({ viewMode: mode }),
 
-    addLevel: (level = {}) => set((state) => {
+  addLevel: (level = {}) =>
+    set((state) => {
         const maxId = state.levels.reduce((max, l) => {
             const num = parseInt(String(l.id).replace(/\D/g, ''), 10)
             return !isNaN(num) && num > max ? num : max
@@ -199,18 +214,16 @@ const useAssetDesignerStore = create((set, get) => ({
         return { levels: [...state.levels, newLevel] }
     }),
 
-    updateLevel: (levelId, updates) => set((state) => ({
-        levels: state.levels.map(l =>
-            l.id === levelId ? { ...l, ...updates } : l
-        ),
+  updateLevel: (levelId, updates) =>
+    set((state) => ({
+      levels: state.levels.map((l) => (l.id === levelId ? { ...l, ...updates } : l)),
     })),
 
-    deleteLevel: (levelId) => set((state) => {
+  deleteLevel: (levelId) =>
+    set((state) => {
         if (state.levels.length <= 1) return state // 至少保留一个楼层
-        const newLevels = state.levels.filter(l => l.id !== levelId)
-        const newActiveId = state.activeLevelId === levelId
-            ? newLevels[0]?.id
-            : state.activeLevelId
+      const newLevels = state.levels.filter((l) => l.id !== levelId)
+      const newActiveId = state.activeLevelId === levelId ? newLevels[0]?.id : state.activeLevelId
         return {
             levels: newLevels,
             activeLevelId: newActiveId,
@@ -221,17 +234,22 @@ const useAssetDesignerStore = create((set, get) => ({
     setMeasurementMode: (mode) => set({ measurementMode: mode }),
     setMeasureMode: (mode = 'distance') => set({ mode: 'measure', measurementMode: mode }),
 
-    addMeasurement: (measurement) => set((state) => ({
-        measurements: [...state.measurements, {
+  addMeasurement: (measurement) =>
+    set((state) => ({
+      measurements: [
+        ...state.measurements,
+        {
             id: `M${Date.now()}`,
             ...measurement,
             levelId: state.activeLevelId,
             visible: true,
-        }]
+        },
+      ],
     })),
 
-    removeMeasurement: (id) => set((state) => ({
-        measurements: state.measurements.filter(m => m.id !== id)
+  removeMeasurement: (id) =>
+    set((state) => ({
+      measurements: state.measurements.filter((m) => m.id !== id),
     })),
 
     clearMeasurements: () => set({ measurements: [] }),
@@ -268,7 +286,8 @@ const useAssetDesignerStore = create((set, get) => ({
         })
     },
 
-    resetDesigner: () => set({
+  resetDesigner: () =>
+    set({
         mode: 'select',
         sceneType: 'warehouse',
         paintMode: null,

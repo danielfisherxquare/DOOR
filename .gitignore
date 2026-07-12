@@ -32,6 +32,7 @@ tsc_output.txt
 # Temporary & debug files
 .tmp-*
 tmp-*
+tmp/
 .runtime/
 result.json
 public/minimal.3mf
@@ -62,6 +63,7 @@ server/pgdata/
 server/backups/
 server/test-output*.txt
 server/test_invoice.png
+server/.env.dev
 
 # Binary uploads
 server/uploads/apps/*.exe

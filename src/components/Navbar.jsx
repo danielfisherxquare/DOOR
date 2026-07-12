@@ -6,7 +6,10 @@ import useAuthStore from '../stores/authStore'
  * 应用层已有侧边栏，不再依赖此组件
  */
 function Navbar() {
-  const { user, isAuthenticated, logout, getDefaultLandingPath } = useAuthStore()
+  const user = useAuthStore((state) => state.user)
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+  const logout = useAuthStore((state) => state.logout)
+  const getDefaultLandingPath = useAuthStore((state) => state.getDefaultLandingPath)
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -24,21 +27,21 @@ function Navbar() {
       <div className="navbar__menu hidden-mobile">
         {isAuthenticated ? (
           <>
-            <Link to={getDefaultLandingPath()} className="btn btn--ghost">进入工作区</Link>
+            <Link to={getDefaultLandingPath()} className="btn btn--ghost">
+              进入工作区
+            </Link>
             <div className="navbar__user">
-              <div className="navbar__avatar">
-                {user?.username?.charAt(0).toUpperCase() || 'U'}
-              </div>
-              <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-primary)' }}>
-                {user?.username || '用户'}
-              </span>
+              <div className="navbar__avatar">{user?.username?.charAt(0).toUpperCase() || 'U'}</div>
+              <span className="navbar__username">{user?.username || '用户'}</span>
             </div>
             <button className="btn btn--ghost" onClick={handleLogout} title="退出登录">
               退出
             </button>
           </>
         ) : (
-          <Link to="/login" className="btn btn--ghost">登录</Link>
+          <Link to="/login" className="btn btn--ghost">
+            登录
+          </Link>
         )}
       </div>
     </nav>

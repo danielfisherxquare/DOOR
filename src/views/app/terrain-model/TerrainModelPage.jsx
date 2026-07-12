@@ -154,12 +154,13 @@ function estimateWgs84BoundsMeters(bounds) {
   if (!bounds) return null
   const latSpan = bounds.north - bounds.south
   const lonSpan = bounds.east - bounds.west
-  if (!Number.isFinite(latSpan) || !Number.isFinite(lonSpan) || latSpan <= 0 || lonSpan <= 0) return null
+  if (!Number.isFinite(latSpan) || !Number.isFinite(lonSpan) || latSpan <= 0 || lonSpan <= 0)
+    return null
   const centerLatitude = (bounds.north + bounds.south) / 2
   const metersPerDegreeLatitude = 111_320
   const metersPerDegreeLongitude = Math.max(
     1,
-    metersPerDegreeLatitude * Math.cos(centerLatitude * Math.PI / 180),
+    metersPerDegreeLatitude * Math.cos((centerLatitude * Math.PI) / 180)
   )
   const widthMeters = lonSpan * metersPerDegreeLongitude
   const depthMeters = latSpan * metersPerDegreeLatitude
@@ -280,14 +281,21 @@ function normalizeElevationBands(value) {
   const bands = value
     .map((band, index) => {
       if (!band || typeof band !== 'object') return null
-      const fallback = DEFAULT_OPTIONS.elevationBands[Math.min(index, DEFAULT_OPTIONS.elevationBands.length - 1)]
+      const fallback =
+        DEFAULT_OPTIONS.elevationBands[Math.min(index, DEFAULT_OPTIONS.elevationBands.length - 1)]
       const percentile = Number(band.percentile)
       const thicknessMm = Number(band.thicknessMm)
       return {
         name: String(band.name || fallback?.name || '高度带'),
-        percentile: Number.isFinite(percentile) ? Math.min(Math.max(percentile, 0), 1) : fallback?.percentile || 1,
-        color: /^#[0-9a-f]{6}$/i.test(String(band.color || '')) ? String(band.color) : fallback?.color || '#D4CFC4',
-        thicknessMm: Number.isFinite(thicknessMm) ? Math.max(thicknessMm, 0) : fallback?.thicknessMm || 0.5,
+        percentile: Number.isFinite(percentile)
+          ? Math.min(Math.max(percentile, 0), 1)
+          : fallback?.percentile || 1,
+        color: /^#[0-9a-f]{6}$/i.test(String(band.color || ''))
+          ? String(band.color)
+          : fallback?.color || '#D4CFC4',
+        thicknessMm: Number.isFinite(thicknessMm)
+          ? Math.max(thicknessMm, 0)
+          : fallback?.thicknessMm || 0.5,
       }
     })
     .filter(Boolean)
@@ -313,7 +321,8 @@ function normalizeTerrainModelOptions(value) {
     }
     if (key === 'snowlineElevationMeters') {
       const number = Number(item)
-      next[key] = item === '' || item === null || item === undefined
+      next[key] =
+        item === '' || item === null || item === undefined
         ? ''
         : Number.isFinite(number)
         ? number
@@ -325,13 +334,25 @@ function normalizeTerrainModelOptions(value) {
 
   next.elevationBands = normalizeElevationBands(value.elevationBands)
   if (!TERRAIN_QUALITY_PRESETS[next.terrainQuality]) next.terrainQuality = defaults.terrainQuality
-  if (!['print-readable', 'realistic', 'true-scale', 'near-real'].includes(next.reliefMode)) next.reliefMode = defaults.reliefMode
+  if (!['print-readable', 'realistic', 'true-scale', 'near-real'].includes(next.reliefMode))
+    next.reliefMode = defaults.reliefMode
   if (!['elevation', 'satellite'].includes(next.colorMode)) next.colorMode = defaults.colorMode
-  if (!SATELLITE_COLOR_STRATEGY_OPTIONS.some((item) => item.key === next.satelliteColorStrategy)) next.satelliteColorStrategy = defaults.satelliteColorStrategy
-  next.satelliteTerrainColorLimit = Math.min(Math.max(Number(next.satelliteTerrainColorLimit) || 0, 0), 7)
-  next.satelliteMinPatchAreaMm2 = Math.min(Math.max(Number(next.satelliteMinPatchAreaMm2) || 0, 0), 5000)
-  next.satelliteColorSmoothing = Math.min(Math.max(Number(next.satelliteColorSmoothing) || 0, 0), 100)
-  if (!['rectangle', 'hexagon', 'circle', 'triangle', 'custom'].includes(next.shapeType)) next.shapeType = defaults.shapeType
+  if (!SATELLITE_COLOR_STRATEGY_OPTIONS.some((item) => item.key === next.satelliteColorStrategy))
+    next.satelliteColorStrategy = defaults.satelliteColorStrategy
+  next.satelliteTerrainColorLimit = Math.min(
+    Math.max(Number(next.satelliteTerrainColorLimit) || 0, 0),
+    7
+  )
+  next.satelliteMinPatchAreaMm2 = Math.min(
+    Math.max(Number(next.satelliteMinPatchAreaMm2) || 0, 0),
+    5000
+  )
+  next.satelliteColorSmoothing = Math.min(
+    Math.max(Number(next.satelliteColorSmoothing) || 0, 0),
+    100
+  )
+  if (!['rectangle', 'hexagon', 'circle', 'triangle', 'custom'].includes(next.shapeType))
+    next.shapeType = defaults.shapeType
   return next
 }
 
@@ -351,12 +372,16 @@ function normalizeSurfaceTextureConfig(value) {
 
 function normalizeTerrainModelSavedConfig(value) {
   const source = value && typeof value === 'object' ? value : {}
-  const manualSource = source.manualFootprint && typeof source.manualFootprint === 'object'
+  const manualSource =
+    source.manualFootprint && typeof source.manualFootprint === 'object'
     ? source.manualFootprint
     : {}
-  const footprintWgs84 = normalizeManualFootprintWgs84(manualSource.footprintWgs84 || source.manualFootprintWgs84)
-  const boundsWgs84 = parseManualBoundsWgs84(manualSource.boundsWgs84 || source.manualBoundsWgs84)
-    || manualFootprintToBoundsWgs84(footprintWgs84)
+  const footprintWgs84 = normalizeManualFootprintWgs84(
+    manualSource.footprintWgs84 || source.manualFootprintWgs84
+  )
+  const boundsWgs84 =
+    parseManualBoundsWgs84(manualSource.boundsWgs84 || source.manualBoundsWgs84) ||
+    manualFootprintToBoundsWgs84(footprintWgs84)
   const shape = MANUAL_FOOTPRINT_SHAPES.some((item) => item.key === manualSource.shape)
     ? manualSource.shape
     : 'rectangle'
@@ -365,14 +390,20 @@ function normalizeTerrainModelSavedConfig(value) {
     version: TERRAIN_MODEL_CONFIG_VERSION,
     savedAt: typeof source.savedAt === 'string' ? source.savedAt : '',
     options: normalizeTerrainModelOptions(source.options),
-    useSampledTerrain: source.useSampledTerrain === undefined ? true : Boolean(source.useSampledTerrain),
-    openTopoDemType: OPENTOPOGRAPHY_DEM_TYPES[source.openTopoDemType] ? source.openTopoDemType : 'COP30',
+    useSampledTerrain:
+      source.useSampledTerrain === undefined ? true : Boolean(source.useSampledTerrain),
+    openTopoDemType: OPENTOPOGRAPHY_DEM_TYPES[source.openTopoDemType]
+      ? source.openTopoDemType
+      : 'COP30',
     surfaceTexture: normalizeSurfaceTextureConfig(source.surfaceTexture),
     manualFootprint: {
-      mode: manualSource.mode === 'manual' || source.terrainBoundsMode === 'manual' ? 'manual' : 'auto',
+      mode:
+        manualSource.mode === 'manual' || source.terrainBoundsMode === 'manual' ? 'manual' : 'auto',
       shape,
       rotationDegrees: normalizeManualFootprintRotationDegrees(manualSource.rotationDegrees),
-      boundsWgs84: boundsWgs84 ? boundsToInputValues(boundsWgs84) : { ...EMPTY_MANUAL_BOUNDS_WGS84 },
+      boundsWgs84: boundsWgs84
+        ? boundsToInputValues(boundsWgs84)
+        : { ...EMPTY_MANUAL_BOUNDS_WGS84 },
       footprintWgs84,
     },
   }
@@ -415,11 +446,12 @@ function rotateManualFootprintWgs84(footprint, degrees, center = null) {
   if (!points || Math.abs(angle) < 0.0001) return points
   const origin = center || getManualFootprintRotationCenter(points)
   if (!origin) return points
-  const cosLatitude = Math.max(0.000001, Math.cos(origin.latitude * Math.PI / 180))
-  const radians = angle * Math.PI / 180
+  const cosLatitude = Math.max(0.000001, Math.cos((origin.latitude * Math.PI) / 180))
+  const radians = (angle * Math.PI) / 180
   const sin = Math.sin(radians)
   const cos = Math.cos(radians)
-  return normalizeManualFootprintWgs84(points.map((point) => {
+  return normalizeManualFootprintWgs84(
+    points.map((point) => {
     const x = (point.longitude - origin.longitude) * cosLatitude
     const y = point.latitude - origin.latitude
     const rotatedX = x * cos - y * sin
@@ -428,7 +460,8 @@ function rotateManualFootprintWgs84(footprint, degrees, center = null) {
       latitude: origin.latitude + rotatedY,
       longitude: origin.longitude + rotatedX / cosLatitude,
     }
-  }))
+    })
+  )
 }
 
 function createPresetFootprintPolygon(bounds, shape, rotationDegrees = 0) {
@@ -487,10 +520,12 @@ function leafletLayerToWgs84Footprint(layer) {
   if (typeof layer.getLatLngs === 'function') {
     const latLngs = layer.getLatLngs()
     const ring = Array.isArray(latLngs?.[0]) ? latLngs[0] : latLngs
-    const footprint = normalizeManualFootprintWgs84((ring || []).map((latLng) => ({
+    const footprint = normalizeManualFootprintWgs84(
+      (ring || []).map((latLng) => ({
       latitude: latLng.lat,
       longitude: latLng.lng,
-    })))
+      }))
+    )
     if (footprint) return footprint
   }
   const bounds = leafletBoundsToWgs84Bounds(layer.getBounds?.())
@@ -529,21 +564,20 @@ function getReliefTone(multiplier) {
 }
 
 function getReliefMeterData(model, recommendation, options = DEFAULT_OPTIONS) {
-  const reliefMode = normalizeReliefMode(model?.stats?.reliefMode || recommendation?.mode || options.reliefMode)
+  const reliefMode = normalizeReliefMode(
+    model?.stats?.reliefMode || recommendation?.mode || options.reliefMode
+  )
   const realReliefMm = firstFinite(
     model?.stats?.realScaleReliefMm,
-    recommendation?.realScaleReliefMm,
+    recommendation?.realScaleReliefMm
   )
-  const reliefMm = firstFinite(
-    model?.stats?.reliefMm,
-    Number(options.maxReliefMm),
-  )
+  const reliefMm = firstFinite(model?.stats?.reliefMm, Number(options.maxReliefMm))
   const multiplier = firstFinite(
     model?.stats?.verticalExaggeration,
     realReliefMm > 0 && reliefMm > 0 ? reliefMm / realReliefMm : null,
-    recommendation?.verticalExaggeration,
+    recommendation?.verticalExaggeration
   )
-  const percent = clampPercent(((multiplier || 1) - 1) / 3 * 100)
+  const percent = clampPercent((((multiplier || 1) - 1) / 3) * 100)
   const tone = getReliefTone(multiplier)
   return {
     reliefMm,
@@ -569,9 +603,13 @@ function ReliefScaleMeter({ model, recommendation, options }) {
       <div className="terrain-model-relief-meter__head">
         <div>
           <span>起伏倍率 · 当前模式</span>
-          <strong>{meter.modeLabel} / {formatNumber(meter.multiplier, 'x')}</strong>
+          <strong>
+            {meter.modeLabel} / {formatNumber(meter.multiplier, 'x')}
+          </strong>
         </div>
-        <span className={`terrain-model-relief-meter__status terrain-model-relief-meter__status--${meter.tone}`}>
+        <span
+          className={`terrain-model-relief-meter__status terrain-model-relief-meter__status--${meter.tone}`}
+        >
           {meter.label}
         </span>
       </div>
@@ -613,19 +651,31 @@ function PrintReadinessPanel({ readiness }) {
   if (!readiness) return null
 
   return (
-    <section className={'terrain-model-readiness terrain-model-readiness--' + readiness.status} aria-label="生产检查">
+    <section
+      className={'terrain-model-readiness terrain-model-readiness--' + readiness.status}
+      aria-label="生产检查"
+    >
       <div className="terrain-model-readiness__head">
         <div>
           <span>生产检查</span>
           <strong>{readiness.label}</strong>
         </div>
-        <span className={'terrain-model-readiness__badge terrain-model-readiness__badge--' + readiness.status}>
+        <span
+          className={
+            'terrain-model-readiness__badge terrain-model-readiness__badge--' + readiness.status
+          }
+        >
           {readiness.warnings?.length ? readiness.warnings.length + ' 项需处理' : '全部通过'}
         </span>
       </div>
       <div className="terrain-model-readiness__checks">
         {readiness.checks.map((check) => (
-          <div key={check.key} className={'terrain-model-readiness__check terrain-model-readiness__check--' + check.status}>
+          <div
+            key={check.key}
+            className={
+              'terrain-model-readiness__check terrain-model-readiness__check--' + check.status
+            }
+          >
             <span className="material-symbols-outlined">{getReadinessIcon(check.status)}</span>
             <div>
               <strong>{check.label}</strong>
@@ -663,8 +713,10 @@ function TerrainWorkflowStrip({
       title: '数据',
       value: fileName || '等待 GPX',
       detail: demRaster
-        ? (demFileName || demRaster.sourceName || '高精 DEM')
-        : useSampledTerrain ? '在线高程待采样' : 'GPX 高程',
+        ? demFileName || demRaster.sourceName || '高精 DEM'
+        : useSampledTerrain
+          ? '在线高程待采样'
+          : 'GPX 高程',
       state: getWorkflowState(Boolean(track), false),
     },
     {
@@ -687,9 +739,12 @@ function TerrainWorkflowStrip({
       title: '打印',
       value: readiness?.label || '未检查',
       detail: model
-        ? formatNumber(model.stats.reliefMm, ' mm') + ' 起伏 / ' + formatNumber(model.stats.verticalExaggeration, 'x')
+        ? formatNumber(model.stats.reliefMm, ' mm') +
+          ' 起伏 / ' +
+          formatNumber(model.stats.verticalExaggeration, 'x')
         : '生成后判断可打印性',
-      state: readiness?.status === 'ready'
+      state:
+        readiness?.status === 'ready'
         ? 'ready'
         : readiness?.status === 'blocked'
           ? 'blocked'
@@ -708,9 +763,14 @@ function TerrainWorkflowStrip({
   return (
     <section className="terrain-model-workflow" aria-label="生成工作流">
       {steps.map((step, index) => (
-        <div key={step.key} className={'terrain-model-workflow__step terrain-model-workflow__step--' + step.state}>
+        <div
+          key={step.key}
+          className={'terrain-model-workflow__step terrain-model-workflow__step--' + step.state}
+        >
           <span className="terrain-model-workflow__index">{index + 1}</span>
-          <span className="material-symbols-outlined terrain-model-workflow__icon">{step.icon}</span>
+          <span className="material-symbols-outlined terrain-model-workflow__icon">
+            {step.icon}
+          </span>
           <div className="terrain-model-workflow__copy">
             <span>{step.title}</span>
             <strong>{step.value}</strong>
@@ -722,7 +782,14 @@ function TerrainWorkflowStrip({
   )
 }
 
-function ControlSection({ icon, title, description, children, collapsible = false, defaultOpen = true }) {
+function ControlSection({
+  icon,
+  title,
+  description,
+  children,
+  collapsible = false,
+  defaultOpen = true,
+}) {
   const content = (
     <>
       <div className="terrain-model-control-section__head">
@@ -732,35 +799,32 @@ function ControlSection({ icon, title, description, children, collapsible = fals
           <p>{description}</p>
         </div>
       </div>
-      <div className="terrain-model-control-section__grid">
-        {children}
-      </div>
+      <div className="terrain-model-control-section__grid">{children}</div>
     </>
   )
 
   if (collapsible) {
     return (
-      <details className="terrain-model-control-section terrain-model-control-section--collapsible" open={defaultOpen}>
+      <details
+        className="terrain-model-control-section terrain-model-control-section--collapsible"
+        open={defaultOpen}
+      >
         <summary>
           <span className="material-symbols-outlined">{icon}</span>
           <div>
             <h3>{title}</h3>
             <p>{description}</p>
           </div>
-          <span className="material-symbols-outlined terrain-model-control-section__chevron">expand_more</span>
+          <span className="material-symbols-outlined terrain-model-control-section__chevron">
+            expand_more
+          </span>
         </summary>
-        <div className="terrain-model-control-section__grid">
-          {children}
-        </div>
+        <div className="terrain-model-control-section__grid">{children}</div>
       </details>
     )
   }
 
-  return (
-    <section className="terrain-model-control-section">
-      {content}
-    </section>
-  )
+  return <section className="terrain-model-control-section">{content}</section>
 }
 
 function TerrainBoundsControlPanel({
@@ -795,21 +859,19 @@ function TerrainBoundsControlPanel({
           ? '未覆盖轨迹'
           : '等待框选'
       : '覆盖完整轨迹'
-  const statusTone = !hasTrack
-    ? 'idle'
-    : statusLabel === '覆盖完整轨迹'
-      ? 'success'
-      : 'warning'
-  const modeDetail = isManual
-    ? '成品比例按框选范围计算'
-    : '成品比例按 GPX 外扩范围计算'
+  const statusTone = !hasTrack ? 'idle' : statusLabel === '覆盖完整轨迹' ? 'success' : 'warning'
+  const modeDetail = isManual ? '成品比例按框选范围计算' : '成品比例按 GPX 外扩范围计算'
   const requestRangeLabel = !hasTrack
     ? '等待 GPX'
     : isManual
-      ? activeManualBounds ? '手动框选范围' : '等待手动范围'
+      ? activeManualBounds
+        ? '手动框选范围'
+        : '等待手动范围'
       : 'GPX + ' + formatNumber(Number(paddingMeters), ' m')
   const outputSizeLabel = hasVisibleBounds
-    ? formatNumber(modelSizing.modelWidthMm, ' mm') + ' x ' + formatNumber(modelSizing.modelDepthMm, ' mm')
+    ? formatNumber(modelSizing.modelWidthMm, ' mm') +
+      ' x ' +
+      formatNumber(modelSizing.modelDepthMm, ' mm')
     : '-'
 
   return (
@@ -828,7 +890,9 @@ function TerrainBoundsControlPanel({
             aria-pressed={!isManual}
             onClick={onAuto}
           >
-            <span className="material-symbols-outlined" aria-hidden="true">auto_awesome_motion</span>
+            <span className="material-symbols-outlined" aria-hidden="true">
+              auto_awesome_motion
+            </span>
             <span>自动外扩</span>
           </button>
           <button
@@ -838,7 +902,9 @@ function TerrainBoundsControlPanel({
             aria-pressed={isManual}
             onClick={onDrawManual}
           >
-            <span className="material-symbols-outlined" aria-hidden="true">select_all</span>
+            <span className="material-symbols-outlined" aria-hidden="true">
+              select_all
+            </span>
             <span>{isManual ? '重画范围' : '手动调整'}</span>
           </button>
         </div>
@@ -861,11 +927,15 @@ function TerrainBoundsControlPanel({
         {isManual && (
           <div className="terrain-model-bounds-panel__manual-actions">
             <button type="button" disabled={!hasTrack} onClick={onUseAutoAsManual}>
-              <span className="material-symbols-outlined" aria-hidden="true">center_focus_strong</span>
+              <span className="material-symbols-outlined" aria-hidden="true">
+                center_focus_strong
+              </span>
               <span>从自动范围开始</span>
             </button>
             <button type="button" disabled={!hasTrack} onClick={onAuto}>
-              <span className="material-symbols-outlined" aria-hidden="true">restart_alt</span>
+              <span className="material-symbols-outlined" aria-hidden="true">
+                restart_alt
+              </span>
               <span>回到自动</span>
             </button>
           </div>
@@ -884,7 +954,9 @@ function TerrainBoundsControlPanel({
                 aria-pressed={manualFootprintShape === shape.key}
                 onClick={() => onManualFootprintShapeChange(shape.key)}
               >
-                <span className="material-symbols-outlined" aria-hidden="true">{shape.icon}</span>
+                <span className="material-symbols-outlined" aria-hidden="true">
+                  {shape.icon}
+                </span>
                 <span>{shape.label}</span>
               </button>
             ))}
@@ -925,7 +997,9 @@ function TerrainBoundsControlPanel({
         </div>
         <div>
           <span>采集范围状态</span>
-          <strong className={'terrain-model-status terrain-model-status--' + statusTone}>{statusLabel}</strong>
+          <strong className={'terrain-model-status terrain-model-status--' + statusTone}>
+            {statusLabel}
+          </strong>
         </div>
         {isManual && (
           <div>
@@ -938,7 +1012,9 @@ function TerrainBoundsControlPanel({
       <details className="terrain-model-bounds-details">
         <summary>
           <span>范围明细</span>
-          <strong>{hasVisibleBounds ? formatBoundsArea(bounds) + ' / ' + requestRangeLabel : '等待轨迹'}</strong>
+          <strong>
+            {hasVisibleBounds ? formatBoundsArea(bounds) + ' / ' + requestRangeLabel : '等待轨迹'}
+          </strong>
         </summary>
         <div className="terrain-model-bounds-panel__extra">
           <div>
@@ -953,7 +1029,7 @@ function TerrainBoundsControlPanel({
         <div className="terrain-model-bounds-panel__coords" aria-label="坐标范围">
           {['south', 'north', 'west', 'east'].map((key) => (
             <div key={key}>
-              <span>{({ south: '南', north: '北', west: '西', east: '东' })[key]}</span>
+              <span>{{ south: '南', north: '北', west: '西', east: '东' }[key]}</span>
               <strong>{bounds?.[key] !== undefined ? Number(bounds[key]).toFixed(6) : '-'}</strong>
             </div>
           ))}
@@ -969,19 +1045,39 @@ function TerrainBoundsControlPanel({
           <div className="terrain-model-bounds-advanced__grid">
             <label>
               <span>南界</span>
-              <input type="number" value={manualBoundsWgs84.south} step="0.0001" onChange={(event) => onManualBoundChange('south', event.target.value)} />
+              <input
+                type="number"
+                value={manualBoundsWgs84.south}
+                step="0.0001"
+                onChange={(event) => onManualBoundChange('south', event.target.value)}
+              />
             </label>
             <label>
               <span>北界</span>
-              <input type="number" value={manualBoundsWgs84.north} step="0.0001" onChange={(event) => onManualBoundChange('north', event.target.value)} />
+              <input
+                type="number"
+                value={manualBoundsWgs84.north}
+                step="0.0001"
+                onChange={(event) => onManualBoundChange('north', event.target.value)}
+              />
             </label>
             <label>
               <span>西界</span>
-              <input type="number" value={manualBoundsWgs84.west} step="0.0001" onChange={(event) => onManualBoundChange('west', event.target.value)} />
+              <input
+                type="number"
+                value={manualBoundsWgs84.west}
+                step="0.0001"
+                onChange={(event) => onManualBoundChange('west', event.target.value)}
+              />
             </label>
             <label>
               <span>东界</span>
-              <input type="number" value={manualBoundsWgs84.east} step="0.0001" onChange={(event) => onManualBoundChange('east', event.target.value)} />
+              <input
+                type="number"
+                value={manualBoundsWgs84.east}
+                step="0.0001"
+                onChange={(event) => onManualBoundChange('east', event.target.value)}
+              />
             </label>
           </div>
         </details>
@@ -1030,7 +1126,9 @@ function BambuHandoffCard({ handoff, files = [], disabled = false, onDownload })
         <div>
           <span>拓竹打印包</span>
           <strong>{handoff.package3mf}</strong>
-          <p>{profile.printerSettingsId || '-'} / {profile.filamentSettingsId || '-'}</p>
+          <p>
+            {profile.printerSettingsId || '-'} / {profile.filamentSettingsId || '-'}
+          </p>
         </div>
       </div>
       <div className="terrain-model-bambu-card__notice">
@@ -1038,27 +1136,47 @@ function BambuHandoffCard({ handoff, files = [], disabled = false, onDownload })
         <p>Bambu Studio 打开后按耗材槽核对颜色；如弹出材料重映射，按下方槽位对应。</p>
       </div>
       <div className="terrain-model-bambu-card__actions">
-        <button type="button" disabled={disabled || !canDownloadPackage} onClick={() => packageFile && onDownload(packageFile)}>
+        <button
+          type="button"
+          disabled={disabled || !canDownloadPackage}
+          onClick={() => packageFile && onDownload(packageFile)}
+        >
           <span className="material-symbols-outlined">download</span>
           <span>下载拓竹 3MF</span>
         </button>
-        <button type="button" disabled={disabled || !canDownloadGuide} onClick={() => guideFile && onDownload(guideFile)}>
+        <button
+          type="button"
+          disabled={disabled || !canDownloadGuide}
+          onClick={() => guideFile && onDownload(guideFile)}
+        >
           <span className="material-symbols-outlined">article</span>
           <span>查看打印说明</span>
         </button>
       </div>
       {preflight?.checks?.length ? (
-        <div className={'terrain-model-bambu-preflight terrain-model-bambu-preflight--' + preflight.status}>
+        <div
+          className={
+            'terrain-model-bambu-preflight terrain-model-bambu-preflight--' + preflight.status
+          }
+        >
           <div className="terrain-model-bambu-preflight__head">
             <div>
               <span>打印前检查</span>
               <strong>{preflight.label}</strong>
             </div>
-            <span>{preflight.warnings?.length ? preflight.warnings.length + ' 项复核' : '全部通过'}</span>
+            <span>
+              {preflight.warnings?.length ? preflight.warnings.length + ' 项复核' : '全部通过'}
+            </span>
           </div>
           <div className="terrain-model-bambu-preflight__checks">
             {preflight.checks.map((check) => (
-              <div key={check.key} className={'terrain-model-bambu-preflight__check terrain-model-bambu-preflight__check--' + check.status}>
+              <div
+                key={check.key}
+                className={
+                  'terrain-model-bambu-preflight__check terrain-model-bambu-preflight__check--' +
+                  check.status
+                }
+              >
                 <span className="material-symbols-outlined">{getReadinessIcon(check.status)}</span>
                 <div>
                   <strong>{check.label}</strong>
@@ -1072,10 +1190,15 @@ function BambuHandoffCard({ handoff, files = [], disabled = false, onDownload })
       <div className="terrain-model-bambu-slots" aria-label="耗材槽">
         {handoff.materialSlots.map((slot) => (
           <div key={slot.slot} className="terrain-model-bambu-slot">
-            <span className="terrain-model-bambu-slot__swatch" style={{ '--bambu-slot-color': slot.color }} />
+            <span
+              className="terrain-model-bambu-slot__swatch"
+              style={{ '--bambu-slot-color': slot.color }}
+            />
             <div>
               <span>耗材槽 {slot.slot}</span>
-              <strong>{slot.filamentType || 'PLA'} / {slot.color}</strong>
+              <strong>
+                {slot.filamentType || 'PLA'} / {slot.color}
+              </strong>
               <div className="terrain-model-bambu-slot__parts">
                 {(slot.parts?.length ? slot.parts : ['未使用']).map((part) => (
                   <span key={part}>{part}</span>
@@ -1131,9 +1254,16 @@ function DeliveryPanel({ files, manifest, model, exportBlocked, onDownload }) {
           <span>{group.label}</span>
           <div className="terrain-model-downloads">
             {group.files.map((file) => (
-              <button key={file.name} type="button" disabled={!model || exportBlocked} onClick={() => onDownload(file)}>
+              <button
+                key={file.name}
+                type="button"
+                disabled={!model || exportBlocked}
+                onClick={() => onDownload(file)}
+              >
                 <span className="material-symbols-outlined">download</span>
-                <span className="terrain-model-downloads__badge">{getDeliveryFileBadge(file.name)}</span>
+                <span className="terrain-model-downloads__badge">
+                  {getDeliveryFileBadge(file.name)}
+                </span>
                 <span>{file.name}</span>
               </button>
             ))}
@@ -1177,7 +1307,8 @@ function removeStoredOpenTopoApiKey() {
 }
 
 function readStoredTerrainModelConfig() {
-  if (typeof window === 'undefined' || !window.localStorage) return normalizeTerrainModelSavedConfig(null)
+  if (typeof window === 'undefined' || !window.localStorage)
+    return normalizeTerrainModelSavedConfig(null)
   try {
     const stored = window.localStorage.getItem(TERRAIN_MODEL_CONFIG_STORAGE_KEY)
     return normalizeTerrainModelSavedConfig(stored ? JSON.parse(stored) : null)
@@ -1241,7 +1372,16 @@ function getOpenTopoStatusLabel(raster, demType) {
   const sourceName = raster?.sourceName || 'OpenTopography ' + demType
   const rows = Number.isFinite(raster?.rows) ? raster.rows : '-'
   const cols = Number.isFinite(raster?.cols) ? raster.cols : '-'
-  return '已获取 ' + sourceName + ' · ' + rows + ' x ' + cols + ' · ' + formatResolution(raster?.resolutionMeters)
+  return (
+    '已获取 ' +
+    sourceName +
+    ' · ' +
+    rows +
+    ' x ' +
+    cols +
+    ' · ' +
+    formatResolution(raster?.resolutionMeters)
+  )
 }
 
 function getElevationSourceLabel(model, demRaster, useSampledTerrain) {
@@ -1252,7 +1392,8 @@ function getElevationSourceLabel(model, demRaster, useSampledTerrain) {
 
 function getSurfaceTextureStatusLabel(surfaceTexture) {
   if (!surfaceTexture) return '等待模型'
-  const zoomLabel = surfaceTexture.budgetLimited && surfaceTexture.requestedZoom
+  const zoomLabel =
+    surfaceTexture.budgetLimited && surfaceTexture.requestedZoom
     ? 'z' + surfaceTexture.requestedZoom + '->z' + surfaceTexture.zoom
     : 'z' + surfaceTexture.zoom
   const parts = [
@@ -1268,7 +1409,9 @@ function getSurfaceTextureStatusLabel(surfaceTexture) {
 }
 
 function getSurfaceTextureStatusTone(surfaceTexture) {
-  return surfaceTexture?.qualityWarnings?.length || surfaceTexture?.missingTileCount ? 'warning' : 'success'
+  return surfaceTexture?.qualityWarnings?.length || surfaceTexture?.missingTileCount
+    ? 'warning'
+    : 'success'
 }
 
 function getSurfaceTextureSuccessMessage(surfaceTexture) {
@@ -1301,6 +1444,20 @@ function getSurfaceTextureProgressLabel(progress) {
   return getSurfaceTextureStatusLabel(plan)
 }
 
+function getArcGisSamplingProgressLabel(progress) {
+  if (!progress?.totalSamples) return 'ArcGIS 高程采样中'
+  return (
+    'ArcGIS 高程 ' +
+    progress.completedSamples +
+    '/' +
+    progress.totalSamples +
+    ' · 批次 ' +
+    progress.completedBatches +
+    '/' +
+    progress.totalBatches
+  )
+}
+
 function isReusableGoogleSession(sessionState, apiKey) {
   if (!sessionState?.session || sessionState.apiKey !== apiKey) return false
   const expiryTime = Date.parse(sessionState.expiry || '')
@@ -1312,13 +1469,16 @@ function meshToGeometry(mesh, options = {}) {
   const positions = []
   const colors = []
   const uvs = []
-  const heightRange = mesh.vertices.reduce((range, vertex) => {
+  const heightRange = mesh.vertices.reduce(
+    (range, vertex) => {
     if (!Number.isFinite(vertex?.y)) return range
     return {
       min: Math.min(range.min, vertex.y),
       max: Math.max(range.max, vertex.y),
     }
-  }, { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY })
+    },
+    { min: Number.POSITIVE_INFINITY, max: Number.NEGATIVE_INFINITY }
+  )
   const minY = Number.isFinite(heightRange.min) ? heightRange.min : 0
   const maxY = Number.isFinite(heightRange.max) ? heightRange.max : minY
   const color = new THREE.Color()
@@ -1373,7 +1533,7 @@ function loadSurfaceTextureMap(surfaceTexture) {
       surfaceTexture.imageUrl,
       (texture) => resolve(configureSurfaceTextureMap(texture)),
       undefined,
-      reject,
+      reject
     )
   })
 }
@@ -1381,7 +1541,8 @@ function loadSurfaceTextureMap(surfaceTexture) {
 function splitTerrainMeshForSurfaceTexture(mesh) {
   const topFaces = []
   const sideFaces = []
-  const isTopFace = (face) => face.every((index) => {
+  const isTopFace = (face) =>
+    face.every((index) => {
     const vertex = mesh.vertices[index]
     return Number.isFinite(vertex?.y) && vertex.y > 0
   })
@@ -1425,10 +1586,12 @@ function createModelGroup(model, { surfaceTextureMap = null } = {}) {
   }
   const baseGeometry = meshToGeometry(model.meshes.base)
   if (baseGeometry) {
-    group.add(new THREE.Mesh(
+    group.add(
+      new THREE.Mesh(
       baseGeometry,
-      new THREE.MeshStandardMaterial({ color: '#171717', roughness: 0.64, metalness: 0.02 }),
-    ))
+        new THREE.MeshStandardMaterial({ color: '#171717', roughness: 0.64, metalness: 0.02 })
+      )
+    )
   }
   if (surfaceTextureMap) {
     const { topMesh, sideMesh } = splitTerrainMeshForSurfaceTexture(model.meshes.terrain)
@@ -1446,43 +1609,49 @@ function createModelGroup(model, { surfaceTextureMap = null } = {}) {
       surfaceTextureDimensions: model.stats,
     })
     if (terrainTopGeometry) {
-      group.add(new THREE.Mesh(
+      group.add(
+        new THREE.Mesh(
         terrainTopGeometry,
         new THREE.MeshStandardMaterial({
           map: surfaceTextureMap,
           roughness: 0.9,
           metalness: 0.02,
           side: THREE.DoubleSide,
-        }),
-      ))
+          })
+        )
+      )
     }
   } else {
     const terrainGeometry = meshToGeometry(model.meshes.terrain, {
       vertexColors: true,
     })
     if (terrainGeometry) {
-      group.add(new THREE.Mesh(
+      group.add(
+        new THREE.Mesh(
         terrainGeometry,
         new THREE.MeshStandardMaterial({
           vertexColors: true,
           roughness: 0.9,
           metalness: 0.02,
           side: THREE.DoubleSide,
-        }),
-      ))
+          })
+        )
+      )
     }
   }
   const lowlandGeometry = meshToGeometry(model.meshes.lowland)
   if (lowlandGeometry) {
-    group.add(new THREE.Mesh(
+    group.add(
+      new THREE.Mesh(
       lowlandGeometry,
       new THREE.MeshStandardMaterial({
         color: '#1f9f72',
         roughness: 0.76,
         metalness: 0.02,
         side: THREE.DoubleSide,
-      }),
-    ))
+        })
+      )
+    )
   }
   // Export keeps the full printable colour shells; the preview avoids
   // rebuilding oversized shells synchronously when a texture already shows them.
@@ -1491,66 +1660,74 @@ function createModelGroup(model, { surfaceTextureMap = null } = {}) {
     ...(model.meshes.elevationBands || []),
     ...(model.meshes.satelliteBands || []),
   ].reduce((total, mesh) => total + (mesh?.faces?.length || 0), 0)
-  const renderPrintableColorBands = hasPreviewElevationBands
-    || (previewColorBandFaceCount <= PREVIEW_COLOR_BAND_FACE_BUDGET
-      && !(surfaceTextureMap && model.colorBands?.mode === 'satellite'))
+  const renderPrintableColorBands =
+    hasPreviewElevationBands ||
+    (previewColorBandFaceCount <= PREVIEW_COLOR_BAND_FACE_BUDGET &&
+      !(surfaceTextureMap && model.colorBands?.mode === 'satellite'))
   const bandMeshes = renderPrintableColorBands
-    ? (model.meshes.elevationBands?.length
+    ? model.meshes.elevationBands?.length
       ? model.meshes.elevationBands
       : model.meshes.satelliteBands?.length
         ? model.meshes.satelliteBands
-        : [])
     : []
-  const bandColorInfo = model.colorBands?.elevationBands?.bands
-    || model.colorBands?.satelliteBands?.bands
-    || []
+    : []
+  const bandColorInfo =
+    model.colorBands?.elevationBands?.bands || model.colorBands?.satelliteBands?.bands || []
   bandMeshes.forEach((bandMesh, index) => {
     if (!bandMesh?.faces?.length) return
     const geometry = meshToGeometry(bandMesh)
     if (!geometry) return
     const color = bandColorInfo[index]?.displayColor || '#808080'
-    group.add(new THREE.Mesh(
+    group.add(
+      new THREE.Mesh(
       geometry,
       new THREE.MeshStandardMaterial({
         color,
         roughness: 0.76,
         metalness: 0.02,
         side: THREE.DoubleSide,
-      }),
-    ))
+        })
+      )
+    )
   })
   const contourGeometry = meshToGeometry(model.meshes.contours)
   if (contourGeometry) {
-    group.add(new THREE.Mesh(
+    group.add(
+      new THREE.Mesh(
       contourGeometry,
       new THREE.MeshStandardMaterial({
         color: '#f5f5f4',
         roughness: 0.72,
         metalness: 0.02,
-      }),
-    ))
+        })
+      )
+    )
   }
   const snowlineGeometry = meshToGeometry(model.meshes.snowline)
   if (snowlineGeometry) {
-    group.add(new THREE.Mesh(
+    group.add(
+      new THREE.Mesh(
       snowlineGeometry,
       new THREE.MeshStandardMaterial({
         color: '#f5f5f4',
         roughness: 0.7,
         metalness: 0.02,
-      }),
-    ))
+        })
+      )
+    )
   }
   const snowGeometry = meshToGeometry(model.meshes.snow)
   if (snowGeometry) {
-    group.add(new THREE.Mesh(
+    group.add(
+      new THREE.Mesh(
       snowGeometry,
       new THREE.MeshStandardMaterial({
         color: '#f5f5f4',
         roughness: 0.74,
         metalness: 0.02,
-      }),
-    ))
+        })
+      )
+    )
   }
   const trackGeometry = meshToGeometry(model.meshes.track)
   if (trackGeometry) {
@@ -1560,17 +1737,19 @@ function createModelGroup(model, { surfaceTextureMap = null } = {}) {
         color: '#d63b2e',
         roughness: 0.48,
         metalness: 0.02,
-      }),
+      })
     )
     trackMesh.name = 'track-red'
     group.add(trackMesh)
   }
   const labelGeometry = meshToGeometry(model.meshes.text)
   if (labelGeometry) {
-    group.add(new THREE.Mesh(
+    group.add(
+      new THREE.Mesh(
       labelGeometry,
-      new THREE.MeshStandardMaterial({ color: '#f5f5f4', roughness: 0.58, metalness: 0.02 }),
-    ))
+        new THREE.MeshStandardMaterial({ color: '#f5f5f4', roughness: 0.58, metalness: 0.02 })
+      )
+    )
   }
   return group
 }
@@ -1646,9 +1825,8 @@ function TerrainRouteMap({
     const layerGroup = L.layerGroup().addTo(map)
     const latLngs = points.map((point) => [point.latitude, point.longitude])
     const terrainLatLngBounds = toLeafletBounds(terrainBounds)
-    const manualFootprintLatLngs = terrainBoundsMode === 'manual'
-      ? footprintToLeafletLatLngs(manualFootprintWgs84)
-      : null
+    const manualFootprintLatLngs =
+      terrainBoundsMode === 'manual' ? footprintToLeafletLatLngs(manualFootprintWgs84) : null
     const isCustomFootprint = manualFootprintShape === 'custom'
     let cleanupManualLayer = () => {}
     if (manualFootprintLatLngs?.length || terrainLatLngBounds?.isValid()) {
@@ -1727,22 +1905,37 @@ function TerrainRouteMap({
       fillOpacity: 1,
     }).addTo(layerGroup)
     const routeBounds = L.latLngBounds(latLngs)
-    const footprintBounds = manualFootprintLatLngs?.length ? L.latLngBounds(manualFootprintLatLngs) : null
+    const footprintBounds = manualFootprintLatLngs?.length
+      ? L.latLngBounds(manualFootprintLatLngs)
+      : null
     const fitBounds = footprintBounds?.isValid()
-      ? L.latLngBounds(footprintBounds.getSouthWest(), footprintBounds.getNorthEast()).extend(routeBounds)
+      ? L.latLngBounds(footprintBounds.getSouthWest(), footprintBounds.getNorthEast()).extend(
+          routeBounds
+        )
       : terrainLatLngBounds?.isValid()
-      ? L.latLngBounds(terrainLatLngBounds.getSouthWest(), terrainLatLngBounds.getNorthEast()).extend(routeBounds)
+        ? L.latLngBounds(
+            terrainLatLngBounds.getSouthWest(),
+            terrainLatLngBounds.getNorthEast()
+          ).extend(routeBounds)
       : routeBounds
     map.fitBounds(fitBounds, { padding: [24, 24], animate: false })
     return () => {
       cleanupManualLayer()
       layerGroup.remove()
     }
-  }, [manualFootprintShape, manualFootprintWgs84, onManualFootprintChange, points, terrainBounds, terrainBoundsMode])
+  }, [
+    manualFootprintShape,
+    manualFootprintWgs84,
+    onManualFootprintChange,
+    points,
+    terrainBounds,
+    terrainBoundsMode,
+  ])
 
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !drawingBounds || !points.length || !onManualFootprintChange || !map.pm) return undefined
+    if (!map || !drawingBounds || !points.length || !onManualFootprintChange || !map.pm)
+      return undefined
 
     const container = map.getContainer()
     const drawStyle = {
@@ -1757,8 +1950,13 @@ function TerrainRouteMap({
     const handleCreate = (event) => {
       const layer = event.layer
       const drawnBounds = leafletBoundsToWgs84Bounds(layer?.getBounds?.())
-      const footprint = manualFootprintShape !== 'custom' && drawnBounds
-        ? createPresetFootprintPolygon(drawnBounds, manualFootprintShape, manualFootprintRotationDegrees)
+      const footprint =
+        manualFootprintShape !== 'custom' && drawnBounds
+          ? createPresetFootprintPolygon(
+              drawnBounds,
+              manualFootprintShape,
+              manualFootprintRotationDegrees
+            )
         : leafletLayerToWgs84Footprint(layer)
       if (layer) map.removeLayer(layer)
       setDrawingBounds(false)
@@ -1811,13 +2009,26 @@ function TerrainRouteMap({
       map.dragging.enable()
       container.classList.remove('terrain-model-map--drawing')
     }
-  }, [drawingBounds, manualFootprintRotationDegrees, manualFootprintShape, onManualFootprintChange, points.length])
+  }, [
+    drawingBounds,
+    manualFootprintRotationDegrees,
+    manualFootprintShape,
+    onManualFootprintChange,
+    points.length,
+  ])
 
   return (
-    <div className={'terrain-model-map-frame' + (drawingBounds ? ' terrain-model-map-frame--drawing' : '')}>
+    <div
+      className={
+        'terrain-model-map-frame' + (drawingBounds ? ' terrain-model-map-frame--drawing' : '')
+      }
+    >
       <div ref={containerRef} className="terrain-model-map" aria-label="轨迹地图预览" />
       {drawingBounds && (
-        <div className="terrain-model-map-status terrain-model-map-status--drawing" aria-hidden="true">
+        <div
+          className="terrain-model-map-status terrain-model-map-status--drawing"
+          aria-hidden="true"
+        >
           <span className="material-symbols-outlined">select_all</span>
           <strong>正在框选范围</strong>
         </div>
@@ -1838,12 +2049,17 @@ function TerrainPreview({ model, surfaceTexture }) {
   const controlsRef = useRef(null)
   const [previewError, setPreviewError] = useState(null)
 
-  const setCameraView = useCallback((view) => {
+  const setCameraView = useCallback(
+    (view) => {
     const camera = cameraRef.current
     const controls = controlsRef.current
     if (!camera || !controls || !model) return
 
-    const modelSize = Math.max(model.stats.modelWidthMm, model.stats.modelDepthMm, model.stats.maxHeightMm)
+      const modelSize = Math.max(
+        model.stats.modelWidthMm,
+        model.stats.modelDepthMm,
+        model.stats.maxHeightMm
+      )
     const targetY = model.stats.maxHeightMm * 0.32
     const positions = {
       reset: [modelSize * 0.82, modelSize * 0.62, modelSize * 1.12],
@@ -1858,7 +2074,9 @@ function TerrainPreview({ model, surfaceTexture }) {
     camera.lookAt(controls.target)
     camera.updateProjectionMatrix()
     controls.update()
-  }, [model])
+    },
+    [model]
+  )
 
   useEffect(() => {
     if (!canvasHostRef.current) return undefined
@@ -1969,7 +2187,11 @@ function TerrainPreview({ model, surfaceTexture }) {
         invalidate()
       })
 
-    const modelSize = Math.max(model.stats.modelWidthMm, model.stats.modelDepthMm, model.stats.maxHeightMm)
+    const modelSize = Math.max(
+      model.stats.modelWidthMm,
+      model.stats.modelDepthMm,
+      model.stats.maxHeightMm
+    )
     controls.minDistance = modelSize * 0.34
     controls.maxDistance = modelSize * 4.8
     controls.minPolarAngle = 0.1
@@ -2021,20 +2243,48 @@ function TerrainPreview({ model, surfaceTexture }) {
       )}
       {model && !previewError && (
         <div className="terrain-model-preview__camera" aria-label="预览视角">
-          <button type="button" aria-label="重置视角" title="重置视角" onClick={() => setCameraView('reset')}>
-            <span className="material-symbols-outlined" aria-hidden="true">home</span>
+          <button
+            type="button"
+            aria-label="重置视角"
+            title="重置视角"
+            onClick={() => setCameraView('reset')}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              home
+            </span>
             <span>重置</span>
           </button>
-          <button type="button" aria-label="俯视" title="俯视" onClick={() => setCameraView('overhead')}>
-            <span className="material-symbols-outlined" aria-hidden="true">vertical_align_top</span>
+          <button
+            type="button"
+            aria-label="俯视"
+            title="俯视"
+            onClick={() => setCameraView('overhead')}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              vertical_align_top
+            </span>
             <span>俯视</span>
           </button>
-          <button type="button" aria-label="正面" title="正面" onClick={() => setCameraView('front')}>
-            <span className="material-symbols-outlined" aria-hidden="true">flip_to_front</span>
+          <button
+            type="button"
+            aria-label="正面"
+            title="正面"
+            onClick={() => setCameraView('front')}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              flip_to_front
+            </span>
             <span>正面</span>
           </button>
-          <button type="button" aria-label="东侧" title="东侧" onClick={() => setCameraView('east')}>
-            <span className="material-symbols-outlined" aria-hidden="true">east</span>
+          <button
+            type="button"
+            aria-label="东侧"
+            title="东侧"
+            onClick={() => setCameraView('east')}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              east
+            </span>
             <span>东侧</span>
           </button>
         </div>
@@ -2055,68 +2305,119 @@ export default function TerrainModelPage() {
   const [model, setModel] = useState(null)
   const [storedTerrainModelConfig] = useState(readStoredTerrainModelConfig)
   const [options, setOptions] = useState(() => storedTerrainModelConfig.options)
-  const [useSampledTerrain, setUseSampledTerrain] = useState(storedTerrainModelConfig.useSampledTerrain)
+  const [useSampledTerrain, setUseSampledTerrain] = useState(
+    storedTerrainModelConfig.useSampledTerrain
+  )
   const [demRaster, setDemRaster] = useState(null)
   const [demFileName, setDemFileName] = useState('')
   const [storedOpenTopoApiKey] = useState(readStoredOpenTopoApiKey)
   const [openTopoApiKey, setOpenTopoApiKey] = useState(storedOpenTopoApiKey)
-  const [rememberOpenTopoApiKey, setRememberOpenTopoApiKey] = useState(Boolean(storedOpenTopoApiKey))
+  const [rememberOpenTopoApiKey, setRememberOpenTopoApiKey] = useState(
+    Boolean(storedOpenTopoApiKey)
+  )
   const [openTopoDemType, setOpenTopoDemType] = useState(storedTerrainModelConfig.openTopoDemType)
   const [openTopoStatus, setOpenTopoStatus] = useState({ tone: 'idle', label: '等待 GPX' })
   const [fetchingOpenTopo, setFetchingOpenTopo] = useState(false)
-  const [surfaceTextureEnabled, setSurfaceTextureEnabled] = useState(storedTerrainModelConfig.surfaceTexture.enabled)
-  const [surfaceTextureSourceKey, setSurfaceTextureSourceKey] = useState(storedTerrainModelConfig.surfaceTexture.sourceKey)
-  const [surfaceTextureQuality, setSurfaceTextureQuality] = useState(storedTerrainModelConfig.surfaceTexture.quality)
-  const [surfaceTextureGoogleApiKey, setSurfaceTextureGoogleApiKey] = useState(DEFAULT_GOOGLE_MAPS_TILE_API_KEY)
+  const [surfaceTextureEnabled, setSurfaceTextureEnabled] = useState(
+    storedTerrainModelConfig.surfaceTexture.enabled
+  )
+  const [surfaceTextureSourceKey, setSurfaceTextureSourceKey] = useState(
+    storedTerrainModelConfig.surfaceTexture.sourceKey
+  )
+  const [surfaceTextureQuality, setSurfaceTextureQuality] = useState(
+    storedTerrainModelConfig.surfaceTexture.quality
+  )
+  const [surfaceTextureGoogleApiKey, setSurfaceTextureGoogleApiKey] = useState(
+    DEFAULT_GOOGLE_MAPS_TILE_API_KEY
+  )
   const [surfaceTextureGoogleSession, setSurfaceTextureGoogleSession] = useState(null)
-  const [surfaceTextureCesiumAccessToken, setSurfaceTextureCesiumAccessToken] = useState(DEFAULT_CESIUM_ION_TOKEN)
-  const [surfaceTextureCesiumAssetId, setSurfaceTextureCesiumAssetId] = useState(storedTerrainModelConfig.surfaceTexture.cesiumAssetId)
-  const [surfaceTextureCesiumUrlTemplate, setSurfaceTextureCesiumUrlTemplate] = useState(storedTerrainModelConfig.surfaceTexture.cesiumUrlTemplate)
+  const [surfaceTextureCesiumAccessToken, setSurfaceTextureCesiumAccessToken] =
+    useState(DEFAULT_CESIUM_ION_TOKEN)
+  const [surfaceTextureCesiumAssetId, setSurfaceTextureCesiumAssetId] = useState(
+    storedTerrainModelConfig.surfaceTexture.cesiumAssetId
+  )
+  const [surfaceTextureCesiumUrlTemplate, setSurfaceTextureCesiumUrlTemplate] = useState(
+    storedTerrainModelConfig.surfaceTexture.cesiumUrlTemplate
+  )
   const [surfaceTexture, setSurfaceTexture] = useState(null)
-  const [surfaceTextureStatus, setSurfaceTextureStatus] = useState({ tone: 'idle', label: '等待模型' })
+  const [surfaceTextureStatus, setSurfaceTextureStatus] = useState({
+    tone: 'idle',
+    label: '等待模型',
+  })
   const [buildingSurfaceTexture, setBuildingSurfaceTexture] = useState(false)
   const [building, setBuilding] = useState(false)
   const [exportingGlb, setExportingGlb] = useState(false)
   const [exportingFiles, setExportingFiles] = useState(false)
   const exportingFilesRef = useRef(false)
   const [fileName, setFileName] = useState('')
-  const [terrainBoundsMode, setTerrainBoundsMode] = useState(storedTerrainModelConfig.manualFootprint.mode)
+  const [terrainBoundsMode, setTerrainBoundsMode] = useState(
+    storedTerrainModelConfig.manualFootprint.mode
+  )
   const [manualDrawRequest, setManualDrawRequest] = useState(0)
-  const [manualFootprintShape, setManualFootprintShape] = useState(storedTerrainModelConfig.manualFootprint.shape)
-  const [manualFootprintRotationDegrees, setManualFootprintRotationDegrees] = useState(storedTerrainModelConfig.manualFootprint.rotationDegrees)
-  const [manualFootprintWgs84, setManualFootprintWgs84] = useState(storedTerrainModelConfig.manualFootprint.footprintWgs84)
-  const [manualBoundsWgs84, setManualBoundsWgs84] = useState(storedTerrainModelConfig.manualFootprint.boundsWgs84)
-  const summary = useMemo(() => track ? summarizeTrack(track.points) : null, [track])
-  const rawExportBaseName = useMemo(() => (
-    fileName.replace(/\.gpx$/i, '') || track?.name || 'door-terrain-model'
-  ), [fileName, track?.name])
-  const exportBaseName = useMemo(() => toAsciiSafeExportBaseName(rawExportBaseName), [rawExportBaseName])
-  const parsedManualBoundsWgs84 = useMemo(() => (
-    parseManualBoundsWgs84(manualBoundsWgs84)
-  ), [manualBoundsWgs84])
-  const activeManualFootprintWgs84 = useMemo(() => (
-    terrainBoundsMode === 'manual' ? normalizeManualFootprintWgs84(manualFootprintWgs84) : null
-  ), [manualFootprintWgs84, terrainBoundsMode])
+  const [manualFootprintShape, setManualFootprintShape] = useState(
+    storedTerrainModelConfig.manualFootprint.shape
+  )
+  const [manualFootprintRotationDegrees, setManualFootprintRotationDegrees] = useState(
+    storedTerrainModelConfig.manualFootprint.rotationDegrees
+  )
+  const [manualFootprintWgs84, setManualFootprintWgs84] = useState(
+    storedTerrainModelConfig.manualFootprint.footprintWgs84
+  )
+  const [manualBoundsWgs84, setManualBoundsWgs84] = useState(
+    storedTerrainModelConfig.manualFootprint.boundsWgs84
+  )
+  const summary = useMemo(() => (track ? summarizeTrack(track.points) : null), [track])
+  const rawExportBaseName = useMemo(
+    () => fileName.replace(/\.gpx$/i, '') || track?.name || 'door-terrain-model',
+    [fileName, track?.name]
+  )
+  const exportBaseName = useMemo(
+    () => toAsciiSafeExportBaseName(rawExportBaseName),
+    [rawExportBaseName]
+  )
+  const parsedManualBoundsWgs84 = useMemo(
+    () => parseManualBoundsWgs84(manualBoundsWgs84),
+    [manualBoundsWgs84]
+  )
+  const activeManualFootprintWgs84 = useMemo(
+    () =>
+      terrainBoundsMode === 'manual' ? normalizeManualFootprintWgs84(manualFootprintWgs84) : null,
+    [manualFootprintWgs84, terrainBoundsMode]
+  )
   const activeTerrainBoundsWgs84 = terrainBoundsMode === 'manual' ? parsedManualBoundsWgs84 : null
-  const manualTerrainBoundsReady = useMemo(() => (
-    terrainBoundsMode !== 'manual'
-      || Boolean(activeTerrainBoundsWgs84)
-  ), [activeTerrainBoundsWgs84, terrainBoundsMode])
-  const autoTerrainBounds = useMemo(() => (
+  const manualTerrainBoundsReady = useMemo(
+    () => terrainBoundsMode !== 'manual' || Boolean(activeTerrainBoundsWgs84),
+    [activeTerrainBoundsWgs84, terrainBoundsMode]
+  )
+  const autoTerrainBounds = useMemo(
+    () =>
     track?.points?.length
       ? buildBufferedWgs84Bounds(track.points, { paddingMeters: options.paddingMeters })
-      : null
-  ), [options.paddingMeters, track])
-  const terrainBounds = useMemo(() => (
-    terrainBoundsMode === 'manual' ? activeTerrainBoundsWgs84 : autoTerrainBounds
-  ), [activeTerrainBoundsWgs84, autoTerrainBounds, terrainBoundsMode])
-  const terrainOptions = useMemo(() => ({
+        : null,
+    [options.paddingMeters, track]
+  )
+  const terrainBounds = useMemo(
+    () => (terrainBoundsMode === 'manual' ? activeTerrainBoundsWgs84 : autoTerrainBounds),
+    [activeTerrainBoundsWgs84, autoTerrainBounds, terrainBoundsMode]
+  )
+  const terrainOptions = useMemo(
+    () => ({
     ...options,
     terrainBoundsWgs84: activeTerrainBoundsWgs84,
     terrainFootprintWgs84: activeManualFootprintWgs84,
-    terrainFootprintRotationDegrees: terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
-  }), [activeManualFootprintWgs84, activeTerrainBoundsWgs84, manualFootprintRotationDegrees, options, terrainBoundsMode])
-  const modelSizing = useMemo(() => (
+      terrainFootprintRotationDegrees:
+        terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
+    }),
+    [
+      activeManualFootprintWgs84,
+      activeTerrainBoundsWgs84,
+      manualFootprintRotationDegrees,
+      options,
+      terrainBoundsMode,
+    ]
+  )
+  const modelSizing = useMemo(
+    () =>
     track?.points?.length
       ? recommendModelDimensionsForTrack(track.points, terrainOptions)
       : {
@@ -2127,49 +2428,72 @@ export default function TerrainModelPage() {
         widthMeters: null,
         depthMeters: null,
         paddingMeters: options.paddingMeters,
-      }
-  ), [options, terrainOptions, track])
-  const generationOptions = useMemo(() => (
-    track?.points?.length ? buildTerrainModelOptions(track.points, terrainOptions) : terrainOptions
-  ), [terrainOptions, track])
+          },
+    [options, terrainOptions, track]
+  )
+  const generationOptions = useMemo(
+    () =>
+      track?.points?.length
+        ? buildTerrainModelOptions(track.points, terrainOptions)
+        : terrainOptions,
+    [terrainOptions, track]
+  )
   // Options shared between the lightweight export plan (rendered eagerly) and
   // the heavy file materialization (only on an explicit download click).
-  const exportOptions = useMemo(() => ({
+  const exportOptions = useMemo(
+    () => ({
     baseName: rawExportBaseName,
     surfaceTexture: surfaceTextureEnabled ? surfaceTexture : null,
-  }), [rawExportBaseName, surfaceTexture, surfaceTextureEnabled])
+    }),
+    [rawExportBaseName, surfaceTexture, surfaceTextureEnabled]
+  )
   // Build only file descriptors + manifest here (~30ms even at ultra grids).
   // Serializing the actual STL/3MF content used to run on every model/texture
   // change inside this memo and blocked the main thread for seconds — that work
   // now happens lazily in the download handlers via buildTerrainModelExportFile
   // / buildTerrainModelExportFiles.
-  const exportPlan = useMemo(() => (
-    model ? buildTerrainModelExportPlan(model, exportOptions) : null
-  ), [model, exportOptions])
+  const exportPlan = useMemo(
+    () => (model ? buildTerrainModelExportPlan(model, exportOptions) : null),
+    [model, exportOptions]
+  )
   const exportFiles = exportPlan?.files || []
-  const printReadiness = useMemo(() => (
-    model ? evaluateTerrainModelReadiness(model) : null
-  ), [model])
-  const reliefRecommendation = useMemo(() => (
-    track?.points?.length ? recommendTerrainReliefOptions(track.points, generationOptions) : null
-  ), [generationOptions, track])
+  const printReadiness = useMemo(
+    () => (model ? evaluateTerrainModelReadiness(model) : null),
+    [model]
+  )
+  const reliefRecommendation = useMemo(
+    () =>
+      track?.points?.length ? recommendTerrainReliefOptions(track.points, generationOptions) : null,
+    [generationOptions, track]
+  )
   const printRecommendation = reliefRecommendation?.printReadable || null
   const activeReliefRecommendation = reliefRecommendation?.active || null
-  const printStyleRecommendation = useMemo(() => (
-    track?.points?.length ? recommendTerrainPrintStyleOptions(track.points, generationOptions) : null
-  ), [generationOptions, track])
-  const highPrecisionRecommendation = useMemo(() => (
+  const printStyleRecommendation = useMemo(
+    () =>
     track?.points?.length
-      ? recommendHighPrecisionTerrainOptions(track.points, generationOptions, demRaster || {
+        ? recommendTerrainPrintStyleOptions(track.points, generationOptions)
+        : null,
+    [generationOptions, track]
+  )
+  const highPrecisionRecommendation = useMemo(
+    () =>
+      track?.points?.length
+        ? recommendHighPrecisionTerrainOptions(
+            track.points,
+            generationOptions,
+            demRaster || {
         sourceName: useSampledTerrain ? 'ArcGIS WorldElevation3D Terrain3D' : 'GPX 高程',
-      })
-      : null
-  ), [demRaster, generationOptions, track, useSampledTerrain])
+            }
+          )
+        : null,
+    [demRaster, generationOptions, track, useSampledTerrain]
+  )
   const elevationSourceLabel = useMemo(
     () => getElevationSourceLabel(model, demRaster, useSampledTerrain),
-    [demRaster, model, useSampledTerrain],
+    [demRaster, model, useSampledTerrain]
   )
-  const exportBlockedBySurfaceTexture = surfaceTextureEnabled && (!surfaceTexture || buildingSurfaceTexture)
+  const exportBlockedBySurfaceTexture =
+    surfaceTextureEnabled && (!surfaceTexture || buildingSurfaceTexture)
 
   useEffect(() => {
     const apiKey = openTopoApiKey.trim()
@@ -2181,7 +2505,8 @@ export default function TerrainModelPage() {
   }, [openTopoApiKey, rememberOpenTopoApiKey])
 
   useEffect(() => {
-    storeTerrainModelConfig(buildTerrainModelConfigSnapshot({
+    storeTerrainModelConfig(
+      buildTerrainModelConfigSnapshot({
       options,
       useSampledTerrain,
       openTopoDemType,
@@ -2195,7 +2520,8 @@ export default function TerrainModelPage() {
       manualFootprintRotationDegrees,
       manualBoundsWgs84,
       manualFootprintWgs84,
-    }))
+      })
+    )
   }, [
     manualBoundsWgs84,
     manualFootprintRotationDegrees,
@@ -2218,7 +2544,8 @@ export default function TerrainModelPage() {
     setSurfaceTextureStatus({ tone: 'idle', label: '等待模型' })
   }, [])
 
-  const applyTerrainModelConfig = useCallback((config) => {
+  const applyTerrainModelConfig = useCallback(
+    (config) => {
     const nextConfig = normalizeTerrainModelSavedConfig(config)
     setOptions(nextConfig.options)
     setUseSampledTerrain(nextConfig.useSampledTerrain)
@@ -2234,9 +2561,14 @@ export default function TerrainModelPage() {
     setManualFootprintWgs84(nextConfig.manualFootprint.footprintWgs84)
     setManualBoundsWgs84(nextConfig.manualFootprint.boundsWgs84)
     setSurfaceTextureGoogleSession(null)
-    setOpenTopoStatus({ tone: 'idle', label: nextConfig.manualFootprint.mode === 'manual' ? '等待获取' : '等待 GPX' })
+      setOpenTopoStatus({
+        tone: 'idle',
+        label: nextConfig.manualFootprint.mode === 'manual' ? '等待获取' : '等待 GPX',
+      })
     resetGeneratedOutputs()
-  }, [resetGeneratedOutputs])
+    },
+    [resetGeneratedOutputs]
+  )
 
   const handleExportConfig = useCallback(() => {
     const config = buildTerrainModelConfigSnapshot({
@@ -2274,7 +2606,8 @@ export default function TerrainModelPage() {
     useSampledTerrain,
   ])
 
-  const handleImportConfigFile = useCallback(async (event) => {
+  const handleImportConfigFile = useCallback(
+    async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
     try {
@@ -2287,19 +2620,27 @@ export default function TerrainModelPage() {
     } finally {
       event.target.value = ''
     }
-  }, [applyTerrainModelConfig])
+    },
+    [applyTerrainModelConfig]
+  )
 
-  const updateUseSampledTerrain = useCallback((value) => {
+  const updateUseSampledTerrain = useCallback(
+    (value) => {
     resetGeneratedOutputs()
     setUseSampledTerrain(Boolean(value))
-  }, [resetGeneratedOutputs])
+    },
+    [resetGeneratedOutputs]
+  )
 
-  const updateTerrainBoundsMode = useCallback((value) => {
+  const updateTerrainBoundsMode = useCallback(
+    (value) => {
     const nextMode = value === 'manual' ? 'manual' : 'auto'
     setTerrainBoundsMode(nextMode)
     resetGeneratedOutputs()
     setOpenTopoStatus({ tone: 'idle', label: '等待获取' })
-  }, [resetGeneratedOutputs])
+    },
+    [resetGeneratedOutputs]
+  )
 
   const startManualTerrainBoundsDraw = useCallback(() => {
     if (!track?.points?.length) {
@@ -2312,12 +2653,20 @@ export default function TerrainModelPage() {
       return
     }
     if (manualFootprintShape !== 'rectangle' && manualFootprintShape !== 'custom') {
-      const presetFootprint = createPresetFootprintPolygon(baseBounds, manualFootprintShape, manualFootprintRotationDegrees)
+      const presetFootprint = createPresetFootprintPolygon(
+        baseBounds,
+        manualFootprintShape,
+        manualFootprintRotationDegrees
+      )
       applyManualTerrainFootprint(presetFootprint, manualFootprintShape)
       return
     }
     if (terrainBoundsMode !== 'manual' || !activeTerrainBoundsWgs84) {
-      const initialFootprint = createPresetFootprintPolygon(baseBounds, 'rectangle', manualFootprintRotationDegrees)
+      const initialFootprint = createPresetFootprintPolygon(
+        baseBounds,
+        'rectangle',
+        manualFootprintRotationDegrees
+      )
       const initialBounds = manualFootprintToBoundsWgs84(initialFootprint) || baseBounds
       setTerrainBoundsMode('manual')
       setManualBoundsWgs84(boundsToInputValues(initialBounds))
@@ -2331,9 +2680,18 @@ export default function TerrainModelPage() {
     resetGeneratedOutputs()
     setOpenTopoStatus({ tone: 'idle', label: '等待获取' })
     setManualDrawRequest((current) => current + 1)
-  }, [activeTerrainBoundsWgs84, autoTerrainBounds, manualFootprintRotationDegrees, manualFootprintShape, resetGeneratedOutputs, terrainBoundsMode, track])
+  }, [
+    activeTerrainBoundsWgs84,
+    autoTerrainBounds,
+    manualFootprintRotationDegrees,
+    manualFootprintShape,
+    resetGeneratedOutputs,
+    terrainBoundsMode,
+    track,
+  ])
 
-  const updateManualBoundsWgs84 = useCallback((key, value) => {
+  const updateManualBoundsWgs84 = useCallback(
+    (key, value) => {
     setManualBoundsWgs84((current) => {
       const next = {
         ...current,
@@ -2342,41 +2700,65 @@ export default function TerrainModelPage() {
       const nextBounds = parseManualBoundsWgs84(next)
       if (nextBounds) {
         setManualFootprintShape('rectangle')
-        setManualFootprintWgs84(createPresetFootprintPolygon(nextBounds, 'rectangle', manualFootprintRotationDegrees))
+          setManualFootprintWgs84(
+            createPresetFootprintPolygon(nextBounds, 'rectangle', manualFootprintRotationDegrees)
+          )
       }
       return next
     })
     resetGeneratedOutputs()
     setOpenTopoStatus({ tone: 'idle', label: '等待获取' })
-  }, [manualFootprintRotationDegrees, resetGeneratedOutputs])
+    },
+    [manualFootprintRotationDegrees, resetGeneratedOutputs]
+  )
 
-  const applyManualTerrainFootprint = useCallback((footprint, shape = manualFootprintShape) => {
+  const applyManualTerrainFootprint = useCallback(
+    (footprint, shape = manualFootprintShape) => {
     const nextFootprint = normalizeManualFootprintWgs84(footprint)
     const nextBounds = manualFootprintToBoundsWgs84(nextFootprint)
     if (!nextBounds) {
       showError('手动范围无效')
       return
     }
-    setManualFootprintShape(MANUAL_FOOTPRINT_SHAPES.some((item) => item.key === shape) ? shape : 'custom')
+      setManualFootprintShape(
+        MANUAL_FOOTPRINT_SHAPES.some((item) => item.key === shape) ? shape : 'custom'
+      )
     setManualFootprintWgs84(nextFootprint)
     setManualBoundsWgs84(boundsToInputValues(nextBounds))
     setTerrainBoundsMode('manual')
     resetGeneratedOutputs()
     setOpenTopoStatus({ tone: 'idle', label: '等待获取' })
-  }, [manualFootprintShape, resetGeneratedOutputs])
+    },
+    [manualFootprintShape, resetGeneratedOutputs]
+  )
 
-  const applyManualTerrainBounds = useCallback((bounds) => {
+  const applyManualTerrainBounds = useCallback(
+    (bounds) => {
     const nextBounds = parseManualBoundsWgs84(bounds)
-    applyManualTerrainFootprint(createPresetFootprintPolygon(nextBounds, 'rectangle', manualFootprintRotationDegrees), 'rectangle')
-  }, [applyManualTerrainFootprint, manualFootprintRotationDegrees])
+      applyManualTerrainFootprint(
+        createPresetFootprintPolygon(nextBounds, 'rectangle', manualFootprintRotationDegrees),
+        'rectangle'
+      )
+    },
+    [applyManualTerrainFootprint, manualFootprintRotationDegrees]
+  )
 
   const applyCurrentTerrainBounds = useCallback(() => {
     if (!autoTerrainBounds) return
     const presetShape = manualFootprintShape === 'custom' ? 'rectangle' : manualFootprintShape
-    applyManualTerrainFootprint(createPresetFootprintPolygon(autoTerrainBounds, presetShape, manualFootprintRotationDegrees), presetShape)
-  }, [applyManualTerrainFootprint, autoTerrainBounds, manualFootprintRotationDegrees, manualFootprintShape])
+    applyManualTerrainFootprint(
+      createPresetFootprintPolygon(autoTerrainBounds, presetShape, manualFootprintRotationDegrees),
+      presetShape
+    )
+  }, [
+    applyManualTerrainFootprint,
+    autoTerrainBounds,
+    manualFootprintRotationDegrees,
+    manualFootprintShape,
+  ])
 
-  const updateManualFootprintRotation = useCallback((value) => {
+  const updateManualFootprintRotation = useCallback(
+    (value) => {
     const nextAngle = normalizeManualFootprintRotationDegrees(value)
     if (nextAngle === manualFootprintRotationDegrees) return
     if (manualFootprintShape === 'custom') {
@@ -2399,17 +2781,22 @@ export default function TerrainModelPage() {
     setTerrainBoundsMode('manual')
     resetGeneratedOutputs()
     setOpenTopoStatus({ tone: 'idle', label: '等待获取' })
-  }, [
+    },
+    [
     activeTerrainBoundsWgs84,
     autoTerrainBounds,
     manualFootprintRotationDegrees,
     manualFootprintShape,
     manualFootprintWgs84,
     resetGeneratedOutputs,
-  ])
+    ]
+  )
 
-  const updateManualFootprintShape = useCallback((shape) => {
-    const nextShape = MANUAL_FOOTPRINT_SHAPES.some((item) => item.key === shape) ? shape : 'rectangle'
+  const updateManualFootprintShape = useCallback(
+    (shape) => {
+      const nextShape = MANUAL_FOOTPRINT_SHAPES.some((item) => item.key === shape)
+        ? shape
+        : 'rectangle'
     setManualFootprintShape(nextShape)
     if (nextShape === 'custom') {
       if (!track?.points?.length) {
@@ -2418,8 +2805,14 @@ export default function TerrainModelPage() {
       }
       const baseBounds = activeTerrainBoundsWgs84 || autoTerrainBounds
       if (baseBounds && !activeManualFootprintWgs84) {
-        const presetFootprint = createPresetFootprintPolygon(baseBounds, 'rectangle', manualFootprintRotationDegrees)
-        setManualBoundsWgs84(boundsToInputValues(manualFootprintToBoundsWgs84(presetFootprint) || baseBounds))
+          const presetFootprint = createPresetFootprintPolygon(
+            baseBounds,
+            'rectangle',
+            manualFootprintRotationDegrees
+          )
+          setManualBoundsWgs84(
+            boundsToInputValues(manualFootprintToBoundsWgs84(presetFootprint) || baseBounds)
+          )
         setManualFootprintWgs84(presetFootprint)
       }
       setTerrainBoundsMode('manual')
@@ -2430,11 +2823,25 @@ export default function TerrainModelPage() {
     }
     const baseBounds = activeTerrainBoundsWgs84 || autoTerrainBounds
     if (!baseBounds) return
-    applyManualTerrainFootprint(createPresetFootprintPolygon(baseBounds, nextShape, manualFootprintRotationDegrees), nextShape)
-  }, [activeManualFootprintWgs84, activeTerrainBoundsWgs84, applyManualTerrainFootprint, autoTerrainBounds, manualFootprintRotationDegrees, resetGeneratedOutputs, track])
+      applyManualTerrainFootprint(
+        createPresetFootprintPolygon(baseBounds, nextShape, manualFootprintRotationDegrees),
+        nextShape
+      )
+    },
+    [
+      activeManualFootprintWgs84,
+      activeTerrainBoundsWgs84,
+      applyManualTerrainFootprint,
+      autoTerrainBounds,
+      manualFootprintRotationDegrees,
+      resetGeneratedOutputs,
+      track,
+    ]
+  )
 
-  const updateOption = useCallback((key, value) => {
-    const nextValue = Number(value)
+  const updateOption = useCallback(
+    (key, value) => {
+      const nextValue = Number(value)
     resetGeneratedOutputs()
     setOptions((current) => {
       const nextOptions = {
@@ -2447,7 +2854,8 @@ export default function TerrainModelPage() {
         ...nextOptions,
         terrainBoundsWgs84: activeTerrainBoundsWgs84,
         terrainFootprintWgs84: activeManualFootprintWgs84,
-        terrainFootprintRotationDegrees: terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
+          terrainFootprintRotationDegrees:
+            terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
       })
       const recommendation = recommendTerrainReliefOptions(track.points, sizedOptions).active
       if (key === 'maxReliefMm') {
@@ -2456,7 +2864,7 @@ export default function TerrainModelPage() {
           verticalScale: resolveVerticalScaleForReliefTarget(
             recommendation.elevationRangeMeters,
             nextValue,
-            current.verticalScale,
+              current.verticalScale
           ),
         }
       }
@@ -2466,15 +2874,27 @@ export default function TerrainModelPage() {
           ...nextOptions,
           maxReliefMm: Math.max(
             Number(current.maxReliefMm) || 0,
-            Number.isFinite(targetReliefMm) ? Number(targetReliefMm.toFixed(1)) : Number(current.maxReliefMm) || 0,
+              Number.isFinite(targetReliefMm)
+                ? Number(targetReliefMm.toFixed(1))
+                : Number(current.maxReliefMm) || 0
           ),
         }
       }
       return nextOptions
     })
-  }, [activeManualFootprintWgs84, activeTerrainBoundsWgs84, manualFootprintRotationDegrees, resetGeneratedOutputs, terrainBoundsMode, track])
+    },
+    [
+      activeManualFootprintWgs84,
+      activeTerrainBoundsWgs84,
+      manualFootprintRotationDegrees,
+      resetGeneratedOutputs,
+      terrainBoundsMode,
+      track,
+    ]
+  )
 
-  const updateSizingOption = useCallback((key, value) => {
+  const updateSizingOption = useCallback(
+    (key, value) => {
     const nextValue = Number(value)
     setModel(null)
     setSurfaceTexture(null)
@@ -2499,7 +2919,8 @@ export default function TerrainModelPage() {
         ...nextOptions,
         terrainBoundsWgs84: activeTerrainBoundsWgs84,
         terrainFootprintWgs84: activeManualFootprintWgs84,
-        terrainFootprintRotationDegrees: terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
+          terrainFootprintRotationDegrees:
+            terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
       })
       return {
         ...nextOptions,
@@ -2507,17 +2928,29 @@ export default function TerrainModelPage() {
         modelDepthMm: sizedOptions.modelDepthMm,
       }
     })
-  }, [activeManualFootprintWgs84, activeTerrainBoundsWgs84, manualFootprintRotationDegrees, terrainBoundsMode, track])
+    },
+    [
+      activeManualFootprintWgs84,
+      activeTerrainBoundsWgs84,
+      manualFootprintRotationDegrees,
+      terrainBoundsMode,
+      track,
+    ]
+  )
 
-  const updateStringOption = useCallback((key, value) => {
+  const updateStringOption = useCallback(
+    (key, value) => {
     resetGeneratedOutputs()
     setOptions((current) => ({
       ...current,
       [key]: value,
     }))
-  }, [resetGeneratedOutputs])
+    },
+    [resetGeneratedOutputs]
+  )
 
-  const updateTerrainQuality = useCallback((value) => {
+  const updateTerrainQuality = useCallback(
+    (value) => {
     const preset = TERRAIN_QUALITY_PRESETS[value] || TERRAIN_QUALITY_PRESETS.standard
     resetGeneratedOutputs()
     setOptions((current) => ({
@@ -2527,25 +2960,34 @@ export default function TerrainModelPage() {
       gridCols: preset.cols,
       elevationSmoothingPasses: preset.smoothing,
     }))
-  }, [resetGeneratedOutputs])
+    },
+    [resetGeneratedOutputs]
+  )
 
-  const updateBooleanOption = useCallback((key, value) => {
+  const updateBooleanOption = useCallback(
+    (key, value) => {
     resetGeneratedOutputs()
     setOptions((current) => ({
       ...current,
       [key]: Boolean(value),
     }))
-  }, [resetGeneratedOutputs])
+    },
+    [resetGeneratedOutputs]
+  )
 
-  const updateOptionalNumberOption = useCallback((key, value) => {
+  const updateOptionalNumberOption = useCallback(
+    (key, value) => {
     resetGeneratedOutputs()
     setOptions((current) => ({
       ...current,
       [key]: value === '' ? '' : Number(value),
     }))
-  }, [resetGeneratedOutputs])
+    },
+    [resetGeneratedOutputs]
+  )
 
-  const updateReliefMode = useCallback((value) => {
+  const updateReliefMode = useCallback(
+    (value) => {
     const nextMode = normalizeReliefMode(value)
     setModel(null)
     setSurfaceTexture(null)
@@ -2557,7 +2999,8 @@ export default function TerrainModelPage() {
           reliefMode: value,
           terrainBoundsWgs84: activeTerrainBoundsWgs84,
           terrainFootprintWgs84: activeManualFootprintWgs84,
-          terrainFootprintRotationDegrees: terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
+              terrainFootprintRotationDegrees:
+                terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
         })
         : { ...current, reliefMode: value }
       const recommendation = track?.points?.length
@@ -2577,7 +3020,15 @@ export default function TerrainModelPage() {
           : {}),
       }
     })
-  }, [activeManualFootprintWgs84, activeTerrainBoundsWgs84, manualFootprintRotationDegrees, terrainBoundsMode, track])
+    },
+    [
+      activeManualFootprintWgs84,
+      activeTerrainBoundsWgs84,
+      manualFootprintRotationDegrees,
+      terrainBoundsMode,
+      track,
+    ]
+  )
 
   const applyReliefRecommendation = useCallback((recommendation) => {
     if (!recommendation) return
@@ -2593,7 +3044,8 @@ export default function TerrainModelPage() {
     }))
   }, [])
 
-  const applyHighPrecisionRecommendation = useCallback((recommendation) => {
+  const applyHighPrecisionRecommendation = useCallback(
+    (recommendation) => {
     if (!recommendation) return
     resetGeneratedOutputs()
     setOptions((current) => ({
@@ -2604,19 +3056,27 @@ export default function TerrainModelPage() {
       elevationSmoothingPasses: recommendation.elevationSmoothingPasses,
       targetModelGridMm: recommendation.targetModelGridMm,
     }))
-  }, [resetGeneratedOutputs])
+    },
+    [resetGeneratedOutputs]
+  )
 
   // 一键「真实地貌」：把行业实践（高网格 + 不平滑 + 卫星取色 + 卫星贴图预览）与
   // 起伏两档组合成单次操作。tier: 'stable'（稳妥可打印）| 'dramatic'（地貌优先戏剧化）。
-  const applyRealisticTerrainPreset = useCallback((tier) => {
+  const applyRealisticTerrainPreset = useCallback(
+    (tier) => {
     if (!track?.points?.length) return
     resetGeneratedOutputs()
     const reliefMode = tier === 'dramatic' ? 'terrain-forward' : 'print-readable'
-    const reliefRec = recommendTerrainReliefOptions(track.points, { ...generationOptions, reliefMode })
+      const reliefRec = recommendTerrainReliefOptions(track.points, {
+        ...generationOptions,
+        reliefMode,
+      })
     const relief = tier === 'dramatic' ? reliefRec.terrainForward : reliefRec.printReadable
     const precision = recommendHighPrecisionTerrainOptions(track.points, generationOptions, {
       ...(demRaster || {}),
-      sourceName: demRaster?.sourceName || (useSampledTerrain ? 'ArcGIS WorldElevation3D Terrain3D' : 'GPX 高程'),
+        sourceName:
+          demRaster?.sourceName ||
+          (useSampledTerrain ? 'ArcGIS WorldElevation3D Terrain3D' : 'GPX 高程'),
       targetModelGridMm: 0.3,
     })
     // 数字预览：开启卫星贴图（Esri World Imagery）
@@ -2643,9 +3103,12 @@ export default function TerrainModelPage() {
       satelliteColorStrategy: 'realistic',
       satelliteTerrainColorLimit: 4,
     }))
-  }, [track, generationOptions, demRaster, useSampledTerrain, resetGeneratedOutputs])
+    },
+    [track, generationOptions, demRaster, useSampledTerrain, resetGeneratedOutputs]
+  )
 
-  const applyPrintStylePreset = useCallback((preset) => {
+  const applyPrintStylePreset = useCallback(
+    (preset) => {
     setModel(null)
     setSurfaceTexture(null)
     setSurfaceTextureStatus({ tone: 'idle', label: '等待模型' })
@@ -2656,7 +3119,8 @@ export default function TerrainModelPage() {
             ...current,
             terrainBoundsWgs84: activeTerrainBoundsWgs84,
             terrainFootprintWgs84: activeManualFootprintWgs84,
-            terrainFootprintRotationDegrees: terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
+                terrainFootprintRotationDegrees:
+                  terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
           })
           : printStyleRecommendation
         if (!recommendation) return current
@@ -2687,7 +3151,10 @@ export default function TerrainModelPage() {
           lowlandCapThicknessMm: Math.max(Number(current.lowlandCapThicknessMm) || 0.45, 0.45),
           snowlineEnabled: true,
           snowlineElevationMeters: '',
-          snowlinePercentile: Math.min(Math.max(Number(current.snowlinePercentile) || 82, 76), 90),
+            snowlinePercentile: Math.min(
+              Math.max(Number(current.snowlinePercentile) || 82, 76),
+              90
+            ),
           snowCapThicknessMm: Math.max(Number(current.snowCapThicknessMm) || 0.5, 0.55),
         }
       }
@@ -2695,16 +3162,29 @@ export default function TerrainModelPage() {
         return {
           ...current,
           contourEnabled: true,
-          contourIntervalMeters: Math.min(Math.max(Number(current.contourIntervalMeters) || 50, 20), 80),
+            contourIntervalMeters: Math.min(
+              Math.max(Number(current.contourIntervalMeters) || 50, 20),
+              80
+            ),
           contourWidthMm: Math.max(Number(current.contourWidthMm) || 0.45, 0.45),
           contourHeightMm: Math.max(Number(current.contourHeightMm) || 0.35, 0.35),
         }
       }
       return current
     })
-  }, [activeManualFootprintWgs84, activeTerrainBoundsWgs84, manualFootprintRotationDegrees, printStyleRecommendation, terrainBoundsMode, track])
+    },
+    [
+      activeManualFootprintWgs84,
+      activeTerrainBoundsWgs84,
+      manualFootprintRotationDegrees,
+      printStyleRecommendation,
+      terrainBoundsMode,
+      track,
+    ]
+  )
 
-  const handleFileChange = useCallback(async (event) => {
+  const handleFileChange = useCallback(
+    async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
     try {
@@ -2766,9 +3246,12 @@ export default function TerrainModelPage() {
       setOpenTopoStatus({ tone: 'idle', label: '等待 GPX' })
       showError(error.message || 'GPX 解析失败')
     }
-  }, [demRaster])
+    },
+    [demRaster]
+  )
 
-  const handleDemFileChange = useCallback(async (event) => {
+  const handleDemFileChange = useCallback(
+    async (event) => {
     const file = event.target.files?.[0]
     if (!file) return
     try {
@@ -2787,9 +3270,14 @@ export default function TerrainModelPage() {
           ...current,
           terrainBoundsWgs84: activeTerrainBoundsWgs84,
           terrainFootprintWgs84: activeManualFootprintWgs84,
-          terrainFootprintRotationDegrees: terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
+            terrainFootprintRotationDegrees:
+              terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
         })
-        const recommendation = recommendHighPrecisionTerrainOptions(track.points, sizedOptions, raster)
+          const recommendation = recommendHighPrecisionTerrainOptions(
+            track.points,
+            sizedOptions,
+            raster
+          )
         return {
           ...current,
           modelWidthMm: sizedOptions.modelWidthMm,
@@ -2809,7 +3297,15 @@ export default function TerrainModelPage() {
     } finally {
       event.target.value = ''
     }
-  }, [activeManualFootprintWgs84, activeTerrainBoundsWgs84, manualFootprintRotationDegrees, terrainBoundsMode, track])
+    },
+    [
+      activeManualFootprintWgs84,
+      activeTerrainBoundsWgs84,
+      manualFootprintRotationDegrees,
+      terrainBoundsMode,
+      track,
+    ]
+  )
 
   const handleFetchOpenTopographyDem = useCallback(async () => {
     if (!track?.points?.length) {
@@ -2852,9 +3348,14 @@ export default function TerrainModelPage() {
           ...current,
           terrainBoundsWgs84: activeTerrainBoundsWgs84,
           terrainFootprintWgs84: activeManualFootprintWgs84,
-          terrainFootprintRotationDegrees: terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
+          terrainFootprintRotationDegrees:
+            terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
         })
-        const recommendation = recommendHighPrecisionTerrainOptions(track.points, sizedOptions, raster)
+        const recommendation = recommendHighPrecisionTerrainOptions(
+          track.points,
+          sizedOptions,
+          raster
+        )
         return {
           ...current,
           modelWidthMm: sizedOptions.modelWidthMm,
@@ -2874,7 +3375,17 @@ export default function TerrainModelPage() {
     } finally {
       setFetchingOpenTopo(false)
     }
-  }, [activeManualFootprintWgs84, activeTerrainBoundsWgs84, manualFootprintRotationDegrees, manualTerrainBoundsReady, openTopoApiKey, openTopoDemType, options.paddingMeters, terrainBoundsMode, track])
+  }, [
+    activeManualFootprintWgs84,
+    activeTerrainBoundsWgs84,
+    manualFootprintRotationDegrees,
+    manualTerrainBoundsReady,
+    openTopoApiKey,
+    openTopoDemType,
+    options.paddingMeters,
+    terrainBoundsMode,
+    track,
+  ])
 
   const getSurfaceTextureSourceOptions = useCallback(async () => {
     if (surfaceTextureSourceKey === 'googleSatellite') {
@@ -2934,7 +3445,8 @@ export default function TerrainModelPage() {
     surfaceTextureSourceKey,
   ])
 
-  const buildSurfaceTextureForModel = useCallback(async (targetModel = model) => {
+  const buildSurfaceTextureForModel = useCallback(
+    async (targetModel = model) => {
     const boundsWgs84 = targetModel?.terrain?.boundsWgs84 || terrainBounds
     if (!boundsWgs84) {
       showError('无法确定贴图范围，请先生成模型或上传 GPX')
@@ -2944,8 +3456,9 @@ export default function TerrainModelPage() {
     setSurfaceTextureStatus({ tone: 'loading', label: '准备贴图' })
     try {
       const sourceOptions = await getSurfaceTextureSourceOptions()
-      const textureQuality = SURFACE_TEXTURE_QUALITY_PRESETS[surfaceTextureQuality]
-        || SURFACE_TEXTURE_QUALITY_PRESETS.standard
+        const textureQuality =
+          SURFACE_TEXTURE_QUALITY_PRESETS[surfaceTextureQuality] ||
+          SURFACE_TEXTURE_QUALITY_PRESETS.standard
       const texturePlan = buildSurfaceTextureTilePlan(boundsWgs84, {
         sourceKey: surfaceTextureSourceKey,
         sourceOptions,
@@ -2988,7 +3501,16 @@ export default function TerrainModelPage() {
     } finally {
       setBuildingSurfaceTexture(false)
     }
-  }, [getSurfaceTextureSourceOptions, model, surfaceTextureQuality, surfaceTextureSourceKey])
+    },
+    [
+      getSurfaceTextureSourceOptions,
+      model,
+      options.colorMode,
+      surfaceTextureQuality,
+      surfaceTextureSourceKey,
+      terrainBounds,
+    ]
+  )
 
   const handleGenerate = useCallback(async () => {
     if (!track?.points?.length) {
@@ -3032,18 +3554,35 @@ export default function TerrainModelPage() {
         ...generationOptions,
         terrainBoundsWgs84: activeTerrainBoundsWgs84,
         terrainFootprintWgs84: activeManualFootprintWgs84,
-        terrainFootprintRotationDegrees: terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
+        terrainFootprintRotationDegrees:
+          terrainBoundsMode === 'manual' ? manualFootprintRotationDegrees : 0,
         labelText: generationOptions.labelText || distanceLabel,
         secondaryLabelText: generationOptions.secondaryLabelText || '中奥致远',
-        elevationSourceType: demRaster ? (demRaster.sourceType || 'uploaded-aaigrid-dem') : (useSampledTerrain ? 'arcgis-terrain3d' : ''),
-        elevationSourceName: demRaster ? demRaster.sourceName : (useSampledTerrain ? 'ArcGIS WorldElevation3D Terrain3D' : 'GPX 高程'),
+        elevationSourceType: demRaster
+          ? demRaster.sourceType || 'uploaded-aaigrid-dem'
+          : useSampledTerrain
+            ? 'arcgis-terrain3d'
+            : '',
+        elevationSourceName: demRaster
+          ? demRaster.sourceName
+          : useSampledTerrain
+            ? 'ArcGIS WorldElevation3D Terrain3D'
+            : 'GPX 高程',
         elevationSourceResolutionMeters: demRaster?.resolutionMeters || null,
         elevationSourceBoundsWgs84: demRaster?.requestBoundsWgs84 || demRaster?.bounds || null,
         sampleElevations: demRaster
           ? (samples) => sampleRasterElevations(samples, demRaster)
           : useSampledTerrain
-          ? (samples) => sampleArcGisTerrain(samples, {
+            ? (samples) =>
+                sampleArcGisTerrain(samples, {
             chunkSize: generationOptions.terrainQuality === 'ultra' ? 6000 : 9000,
+                  concurrency: generationOptions.terrainQuality === 'ultra' ? 4 : 3,
+                  onProgress: (progress) => {
+                    setOpenTopoStatus({
+                      tone: 'loading',
+                      label: getArcGisSamplingProgressLabel(progress),
+                    })
+                  },
           })
           : undefined,
         // Satellite colour-mapping data (only passed when in satellite mode)
@@ -3052,6 +3591,12 @@ export default function TerrainModelPage() {
         textureHeight: textureHeightPx,
       })
       setModel(nextModel)
+      if (useSampledTerrain && !demRaster) {
+        setOpenTopoStatus({
+          tone: 'success',
+          label: 'ArcGIS 高程已采样 · ' + nextModel.terrain.precision.sampleCount + ' 点',
+        })
+      }
 
       if (surfaceTextureEnabled && !useSatelliteMode) {
         setSurfaceTexture(null)
@@ -3067,13 +3612,29 @@ export default function TerrainModelPage() {
     } finally {
       setBuilding(false)
     }
-  }, [activeManualFootprintWgs84, activeTerrainBoundsWgs84, buildSurfaceTextureForModel, demRaster, generationOptions, manualTerrainBoundsReady, options.colorMode, summary?.distanceMeters, surfaceTextureEnabled, terrainBoundsMode, track, useSampledTerrain])
+  }, [
+    activeManualFootprintWgs84,
+    activeTerrainBoundsWgs84,
+    buildSurfaceTextureForModel,
+    demRaster,
+    generationOptions,
+    manualFootprintRotationDegrees,
+    manualTerrainBoundsReady,
+    options.colorMode,
+    summary?.distanceMeters,
+    surfaceTextureEnabled,
+    terrainBoundsMode,
+    track,
+    useSampledTerrain,
+  ])
 
   const handleDownloadZip = useCallback(async () => {
     if (exportBlockedBySurfaceTexture) {
-      showError(buildingSurfaceTexture
+      showError(
+        buildingSurfaceTexture
         ? '卫星贴图生成中，请稍后再导出'
-        : '请先生成卫星贴图，或关闭卫星贴图后导出')
+          : '请先生成卫星贴图，或关闭卫星贴图后导出'
+      )
       return
     }
     if (!model || exportingFilesRef.current) return
@@ -3096,7 +3657,8 @@ export default function TerrainModelPage() {
     }
   }, [buildingSurfaceTexture, exportBaseName, exportBlockedBySurfaceTexture, exportOptions, model])
 
-  const handleDownloadFile = useCallback(async (fileDescriptor) => {
+  const handleDownloadFile = useCallback(
+    async (fileDescriptor) => {
     if (!model || !fileDescriptor?.name || exportingFilesRef.current) return
     exportingFilesRef.current = true
     setExportingFiles(true)
@@ -3114,14 +3676,18 @@ export default function TerrainModelPage() {
       exportingFilesRef.current = false
       setExportingFiles(false)
     }
-  }, [exportOptions, model])
+    },
+    [exportOptions, model]
+  )
 
   const handleDownloadGlb = useCallback(async () => {
     if (!model) return
     if (exportBlockedBySurfaceTexture) {
-      showError(buildingSurfaceTexture
+      showError(
+        buildingSurfaceTexture
         ? '卫星贴图生成中，请稍后再导出'
-        : '请先生成卫星贴图，或关闭卫星贴图后导出')
+          : '请先生成卫星贴图，或关闭卫星贴图后导出'
+      )
       return
     }
     setExportingGlb(true)
@@ -3131,14 +3697,10 @@ export default function TerrainModelPage() {
       const exporter = new GLTFExporter()
       group = createModelGroup(model, { surfaceTextureMap })
       const result = await new Promise((resolve, reject) => {
-        exporter.parse(
-          group,
-          resolve,
-          reject,
-          { binary: true },
-        )
+        exporter.parse(group, resolve, reject, { binary: true })
       })
-      const blob = result instanceof ArrayBuffer
+      const blob =
+        result instanceof ArrayBuffer
         ? new Blob([result], { type: 'model/gltf-binary' })
         : new Blob([JSON.stringify(result)], { type: 'model/gltf+json' })
       const glbFileName = surfaceTexture
@@ -3203,12 +3765,18 @@ export default function TerrainModelPage() {
           <div className="terrain-model-panel terrain-model-panel--controls">
             <div className="terrain-model-panel__head">
               <h2>模型设置</h2>
-              <span>{model ? `${model.stats.terrainTriangles + model.stats.lowlandTriangles + model.stats.contourTriangles + model.stats.snowlineTriangles + model.stats.snowTriangles + model.stats.trackTriangles + model.stats.baseTriangles + model.stats.labelTriangles} tris` : '按流程配置'}</span>
+              <span>
+                {model
+                  ? `${model.stats.terrainTriangles + model.stats.lowlandTriangles + model.stats.contourTriangles + model.stats.snowlineTriangles + model.stats.snowTriangles + model.stats.trackTriangles + model.stats.baseTriangles + model.stats.labelTriangles} tris`
+                  : '按流程配置'}
+              </span>
             </div>
             <div className="terrain-model-controls">
               <div className="terrain-model-realistic-preset" aria-label="真实地貌一键预设">
                 <div className="terrain-model-realistic-preset__head">
-                  <span className="material-symbols-outlined" aria-hidden="true">landscape</span>
+                  <span className="material-symbols-outlined" aria-hidden="true">
+                    landscape
+                  </span>
                   <div>
                     <strong>真实地貌（推荐）</strong>
                     <p>一键套用高精网格、卫星取色和数字预览贴图；起伏选一档即可。</p>
@@ -3220,7 +3788,9 @@ export default function TerrainModelPage() {
                     disabled={!track}
                     onClick={() => applyRealisticTerrainPreset('stable')}
                   >
-                    <span className="material-symbols-outlined" aria-hidden="true">verified</span>
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      verified
+                    </span>
                     <span>稳妥可打印</span>
                   </button>
                   <button
@@ -3229,21 +3799,31 @@ export default function TerrainModelPage() {
                     disabled={!track}
                     onClick={() => applyRealisticTerrainPreset('dramatic')}
                   >
-                    <span className="material-symbols-outlined" aria-hidden="true">terrain</span>
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      terrain
+                    </span>
                     <span>地貌优先 · 戏剧化</span>
                   </button>
                 </div>
               </div>
-              <ControlSection icon="database" title="① 数据来源" description="DEM、API Key 和在线高精数据状态集中在这里，先确认数据再调模型。">
+              <ControlSection
+                icon="database"
+                title="① 数据来源"
+                description="DEM、API Key 和在线高精数据状态集中在这里，先确认数据再调模型。"
+              >
               {highPrecisionRecommendation && (
                 <>
                   <div className="terrain-model-status-strip terrain-model-status-strip--two">
                     <div>
                       <span>高精 DEM</span>
                       <strong>
-                        {highPrecisionRecommendation.gridRows} x {highPrecisionRecommendation.gridCols}
+                          {highPrecisionRecommendation.gridRows} x{' '}
+                          {highPrecisionRecommendation.gridCols}
                         {' / '}
-                        {formatNumber(highPrecisionRecommendation.precision.gridSpacingMm.min, ' mm')}
+                          {formatNumber(
+                            highPrecisionRecommendation.precision.gridSpacingMm.min,
+                            ' mm'
+                          )}
                       </strong>
                     </div>
                     <div>
@@ -3251,12 +3831,19 @@ export default function TerrainModelPage() {
                       <strong>
                         {elevationSourceLabel}
                         {' / '}
-                        {formatResolution(highPrecisionRecommendation.precision.source.resolutionMeters)}
+                          {formatResolution(
+                            highPrecisionRecommendation.precision.source.resolutionMeters
+                          )}
                       </strong>
                     </div>
                   </div>
                   <div className="terrain-model-action-row terrain-model-action-row--single">
-                    <button type="button" onClick={() => applyHighPrecisionRecommendation(highPrecisionRecommendation)}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          applyHighPrecisionRecommendation(highPrecisionRecommendation)
+                        }
+                      >
                       <span className="material-symbols-outlined">grid_view</span>
                       <span>应用高精网格</span>
                     </button>
@@ -3276,47 +3863,72 @@ export default function TerrainModelPage() {
               <label className="terrain-model-check terrain-model-check--field">
                 <span>本机保存</span>
                 <span className="terrain-model-check__control">
-                  <span className="terrain-model-check__state">{rememberOpenTopoApiKey ? '已开启' : '关闭'}</span>
+                    <span className="terrain-model-check__state">
+                      {rememberOpenTopoApiKey ? '已开启' : '关闭'}
+                    </span>
                   <input
                     type="checkbox"
                     checked={rememberOpenTopoApiKey}
                     onChange={(event) => setRememberOpenTopoApiKey(event.target.checked)}
                   />
-                  <span className="material-symbols-outlined terrain-model-check__indicator" aria-hidden="true">check</span>
+                    <span
+                      className="material-symbols-outlined terrain-model-check__indicator"
+                      aria-hidden="true"
+                    >
+                      check
+                    </span>
                 </span>
               </label>
               <label>
                 <span>OpenTopography DEM</span>
-                <select value={openTopoDemType} onChange={(event) => setOpenTopoDemType(event.target.value)}>
+                  <select
+                    value={openTopoDemType}
+                    onChange={(event) => setOpenTopoDemType(event.target.value)}
+                  >
                   {Object.entries(OPENTOPOGRAPHY_DEM_TYPES).map(([key, item]) => (
-                    <option key={key} value={key}>{item.label}</option>
+                      <option key={key} value={key}>
+                        {item.label}
+                      </option>
                   ))}
                 </select>
               </label>
               <div className="terrain-model-status-strip terrain-model-status-strip--three">
                 <div>
                   <span>在线高精 DEM</span>
-                  <strong>{OPENTOPOGRAPHY_DEM_TYPES[openTopoDemType]?.label || 'Copernicus 30m'}</strong>
+                    <strong>
+                      {OPENTOPOGRAPHY_DEM_TYPES[openTopoDemType]?.label || 'Copernicus 30m'}
+                    </strong>
                 </div>
                 <div>
                   <span>请求范围</span>
                   <strong>
                     {track?.points?.length
                       ? terrainBoundsMode === 'manual'
-                        ? activeTerrainBoundsWgs84 ? '手动框选范围 / ' + formatBoundsSize(terrainBounds) : '等待手动范围'
-                        : 'GPX + ' + formatNumber(options.paddingMeters, ' m') + ' / ' + formatBoundsSize(terrainBounds)
+                          ? activeTerrainBoundsWgs84
+                            ? '手动框选范围 / ' + formatBoundsSize(terrainBounds)
+                            : '等待手动范围'
+                          : 'GPX + ' +
+                            formatNumber(options.paddingMeters, ' m') +
+                            ' / ' +
+                            formatBoundsSize(terrainBounds)
                       : '等待 GPX'}
                   </strong>
                 </div>
                 <div>
                   <span>DEM 状态</span>
-                  <strong className={`terrain-model-status terrain-model-status--${openTopoStatus.tone}`}>
+                    <strong
+                      className={`terrain-model-status terrain-model-status--${openTopoStatus.tone}`}
+                    >
                     {fetchingOpenTopo ? '请求中' : openTopoStatus.label}
                   </strong>
                 </div>
               </div>
               <div className="terrain-model-action-row terrain-model-action-row--single">
-                <button type="button" disabled={!track || fetchingOpenTopo || !manualTerrainBoundsReady} onClick={handleFetchOpenTopographyDem}>
+                  <button
+                    type="button"
+                    disabled={!track || fetchingOpenTopo || !manualTerrainBoundsReady}
+                    onClick={handleFetchOpenTopographyDem}
+                  >
                   <span className="material-symbols-outlined">cloud_download</span>
                   <span>{fetchingOpenTopo ? '获取中' : '获取 DEM'}</span>
                 </button>
@@ -3324,18 +3936,30 @@ export default function TerrainModelPage() {
               </ControlSection>
 
               {/* ── 模型规格：外形、尺寸、起伏 + 高级子项 ─────────────── */}
-              <ControlSection icon="straighten" title="② 模型规格" description="外形、尺寸、起伏倍率和底座/磁铁等制造参数。">
+              <ControlSection
+                icon="straighten"
+                title="② 模型规格"
+                description="外形、尺寸、起伏倍率和底座/磁铁等制造参数。"
+              >
               <label>
                 <span>地形精度</span>
-                <select value={options.terrainQuality} onChange={(event) => updateTerrainQuality(event.target.value)}>
+                  <select
+                    value={options.terrainQuality}
+                    onChange={(event) => updateTerrainQuality(event.target.value)}
+                  >
                   {Object.entries(TERRAIN_QUALITY_PRESETS).map(([key, preset]) => (
-                    <option key={key} value={key}>{preset.label}</option>
+                      <option key={key} value={key}>
+                        {preset.label}
+                      </option>
                   ))}
                 </select>
               </label>
               <label>
                 <span>外形</span>
-                <select value={options.shapeType} onChange={(event) => updateStringOption('shapeType', event.target.value)}>
+                  <select
+                    value={options.shapeType}
+                    onChange={(event) => updateStringOption('shapeType', event.target.value)}
+                  >
                   <option value="hexagon">六边形</option>
                   <option value="triangle">三角形</option>
                   <option value="rectangle">矩形</option>
@@ -3344,19 +3968,37 @@ export default function TerrainModelPage() {
               </label>
               <label>
                 <span>成品长边 mm</span>
-                <input type="number" value={options.modelLongSideMm} min="40" max="260" step="5" onChange={(event) => updateSizingOption('modelLongSideMm', event.target.value)} />
+                  <input
+                    type="number"
+                    value={options.modelLongSideMm}
+                    min="40"
+                    max="260"
+                    step="5"
+                    onChange={(event) => updateSizingOption('modelLongSideMm', event.target.value)}
+                  />
               </label>
               <div className="terrain-model-size-readout">
                 <span>自动宽深</span>
-                <strong>{formatNumber(modelSizing.modelWidthMm, ' mm')} x {formatNumber(modelSizing.modelDepthMm, ' mm')}</strong>
-                <p>{track?.points?.length ? (terrainBoundsMode === 'manual' ? '按手动采集范围比例锁定' : '按自动采集范围比例锁定') : '上传 GPX 后自动计算比例'}</p>
+                  <strong>
+                    {formatNumber(modelSizing.modelWidthMm, ' mm')} x{' '}
+                    {formatNumber(modelSizing.modelDepthMm, ' mm')}
+                  </strong>
+                  <p>
+                    {track?.points?.length
+                      ? terrainBoundsMode === 'manual'
+                        ? '按手动采集范围比例锁定'
+                        : '按自动采集范围比例锁定'
+                      : '上传 GPX 后自动计算比例'}
+                  </p>
               </div>
               <div className="terrain-model-relief-mode" aria-label="起伏模式">
                 <span>起伏模式</span>
                 <div role="group" aria-label="起伏模式">
                   <button
                     type="button"
-                    className={normalizeReliefMode(options.reliefMode) === 'realistic' ? 'is-active' : ''}
+                      className={
+                        normalizeReliefMode(options.reliefMode) === 'realistic' ? 'is-active' : ''
+                      }
                     aria-pressed={normalizeReliefMode(options.reliefMode) === 'realistic'}
                     onClick={() => updateReliefMode('realistic')}
                   >
@@ -3364,7 +4006,11 @@ export default function TerrainModelPage() {
                   </button>
                   <button
                     type="button"
-                    className={normalizeReliefMode(options.reliefMode) === 'print-readable' ? 'is-active' : ''}
+                      className={
+                        normalizeReliefMode(options.reliefMode) === 'print-readable'
+                          ? 'is-active'
+                          : ''
+                      }
                     aria-pressed={normalizeReliefMode(options.reliefMode) === 'print-readable'}
                     onClick={() => updateReliefMode('print-readable')}
                   >
@@ -3372,7 +4018,11 @@ export default function TerrainModelPage() {
                   </button>
                   <button
                     type="button"
-                    className={normalizeReliefMode(options.reliefMode) === 'terrain-forward' ? 'is-active' : ''}
+                      className={
+                        normalizeReliefMode(options.reliefMode) === 'terrain-forward'
+                          ? 'is-active'
+                          : ''
+                      }
                     aria-pressed={normalizeReliefMode(options.reliefMode) === 'terrain-forward'}
                     onClick={() => updateReliefMode('terrain-forward')}
                   >
@@ -3403,16 +4053,29 @@ export default function TerrainModelPage() {
                     </div>
                   </div>
                   <div className="terrain-model-action-row terrain-model-action-row--three">
-                    <button type="button" onClick={() => applyReliefRecommendation(reliefRecommendation.realistic)}>
+                      <button
+                        type="button"
+                        onClick={() => applyReliefRecommendation(reliefRecommendation.realistic)}
+                      >
                       <span className="material-symbols-outlined">straighten</span>
                       <span>真实优先</span>
                     </button>
-                    <button type="button" onClick={() => applyReliefRecommendation(reliefRecommendation.printReadable)}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          applyReliefRecommendation(reliefRecommendation.printReadable)
+                        }
+                      >
                       <span className="material-symbols-outlined">auto_fix_high</span>
                       <span>打印可读</span>
                     </button>
                     {reliefRecommendation.terrainForward && (
-                      <button type="button" onClick={() => applyReliefRecommendation(reliefRecommendation.terrainForward)}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            applyReliefRecommendation(reliefRecommendation.terrainForward)
+                          }
+                        >
                         <span className="material-symbols-outlined">terrain</span>
                         <span>地貌优先</span>
                       </button>
@@ -3421,19 +4084,41 @@ export default function TerrainModelPage() {
                 </>
               )}
               <details className="terrain-model-subsection">
-                <summary><span className="material-symbols-outlined" aria-hidden="true">tune</span>高级几何</summary>
+                  <summary>
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      tune
+                    </span>
+                    高级几何
+                  </summary>
                 <div className="terrain-model-subsection__grid">
               <label>
                 <span>网格行</span>
-                <input type="number" value={options.gridRows} min="8" max="320" step="4" onChange={(event) => updateOption('gridRows', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.gridRows}
+                        min="8"
+                        max="320"
+                        step="4"
+                        onChange={(event) => updateOption('gridRows', event.target.value)}
+                      />
               </label>
               <label>
                 <span>网格列</span>
-                <input type="number" value={options.gridCols} min="8" max="320" step="4" onChange={(event) => updateOption('gridCols', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.gridCols}
+                        min="8"
+                        max="320"
+                        step="4"
+                        onChange={(event) => updateOption('gridCols', event.target.value)}
+                      />
               </label>
               <label>
                 <span>保峰超采样</span>
-                <select value={options.terrainSupersample ?? 1} onChange={(event) => updateOption('terrainSupersample', event.target.value)}>
+                      <select
+                        value={options.terrainSupersample ?? 1}
+                        onChange={(event) => updateOption('terrainSupersample', event.target.value)}
+                      >
                   <option value="1">关闭（更快）</option>
                   <option value="2">2× 保峰（更尖锐，较慢）</option>
                   <option value="3">3× 保峰（最尖锐，最慢）</option>
@@ -3441,78 +4126,209 @@ export default function TerrainModelPage() {
               </label>
               <label>
                 <span>地形底厚 mm</span>
-                <input type="number" value={options.baseHeightMm} min="0.6" max="12" step="0.2" onChange={(event) => updateOption('baseHeightMm', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.baseHeightMm}
+                        min="0.6"
+                        max="12"
+                        step="0.2"
+                        onChange={(event) => updateOption('baseHeightMm', event.target.value)}
+                      />
               </label>
               <label>
                 <span>高程倍率</span>
-                <input type="number" value={options.verticalScale} min="0.001" max="2" step="0.005" onChange={(event) => updateOption('verticalScale', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.verticalScale}
+                        min="0.001"
+                        max="2"
+                        step="0.005"
+                        onChange={(event) => updateOption('verticalScale', event.target.value)}
+                      />
               </label>
               <label>
                 <span>最大起伏 mm</span>
-                <input type="number" value={options.maxReliefMm} min="3" max="90" step="0.5" onChange={(event) => updateOption('maxReliefMm', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.maxReliefMm}
+                        min="3"
+                        max="90"
+                        step="0.5"
+                        onChange={(event) => updateOption('maxReliefMm', event.target.value)}
+                      />
               </label>
               <label>
                 <span>面网格 mm</span>
-                <input type="number" value={options.targetModelGridMm} min="0.25" max="1.2" step="0.01" onChange={(event) => updateOption('targetModelGridMm', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.targetModelGridMm}
+                        min="0.25"
+                        max="1.2"
+                        step="0.01"
+                        onChange={(event) => updateOption('targetModelGridMm', event.target.value)}
+                      />
               </label>
               <label>
                 <span>平滑次数</span>
-                <input type="number" value={options.elevationSmoothingPasses} min="0" max="4" step="1" onChange={(event) => updateOption('elevationSmoothingPasses', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.elevationSmoothingPasses}
+                        min="0"
+                        max="4"
+                        step="1"
+                        onChange={(event) =>
+                          updateOption('elevationSmoothingPasses', event.target.value)
+                        }
+                      />
               </label>
                 </div>
               </details>
               <details className="terrain-model-subsection">
-                <summary><span className="material-symbols-outlined" aria-hidden="true">manufacturing</span>底座与铭牌</summary>
+                  <summary>
+                    <span className="material-symbols-outlined" aria-hidden="true">
+                      manufacturing
+                    </span>
+                    底座与铭牌
+                  </summary>
                 <div className="terrain-model-subsection__grid">
               <label>
                 <span>黑边宽 mm</span>
-                <input type="number" value={options.frameWidthMm} min="0" max="28" step="0.5" onChange={(event) => updateOption('frameWidthMm', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.frameWidthMm}
+                        min="0"
+                        max="28"
+                        step="0.5"
+                        onChange={(event) => updateOption('frameWidthMm', event.target.value)}
+                      />
               </label>
               <label>
                 <span>黑底厚 mm</span>
-                <input type="number" value={options.basePlateHeightMm} min="0" max="10" step="0.2" onChange={(event) => updateOption('basePlateHeightMm', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.basePlateHeightMm}
+                        min="0"
+                        max="10"
+                        step="0.2"
+                        onChange={(event) => updateOption('basePlateHeightMm', event.target.value)}
+                      />
               </label>
               <label className="terrain-model-check terrain-model-check--field">
                 <span>磁铁孔</span>
                 <span className="terrain-model-check__control">
-                  <span className="terrain-model-check__state">{options.magnetHoleEnabled ? '已开启' : '关闭'}</span>
-                  <input type="checkbox" checked={options.magnetHoleEnabled} onChange={(event) => updateBooleanOption('magnetHoleEnabled', event.target.checked)} />
-                  <span className="material-symbols-outlined terrain-model-check__indicator" aria-hidden="true">check</span>
+                        <span className="terrain-model-check__state">
+                          {options.magnetHoleEnabled ? '已开启' : '关闭'}
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={options.magnetHoleEnabled}
+                          onChange={(event) =>
+                            updateBooleanOption('magnetHoleEnabled', event.target.checked)
+                          }
+                        />
+                        <span
+                          className="material-symbols-outlined terrain-model-check__indicator"
+                          aria-hidden="true"
+                        >
+                          check
+                        </span>
                 </span>
               </label>
               <label>
                 <span>孔数量</span>
-                <input type="number" value={options.magnetHoleCount} min="2" max="12" step="1" disabled={!options.magnetHoleEnabled} onChange={(event) => updateOption('magnetHoleCount', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.magnetHoleCount}
+                        min="2"
+                        max="12"
+                        step="1"
+                        disabled={!options.magnetHoleEnabled}
+                        onChange={(event) => updateOption('magnetHoleCount', event.target.value)}
+                      />
               </label>
               <label>
                 <span>孔直径 mm</span>
-                <input type="number" value={options.magnetHoleDiameterMm} min="3" max="18" step="0.5" disabled={!options.magnetHoleEnabled} onChange={(event) => updateOption('magnetHoleDiameterMm', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.magnetHoleDiameterMm}
+                        min="3"
+                        max="18"
+                        step="0.5"
+                        disabled={!options.magnetHoleEnabled}
+                        onChange={(event) =>
+                          updateOption('magnetHoleDiameterMm', event.target.value)
+                        }
+                      />
               </label>
               <label>
                 <span>孔内缩 mm</span>
-                <input type="number" value={options.magnetHoleInsetMm} min="3" max="40" step="1" disabled={!options.magnetHoleEnabled} onChange={(event) => updateOption('magnetHoleInsetMm', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.magnetHoleInsetMm}
+                        min="3"
+                        max="40"
+                        step="1"
+                        disabled={!options.magnetHoleEnabled}
+                        onChange={(event) => updateOption('magnetHoleInsetMm', event.target.value)}
+                      />
               </label>
               <label>
                 <span>正面文字</span>
-                <input type="text" value={options.labelText} placeholder={summary ? formatDistance(summary.distanceMeters).replace(/\s+/g, '').toUpperCase() : '23.40KM'} onChange={(event) => updateStringOption('labelText', event.target.value)} />
+                      <input
+                        type="text"
+                        value={options.labelText}
+                        placeholder={
+                          summary
+                            ? formatDistance(summary.distanceMeters)
+                                .replace(/\s+/g, '')
+                                .toUpperCase()
+                            : '23.40KM'
+                        }
+                        onChange={(event) => updateStringOption('labelText', event.target.value)}
+                      />
               </label>
               <label>
                 <span>背面文字</span>
-                <input type="text" value={options.secondaryLabelText} placeholder="中奥致远" onChange={(event) => updateStringOption('secondaryLabelText', event.target.value)} />
+                      <input
+                        type="text"
+                        value={options.secondaryLabelText}
+                        placeholder="中奥致远"
+                        onChange={(event) =>
+                          updateStringOption('secondaryLabelText', event.target.value)
+                        }
+                      />
               </label>
               <label>
                 <span>文字凸起 mm</span>
-                <input type="number" value={options.labelRaisedMm} min="0.4" max="3" step="0.1" onChange={(event) => updateOption('labelRaisedMm', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.labelRaisedMm}
+                        min="0.4"
+                        max="3"
+                        step="0.1"
+                        onChange={(event) => updateOption('labelRaisedMm', event.target.value)}
+                      />
               </label>
               <label>
                 <span>底座网格</span>
-                <input type="number" value={options.baseGridResolution} min="18" max="96" step="2" onChange={(event) => updateOption('baseGridResolution', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.baseGridResolution}
+                        min="18"
+                        max="96"
+                        step="2"
+                        onChange={(event) => updateOption('baseGridResolution', event.target.value)}
+                      />
               </label>
                 </div>
               </details>
               </ControlSection>
 
-              <ControlSection icon="palette" title="③ 打印外观" description="颜色分件策略、色带配置和耗材类型。">
+              <ControlSection
+                icon="palette"
+                title="③ 打印外观"
+                description="颜色分件策略、色带配置和耗材类型。"
+              >
               <div className="terrain-model-color-mode-switch" aria-label="色彩模式">
                 {['elevation', 'satellite'].map((mode) => (
                   <button
@@ -3528,7 +4344,8 @@ export default function TerrainModelPage() {
                         colorMode: mode,
                         terrainColorBandsEnabled: mode === 'satellite' ? false : true,
                         snowlineEnabled: mode === 'satellite' ? false : current.snowlineEnabled,
-                        snowlineElevationMeters: mode === 'satellite' ? '' : current.snowlineElevationMeters,
+                          snowlineElevationMeters:
+                            mode === 'satellite' ? '' : current.snowlineElevationMeters,
                       }))
                     }}
                   >
@@ -3554,32 +4371,132 @@ export default function TerrainModelPage() {
                           setSurfaceTextureStatus({ tone: 'idle', label: '等待模型' })
                           const presetBands = {
                             classic: [
-                              { name: '低地', percentile: 0.28, color: '#2E8B57', thicknessMm: 0.5 },
-                              { name: '丘陵', percentile: 0.50, color: '#8B9A46', thicknessMm: 0.5 },
-                              { name: '中山', percentile: 0.72, color: '#B8964E', thicknessMm: 0.5 },
-                              { name: '高山', percentile: 0.90, color: '#9E8E7E', thicknessMm: 0.5 },
-                              { name: '雪冠', percentile: 1.0, color: '#F0EDE5', thicknessMm: 0.5 },
+                                {
+                                  name: '低地',
+                                  percentile: 0.28,
+                                  color: '#2E8B57',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '丘陵',
+                                  percentile: 0.5,
+                                  color: '#8B9A46',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '中山',
+                                  percentile: 0.72,
+                                  color: '#B8964E',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '高山',
+                                  percentile: 0.9,
+                                  color: '#9E8E7E',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '雪冠',
+                                  percentile: 1.0,
+                                  color: '#F0EDE5',
+                                  thicknessMm: 0.5,
+                                },
                             ],
                             monochrome: [
-                              { name: '底层', percentile: 0.40, color: '#4A4A4A', thicknessMm: 0.45 },
-                              { name: '中层', percentile: 0.70, color: '#8A8A8A', thicknessMm: 0.45 },
-                              { name: '高层', percentile: 0.90, color: '#BEBEBE', thicknessMm: 0.45 },
-                              { name: '顶层', percentile: 1.0, color: '#F5F5F5', thicknessMm: 0.45 },
+                                {
+                                  name: '底层',
+                                  percentile: 0.4,
+                                  color: '#4A4A4A',
+                                  thicknessMm: 0.45,
+                                },
+                                {
+                                  name: '中层',
+                                  percentile: 0.7,
+                                  color: '#8A8A8A',
+                                  thicknessMm: 0.45,
+                                },
+                                {
+                                  name: '高层',
+                                  percentile: 0.9,
+                                  color: '#BEBEBE',
+                                  thicknessMm: 0.45,
+                                },
+                                {
+                                  name: '顶层',
+                                  percentile: 1.0,
+                                  color: '#F5F5F5',
+                                  thicknessMm: 0.45,
+                                },
                             ],
                             inferno: [
-                              { name: '低地', percentile: 0.25, color: '#4A1C0E', thicknessMm: 0.5 },
-                              { name: '缓坡', percentile: 0.50, color: '#A83C1C', thicknessMm: 0.5 },
-                              { name: '陡坡', percentile: 0.75, color: '#E8863A', thicknessMm: 0.5 },
-                              { name: '山脊', percentile: 0.92, color: '#F5D45A', thicknessMm: 0.5 },
-                              { name: '峰顶', percentile: 1.0, color: '#FFF8E7', thicknessMm: 0.5 },
+                                {
+                                  name: '低地',
+                                  percentile: 0.25,
+                                  color: '#4A1C0E',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '缓坡',
+                                  percentile: 0.5,
+                                  color: '#A83C1C',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '陡坡',
+                                  percentile: 0.75,
+                                  color: '#E8863A',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '山脊',
+                                  percentile: 0.92,
+                                  color: '#F5D45A',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '峰顶',
+                                  percentile: 1.0,
+                                  color: '#FFF8E7',
+                                  thicknessMm: 0.5,
+                                },
                             ],
                             alps: [
-                              { name: '谷地', percentile: 0.22, color: '#3D7A3E', thicknessMm: 0.5 },
-                              { name: '林线', percentile: 0.48, color: '#6B8C42', thicknessMm: 0.5 },
-                              { name: '草甸', percentile: 0.66, color: '#B5A87A', thicknessMm: 0.5 },
-                              { name: '岩壁', percentile: 0.82, color: '#8B7D6B', thicknessMm: 0.5 },
-                              { name: '冰川', percentile: 0.94, color: '#D4D9DF', thicknessMm: 0.5 },
-                              { name: '雪峰', percentile: 1.0, color: '#F8F9FA', thicknessMm: 0.5 },
+                                {
+                                  name: '谷地',
+                                  percentile: 0.22,
+                                  color: '#3D7A3E',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '林线',
+                                  percentile: 0.48,
+                                  color: '#6B8C42',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '草甸',
+                                  percentile: 0.66,
+                                  color: '#B5A87A',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '岩壁',
+                                  percentile: 0.82,
+                                  color: '#8B7D6B',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '冰川',
+                                  percentile: 0.94,
+                                  color: '#D4D9DF',
+                                  thicknessMm: 0.5,
+                                },
+                                {
+                                  name: '雪峰',
+                                  percentile: 1.0,
+                                  color: '#F8F9FA',
+                                  thicknessMm: 0.5,
+                                },
                             ],
                           }[presetKey]
                           setOptions((current) => ({
@@ -3589,7 +4506,9 @@ export default function TerrainModelPage() {
                           }))
                         }}
                       >
-                        <span className="material-symbols-outlined" aria-hidden="true">{preset.icon}</span>
+                          <span className="material-symbols-outlined" aria-hidden="true">
+                            {preset.icon}
+                          </span>
                         <strong>{preset.name}</strong>
                       </button>
                     ))}
@@ -3604,7 +4523,10 @@ export default function TerrainModelPage() {
                     {options.elevationBands.map((band, index) => (
                       <div key={index} className="terrain-model-band-row">
                         <label className="terrain-model-band-color" title="点击修改颜色">
-                          <span className="terrain-model-band-swatch" style={{ background: band.color }} />
+                            <span
+                              className="terrain-model-band-swatch"
+                              style={{ background: band.color }}
+                            />
                           <input
                             type="color"
                             value={band.color}
@@ -3638,7 +4560,13 @@ export default function TerrainModelPage() {
                           className="terrain-model-band-pct"
                           type="number"
                           value={Math.round(band.percentile * 100)}
-                          min={index === 0 ? 5 : Math.round((options.elevationBands[index - 1]?.percentile || 0) * 100) + 1}
+                            min={
+                              index === 0
+                                ? 5
+                                : Math.round(
+                                    (options.elevationBands[index - 1]?.percentile || 0) * 100
+                                  ) + 1
+                            }
                           max={index === options.elevationBands.length - 1 ? 100 : 99}
                           step="1"
                           aria-label="占比"
@@ -3646,7 +4574,10 @@ export default function TerrainModelPage() {
                             resetGeneratedOutputs()
                             setOptions((current) => {
                               const next = [...current.elevationBands]
-                              next[index] = { ...next[index], percentile: Number(event.target.value) / 100 }
+                                next[index] = {
+                                  ...next[index],
+                                  percentile: Number(event.target.value) / 100,
+                                }
                               return { ...current, elevationBands: next }
                             })
                           }}
@@ -3660,14 +4591,21 @@ export default function TerrainModelPage() {
                               resetGeneratedOutputs()
                               setOptions((current) => ({
                                 ...current,
-                                elevationBands: current.elevationBands.filter((_, i) => i !== index),
+                                  elevationBands: current.elevationBands.filter(
+                                    (_, i) => i !== index
+                                  ),
                               }))
                             }}
                           >
-                            <span className="material-symbols-outlined" aria-hidden="true">close</span>
+                              <span className="material-symbols-outlined" aria-hidden="true">
+                                close
+                              </span>
                           </button>
                         ) : (
-                          <span className="terrain-model-band-remove terrain-model-band-remove--empty" aria-hidden="true" />
+                            <span
+                              className="terrain-model-band-remove terrain-model-band-remove--empty"
+                              aria-hidden="true"
+                            />
                         )}
                       </div>
                     ))}
@@ -3682,29 +4620,48 @@ export default function TerrainModelPage() {
                             const newPercentile = Math.min(1, (last?.percentile || 0.9) - 0.05)
                             return {
                               ...current,
-                              elevationBands: [...current.elevationBands, {
+                                elevationBands: [
+                                  ...current.elevationBands,
+                                  {
                                 name: '色带 ' + (current.elevationBands.length + 1),
-                                percentile: newPercentile > (last?.percentile || 0.9) ? 1 : newPercentile + 0.1,
+                                    percentile:
+                                      newPercentile > (last?.percentile || 0.9)
+                                        ? 1
+                                        : newPercentile + 0.1,
                                 color: '#808080',
                                 thicknessMm: 0.5,
-                              }],
+                                  },
+                                ],
                             }
                           })
                         }}
                       >
-                        <span className="material-symbols-outlined" aria-hidden="true">add</span> 添加色带
+                          <span className="material-symbols-outlined" aria-hidden="true">
+                            add
+                          </span>{' '}
+                          添加色带
                       </button>
                     )}
                   </div>
                   <label>
                     <span>色带互锁 mm</span>
-                    <input type="number" value={options.bandInterlockMm} min="0.05" max="0.5" step="0.05" disabled={!options.terrainColorBandsEnabled} onChange={(event) => updateOption('bandInterlockMm', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.bandInterlockMm}
+                        min="0.05"
+                        max="0.5"
+                        step="0.05"
+                        disabled={!options.terrainColorBandsEnabled}
+                        onChange={(event) => updateOption('bandInterlockMm', event.target.value)}
+                      />
                   </label>
                 </div>
               )}
               {options.colorMode === 'satellite' && (
                 <div className="terrain-model-satellite-config" aria-label="卫星色彩配置">
-                  <p className="terrain-model-satellite-hint">色彩由卫星图自动提取，并按可打印材料色压缩。请确保已开启贴图预览。</p>
+                    <p className="terrain-model-satellite-hint">
+                      色彩由卫星图自动提取，并按可打印材料色压缩。请确保已开启贴图预览。
+                    </p>
                   <label>
                     <span>卫星来源</span>
                     <select
@@ -3713,51 +4670,112 @@ export default function TerrainModelPage() {
                         setSurfaceTextureSourceKey(event.target.value)
                         setSurfaceTextureGoogleSession(null)
                         setSurfaceTexture(null)
-                        setSurfaceTextureStatus({ tone: 'idle', label: model ? '等待生成' : '等待模型' })
+                          setSurfaceTextureStatus({
+                            tone: 'idle',
+                            label: model ? '等待生成' : '等待模型',
+                          })
                       }}
                     >
                       {Object.values(SURFACE_TEXTURE_SOURCES).map((source) => (
-                        <option key={source.key} value={source.key}>{source.name}</option>
+                          <option key={source.key} value={source.key}>
+                            {source.name}
+                          </option>
                       ))}
                     </select>
                   </label>
                   <label>
                     <span>色彩策略</span>
-                    <select value={options.satelliteColorStrategy} onChange={(event) => updateStringOption('satelliteColorStrategy', event.target.value)}>
+                      <select
+                        value={options.satelliteColorStrategy}
+                        onChange={(event) =>
+                          updateStringOption('satelliteColorStrategy', event.target.value)
+                        }
+                      >
                       {SATELLITE_COLOR_STRATEGY_OPTIONS.map((strategy) => (
-                        <option key={strategy.key} value={strategy.key}>{strategy.label}</option>
+                          <option key={strategy.key} value={strategy.key}>
+                            {strategy.label}
+                          </option>
                       ))}
                     </select>
                   </label>
                   <label>
                     <span>色彩数量</span>
-                    <input type="number" value={options.satelliteColorCount} min="4" max="7" step="1" onChange={(event) => updateOption('satelliteColorCount', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.satelliteColorCount}
+                        min="4"
+                        max="7"
+                        step="1"
+                        onChange={(event) =>
+                          updateOption('satelliteColorCount', event.target.value)
+                        }
+                      />
                   </label>
                   <label>
                     <span>地貌色上限</span>
-                    <input type="number" value={options.satelliteTerrainColorLimit} min="0" max="7" step="1" onChange={(event) => updateOption('satelliteTerrainColorLimit', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.satelliteTerrainColorLimit}
+                        min="0"
+                        max="7"
+                        step="1"
+                        onChange={(event) =>
+                          updateOption('satelliteTerrainColorLimit', event.target.value)
+                        }
+                      />
                   </label>
                   <label>
                     <span>小色块 mm2</span>
-                    <input type="number" value={options.satelliteMinPatchAreaMm2} min="0" max="5000" step="5" onChange={(event) => updateOption('satelliteMinPatchAreaMm2', event.target.value)} />
+                      <input
+                        type="number"
+                        value={options.satelliteMinPatchAreaMm2}
+                        min="0"
+                        max="5000"
+                        step="5"
+                        onChange={(event) =>
+                          updateOption('satelliteMinPatchAreaMm2', event.target.value)
+                        }
+                      />
                   </label>
                   <label>
                     <span>色彩平滑</span>
-                    <input type="range" value={options.satelliteColorSmoothing} min="0" max="100" step="5" onChange={(event) => updateOption('satelliteColorSmoothing', event.target.value)} />
+                      <input
+                        type="range"
+                        value={options.satelliteColorSmoothing}
+                        min="0"
+                        max="100"
+                        step="5"
+                        onChange={(event) =>
+                          updateOption('satelliteColorSmoothing', event.target.value)
+                        }
+                      />
                   </label>
                   {model?.colorBands?.satelliteBands && (
-                    <div className="terrain-model-satellite-metrics" aria-label="卫星色彩打印状态">
+                      <div
+                        className="terrain-model-satellite-metrics"
+                        aria-label="卫星色彩打印状态"
+                      >
                       <div>
                         <span>材料槽</span>
-                        <strong>{(model.colorBands.satelliteBands.materialBudget?.reservedSlots || 0) + (model.colorBands.satelliteBands.bandCount || 0)}/{model.colorBands.satelliteBands.materialBudget?.maxSlots || 6}</strong>
+                          <strong>
+                            {(model.colorBands.satelliteBands.materialBudget?.reservedSlots || 0) +
+                              (model.colorBands.satelliteBands.bandCount || 0)}
+                            /{model.colorBands.satelliteBands.materialBudget?.maxSlots || 6}
+                          </strong>
                       </div>
                       <div>
                         <span>地貌色</span>
-                        <strong>{model.colorBands.satelliteBands.bandCount || 0}/{model.colorBands.satelliteBands.materialBudget?.terrainColorLimit || options.satelliteColorCount}</strong>
+                          <strong>
+                            {model.colorBands.satelliteBands.bandCount || 0}/
+                            {model.colorBands.satelliteBands.materialBudget?.terrainColorLimit ||
+                              options.satelliteColorCount}
+                          </strong>
                       </div>
                       <div>
                         <span>小色块</span>
-                        <strong>{model.colorBands.satelliteBands.cleanup?.mergedPatchCount || 0}</strong>
+                          <strong>
+                            {model.colorBands.satelliteBands.cleanup?.mergedPatchCount || 0}
+                          </strong>
                       </div>
                     </div>
                   )}
@@ -3765,7 +4783,10 @@ export default function TerrainModelPage() {
                     <div className="terrain-model-cluster-preview" aria-label="提取色彩">
                       {model.colorBands.satelliteBands.clusterCenters.map((center, index) => (
                         <div key={index} className="terrain-model-cluster-swatch">
-                          <span className="terrain-model-cluster-color" style={{ background: center.hex }} />
+                            <span
+                              className="terrain-model-cluster-color"
+                              style={{ background: center.hex }}
+                            />
                           <code>{center.hex}</code>
                         </div>
                       ))}
@@ -3776,65 +4797,168 @@ export default function TerrainModelPage() {
               <div className="terrain-model-section-divider" />
               <label>
                 <span>耗材类型</span>
-                <select value={options.filamentType} onChange={(event) => {
+                  <select
+                    value={options.filamentType}
+                    onChange={(event) => {
                   resetGeneratedOutputs()
                   setOptions((current) => ({ ...current, filamentType: event.target.value }))
-                }}>
+                    }}
+                  >
                   {['PLA Basic', 'PLA Matte', 'PLA Silk', 'PETG', 'ABS'].map((type) => (
-                    <option key={type} value={type}>{type}</option>
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
                   ))}
                 </select>
               </label>
               </ControlSection>
 
-              <ControlSection icon="layers" title="④ 表现细节" description="等高线、雪线和轨迹的线宽盖厚，按需开启。" collapsible defaultOpen={false}>
+              <ControlSection
+                icon="layers"
+                title="④ 表现细节"
+                description="等高线、雪线和轨迹的线宽盖厚，按需开启。"
+                collapsible
+                defaultOpen={false}
+              >
               <label>
                 <span>等高距 m</span>
-                <input type="number" value={options.contourIntervalMeters} min="5" max="500" step="5" disabled={!options.contourEnabled} onChange={(event) => updateOption('contourIntervalMeters', event.target.value)} />
+                  <input
+                    type="number"
+                    value={options.contourIntervalMeters}
+                    min="5"
+                    max="500"
+                    step="5"
+                    disabled={!options.contourEnabled}
+                    onChange={(event) => updateOption('contourIntervalMeters', event.target.value)}
+                  />
               </label>
               <label>
                 <span>等高线宽 mm</span>
-                <input type="number" value={options.contourWidthMm} min="0.2" max="2" step="0.05" disabled={!options.contourEnabled} onChange={(event) => updateOption('contourWidthMm', event.target.value)} />
+                  <input
+                    type="number"
+                    value={options.contourWidthMm}
+                    min="0.2"
+                    max="2"
+                    step="0.05"
+                    disabled={!options.contourEnabled}
+                    onChange={(event) => updateOption('contourWidthMm', event.target.value)}
+                  />
               </label>
               <label>
                 <span>等高线高 mm</span>
-                <input type="number" value={options.contourHeightMm} min="0.1" max="1.5" step="0.05" disabled={!options.contourEnabled} onChange={(event) => updateOption('contourHeightMm', event.target.value)} />
+                  <input
+                    type="number"
+                    value={options.contourHeightMm}
+                    min="0.1"
+                    max="1.5"
+                    step="0.05"
+                    disabled={!options.contourEnabled}
+                    onChange={(event) => updateOption('contourHeightMm', event.target.value)}
+                  />
               </label>
               <label>
                 <span>低地百分位</span>
-                <input type="number" value={options.lowlandPercentile} min="5" max="60" step="1" disabled={options.colorMode === 'satellite' || !options.terrainColorBandsEnabled} onChange={(event) => updateOption('lowlandPercentile', event.target.value)} />
+                  <input
+                    type="number"
+                    value={options.lowlandPercentile}
+                    min="5"
+                    max="60"
+                    step="1"
+                    disabled={
+                      options.colorMode === 'satellite' || !options.terrainColorBandsEnabled
+                    }
+                    onChange={(event) => updateOption('lowlandPercentile', event.target.value)}
+                  />
               </label>
               <label>
                 <span>低地盖厚 mm</span>
-                <input type="number" value={options.lowlandCapThicknessMm} min="0.2" max="1.5" step="0.05" disabled={options.colorMode === 'satellite' || !options.terrainColorBandsEnabled} onChange={(event) => updateOption('lowlandCapThicknessMm', event.target.value)} />
+                  <input
+                    type="number"
+                    value={options.lowlandCapThicknessMm}
+                    min="0.2"
+                    max="1.5"
+                    step="0.05"
+                    disabled={
+                      options.colorMode === 'satellite' || !options.terrainColorBandsEnabled
+                    }
+                    onChange={(event) => updateOption('lowlandCapThicknessMm', event.target.value)}
+                  />
               </label>
               <label>
                 <span>雪线 m</span>
-                <input type="number" value={options.snowlineElevationMeters} min="-500" max="9000" step="10" disabled={!options.snowlineEnabled} onChange={(event) => updateOptionalNumberOption('snowlineElevationMeters', event.target.value)} />
+                  <input
+                    type="number"
+                    value={options.snowlineElevationMeters}
+                    min="-500"
+                    max="9000"
+                    step="10"
+                    disabled={!options.snowlineEnabled}
+                    onChange={(event) =>
+                      updateOptionalNumberOption('snowlineElevationMeters', event.target.value)
+                    }
+                  />
               </label>
               <label>
                 <span>雪线百分位</span>
-                <input type="number" value={options.snowlinePercentile} min="50" max="98" step="1" disabled={!options.snowlineEnabled || options.snowlineElevationMeters !== ''} onChange={(event) => updateOption('snowlinePercentile', event.target.value)} />
+                  <input
+                    type="number"
+                    value={options.snowlinePercentile}
+                    min="50"
+                    max="98"
+                    step="1"
+                    disabled={!options.snowlineEnabled || options.snowlineElevationMeters !== ''}
+                    onChange={(event) => updateOption('snowlinePercentile', event.target.value)}
+                  />
               </label>
               <label>
                 <span>雪盖厚 mm</span>
-                <input type="number" value={options.snowCapThicknessMm} min="0.2" max="1.5" step="0.05" disabled={!options.snowlineEnabled} onChange={(event) => updateOption('snowCapThicknessMm', event.target.value)} />
+                  <input
+                    type="number"
+                    value={options.snowCapThicknessMm}
+                    min="0.2"
+                    max="1.5"
+                    step="0.05"
+                    disabled={!options.snowlineEnabled}
+                    onChange={(event) => updateOption('snowCapThicknessMm', event.target.value)}
+                  />
               </label>
               <label>
                 <span>轨迹宽 mm</span>
-                <input type="number" value={options.trackWidthMm} min="0.4" max="8" step="0.1" onChange={(event) => updateOption('trackWidthMm', event.target.value)} />
+                  <input
+                    type="number"
+                    value={options.trackWidthMm}
+                    min="0.4"
+                    max="8"
+                    step="0.1"
+                    onChange={(event) => updateOption('trackWidthMm', event.target.value)}
+                  />
               </label>
               <label>
                 <span>轨迹高 mm</span>
-                <input type="number" value={options.trackHeightMm} min="0.2" max="6" step="0.1" onChange={(event) => updateOption('trackHeightMm', event.target.value)} />
+                  <input
+                    type="number"
+                    value={options.trackHeightMm}
+                    min="0.2"
+                    max="6"
+                    step="0.1"
+                    onChange={(event) => updateOption('trackHeightMm', event.target.value)}
+                  />
               </label>
               </ControlSection>
 
-              <ControlSection icon="satellite_alt" title="⑤ 贴图预览" description="卫星影像用于 GLB 和客户预览；STL/3MF 仍以分件分色打印为准。" collapsible defaultOpen={surfaceTextureEnabled}>
+              <ControlSection
+                icon="satellite_alt"
+                title="⑤ 贴图预览"
+                description="卫星影像用于 GLB 和客户预览；STL/3MF 仍以分件分色打印为准。"
+                collapsible
+                defaultOpen={surfaceTextureEnabled}
+              >
               <label className="terrain-model-check terrain-model-check--field">
                 <span>卫星贴图</span>
                 <span className="terrain-model-check__control">
-                  <span className="terrain-model-check__state">{surfaceTextureEnabled ? '已开启' : '关闭'}</span>
+                    <span className="terrain-model-check__state">
+                      {surfaceTextureEnabled ? '已开启' : '关闭'}
+                    </span>
                   <input
                     type="checkbox"
                     checked={surfaceTextureEnabled}
@@ -3847,7 +4971,12 @@ export default function TerrainModelPage() {
                       }
                     }}
                   />
-                  <span className="material-symbols-outlined terrain-model-check__indicator" aria-hidden="true">check</span>
+                    <span
+                      className="material-symbols-outlined terrain-model-check__indicator"
+                      aria-hidden="true"
+                    >
+                      check
+                    </span>
                 </span>
               </label>
               <label>
@@ -3859,11 +4988,16 @@ export default function TerrainModelPage() {
                     setSurfaceTextureSourceKey(event.target.value)
                     setSurfaceTextureGoogleSession(null)
                     setSurfaceTexture(null)
-                    setSurfaceTextureStatus({ tone: 'idle', label: model ? '等待生成' : '等待模型' })
+                      setSurfaceTextureStatus({
+                        tone: 'idle',
+                        label: model ? '等待生成' : '等待模型',
+                      })
                   }}
                 >
                   {Object.values(SURFACE_TEXTURE_SOURCES).map((source) => (
-                    <option key={source.key} value={source.key}>{source.name}</option>
+                      <option key={source.key} value={source.key}>
+                        {source.name}
+                      </option>
                   ))}
                 </select>
               </label>
@@ -3875,11 +5009,16 @@ export default function TerrainModelPage() {
                   onChange={(event) => {
                     setSurfaceTextureQuality(event.target.value)
                     setSurfaceTexture(null)
-                    setSurfaceTextureStatus({ tone: 'idle', label: model ? '等待生成' : '等待模型' })
+                      setSurfaceTextureStatus({
+                        tone: 'idle',
+                        label: model ? '等待生成' : '等待模型',
+                      })
                   }}
                 >
                   {Object.entries(SURFACE_TEXTURE_QUALITY_PRESETS).map(([key, preset]) => (
-                    <option key={key} value={key}>{preset.label}</option>
+                      <option key={key} value={key}>
+                        {preset.label}
+                      </option>
                   ))}
                 </select>
               </label>
@@ -3896,7 +5035,10 @@ export default function TerrainModelPage() {
                       setSurfaceTextureGoogleApiKey(event.target.value)
                       setSurfaceTextureGoogleSession(null)
                       setSurfaceTexture(null)
-                      setSurfaceTextureStatus({ tone: 'idle', label: model ? '等待生成' : '等待模型' })
+                        setSurfaceTextureStatus({
+                          tone: 'idle',
+                          label: model ? '等待生成' : '等待模型',
+                        })
                     }}
                   />
                 </label>
@@ -3914,7 +5056,10 @@ export default function TerrainModelPage() {
                       onChange={(event) => {
                         setSurfaceTextureCesiumAccessToken(event.target.value)
                         setSurfaceTexture(null)
-                        setSurfaceTextureStatus({ tone: 'idle', label: model ? '等待生成' : '等待模型' })
+                          setSurfaceTextureStatus({
+                            tone: 'idle',
+                            label: model ? '等待生成' : '等待模型',
+                          })
                       }}
                     />
                   </label>
@@ -3928,7 +5073,10 @@ export default function TerrainModelPage() {
                       onChange={(event) => {
                         setSurfaceTextureCesiumAssetId(event.target.value)
                         setSurfaceTexture(null)
-                        setSurfaceTextureStatus({ tone: 'idle', label: model ? '等待生成' : '等待模型' })
+                          setSurfaceTextureStatus({
+                            tone: 'idle',
+                            label: model ? '等待生成' : '等待模型',
+                          })
                       }}
                     />
                   </label>
@@ -3942,7 +5090,10 @@ export default function TerrainModelPage() {
                       onChange={(event) => {
                         setSurfaceTextureCesiumUrlTemplate(event.target.value)
                         setSurfaceTexture(null)
-                        setSurfaceTextureStatus({ tone: 'idle', label: model ? '等待生成' : '等待模型' })
+                          setSurfaceTextureStatus({
+                            tone: 'idle',
+                            label: model ? '等待生成' : '等待模型',
+                          })
                       }}
                     />
                   </label>
@@ -3951,18 +5102,24 @@ export default function TerrainModelPage() {
               <div className="terrain-model-status-strip terrain-model-status-strip--three">
                 <div>
                   <span>表面贴图</span>
-                  <strong>{SURFACE_TEXTURE_SOURCES[surfaceTextureSourceKey]?.name || '卫星影像'}</strong>
+                    <strong>
+                      {SURFACE_TEXTURE_SOURCES[surfaceTextureSourceKey]?.name || '卫星影像'}
+                    </strong>
                 </div>
                 <div>
                   <span>贴图状态</span>
-                  <strong className={`terrain-model-status terrain-model-status--${surfaceTextureStatus.tone}`}>
+                    <strong
+                      className={`terrain-model-status terrain-model-status--${surfaceTextureStatus.tone}`}
+                    >
                     {surfaceTextureStatus.label}
                   </strong>
                 </div>
                 <div>
                   <span>预算</span>
                   <strong>
-                    {SURFACE_TEXTURE_QUALITY_PRESETS[surfaceTextureQuality]?.maxTextureSize || 2048}px
+                      {SURFACE_TEXTURE_QUALITY_PRESETS[surfaceTextureQuality]?.maxTextureSize ||
+                        2048}
+                      px
                     {' / '}
                     {SURFACE_TEXTURE_QUALITY_PRESETS[surfaceTextureQuality]?.maxTiles || 24} tiles
                   </strong>
@@ -3992,7 +5149,11 @@ export default function TerrainModelPage() {
             </label>
             <div className="terrain-model-toolbar__row">
               <label className="terrain-model-file terrain-model-file--dem">
-                <input type="file" accept=".asc,.txt,.dem,.grd,text/plain" onChange={handleDemFileChange} />
+                <input
+                  type="file"
+                  accept=".asc,.txt,.dem,.grd,text/plain"
+                  onChange={handleDemFileChange}
+                />
                 <span className="material-symbols-outlined">terrain</span>
                 <span>{demFileName || '高精 DEM'}</span>
               </label>
@@ -4006,29 +5167,64 @@ export default function TerrainModelPage() {
                 <span>ArcGIS 高程</span>
               </label>
             </div>
-            <button type="button" className="terrain-model-btn terrain-model-btn--primary terrain-model-btn--generate" disabled={!track || building || !manualTerrainBoundsReady} onClick={handleGenerate}>
+            <button
+              type="button"
+              className="terrain-model-btn terrain-model-btn--primary terrain-model-btn--generate"
+              disabled={!track || building || !manualTerrainBoundsReady}
+              onClick={handleGenerate}
+            >
               <span className="material-symbols-outlined">deployed_code</span>
               <span>{building ? '生成中' : '生成模型'}</span>
             </button>
             {model && (
               <div className="terrain-model-toolbar__row">
-                <button type="button" className="terrain-model-btn" disabled={!model} onClick={handleDownloadZip}>
+                <button
+                  type="button"
+                  className="terrain-model-btn"
+                  disabled={!model}
+                  onClick={handleDownloadZip}
+                >
                   <span className="material-symbols-outlined">archive</span>
                   <span>{exportingFiles ? '导出中' : '下载 ZIP'}</span>
                 </button>
-                <button type="button" className="terrain-model-btn" disabled={!model || exportBlockedBySurfaceTexture || exportingGlb} onClick={handleDownloadGlb}>
+                <button
+                  type="button"
+                  className="terrain-model-btn"
+                  disabled={!model || exportBlockedBySurfaceTexture || exportingGlb}
+                  onClick={handleDownloadGlb}
+                >
                   <span className="material-symbols-outlined">view_in_ar</span>
-                  <span>{exportBlockedBySurfaceTexture ? '等待贴图' : exportingGlb ? '导出中' : surfaceTexture ? '下载贴图 GLB' : '下载 GLB'}</span>
+                  <span>
+                    {exportBlockedBySurfaceTexture
+                      ? '等待贴图'
+                      : exportingGlb
+                        ? '导出中'
+                        : surfaceTexture
+                          ? '下载贴图 GLB'
+                          : '下载 GLB'}
+                  </span>
                 </button>
               </div>
             )}
             <div className="terrain-model-toolbar__row terrain-model-toolbar__config">
-              <button type="button" className="terrain-model-btn terrain-model-btn--ghost" onClick={handleExportConfig} title="导出配置">
+              <button
+                type="button"
+                className="terrain-model-btn terrain-model-btn--ghost"
+                onClick={handleExportConfig}
+                title="导出配置"
+              >
                 <span className="material-symbols-outlined">download</span>
                 <span>导出配置</span>
               </button>
-              <label className="terrain-model-btn terrain-model-btn--ghost terrain-model-config-file" title="导入配置">
-                <input type="file" accept="application/json,.json" onChange={handleImportConfigFile} />
+              <label
+                className="terrain-model-btn terrain-model-btn--ghost terrain-model-config-file"
+                title="导入配置"
+              >
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={handleImportConfigFile}
+                />
                 <span className="material-symbols-outlined">upload</span>
                 <span>导入配置</span>
               </label>
@@ -4051,25 +5247,75 @@ export default function TerrainModelPage() {
           <div className="terrain-model-panel terrain-model-panel--preview">
             <div className="terrain-model-panel__head">
               <h2>3D 预览</h2>
-              <span>{model ? `${formatNumber(model.stats.modelWidthMm, ' mm')} x ${formatNumber(model.stats.modelDepthMm, ' mm')}` : '-'}</span>
+              <span>
+                {model
+                  ? `${formatNumber(model.stats.modelWidthMm, ' mm')} x ${formatNumber(model.stats.modelDepthMm, ' mm')}`
+                  : '-'}
+              </span>
             </div>
-            <TerrainPreview model={model} surfaceTexture={surfaceTextureEnabled ? surfaceTexture : null} />
+            <TerrainPreview
+              model={model}
+              surfaceTexture={surfaceTextureEnabled ? surfaceTexture : null}
+            />
           </div>
 
           {(printRecommendation || model) && (
-            <ReliefScaleMeter model={model} recommendation={activeReliefRecommendation || printRecommendation} options={options} />
+            <ReliefScaleMeter
+              model={model}
+              recommendation={activeReliefRecommendation || printRecommendation}
+              options={options}
+            />
           )}
 
           <div className="terrain-model-stats">
-            <div><span>点数</span><strong>{summary?.pointCount || '-'}</strong></div>
-            <div><span>距离</span><strong>{summary ? formatDistance(summary.distanceMeters) : '-'}</strong></div>
-            <div><span>海拔</span><strong>{summary ? `${formatNumber(summary.minElevationMeters, ' m')} / ${formatNumber(summary.maxElevationMeters, ' m')}` : '-'}</strong></div>
-            <div><span>模型高度</span><strong>{model ? formatNumber(model.stats.maxHeightMm, ' mm') : '-'}</strong></div>
-            <div><span>采样</span><strong>{model ? `${model.terrain.rows} x ${model.terrain.cols}` : '-'}</strong></div>
-            <div><span>面网格</span><strong>{model?.terrain?.precision?.gridSpacingMm ? formatNumber(model.terrain.precision.gridSpacingMm.min, ' mm') : '-'}</strong></div>
-            <div><span>垂直夸张</span><strong>{model ? formatNumber(model.stats.verticalExaggeration, 'x') : '-'}</strong></div>
-            <div><span>低地分色</span><strong>{model?.colorBands?.lowland?.enabled ? formatNumber(model.colorBands.lowland.coverageRatio * 100, '%') : '-'}</strong></div>
-            <div><span>贴图</span><strong>{surfaceTexture ? surfaceTexture.source?.name || '卫星影像' : '-'}</strong></div>
+            <div>
+              <span>点数</span>
+              <strong>{summary?.pointCount || '-'}</strong>
+            </div>
+            <div>
+              <span>距离</span>
+              <strong>{summary ? formatDistance(summary.distanceMeters) : '-'}</strong>
+            </div>
+            <div>
+              <span>海拔</span>
+              <strong>
+                {summary
+                  ? `${formatNumber(summary.minElevationMeters, ' m')} / ${formatNumber(summary.maxElevationMeters, ' m')}`
+                  : '-'}
+              </strong>
+            </div>
+            <div>
+              <span>模型高度</span>
+              <strong>{model ? formatNumber(model.stats.maxHeightMm, ' mm') : '-'}</strong>
+            </div>
+            <div>
+              <span>采样</span>
+              <strong>{model ? `${model.terrain.rows} x ${model.terrain.cols}` : '-'}</strong>
+            </div>
+            <div>
+              <span>面网格</span>
+              <strong>
+                {model?.terrain?.precision?.gridSpacingMm
+                  ? formatNumber(model.terrain.precision.gridSpacingMm.min, ' mm')
+                  : '-'}
+              </strong>
+            </div>
+            <div>
+              <span>垂直夸张</span>
+              <strong>{model ? formatNumber(model.stats.verticalExaggeration, 'x') : '-'}</strong>
+            </div>
+            <div>
+              <span>低地分色</span>
+              <strong>
+                {model?.colorBands?.lowland?.enabled
+                  ? formatNumber(model.colorBands.lowland.coverageRatio * 100, '%')
+                  : '-'}
+              </strong>
+            </div>
+            <div>
+              <span>贴图</span>
+              <strong>{surfaceTexture ? surfaceTexture.source?.name || '卫星影像' : '-'}</strong>
+            </div>
           </div>
 
           <PrintReadinessPanel readiness={printReadiness} />
