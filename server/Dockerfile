@@ -9,7 +9,8 @@ COPY packages/contracts/package.json packages/contracts/package.json
 COPY packages/studio-model/package.json packages/studio-model/package.json
 
 RUN apk add --no-cache bash postgresql16-client \
-    && npm ci --omit=dev --workspace=arcspro-server
+    && npm ci --omit=dev --include=optional --workspace=arcspro-server \
+    && node -e "require('@napi-rs/canvas'); console.log('native canvas binding ready')"
 
 COPY server/src/ server/src/
 COPY server/scripts/ server/scripts/
