@@ -8,7 +8,7 @@
 
 **复验日期：** 2026-07-12
 
-**代码验收提交：** `71af029e800a50bed4fb385d7c5016c35f44ece9`
+**代码验收提交：** `28989c9304908f2178cbaa13a1272ec4cb6fba9d`
 
 **当前完成度：** 98%
 
@@ -58,6 +58,7 @@
 | 后端测试日志直接打印完整 JWT、解密后的手机号、证件号和盲索引片段 | 删除敏感值输出，新增递归扫描全部后端测试文件的日志安全门禁，阻止凭证或解密 PII 进入 `console` | 日志门禁与全链路加密测试 23/23；后端隔离测试 103/103；`records-query` 不再输出 token |
 | 设计协作导入服务同时承担权限事务、字段归一化、稳定键计算、Excel 输入解析和输出渲染 | 纯数据契约拆入 `design-collaboration-data.js`，Excel 读写拆入 `design-collaboration-workbook.js`；事务服务由 1316 行降至 906 行，新增 950 行门禁并禁止直接依赖 `exceljs` | 数据/工作簿与架构测试 8/8；设计协作完整路由 7/7；后端隔离测试 104/104 |
 | 考评服务重复维护两份默认模板，并混合输入归一化、报告统计、红线分级和数据库编排 | 默认模板、标题、名单与评分归一化、均值/方差及人才分级统一拆入 `assessment-domain.js`；service 由 1281 行降至 897 行并新增 950 行门禁 | 领域与架构测试 10/10，覆盖 S/A/B/C/D、单/双红线和公开错误契约；后端隔离测试 105/105；根测试与生产构建通过 |
+| 团队名单页面同时维护数据归一化、Excel 读写、照片 URL 生命周期和整页交互 | 数据计算拆入 `teamListPageData.js`，工作簿读写拆入 `teamMemberWorkbook.js`，照片组件改为类型化边界并按成员/机构/token 身份绑定 Blob URL；页面由 1075 行降至 920 行并新增 925 行门禁 | 团队边界与行为测试 8/8，覆盖乱序响应、身份切换首帧、卸载释放、模板 Sheet 名称和首 Sheet 解析；独立复审无 Critical/Important/Minor；根测试、后端隔离测试和生产构建通过 |
 
 ## 2. 自动化门禁
 
@@ -69,9 +70,10 @@ npm run check:secrets                  PASS
 npm run lint                           PASS，0 error / 0 warning
 npm run typecheck                      PASS
 npm run format:check                   PASS
-npm test                               PASS，333/333
+npm test                               PASS，344/344
 npm run build                          PASS，Vite 8
-npm audit --audit-level=low            PASS，0 vulnerabilities
+npm ci                                 PASS，922 packages；安装阶段 0 vulnerabilities
+npm audit --audit-level=low            BLOCKED，Registry TLS/socket 两次断开
 git diff --check                       PASS
 ```
 
@@ -79,13 +81,13 @@ ECharts 已按需注册，`vendor-echarts` 从约 1.12 MB 降到 443.08 kB；文
 
 ### 2.2 后端
 
-专用 PostgreSQL 16 容器只用于测试连接。测试 runner 为 104 个测试文件逐一创建隔离数据库：
+专用 PostgreSQL 16 容器只用于测试连接。测试 runner 为 105 个测试文件逐一创建隔离数据库：
 
 ```text
 npm test
 ...
-[isolated-db 104/104] tests/test-log-safety.test.js
-[isolated-db] PASS 104/104 files
+[isolated-db 105/105] tests/test-log-safety.test.js
+[isolated-db] PASS 105/105 files
 
 npm audit --workspace=arcspro-server --audit-level=low
 found 0 vulnerabilities
@@ -256,4 +258,4 @@ app 单独重建后网关探测                20/20 通过，Nginx 容器未重
 4. 推送分支，远程 CI 全绿；
 5. 在远程候选环境重跑迁移、健康、备份恢复和镜像回退；
 6. 生产切换后验证 endpoint、静态 chunk、健康检查和关键业务抽样；
-7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `71af029` 执行 333/333、考评领域与架构测试 10/10、format/lint/typecheck、编码/密钥扫描、生产构建及边界检查；开发工作树使用专用 PostgreSQL 16 完成后端隔离测试 105/105。该干净工作树在同一 lockfile 的上一代码节点执行 fresh `npm ci`，安装审计 0 vulnerabilities，且无跟踪改动。
+7. 最终 HEAD 从全新检出重跑全部门禁。已在 `/Users/xquare/scratch/door/.worktrees/door-clean-verify-20260711` 对 `28989c9` fresh `npm ci` 后执行根测试 344/344、团队边界与行为测试 8/8、format/lint/typecheck、编码/密钥扫描、生产构建及边界检查，并使用专用 PostgreSQL 16 完成后端隔离测试 105/105。安装阶段审计为 0 vulnerabilities；随后单独刷新 `npm audit` 时 Registry 连接两次中断。该干净工作树无跟踪改动。
