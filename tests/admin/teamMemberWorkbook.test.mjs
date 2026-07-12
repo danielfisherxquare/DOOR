@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as XLSX from 'xlsx'
 
 async function loadWorkbook() {
   try {
@@ -21,6 +22,7 @@ test('team workbook preserves titles, field descriptions, and sample rows', asyn
     { employeeCode: 'STA001', employeeName: '张三' },
   ])
 
+  assert.equal(book.SheetNames[0], '团队成员模板')
   assert.deepEqual(workbook.readFirstSheetRows(book), [
     ['工号', '姓名'],
     ['employeeCode（必填）', 'employeeName（选填）'],
@@ -34,6 +36,11 @@ test('team workbook parses the first sheet through the shared row contract', asy
 
   const columns = [{ key: 'employeeCode', title: '工号', required: true }]
   const book = workbook.createTeamImportWorkbook(columns, [{ employeeCode: 'STA001' }])
+  XLSX.utils.book_append_sheet(
+    book,
+    XLSX.utils.aoa_to_sheet([['工号'], ['WRONG_SHEET']]),
+    '不应读取的第二张表',
+  )
   const buffer = workbook.writeTeamImportWorkbookBuffer(book)
 
   assert.deepEqual(workbook.parseTeamImportWorkbook(buffer, columns), [

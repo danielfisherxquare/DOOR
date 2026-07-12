@@ -30,7 +30,11 @@ test('team member photo component owns a typed URL lifecycle', async () => {
   const photoSource = await readOrEmpty('../../src/views/admin/TeamMemberPhoto.tsx')
 
   assert.match(photoSource, /interface TeamMemberPhotoProps/)
-  assert.match(photoSource, /URL\.createObjectURL/)
-  assert.match(photoSource, /URL\.revokeObjectURL/)
+  assert.match(photoSource, /from ['"]\.\/teamMemberPhotoUrlState\.js['"]/)
+  assert.match(photoSource, /beginRequest/)
+  assert.match(photoSource, /resolveRequest/)
+  assert.match(photoSource, /dispose/)
+  assert.match(photoSource, /createTeamMemberPhotoIdentity/)
+  assert.match(photoSource, /getVisibleTeamMemberPhotoSrc/)
   assert.match(photoSource, /validatePortraitPhotoFile/)
 })

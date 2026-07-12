@@ -1,6 +1,11 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import adminApi from '../../api/adminApi'
 import useAuthStore from '../../stores/authStore'
+import {
+  createTeamMemberPhotoIdentity,
+  createTeamMemberPhotoUrlState,
+  getVisibleTeamMemberPhotoSrc,
+} from './teamMemberPhotoUrlState.js'
 
 export interface TeamMemberPhotoProps {
   teamMemberId: string | number
@@ -49,34 +54,38 @@ export default function TeamMemberPhoto({
   placeholder,
 }: TeamMemberPhotoProps) {
   const token = useAuthStore((state: { token?: string }) => state.token)
-  const [src, setSrc] = useState('')
+  const photoIdentity = createTeamMemberPhotoIdentity({ teamMemberId, orgId, token })
+  const [photo, setPhoto] = useState({ identity: '', src: '' })
+  const photoUrlStateRef = useRef<ReturnType<typeof createTeamMemberPhotoUrlState> | null>(null)
+  if (!photoUrlStateRef.current) {
+    photoUrlStateRef.current = createTeamMemberPhotoUrlState({
+      createObjectUrl: (blob) => URL.createObjectURL(blob),
+      revokeObjectUrl: (url) => URL.revokeObjectURL(url),
+    })
+  }
 
   useEffect(() => {
-    let active = true
-    let objectUrl = ''
+    const photoUrlState = photoUrlStateRef.current
+    if (!photoUrlState) return undefined
+    const requestGeneration = photoUrlState.beginRequest()
+    setPhoto({ identity: photoIdentity, src: '' })
 
     const load = async () => {
-      if (!teamMemberId || !hasPhoto || !token) {
-        setSrc('')
-        return
-      }
+      if (!teamMemberId || !hasPhoto || !token) return
       try {
         const blob = await adminApi.getTeamMemberPhoto(teamMemberId, orgId, token)
-        if (!active) return
-        objectUrl = URL.createObjectURL(blob)
-        setSrc(objectUrl)
+        const objectUrl = photoUrlState.resolveRequest(requestGeneration, blob)
+        if (objectUrl) setPhoto({ identity: photoIdentity, src: objectUrl })
       } catch {
-        if (active) setSrc('')
+        return
       }
     }
 
     void load()
-    return () => {
-      active = false
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [teamMemberId, hasPhoto, orgId, token])
+    return () => photoUrlState.dispose()
+  }, [teamMemberId, hasPhoto, orgId, photoIdentity, token])
 
+  const src = getVisibleTeamMemberPhotoSrc(photo, photoIdentity)
   if (!hasPhoto || !src) return placeholder
   return <img src={src} alt={alt} style={style} />
 }
