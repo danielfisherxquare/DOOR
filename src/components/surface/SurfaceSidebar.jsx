@@ -115,6 +115,7 @@ export default function SurfaceSidebar({
           </span>
         </div>
         <div className="workspace-sidebar__actions">
+          <Link to="/launcher" className="workspace-sidebar__action">切换入口</Link>
           <button type="button" className="workspace-sidebar__action" onClick={onLogout}>退出登录</button>
         </div>
       </div>

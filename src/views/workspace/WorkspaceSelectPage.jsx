@@ -10,6 +10,7 @@ import {
   PLATFORM_WORKSPACE_ID,
 } from '../../features/workspace/workspaceSession'
 import { fetchWorkspaceOptions } from '../../features/workspace/workspaceApi'
+import { resolvePlatformWorkspaceTarget } from '../../features/workspace/workspaceNavigation'
 import { showError } from '../../utils/toast'
 import './workspace-entry.css'
 
@@ -161,10 +162,7 @@ export default function WorkspaceSelectPage() {
         surface: 'admin',
       }))
 
-      const redirect = searchParams.get('redirect')
-      const target = redirect && redirect.startsWith('/admin') && !redirect.startsWith('/login')
-        ? redirect
-        : '/admin'
+      const target = resolvePlatformWorkspaceTarget(searchParams.get('redirect'))
       navigate(target, { replace: true })
       return
     }

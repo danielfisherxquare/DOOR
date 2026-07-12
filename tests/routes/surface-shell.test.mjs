@@ -25,4 +25,21 @@ describe('shared surface shell', () => {
     assert.match(shell, /<SurfaceMobileMenu/)
     assert.match(shell, /workspace-main__content/)
   })
+
+  it('exposes the surface launcher from desktop and mobile navigation', () => {
+    const sidebar = readFileSync('src/components/surface/SurfaceSidebar.jsx', 'utf8')
+    const mobileMenu = readFileSync('src/components/surface/SurfaceMobileMenu.jsx', 'utf8')
+
+    for (const source of [sidebar, mobileMenu]) {
+      assert.match(source, /to="\/launcher"/)
+      assert.match(source, /切换入口/)
+    }
+  })
+
+  it('routes platform app and ops requests through workspace selection', () => {
+    const guard = readFileSync('src/components/SurfaceProtectedRoute.jsx', 'utf8')
+
+    assert.match(guard, /resolveSurfaceWorkspaceRedirect/)
+    assert.match(guard, /platformWorkspaceRedirect/)
+  })
 })

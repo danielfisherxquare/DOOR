@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom'
 import useAuthStore from '../stores/authStore'
 import useWorkspaceStore from '../features/workspace/workspaceStore'
 import { createWorkspaceSession } from '../features/workspace/workspaceSession'
+import { resolveLoginDestination } from '../features/workspace/workspaceNavigation'
 import { requestRaw } from '../utils/request'
 
 const SERVICE_STATUS_LABELS = {
@@ -34,12 +35,17 @@ function Login() {
       if (hasPlatformProfile) {
         setWorkspaceSession(createWorkspaceSession({ scopeType: 'platform', surface: 'admin' }))
       }
-      const platformLanding = hasPlatformProfile ? getDefaultLandingPath() : '/workspaces'
+      const defaultLanding = hasPlatformProfile ? getDefaultLandingPath() : '/workspaces'
       const fromLocation = location.state?.from
       const protectedRouteReturn = fromLocation?.pathname
         ? `${fromLocation.pathname}${fromLocation.search || ''}${fromLocation.hash || ''}`
         : null
-      const from = protectedRouteReturn || (redirect && redirect.startsWith('/') ? redirect : null) || platformLanding
+      const from = resolveLoginDestination({
+        protectedRouteReturn,
+        redirect,
+        hasPlatformProfile,
+        defaultLanding,
+      })
       navigate(from, { replace: true })
     }
   }, [getDefaultLandingPath, isAuthenticated, navigate, location, setWorkspaceSession, user])

@@ -9,6 +9,7 @@ import {
   getWorkspaceProfileRefreshParams,
   resolveSurfaceWorkspaceSession,
 } from '../features/workspace/workspaceSession'
+import { resolveSurfaceWorkspaceRedirect } from '../features/workspace/workspaceNavigation'
 
 const EMPTY_PROFILE_REFRESH = {
   key: '',
@@ -37,6 +38,10 @@ function SurfaceProtectedRoute({ surface, children }) {
     () => resolveSurfaceWorkspaceSession({ user, session, surface }),
     [session, surface, user],
   )
+  const platformWorkspaceRedirect = resolveSurfaceWorkspaceRedirect({
+    scopeType: routeSession?.scopeType,
+    surface,
+  })
   const profileRefreshParams = useMemo(
     () => getWorkspaceProfileRefreshParams(routeSession),
     [routeSession],
@@ -123,6 +128,10 @@ function SurfaceProtectedRoute({ surface, children }) {
 
   if (user?.mustChangePassword) {
     return <Navigate to="/change-password" replace />
+  }
+
+  if (platformWorkspaceRedirect) {
+    return <Navigate to={platformWorkspaceRedirect} replace />
   }
 
   if (shouldRefreshProfile || isProfileRefreshPending) {

@@ -351,6 +351,9 @@
 }
 
 .workspace-sidebar__action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: 32px;
   font-size: 12px;
   font-weight: 600;
@@ -360,6 +363,7 @@
   background: transparent;
   color: rgba(250, 250, 249, 0.7);
   text-align: center;
+  text-decoration: none;
   transition:
     background 150ms ease,
     opacity 180ms ease,
@@ -1645,13 +1649,24 @@
     font-size: 12px;
   }
 
+  .workspace-mobile-menu__footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .workspace-mobile-menu__footer a,
   .workspace-mobile-menu__footer button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     min-height: 44px;
     padding: 0 12px;
     border: 1px solid var(--layer-border, #e7e5e4);
     background: var(--layer-surface, #ffffff);
     color: var(--layer-text-primary, #1c1917);
     font-size: 12px;
+    text-decoration: none;
   }
 }
 

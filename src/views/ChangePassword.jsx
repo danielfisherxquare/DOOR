@@ -2,12 +2,16 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import authApi from '../api/auth'
 import useAuthStore from '../stores/authStore'
+import useWorkspaceStore from '../features/workspace/workspaceStore'
+import { createWorkspaceSession } from '../features/workspace/workspaceSession'
+import { resolveLoginDestination } from '../features/workspace/workspaceNavigation'
 
 function ChangePasswordPage() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
   const fetchCurrentUser = useAuthStore((state) => state.fetchCurrentUser)
   const getDefaultLandingPath = useAuthStore((state) => state.getDefaultLandingPath)
+  const setWorkspaceSession = useWorkspaceStore((state) => state.setWorkspaceSession)
 
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -32,7 +36,16 @@ function ChangePasswordPage() {
       const res = await authApi.changePassword({ oldPassword, newPassword })
       if (res.success) {
         await fetchCurrentUser()
-        navigate(getDefaultLandingPath(), { replace: true })
+        const refreshedUser = useAuthStore.getState().user
+        const hasPlatformProfile = refreshedUser?.role === 'super_admin'
+          && refreshedUser?.authzProfile?.scopeType === 'platform'
+        if (hasPlatformProfile) {
+          setWorkspaceSession(createWorkspaceSession({ scopeType: 'platform', surface: 'admin' }))
+        }
+        navigate(resolveLoginDestination({
+          hasPlatformProfile,
+          defaultLanding: getDefaultLandingPath(),
+        }), { replace: true })
       }
     } catch (error) {
       setMessage(error.message)

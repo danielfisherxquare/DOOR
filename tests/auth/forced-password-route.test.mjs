@@ -30,4 +30,7 @@ test('forced password changes use one authenticated route outside workspace layo
   assert.equal((changePassword.match(/autoComplete="current-password"/g) || []).length, 1)
   assert.equal((changePassword.match(/autoComplete="new-password"/g) || []).length, 2)
   assert.match(changePassword, /name="username"[\s\S]{0,160}autoComplete="username"/)
+  assert.match(changePassword, /resolveLoginDestination/)
+  assert.match(changePassword, /hasPlatformProfile/)
+  assert.match(changePassword, /setWorkspaceSession\(createWorkspaceSession\(\{ scopeType: 'platform', surface: 'admin' \}\)\)/)
 })

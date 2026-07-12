@@ -54,7 +54,10 @@ export default function SurfaceMobileMenu({
         </nav>
         <div className="workspace-mobile-menu__footer">
           <span>{user?.username || userFallback} · {roleName}</span>
-          <button type="button" onClick={onLogout}>退出登录</button>
+          <div className="workspace-mobile-menu__footer-actions">
+            <Link to="/launcher" onClick={onClose}>切换入口</Link>
+            <button type="button" onClick={onLogout}>退出登录</button>
+          </div>
         </div>
       </aside>
     </div>
