@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import * as XLSX from 'xlsx'
 import adminApi from '../../api/adminApi'
 import useAuthStore from '../../stores/authStore'
 import {
@@ -13,149 +12,25 @@ import {
   CommandStatusTag,
   ContextRequirementState,
 } from '../../components/command/CommandPrimitives'
+import TeamMemberPhoto, {
+  revokePreviewUrl,
+  validatePortraitPhotoFile,
+} from './TeamMemberPhoto'
+import {
+  buildEmployeeCodeOptions,
+  buildTeamMemberMetrics,
+  EMPLOYEE_CODE_PAGE_SIZE,
+  EMPLOYEE_CODE_SUGGESTION_LIMIT,
+  EMPTY_TEAM_MEMBER_FORM,
+  EXTERNAL_TYPE_LABELS,
+  MEMBER_TYPE_LABELS,
+  PAGE_LIMIT,
+} from './teamListPageData.js'
+import {
+  parseTeamImportWorkbook,
+  writeTeamImportTemplate,
+} from './teamMemberWorkbook.js'
 import './team-list-page.css'
-
-const MEMBER_TYPE_LABELS = {
-  employee: '正式成员',
-  external_support: '外援',
-}
-
-const EXTERNAL_TYPE_LABELS = {
-  temporary: '临时外援',
-  long_term: '长期外援',
-}
-
-const emptyForm = {
-  employeeCode: '',
-  employeeName: '',
-  position: '',
-  department: '',
-  memberType: 'employee',
-  externalEngagementType: '',
-  idNumber: '',
-  contact: '',
-  hasPhoto: false,
-}
-
-const PAGE_LIMIT = 20
-const EMPLOYEE_CODE_PAGE_SIZE = 200
-const EMPLOYEE_CODE_SUGGESTION_LIMIT = 16
-
-function parseEmployeeCode(value) {
-  const match = String(value || '').trim().match(/^(.*?)(\d+)$/)
-  if (!match) return null
-  return {
-    prefix: match[1],
-    number: Number(match[2]),
-    width: match[2].length,
-  }
-}
-
-function buildEmployeeCodeOptions(codes, currentCode = '') {
-  const occupiedCodes = new Set(
-    (Array.isArray(codes) ? codes : [])
-      .map((item) => String(item || '').trim())
-      .filter(Boolean),
-  )
-  const groups = new Map()
-  const plainCodes = []
-
-  occupiedCodes.forEach((code) => {
-    const parsed = parseEmployeeCode(code)
-    if (!parsed) {
-      plainCodes.push(code)
-      return
-    }
-    const key = `${parsed.prefix}__${parsed.width}`
-    const group = groups.get(key) || { prefix: parsed.prefix, width: parsed.width, max: 0, count: 0 }
-    group.max = Math.max(group.max, parsed.number)
-    group.count += 1
-    groups.set(key, group)
-  })
-
-  const options = []
-  groups.forEach((group) => {
-    const upperBound = Math.max(group.max + 20, group.count + 20)
-    for (let value = 1; value <= upperBound; value += 1) {
-      const code = `${group.prefix}${String(value).padStart(group.width, '0')}`
-      options.push({ code, occupied: occupiedCodes.has(code) })
-    }
-  })
-
-  plainCodes
-    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }))
-    .forEach((code) => options.push({ code, occupied: occupiedCodes.has(code) }))
-
-  const normalizedCurrentCode = String(currentCode || '').trim()
-  if (normalizedCurrentCode && !options.some((item) => item.code === normalizedCurrentCode)) {
-    options.unshift({ code: normalizedCurrentCode, occupied: false })
-  }
-
-  return options.sort((left, right) => left.code.localeCompare(right.code, undefined, { numeric: true, sensitivity: 'base' }))
-}
-
-function revokePreviewUrl(url) {
-  if (url) URL.revokeObjectURL(url)
-}
-
-function validatePortraitPhotoFile(file) {
-  return new Promise((resolve, reject) => {
-    const previewUrl = URL.createObjectURL(file)
-    const image = new Image()
-    image.onload = () => {
-      const ratio = image.width / image.height
-      URL.revokeObjectURL(previewUrl)
-      if (image.height <= image.width) {
-        reject(new Error('照片必须是 2:3 竖幅'))
-        return
-      }
-      if (Math.abs(ratio - (2 / 3)) > 0.015) {
-        reject(new Error('照片比例必须为 2:3 竖幅'))
-        return
-      }
-      resolve()
-    }
-    image.onerror = () => {
-      URL.revokeObjectURL(previewUrl)
-      reject(new Error('无法读取照片，请重新选择'))
-    }
-    image.src = previewUrl
-  })
-}
-
-function TeamMemberPhoto({ teamMemberId, hasPhoto, orgId, alt, style, placeholder }) {
-  const token = useAuthStore((state) => state.token)
-  const [src, setSrc] = useState('')
-
-  useEffect(() => {
-    let active = true
-    let objectUrl = ''
-
-    const load = async () => {
-      if (!teamMemberId || !hasPhoto || !token) {
-        setSrc('')
-        return
-      }
-      try {
-        const blob = await adminApi.getTeamMemberPhoto(teamMemberId, orgId, token)
-        if (!active) return
-        objectUrl = URL.createObjectURL(blob)
-        setSrc(objectUrl)
-      } catch {
-        if (active) setSrc('')
-      }
-    }
-
-    void load()
-    return () => {
-      active = false
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [teamMemberId, hasPhoto, orgId, token])
-
-  if (!hasPhoto || !src) return placeholder
-  return <img src={src} alt={alt} style={style} />
-}
 
 export default function TeamListPage() {
   const { user } = useAuthStore()
@@ -174,7 +49,7 @@ export default function TeamListPage() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [editing, setEditing] = useState(undefined)
-  const [form, setForm] = useState(emptyForm)
+  const [form, setForm] = useState(EMPTY_TEAM_MEMBER_FORM)
   const [saving, setSaving] = useState(false)
   const [employeeCodeCatalog, setEmployeeCodeCatalog] = useState([])
   const [loadingEmployeeCodes, setLoadingEmployeeCodes] = useState(false)
@@ -207,17 +82,7 @@ export default function TeamListPage() {
     [employeeCodeCatalog, form.employeeCode],
   )
 
-  const metrics = useMemo(() => {
-    const activeCount = items.filter((item) => item.status === 'active').length
-    const withPhotoCount = items.filter((item) => item.hasPhoto).length
-    const accountCount = items.filter((item) => item.accountUsername).length
-    return [
-      { key: 'total', label: '当前成员', value: total || items.length, meta: '当前筛选条件下命中的成员总数', pill: 'TM' },
-      { key: 'active', label: '启用成员', value: activeCount, meta: '当前页中仍处于启用状态的成员', pill: 'ON' },
-      { key: 'photo', label: '已上传照片', value: withPhotoCount, meta: '当前页中已经补齐成员照片的数量', pill: 'PH' },
-      { key: 'account', label: '已开通账号', value: accountCount, meta: '当前页中已绑定登录账号的成员数量', pill: 'AC' },
-    ]
-  }, [items, total])
+  const metrics = useMemo(() => buildTeamMemberMetrics(items, total), [items, total])
 
   const filteredEmployeeCodeOptions = useMemo(() => {
     const input = String(form.employeeCode || '').trim().toLowerCase()
@@ -322,7 +187,7 @@ export default function TeamListPage() {
 
   const openCreate = () => {
     setEditing(null)
-    setForm(emptyForm)
+    setForm(EMPTY_TEAM_MEMBER_FORM)
     setEmployeeCodeMenuOpen(false)
     resetPhotoState(false)
     void loadEmployeeCodeCatalog()
@@ -355,7 +220,7 @@ export default function TeamListPage() {
 
   const closeDialog = () => {
     setEditing(undefined)
-    setForm(emptyForm)
+    setForm(EMPTY_TEAM_MEMBER_FORM)
     setEmployeeCodeMenuOpen(false)
     resetPhotoState(false)
   }
@@ -457,13 +322,7 @@ export default function TeamListPage() {
       if (!res.success) return
 
       const { fileName = 'team_members_template.xlsx', columns = [], sampleRows = [] } = res.data || {}
-      const titleRow = columns.map((item) => item.title)
-      const descriptionRow = columns.map((item) => `${item.key}${item.required ? '（必填）' : '（选填）'}`)
-      const sampleDataRows = sampleRows.map((row) => columns.map((item) => row[item.key] ?? ''))
-      const worksheet = XLSX.utils.aoa_to_sheet([titleRow, descriptionRow, ...sampleDataRows])
-      const workbook = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(workbook, worksheet, '团队成员模板')
-      XLSX.writeFile(workbook, fileName)
+      writeTeamImportTemplate({ columns, sampleRows, fileName })
       setMessage('模板已下载')
     } catch (error) {
       setMessage(error.message)
@@ -479,23 +338,9 @@ export default function TeamListPage() {
     try {
       const templateRes = await adminApi.getTeamImportTemplate(effectiveOrgId)
       const columns = templateRes.data?.columns || []
-      const titleToKeyMap = new Map(columns.map((item) => [item.title, item.key]))
 
       const buffer = await file.arrayBuffer()
-      const workbook = XLSX.read(buffer, { type: 'array' })
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json(worksheet, { defval: '' })
-
-      const normalizedRows = rows
-        .map((row) => {
-          const normalized = {}
-          Object.entries(row).forEach(([title, value]) => {
-            const key = titleToKeyMap.get(title) || title
-            normalized[key] = value
-          })
-          return normalized
-        })
-        .filter((row) => Object.values(row).some((value) => String(value || '').trim()))
+      const normalizedRows = parseTeamImportWorkbook(buffer, columns)
 
       if (normalizedRows.length === 0) throw new Error('导入文件没有有效数据')
 

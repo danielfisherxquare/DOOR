@@ -98,3 +98,39 @@ export function normalizeTeamImportRows(rows, columns) {
     )
     .filter((row) => Object.values(row).some((value) => String(value || '').trim()))
 }
+
+export function buildTeamMemberMetrics(items, total) {
+  const activeCount = items.filter((item) => item.status === 'active').length
+  const withPhotoCount = items.filter((item) => item.hasPhoto).length
+  const accountCount = items.filter((item) => item.accountUsername).length
+  return [
+    {
+      key: 'total',
+      label: '当前成员',
+      value: total || items.length,
+      meta: '当前筛选条件下命中的成员总数',
+      pill: 'TM',
+    },
+    {
+      key: 'active',
+      label: '启用成员',
+      value: activeCount,
+      meta: '当前页中仍处于启用状态的成员',
+      pill: 'ON',
+    },
+    {
+      key: 'photo',
+      label: '已上传照片',
+      value: withPhotoCount,
+      meta: '当前页中已经补齐成员照片的数量',
+      pill: 'PH',
+    },
+    {
+      key: 'account',
+      label: '已开通账号',
+      value: accountCount,
+      meta: '当前页中已绑定登录账号的成员数量',
+      pill: 'AC',
+    },
+  ]
+}

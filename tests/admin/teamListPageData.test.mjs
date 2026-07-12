@@ -41,3 +41,19 @@ test('team import rows map template titles and remove empty rows', async () => {
   assert.deepEqual(rows, [{ employeeName: '张三', department: '执行' }])
   assert.equal(data.EMPTY_TEAM_MEMBER_FORM.memberType, 'employee')
 })
+
+test('team metrics summarize the visible page without changing the filtered total', async () => {
+  const data = await loadData()
+  assert.ok(data, 'team list data module must exist')
+  assert.equal(typeof data.buildTeamMemberMetrics, 'function')
+
+  const metrics = data.buildTeamMemberMetrics(
+    [
+      { status: 'active', hasPhoto: true, accountUsername: 'STA001' },
+      { status: 'archived', hasPhoto: false, accountUsername: '' },
+    ],
+    5,
+  )
+
+  assert.deepEqual(metrics.map((item) => item.value), [5, 1, 1, 1])
+})
