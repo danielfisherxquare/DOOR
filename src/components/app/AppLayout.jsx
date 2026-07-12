@@ -12,6 +12,7 @@ import AppSurfaceRoutes, { AppRouteGuard } from '../../routes/appRoutes'
 import './app-layout.css'
 
 const StudioProjectPage = lazy(() => import('../../views/app/StudioProjectPage'))
+const SiteModePage = lazy(() => import('../../views/app/SiteModePage'))
 const MechanicalClock = lazy(() => import('../tools/MechanicalClock'))
 const MechanicalClock3D = lazy(() => import('../tools/MechanicalClock3D'))
 
@@ -92,8 +93,10 @@ export default function AppLayout() {
     navigate(buildAppHref('', currentContext))
   }, [currentContext, navigate])
   const isMapRoute = location.pathname === '/app/map' || location.pathname.startsWith('/app/map/')
-  const isStudioImmersiveRoute = location.pathname === '/app/3d-studio/new'
+  const isSiteModeRoute = location.pathname === '/app/3d-studio/site'
+  const isStudioImmersiveRoute = !isSiteModeRoute && (location.pathname === '/app/3d-studio/new'
     || /^\/app\/3d-studio\/[^/]+$/.test(location.pathname)
+  )
   const studioProjectMatch = useMatch('/app/3d-studio/:projectId')
   const immersiveToolComponent = useMemo(() => {
     if (location.pathname === '/app/tools/mechanical-clock') return MechanicalClock
@@ -166,6 +169,19 @@ export default function AppLayout() {
     return (
       <AppRouteGuard routeKey="map" selectedRaceId={selectedRaceId} currentRequestPath={`${location.pathname}${location.search}`}>
         <AppMapLayout context={currentContext} />
+      </AppRouteGuard>
+    )
+  }
+  if (isSiteModeRoute) {
+    return (
+      <AppRouteGuard
+        routeKey="three-studio-site"
+        selectedRaceId={selectedRaceId}
+        currentRequestPath={`${location.pathname}${location.search}`}
+      >
+        <Suspense fallback={<AppRouteLoader />}>
+          <SiteModePage />
+        </Suspense>
       </AppRouteGuard>
     )
   }

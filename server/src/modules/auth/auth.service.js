@@ -8,7 +8,10 @@ import { env } from '../../config/env.js';
 import knex from '../../db/knex.js';
 import * as authRepo from './auth.repository.js';
 import { userMapper } from '../../db/mappers/auth.js';
-import { listEffectiveRacePermissionsForUser, listVisibleRacesForOrg } from '../races/race-access.service.js';
+import {
+    listEffectiveRacePermissionsForUser,
+    listVisibleRacesForOrg,
+} from '../races/race-access.service.js';
 import { buildAuthzProfile } from '../../utils/capability-policy.js';
 import { getUserAllModules } from '../../authz/module-grants.js';
 
@@ -21,9 +24,14 @@ const LOCK_DURATION_MINUTES = 15;
 
 function generateAccessToken(user) {
     return jwt.sign(
-        { userId: user.id, orgId: user.org_id || user.orgId, role: user.role, preferences: user.preferences || {} },
+        {
+            userId: user.id,
+            orgId: user.org_id || user.orgId,
+            role: user.role,
+            preferences: user.preferences || {},
+        },
         env.JWT_SECRET,
-        { expiresIn: ACCESS_TOKEN_EXPIRES },
+        { expiresIn: ACCESS_TOKEN_EXPIRES }
     );
 }
 
@@ -32,7 +40,7 @@ function hashToken(token) {
 }
 
 function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function buildAuthProfile(user) {
@@ -43,10 +51,11 @@ async function buildAuthProfile(user) {
         role: user.role,
         orgId: user.org_id || null,
     });
-    const raceIds = racePermissions.map((permission) => Number(permission.raceId)).filter((id) => Number.isFinite(id));
-    const raceRows = raceIds.length > 0
-        ? await knex('races').whereIn('id', raceIds).select('id', 'name')
-        : [];
+    const raceIds = racePermissions
+        .map((permission) => Number(permission.raceId))
+        .filter((id) => Number.isFinite(id));
+    const raceRows =
+        raceIds.length > 0 ? await knex('races').whereIn('id', raceIds).select('id', 'name') : [];
     const raceNameMap = new Map(raceRows.map((row) => [Number(row.id), row.name]));
 
     // 获取用户模块访问权限
@@ -76,11 +85,11 @@ async function buildAuthProfile(user) {
 
 export async function register({ username, email, password, orgName }) {
     // 生成 slug
-    const slug = orgName
+    const slug =
+        orgName
         .toLowerCase()
         .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
-        .replace(/^-|-$/g, '')
-        || `org-${Date.now()}`;
+            .replace(/^-|-$/g, '') || `org-${Date.now()}`;
 
     // 创建组织
     const org = await authRepo.createOrg(orgName, slug);
@@ -147,7 +156,9 @@ export async function login({ login, password }) {
         const currentAttempts = (user.failed_login_attempts || 0) + 1;
         if (currentAttempts >= MAX_FAILED_ATTEMPTS) {
             await authRepo.lockUser(user.id, LOCK_DURATION_MINUTES);
-            console.warn(`[AUTH] 账户 ${user.username} 已因连续 ${currentAttempts} 次错误密码被锁定 ${LOCK_DURATION_MINUTES} 分钟`);
+            console.warn(
+                `[AUTH] 账户 ${user.username} 已因连续 ${currentAttempts} 次错误密码被锁定 ${LOCK_DURATION_MINUTES} 分钟`
+            );
         }
         // 慢响应
         await sleep(1000);
@@ -359,7 +370,9 @@ export async function assignRaceRole(operatorContext, targetUserId, raceId, role
             throw err;
         }
         if (raceInfo.orgAccessLevel === 'viewer' && accessLevel === 'editor') {
-            const err = new Error(`赛事 ${numericRaceId} 对目标机构仅开放 viewer，成员不可配置为 editor`);
+            const err = new Error(
+                `赛事 ${numericRaceId} 对目标机构仅开放 viewer，成员不可配置为 editor`
+            );
             err.status = 400;
             err.expose = true;
             throw err;
@@ -372,7 +385,7 @@ export async function assignRaceRole(operatorContext, targetUserId, raceId, role
             targetUser.org_id,
             numericRaceId,
             accessLevel,
-            operatorContext.userId,
+            operatorContext.userId
         );
         return { message: `赛事权限已更新为: ${accessLevel}` };
     }
@@ -389,8 +402,6 @@ export async function forgotPassword(email) {
     const user = await authRepo.findUserByLogin(email);
     if (!user) {
         // 不暴露用户是否存在的信息，但仍然返回成功
-        // 实际环境中应该发送邮件，这里只返回成功
-        console.log(`[AUTH] 忘记密码请求: ${email} - 用户${user ? '存在' : '不存在'}`);
         return { message: '如果该邮箱已注册，您将收到密码重置邮件' };
     }
 
@@ -405,9 +416,9 @@ export async function forgotPassword(email) {
     await authRepo.createPasswordResetToken(user.id, tokenHash, expiresAt);
 
     // 在开发环境打印令牌，生产环境应该发送邮件
-    if (process.env.NODE_ENV !== 'production') {
+    if (env.NODE_ENV !== 'production') {
         console.log(`[AUTH] 密码重置令牌(开发模式): ${rawToken}`);
-        console.log(`[AUTH] 重置链接: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password/${rawToken}`);
+        console.log(`[AUTH] 重置链接: ${env.FRONTEND_URL}/reset-password/${rawToken}`);
     }
 
     // TODO: 生产环境发送邮件

@@ -3,7 +3,7 @@ import request from '../utils/request'
 /**
  * Race API - maps to backend /api/admin/races
  */
-export const racesApi = {
+const racesApi = {
     /**
      * Get races visible to current user.
      * super_admin can pass { orgId } to scope to one org.

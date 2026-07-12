@@ -12,6 +12,7 @@ import {
   resolveSketchPlaneForSelection,
 } from './model/editorDocument'
 import GeometryRenderer from './renderers/GeometryRenderer'
+import SiteBackdrop from './renderers/SiteBackdrop'
 import PropertyInspector from './panels/PropertyInspector'
 import SceneTreePanel from './panels/SceneTreePanel'
 import SelectTool from './tools/SelectTool'
@@ -71,10 +72,7 @@ function StudioTools() {
 
 function projectIsoPoint(point) {
   const [x, y, z] = point
-  return [
-    (x - z) * 0.58,
-    (x + z) * 0.3 - y * 3.6,
-  ]
+  return [(x - z) * 0.58, (x + z) * 0.3 - y * 3.6]
 }
 
 function getPlanarBounds(points) {
@@ -98,9 +96,11 @@ function getPlanarArea(points) {
 }
 
 function isGisOsmSolid(solid) {
-  return solid?.metadata?.compatType === 'osm-building'
-    || solid?.metadata?.objectType === 'osm_building'
-    || Boolean(solid?.metadata?.osmId)
+  return (
+    solid?.metadata?.compatType === 'osm-building' ||
+    solid?.metadata?.objectType === 'osm_building' ||
+    Boolean(solid?.metadata?.osmId)
+  )
 }
 
 function isUsablePreviewSolid(solid, footprint) {
@@ -111,7 +111,11 @@ function isUsablePreviewSolid(solid, footprint) {
   const area = getPlanarArea(footprint)
   if (major > GIS_PREVIEW_MAX_BUILDING_MAJOR_METERS) return false
   if (area > GIS_PREVIEW_MAX_BUILDING_AREA_SQM) return false
-  if (major > GIS_PREVIEW_MAX_RIBBON_MAJOR_METERS && major / minor > GIS_PREVIEW_MAX_RIBBON_ASPECT_RATIO) return false
+  if (
+    major > GIS_PREVIEW_MAX_RIBBON_MAJOR_METERS &&
+    major / minor > GIS_PREVIEW_MAX_RIBBON_ASPECT_RATIO
+  )
+    return false
   return true
 }
 
@@ -135,7 +139,8 @@ function GisWhiteModelPreview({ document, onOpenInteractive }) {
       .map((solid) => {
         const profile = profileById.get(solid.profileId)
         const vertexIds = Array.isArray(profile?.vertexIds) ? profile.vertexIds.filter(Boolean) : []
-        const cycle = vertexIds.length > 1 && vertexIds[0] === vertexIds[vertexIds.length - 1]
+        const cycle =
+          vertexIds.length > 1 && vertexIds[0] === vertexIds[vertexIds.length - 1]
           ? vertexIds.slice(0, -1)
           : vertexIds
         const footprint = cycle.map((vertexId) => vertexById.get(vertexId)).filter(Boolean)
@@ -148,7 +153,8 @@ function GisWhiteModelPreview({ document, onOpenInteractive }) {
         const height = Math.max(Number(solid.height) || 0.1, 0.1)
         const base = footprint.map((vertex) => [vertex.x, baseY, vertex.z])
         const top = footprint.map((vertex) => [vertex.x, baseY + height, vertex.z])
-        const sortKey = footprint.reduce((sum, vertex) => sum + vertex.x + vertex.z, 0) / footprint.length
+        const sortKey =
+          footprint.reduce((sum, vertex) => sum + vertex.x + vertex.z, 0) / footprint.length
         return {
           id: solid.id,
           name: solid.name,
@@ -193,7 +199,12 @@ function GisWhiteModelPreview({ document, onOpenInteractive }) {
     })
 
     if (!projected.length) {
-      return { bounds: { height: 200, minX: -100, minY: -100, width: 200 }, hiddenSolids, solids: [], terrains: [] }
+      return {
+        bounds: { height: 200, minX: -100, minY: -100, width: 200 },
+        hiddenSolids,
+        solids: [],
+        terrains: [],
+      }
     }
 
     const minX = Math.min(...projected.map((point) => point[0]))
@@ -314,7 +325,9 @@ function GisWhiteModelPreview({ document, onOpenInteractive }) {
             points[nextRow * cols + col],
           ].filter(Boolean)
           if (cell.length < 4) continue
-          const heightWeight = cell.reduce((sum, point) => sum + (point[1] - terrain.minY) / heightRange, 0) / cell.length
+          const heightWeight =
+            cell.reduce((sum, point) => sum + (point[1] - terrain.minY) / heightRange, 0) /
+            cell.length
           const green = Math.round(188 + heightWeight * 22)
           const blue = Math.round(176 - heightWeight * 18)
           drawPolygon(cell.map(projectIsoPoint), `rgb(206,${green},${blue})`, '#9aae92', 0.48)
@@ -322,10 +335,18 @@ function GisWhiteModelPreview({ document, onOpenInteractive }) {
       }
 
       for (let row = 0; row < rows; row += stride * 2) {
-        drawPolyline(Array.from({ length: cols }, (_, col) => projectIsoPoint(points[row * cols + col])).filter(Boolean))
+        drawPolyline(
+          Array.from({ length: cols }, (_, col) =>
+            projectIsoPoint(points[row * cols + col])
+          ).filter(Boolean)
+        )
       }
       for (let col = 0; col < cols; col += stride * 2) {
-        drawPolyline(Array.from({ length: rows }, (_, row) => projectIsoPoint(points[row * cols + col])).filter(Boolean))
+        drawPolyline(
+          Array.from({ length: rows }, (_, row) =>
+            projectIsoPoint(points[row * cols + col])
+          ).filter(Boolean)
+        )
       }
     })
 
@@ -334,22 +355,75 @@ function GisWhiteModelPreview({ document, onOpenInteractive }) {
       const top = solid.top.map(projectIsoPoint)
       for (let index = 0; index < base.length; index += 1) {
         const next = (index + 1) % base.length
-        drawPolygon([base[index], base[next], top[next], top[index]], index % 2 === 0 ? '#b8c2cf' : '#aab6c4', '#7b8794', 0.92)
+        drawPolygon(
+          [base[index], base[next], top[next], top[index]],
+          index % 2 === 0 ? '#b8c2cf' : '#aab6c4',
+          '#7b8794',
+          0.92
+        )
       }
       drawPolygon(top, '#dce5ef', '#475569', 1)
     })
   }, [preview])
 
   return (
-    <div style={{ background: 'linear-gradient(135deg, #eef3f8 0%, #f8fafc 100%)', height: '100%', overflow: 'hidden', position: 'relative', width: '100%' }}>
-      <canvas aria-label="GIS 白模轻量预览" ref={canvasRef} style={{ display: 'block', height: '100%', width: '100%' }} />
-      <div style={{ background: 'rgba(255,255,255,0.88)', border: '1px solid #d8dee8', boxShadow: '0 12px 36px rgba(15,23,42,0.12)', left: 18, padding: '14px 16px', position: 'absolute', top: 18 }}>
-        <div style={{ color: '#b7791f', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 6 }}>GIS 白模预览</div>
-        <div style={{ color: '#0f172a', fontSize: 18, fontWeight: 800, marginBottom: 6 }}>{preview.solids.length} 个建筑实体</div>
-        <div style={{ color: '#475569', fontSize: 13, lineHeight: 1.55, maxWidth: 310 }}>
-          已加载 {preview.terrains.length} 个地形网格{preview.hiddenSolids > 0 ? `，隐藏 ${preview.hiddenSolids} 个异常 OSM 轮廓` : ''}。大范围 GIS 场景默认使用轻量预览，避免 WebGL 首帧卡死。
+    <div
+      style={{
+        background: 'linear-gradient(135deg, #eef3f8 0%, #f8fafc 100%)',
+        height: '100%',
+        overflow: 'hidden',
+        position: 'relative',
+        width: '100%',
+      }}
+    >
+      <canvas
+        aria-label="GIS 白模轻量预览"
+        ref={canvasRef}
+        style={{ display: 'block', height: '100%', width: '100%' }}
+      />
+      <div
+        style={{
+          background: 'rgba(255,255,255,0.88)',
+          border: '1px solid #d8dee8',
+          boxShadow: '0 12px 36px rgba(15,23,42,0.12)',
+          left: 18,
+          padding: '14px 16px',
+          position: 'absolute',
+          top: 18,
+        }}
+      >
+        <div
+          style={{
+            color: '#b7791f',
+            fontSize: 12,
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            marginBottom: 6,
+          }}
+        >
+          GIS 白模预览
         </div>
-        <button onClick={onOpenInteractive} style={{ background: '#111827', border: 0, color: '#fff', cursor: 'pointer', fontWeight: 700, marginTop: 12, padding: '9px 12px' }} type="button">
+        <div style={{ color: '#0f172a', fontSize: 18, fontWeight: 800, marginBottom: 6 }}>
+          {preview.solids.length} 个建筑实体
+        </div>
+        <div style={{ color: '#475569', fontSize: 13, lineHeight: 1.55, maxWidth: 310 }}>
+          已加载 {preview.terrains.length} 个地形网格
+          {preview.hiddenSolids > 0 ? `，隐藏 ${preview.hiddenSolids} 个异常 OSM 轮廓` : ''}。大范围
+          GIS 场景默认使用轻量预览，避免 WebGL 首帧卡死。
+        </div>
+        <button
+          onClick={onOpenInteractive}
+          style={{
+            background: '#111827',
+            border: 0,
+            color: '#fff',
+            cursor: 'pointer',
+            fontWeight: 700,
+            marginTop: 12,
+            padding: '9px 12px',
+          }}
+          type="button"
+        >
           进入完整 3D 编辑
         </button>
       </div>
@@ -429,6 +503,7 @@ export default function Studio3DApp({
   sceneType = 'warehouse',
   warehouseMeta = {},
   sourceContext,
+  siteBackdrop = null,
   focusZoneContext = null,
   focusZoneObjectsContext = [],
   focusZoneObjectSummary = null,
@@ -485,19 +560,26 @@ export default function Studio3DApp({
   const setShowGrid = useViewer((state) => state.setShowGrid)
 
   const geometryStats = useMemo(() => getEditorDocumentStats(document), [document])
-  const sceneViewportBounds = useMemo(() => computeDocumentSceneBounds(document, initialScene), [document, initialScene])
-  const useLightweightViewer = geometryStats.solidCount > 120 || geometryStats.vertexCount > 1500
+  const sceneViewportBounds = useMemo(
+    () => computeDocumentSceneBounds(document, initialScene),
+    [document, initialScene]
+  )
+  // 场地模式下 OSM 白模走只读底图层（不进 editorDocument），故按可编辑实体计数；
+  // 同时底图存在时强制交互视图，避免因地形网格顶点数触发静态 2D 退化。
+  const useLightweightViewer =
+    !siteBackdrop && (geometryStats.solidCount > 120 || geometryStats.vertexCount > 1500)
   const [forceInteractiveViewer, setForceInteractiveViewer] = useState(false)
   const showStaticGisPreview = useLightweightViewer && !forceInteractiveViewer
   const enableViewerBvh = !useLightweightViewer
   const focusZoneObjectCount = focusZoneObjectSummary?.total ?? focusZoneObjectsContext.length
-  const focusZoneSceneSource = initialScene?.editorDocument?.metadata?.source || initialScene?.metadata?.source || null
+  const focusZoneSceneSource =
+    initialScene?.editorDocument?.metadata?.source || initialScene?.metadata?.source || null
   const focusZoneImportLabel = focusZoneSceneImportState
     ? FOCUS_ZONE_IMPORT_LABELS[focusZoneSceneImportState] || focusZoneSceneImportState
     : null
   const activeSketchPlane = useMemo(
     () => resolveSketchPlaneForSelection(document, selectedGeometry),
-    [document, selectedGeometry],
+    [document, selectedGeometry]
   )
 
   useEffect(() => {
@@ -520,7 +602,20 @@ export default function Studio3DApp({
     setViewportView('iso')
     setCameraMode('perspective')
     setLoading(false)
-  }, [clearScene, initialScene, loadFromScene, resetEditor, sceneKey, sceneType, setCameraMode, setProjectName, setScene, setSceneType, setViewportView, warehouseMeta.name])
+  }, [
+    clearScene,
+    initialScene,
+    loadFromScene,
+    resetEditor,
+    sceneKey,
+    sceneType,
+    setCameraMode,
+    setProjectName,
+    setScene,
+    setSceneType,
+    setViewportView,
+    warehouseMeta.name,
+  ])
 
   const buildSnapshot = useCallback(() => {
     const legacyScene = convertEditorDocumentToLegacyScene(document, {
@@ -536,7 +631,14 @@ export default function Studio3DApp({
       activeLevelId: legacyScene.activeLevelId,
       sceneType,
     }
-  }, [document, initialScene?.activeLevelId, initialScene?.warehouse, projectName, sceneType, warehouseMeta])
+  }, [
+    document,
+    initialScene?.activeLevelId,
+    initialScene?.warehouse,
+    projectName,
+    sceneType,
+    warehouseMeta,
+  ])
 
   useEffect(() => {
     if (!sceneLoadedRef.current || !onSceneChange || !dirty) return
@@ -564,16 +666,32 @@ export default function Studio3DApp({
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target?.tagName)) return
       const key = event.key.toLowerCase()
       const chord = event.ctrlKey || event.metaKey
-      if (chord && (key === 'y' || (event.shiftKey && key === 'z'))) { event.preventDefault(); redo() }
-      else if (chord && key === 'z') { event.preventDefault(); undo() }
-      else if (chord && key === 's') { event.preventDefault(); handleSave() }
-      else if (!chord && key === 'v') setTool(TOOL_TYPES.SELECT)
-      else if (!chord && key === 'l') { setTool(TOOL_TYPES.SKETCH); setSketchMode('line') }
-      else if (!chord && key === 'r') { setTool(TOOL_TYPES.SKETCH); setSketchMode('rect') }
-      else if (!chord && key === 'a') { setTool(TOOL_TYPES.SKETCH); setSketchMode('arc') }
-      else if (!chord && key === 'c') { setTool(TOOL_TYPES.SKETCH); setSketchMode('circle') }
-      else if (!chord && key === 'b') { setTool(TOOL_TYPES.SKETCH); setSketchMode('bezier') }
-      else if (!chord && key === 'p') setTool(TOOL_TYPES.PUSHPULL)
+      if (chord && (key === 'y' || (event.shiftKey && key === 'z'))) {
+        event.preventDefault()
+        redo()
+      } else if (chord && key === 'z') {
+        event.preventDefault()
+        undo()
+      } else if (chord && key === 's') {
+        event.preventDefault()
+        handleSave()
+      } else if (!chord && key === 'v') setTool(TOOL_TYPES.SELECT)
+      else if (!chord && key === 'l') {
+        setTool(TOOL_TYPES.SKETCH)
+        setSketchMode('line')
+      } else if (!chord && key === 'r') {
+        setTool(TOOL_TYPES.SKETCH)
+        setSketchMode('rect')
+      } else if (!chord && key === 'a') {
+        setTool(TOOL_TYPES.SKETCH)
+        setSketchMode('arc')
+      } else if (!chord && key === 'c') {
+        setTool(TOOL_TYPES.SKETCH)
+        setSketchMode('circle')
+      } else if (!chord && key === 'b') {
+        setTool(TOOL_TYPES.SKETCH)
+        setSketchMode('bezier')
+      } else if (!chord && key === 'p') setTool(TOOL_TYPES.PUSHPULL)
       else if (!chord && key === 'm') setTool(TOOL_TYPES.MOVE)
       else if (!chord && key === 'q') setTool(TOOL_TYPES.ROTATE)
       else if (!chord && key === 't') setTool(TOOL_TYPES.MEASURE)
@@ -600,11 +718,16 @@ export default function Studio3DApp({
     setCameraMode(cameraMode === 'orthographic' ? 'perspective' : 'orthographic')
   }
 
-  const selectionItems = selectedGeometry?.meta?.entityType === 'multi'
+  const selectionItems =
+    selectedGeometry?.meta?.entityType === 'multi'
     ? selectedGeometry.meta.items || []
-    : selectedGeometry ? [selectedGeometry] : []
+      : selectedGeometry
+        ? [selectedGeometry]
+        : []
   const selectedProfileIds = selectionItems
-    .map((item) => item.meta?.profileId || (item.meta?.entityType === 'profile' ? item.entityId : null))
+    .map(
+      (item) => item.meta?.profileId || (item.meta?.entityType === 'profile' ? item.entityId : null)
+    )
     .filter(Boolean)
   const selectedSegmentIds = selectionItems
     .filter((item) => item.meta?.entityType === 'segment')
@@ -630,48 +753,163 @@ export default function Studio3DApp({
     <div className="studio-shell">
       <header className={`studio-toolbar ${compactChrome ? 'is-compact' : ''}`.trim()}>
         <div className="studio-toolbar__left">
-          {onBack && !embedded ? <button className="studio-link-btn" onClick={onBack} type="button">返回</button> : null}
+          {onBack && !embedded ? (
+            <button className="studio-link-btn" onClick={onBack} type="button">
+              返回
+            </button>
+          ) : null}
           <div className="studio-title-block">
             <strong>{projectName}</strong>
-            <span>{dirty ? '未保存' : '已保存'} {sourceContext ? `· ${sourceContext.label}` : ''}</span>
+            <span>
+              {dirty ? '未保存' : '已保存'} {sourceContext ? `· ${sourceContext.label}` : ''}
+            </span>
           </div>
         </div>
 
         <div className="studio-toolbar__center">
           <div className="studio-toolbar__group">
-            <ToolButton active={activeTool === TOOL_TYPES.SELECT} label="Select" onClick={() => setTool(TOOL_TYPES.SELECT)} />
-            <ToolButton active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'line'} label="Sketch" onClick={() => { setTool(TOOL_TYPES.SKETCH); setSketchMode('line') }} />
-            <ToolButton active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'rect'} label="Rect" onClick={() => { setTool(TOOL_TYPES.SKETCH); setSketchMode('rect') }} secondary />
-            <ToolButton active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'arc'} label="Arc" onClick={() => { setTool(TOOL_TYPES.SKETCH); setSketchMode('arc') }} secondary />
-            <ToolButton active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'circle'} label="Circle" onClick={() => { setTool(TOOL_TYPES.SKETCH); setSketchMode('circle') }} secondary />
-            <ToolButton active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'bezier'} label="Bezier" onClick={() => { setTool(TOOL_TYPES.SKETCH); setSketchMode('bezier') }} secondary />
-            <ToolButton active={activeTool === TOOL_TYPES.PUSHPULL} label="Push/Pull" onClick={() => setTool(TOOL_TYPES.PUSHPULL)} />
+            <ToolButton
+              active={activeTool === TOOL_TYPES.SELECT}
+              label="Select"
+              onClick={() => setTool(TOOL_TYPES.SELECT)}
+            />
+            <ToolButton
+              active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'line'}
+              label="Sketch"
+              onClick={() => {
+                setTool(TOOL_TYPES.SKETCH)
+                setSketchMode('line')
+              }}
+            />
+            <ToolButton
+              active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'rect'}
+              label="Rect"
+              onClick={() => {
+                setTool(TOOL_TYPES.SKETCH)
+                setSketchMode('rect')
+              }}
+              secondary
+            />
+            <ToolButton
+              active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'arc'}
+              label="Arc"
+              onClick={() => {
+                setTool(TOOL_TYPES.SKETCH)
+                setSketchMode('arc')
+              }}
+              secondary
+            />
+            <ToolButton
+              active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'circle'}
+              label="Circle"
+              onClick={() => {
+                setTool(TOOL_TYPES.SKETCH)
+                setSketchMode('circle')
+              }}
+              secondary
+            />
+            <ToolButton
+              active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'bezier'}
+              label="Bezier"
+              onClick={() => {
+                setTool(TOOL_TYPES.SKETCH)
+                setSketchMode('bezier')
+              }}
+              secondary
+            />
+            <ToolButton
+              active={activeTool === TOOL_TYPES.PUSHPULL}
+              label="Push/Pull"
+              onClick={() => setTool(TOOL_TYPES.PUSHPULL)}
+            />
             <ToolButton active={false} label="Sweep" onClick={handleSweep} secondary />
             <ToolButton active={false} label="Loft" onClick={handleLoft} secondary />
-            <ToolButton active={activeTool === TOOL_TYPES.MOVE} label="Move" onClick={() => setTool(TOOL_TYPES.MOVE)} />
-            <ToolButton active={activeTool === TOOL_TYPES.ROTATE} label="Rotate" onClick={() => setTool(TOOL_TYPES.ROTATE)} />
-            <ToolButton active={activeTool === TOOL_TYPES.MEASURE} label="Measure" onClick={() => setTool(TOOL_TYPES.MEASURE)} />
+            <ToolButton
+              active={activeTool === TOOL_TYPES.MOVE}
+              label="Move"
+              onClick={() => setTool(TOOL_TYPES.MOVE)}
+            />
+            <ToolButton
+              active={activeTool === TOOL_TYPES.ROTATE}
+              label="Rotate"
+              onClick={() => setTool(TOOL_TYPES.ROTATE)}
+            />
+            <ToolButton
+              active={activeTool === TOOL_TYPES.MEASURE}
+              label="Measure"
+              onClick={() => setTool(TOOL_TYPES.MEASURE)}
+            />
           </div>
 
           <div className="studio-toolbar__group">
             {VIEW_PRESETS.map((view) => (
-              <ToolButton key={view.id} active={viewportView === view.id} label={view.label} onClick={() => { setViewportView(view.id); setCameraMode(view.id === 'top' ? 'orthographic' : 'perspective') }} />
+              <ToolButton
+                key={view.id}
+                active={viewportView === view.id}
+                label={view.label}
+                onClick={() => {
+                  setViewportView(view.id)
+                  setCameraMode(view.id === 'top' ? 'orthographic' : 'perspective')
+                }}
+              />
             ))}
-            <ToolButton active={cameraMode === 'orthographic'} label={cameraMode === 'orthographic' ? '平行' : '透视'} onClick={handleProjectionToggle} />
+            <ToolButton
+              active={cameraMode === 'orthographic'}
+              label={cameraMode === 'orthographic' ? '平行' : '透视'}
+              onClick={handleProjectionToggle}
+            />
             <ToolButton active={showGrid} label="网格" onClick={() => setShowGrid(!showGrid)} />
           </div>
         </div>
 
         <div className="studio-toolbar__right">
-          <ToolButton active={selectionMode === 'object'} label="对象" onClick={() => setSelectionMode('object')} />
-          <ToolButton active={selectionMode === 'face'} label="面" onClick={() => setSelectionMode('face')} />
-          <ToolButton active={selectionMode === 'edge'} label="边" onClick={() => setSelectionMode('edge')} />
-          <ToolButton active={selectionMode === 'vertex'} label="点" onClick={() => setSelectionMode('vertex')} />
-          <button className="studio-link-btn" onClick={toggleSceneTree} type="button">{sceneTreeOpen ? '隐藏树' : '场景树'}</button>
-          <button className="studio-link-btn" onClick={toggleInspector} type="button">{inspectorOpen ? '隐藏属性' : '属性'}</button>
-          {onSaveTemplate ? <button className="studio-link-btn" onClick={() => onSaveTemplate({ snapshotJson: buildSnapshot() })} type="button">标件</button> : null}
-          {onSaveAsset ? <button className="studio-link-btn" onClick={() => onSaveAsset({ snapshotJson: buildSnapshot() })} type="button">资产</button> : null}
-          <button className="studio-save-btn" disabled={saving} onClick={handleSave} type="button">{saving ? '保存中...' : '保存'}</button>
+          <ToolButton
+            active={selectionMode === 'object'}
+            label="对象"
+            onClick={() => setSelectionMode('object')}
+          />
+          <ToolButton
+            active={selectionMode === 'face'}
+            label="面"
+            onClick={() => setSelectionMode('face')}
+          />
+          <ToolButton
+            active={selectionMode === 'edge'}
+            label="边"
+            onClick={() => setSelectionMode('edge')}
+          />
+          <ToolButton
+            active={selectionMode === 'vertex'}
+            label="点"
+            onClick={() => setSelectionMode('vertex')}
+          />
+          <button className="studio-link-btn" onClick={toggleSceneTree} type="button">
+            {sceneTreeOpen ? '隐藏树' : '场景树'}
+          </button>
+          <button className="studio-link-btn" onClick={toggleInspector} type="button">
+            {inspectorOpen ? '隐藏属性' : '属性'}
+          </button>
+          {onSaveTemplate ? (
+            <button
+              className="studio-link-btn"
+              onClick={() => onSaveTemplate({ snapshotJson: buildSnapshot() })}
+              type="button"
+            >
+              标件
+            </button>
+          ) : null}
+          {onSaveAsset ? (
+            <button
+              className="studio-link-btn"
+              onClick={() => onSaveAsset({ snapshotJson: buildSnapshot() })}
+              type="button"
+            >
+              资产
+            </button>
+          ) : null}
+          <button className="studio-save-btn" disabled={saving} onClick={handleSave} type="button">
+            {saving ? '保存中...' : '保存'}
+          </button>
         </div>
       </header>
 
@@ -680,12 +918,23 @@ export default function Studio3DApp({
 
         <div className="studio-canvas-shell">
           {focusZoneContext ? (
-            <div className={`studio-focus-chip ${focusZoneSceneImportState === 'stale' ? 'is-stale' : ''}`.trim()}>
+            <div
+              className={`studio-focus-chip ${focusZoneSceneImportState === 'stale' ? 'is-stale' : ''}`.trim()}
+            >
               <strong>GIS 固定区域 · {focusZoneContext.name || '未命名'}</strong>
-              <span>{Math.round(focusZoneContext.boundsMeters?.width || 0)}m × {Math.round(focusZoneContext.boundsMeters?.depth || 0)}m</span>
+              <span>
+                {Math.round(focusZoneContext.boundsMeters?.width || 0)}m ×{' '}
+                {Math.round(focusZoneContext.boundsMeters?.depth || 0)}m
+              </span>
               <span>{Math.round(focusZoneContext.approximateAreaSqm || 0)}㎡</span>
               <span>已导入 {focusZoneObjectCount} 个对象</span>
-              {focusZoneSceneSource ? <span>{focusZoneSceneSource === 'gis-focus-zone' ? 'GIS 初始白模' : focusZoneSceneSource}</span> : null}
+              {focusZoneSceneSource ? (
+                <span>
+                  {focusZoneSceneSource === 'gis-focus-zone'
+                    ? 'GIS 初始白模'
+                    : focusZoneSceneSource}
+                </span>
+              ) : null}
               {focusZoneImportLabel ? <span>{focusZoneImportLabel}</span> : null}
             </div>
           ) : null}
@@ -698,14 +947,18 @@ export default function Studio3DApp({
 
           <div className="studio-canvas">
             {showStaticGisPreview ? (
-              <GisWhiteModelPreview document={document} onOpenInteractive={() => setForceInteractiveViewer(true)} />
+              <GisWhiteModelPreview
+                document={document}
+                onOpenInteractive={() => setForceInteractiveViewer(true)}
+              />
             ) : (
               <PascalViewer
+                backdrop={siteBackdrop ? <SiteBackdrop data={siteBackdrop} /> : null}
                 defaultView="iso"
                 enableBvh={enableViewerBvh}
                 enableShadows={!useLightweightViewer}
                 lightweight={useLightweightViewer}
-                preferWebGpu={!useLightweightViewer}
+                preferWebGpu={!useLightweightViewer && !siteBackdrop}
                 referenceMode="bounded"
                 sceneBounds={sceneViewportBounds}
                 selectionManager="none"
@@ -725,7 +978,11 @@ export default function Studio3DApp({
             <span>{geometryStats.faceCount} 面</span>
             <span>{geometryStats.solidCount} 实体</span>
             <span>{geometryStats.surfaceCount} 曲面</span>
-            {openingPlacement ? <span>开洞放置: {openingPlacement.type === 'door' ? '门洞' : '窗洞'} · 侧面单击落位</span> : null}
+            {openingPlacement ? (
+              <span>
+                开洞放置: {openingPlacement.type === 'door' ? '门洞' : '窗洞'} · 侧面单击落位
+              </span>
+            ) : null}
             <span>{selectedGeometry ? `已选: ${selectedGeometry.label}` : '未选择对象'}</span>
           </div>
         </div>

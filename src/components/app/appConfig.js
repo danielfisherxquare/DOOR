@@ -394,6 +394,11 @@ const componentRoutes = [
     moduleId: '3d-studio',
     renderMode: 'immersive',
   }],
+  ['three-studio-site', '3d-studio/site', 'site-mode', {
+    navKey: 'three-studio',
+    moduleId: '3d-studio',
+    renderMode: 'immersive',
+  }],
   ['three-studio-project', '3d-studio/:projectId', 'studio-project', {
     navKey: 'three-studio',
     moduleId: '3d-studio',

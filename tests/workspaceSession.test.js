@@ -160,8 +160,14 @@ describe('workspace session', () => {
     assert.equal(options.current.scopeType, 'platform')
     assert.equal(options.organizations[0].id, PLATFORM_WORKSPACE_ID)
     assert.equal(options.organizations[0].name, '系统平台')
-    assert.deepEqual(options.organizations[0].scopes.map((scope) => scope.id), [PLATFORM_SCOPE_VALUE])
-    assert.deepEqual(options.organizations[1].scopes.map((scope) => scope.id), [ORG_OPERATION_SCOPE_VALUE, '11'])
+    assert.deepEqual(
+      options.organizations[0].scopes.map((scope) => scope.id),
+      [PLATFORM_SCOPE_VALUE]
+    )
+    assert.deepEqual(
+      options.organizations[1].scopes.map((scope) => scope.id),
+      [ORG_OPERATION_SCOPE_VALUE, '11']
+    )
   })
 
   it('normalizes context options into organizations with races', () => {
@@ -179,8 +185,14 @@ describe('workspace session', () => {
 
     assert.equal(options.current.orgId, '1')
     assert.equal(options.current.raceId, '11')
-    assert.deepEqual(options.organizations.map((org) => org.races.map((race) => race.id)), [['11'], ['22']])
-    assert.deepEqual(options.organizations[0].scopes.map((scope) => scope.id), [ORG_OPERATION_SCOPE_VALUE, '11'])
+    assert.deepEqual(
+      options.organizations.map((org) => org.races.map((race) => race.id)),
+      [['11'], ['22']]
+    )
+    assert.deepEqual(
+      options.organizations[0].scopes.map((scope) => scope.id),
+      [ORG_OPERATION_SCOPE_VALUE, '11']
+    )
     assert.equal(options.organizations[0].scopes[0].scopeType, 'org')
     assert.equal(options.organizations[0].scopes[1].scopeType, 'race')
   })
@@ -190,12 +202,21 @@ describe('workspace session', () => {
       surfaceAccess: { app: true, ops: false, admin: true },
     })
 
-    assert.deepEqual(surfaces.map((surface) => surface.key), ['app', 'admin'])
+    assert.deepEqual(
+      surfaces.map((surface) => surface.key),
+      ['app', 'admin']
+    )
   })
 
   it('does not infer available surfaces from role alone', () => {
-    assert.deepEqual(getAvailableWorkspaceSurfaces({ role: 'super_admin' }).map((surface) => surface.key), [])
-    assert.deepEqual(getAvailableWorkspaceSurfaces({ role: 'org_admin' }).map((surface) => surface.key), [])
+    assert.deepEqual(
+      getAvailableWorkspaceSurfaces({ role: 'super_admin' }).map((surface) => surface.key),
+      []
+    )
+    assert.deepEqual(
+      getAvailableWorkspaceSurfaces({ role: 'org_admin' }).map((surface) => surface.key),
+      []
+    )
   })
 
   it('returns the launcher after a multi-surface user switches workspace inside a surface', () => {
@@ -263,42 +284,117 @@ describe('workspace session', () => {
     }
 
     assert.equal(canCommitWorkspaceProfile(null, raceScope), false)
-    assert.equal(canCommitWorkspaceProfile({
+    assert.equal(
+      canCommitWorkspaceProfile(
+        {
       scopeType: 'org',
       orgId: 'org-a',
       raceId: null,
       surfaces: ['app'],
-    }, raceScope), false)
-    assert.equal(canCommitWorkspaceProfile({
+        },
+        raceScope
+      ),
+      false
+    )
+    assert.equal(
+      canCommitWorkspaceProfile(
+        {
       scopeType: 'race',
       orgId: 'org-a',
       raceId: 'race-1',
       surfaces: ['app'],
-    }, raceScope), true)
+        },
+        raceScope
+      ),
+      true
+    )
+  })
+
+  it('treats an absent workspace session as unselected instead of throwing', () => {
+    const platformProfile = {
+      scopeType: 'platform',
+      surfaces: ['admin'],
+    }
+
+    assert.equal(getWorkspaceProfileRefreshParams(null), null)
+    assert.equal(getWorkspaceProfileKey(null), '')
+    assert.equal(canCommitWorkspaceProfile(platformProfile, null), false)
+  })
+
+  it('recovers a missing platform session only from a verified super admin profile', () => {
+    assert.deepEqual(
+      resolveSurfaceWorkspaceSession({
+        user: {
+          role: 'super_admin',
+          authzProfile: { scopeType: 'platform', surfaces: ['admin'] },
+        },
+        session: null,
+        surface: 'admin',
+      }),
+      createWorkspaceSession({ scopeType: 'platform', surface: 'admin' })
+    )
+
+    assert.equal(
+      resolveSurfaceWorkspaceSession({
+        user: { role: 'super_admin', authzProfile: null },
+        session: null,
+        surface: 'admin',
+      }),
+      null
+    )
+
+    assert.equal(
+      resolveSurfaceWorkspaceSession({
+        user: { role: 'org_admin', authzProfile: { scopeType: 'platform', surfaces: ['admin'] } },
+        session: null,
+        surface: 'admin',
+      }),
+      null
+    )
   })
 
   it('builds explicit authz profile refresh params from the active workspace', () => {
-    assert.deepEqual(getWorkspaceProfileRefreshParams(createWorkspaceSession({
+    assert.deepEqual(
+      getWorkspaceProfileRefreshParams(
+        createWorkspaceSession({
       scopeType: 'platform',
       surface: 'admin',
-    })), { scopeType: 'platform' })
+        })
+      ),
+      { scopeType: 'platform' }
+    )
 
-    assert.deepEqual(getWorkspaceProfileRefreshParams(createWorkspaceSession({
+    assert.deepEqual(
+      getWorkspaceProfileRefreshParams(
+        createWorkspaceSession({
       scopeType: 'org',
       orgId: 'org-a',
-    })), { orgId: 'org-a', raceId: '' })
+        })
+      ),
+      { orgId: 'org-a', raceId: '' }
+    )
 
-    assert.deepEqual(getWorkspaceProfileRefreshParams(createWorkspaceSession({
+    assert.deepEqual(
+      getWorkspaceProfileRefreshParams(
+        createWorkspaceSession({
       scopeType: 'race',
       orgId: 'org-a',
       raceId: 'race-1',
-    })), { orgId: 'org-a', raceId: 'race-1' })
+        })
+      ),
+      { orgId: 'org-a', raceId: 'race-1' }
+    )
 
-    assert.equal(getWorkspaceProfileRefreshParams(createWorkspaceSession({
+    assert.equal(
+      getWorkspaceProfileRefreshParams(
+        createWorkspaceSession({
       scopeType: 'race',
       orgId: 'org-a',
       raceId: '',
-    })), null)
+        })
+      ),
+      null
+    )
   })
 
   it('treats an absent workspace session as unselected instead of throwing', () => {
@@ -338,7 +434,10 @@ describe('workspace session', () => {
   it('uses stable workspace profile keys for route guard refresh attempts', () => {
     assert.equal(getWorkspaceProfileKey({ scopeType: 'platform' }), 'platform')
     assert.equal(getWorkspaceProfileKey({ scopeType: 'org', orgId: 'org-a' }), 'org-a:')
-    assert.equal(getWorkspaceProfileKey({ scopeType: 'race', orgId: 'org-a', raceId: 'race-1' }), 'org-a:race-1')
+    assert.equal(
+      getWorkspaceProfileKey({ scopeType: 'race', orgId: 'org-a', raceId: 'race-1' }),
+      'org-a:race-1'
+    )
     assert.equal(getWorkspaceProfileKey({ scopeType: 'race', orgId: 'org-a' }), '')
   })
 })

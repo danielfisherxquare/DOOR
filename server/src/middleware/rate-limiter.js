@@ -26,12 +26,15 @@ async function createRateLimitStoreFactory() {
         if (!client.isOpen) {
             await client.connect();
         }
-        return (prefix) => new RedisStore({
+        return (prefix) =>
+            new RedisStore({
             sendCommand: (...args) => client.sendCommand(args),
             prefix,
         });
     } catch (err) {
-        console.warn(`[rate-limit] Redis store unavailable, falling back to in-memory store: ${err.message}`);
+        console.warn(
+            `[rate-limit] Redis store unavailable, falling back to in-memory store: ${err.message}`
+        );
         return null;
     }
 }
@@ -39,16 +42,16 @@ async function createRateLimitStoreFactory() {
 const createStore = await createRateLimitStoreFactory();
 
 function withOptionalStore(config, prefix) {
-    return createStore
-        ? { ...config, store: createStore(prefix) }
-        : config;
+    return createStore ? { ...config, store: createStore(prefix) } : config;
 }
 
 function resolveIpKey(req) {
     return ipKeyGenerator(req.ip || req.headers['x-forwarded-for'] || '127.0.0.1');
 }
 
-export const loginLimiter = rateLimit({
+export const loginLimiter = rateLimit(
+    withOptionalStore(
+        {
     windowMs: 60 * 1000,
     max: 5,
     standardHeaders: true,
@@ -57,9 +60,14 @@ export const loginLimiter = rateLimit({
     keyGenerator: (req) => resolveIpKey(req),
     validate: { ip: false, xForwardedForHeader: false },
     skip: () => isTest,
-});
+        },
+        'rate-limit:login:'
+    )
+);
 
-export const registerLimiter = rateLimit({
+export const registerLimiter = rateLimit(
+    withOptionalStore(
+        {
     windowMs: 60 * 60 * 1000,
     max: 3,
     standardHeaders: true,
@@ -68,9 +76,14 @@ export const registerLimiter = rateLimit({
     keyGenerator: (req) => resolveIpKey(req),
     validate: { ip: false, xForwardedForHeader: false },
     skip: () => isTest,
-});
+        },
+        'rate-limit:register:'
+    )
+);
 
-export const assessmentLoginLimiter = rateLimit(withOptionalStore({
+export const assessmentLoginLimiter = rateLimit(
+    withOptionalStore(
+        {
     windowMs: 60 * 1000,
     max: 10,
     standardHeaders: true,
@@ -79,9 +92,14 @@ export const assessmentLoginLimiter = rateLimit(withOptionalStore({
     keyGenerator: (req) => resolveIpKey(req),
     validate: { ip: false, xForwardedForHeader: false },
     skip: () => isTest,
-}, 'rate-limit:assessment-login:'));
+        },
+        'rate-limit:assessment-login:'
+    )
+);
 
-export const assessmentDraftLimiter = rateLimit(withOptionalStore({
+export const assessmentDraftLimiter = rateLimit(
+    withOptionalStore(
+        {
     windowMs: 60 * 1000,
     max: 300,
     standardHeaders: true,
@@ -90,9 +108,14 @@ export const assessmentDraftLimiter = rateLimit(withOptionalStore({
     keyGenerator: (req) => req.authContext?.userId || resolveIpKey(req),
     validate: { ip: false, xForwardedForHeader: false },
     skip: () => isTest,
-}, 'rate-limit:assessment-draft:'));
+        },
+        'rate-limit:assessment-draft:'
+    )
+);
 
-export const assessmentSubmitLimiter = rateLimit(withOptionalStore({
+export const assessmentSubmitLimiter = rateLimit(
+    withOptionalStore(
+        {
     windowMs: 60 * 1000,
     max: 120,
     standardHeaders: true,
@@ -101,13 +124,18 @@ export const assessmentSubmitLimiter = rateLimit(withOptionalStore({
     keyGenerator: (req) => req.authContext?.userId || resolveIpKey(req),
     validate: { ip: false, xForwardedForHeader: false },
     skip: () => isTest,
-}, 'rate-limit:assessment-submit:'));
+        },
+        'rate-limit:assessment-submit:'
+    )
+);
 
 function resolveRequesterKey(req) {
     return req.authContext?.userId || resolveIpKey(req);
 }
 
-export const scanResolveLimiter = rateLimit(withOptionalStore({
+export const scanResolveLimiter = rateLimit(
+    withOptionalStore(
+        {
     windowMs: resolveWindowMs,
     max: 600,
     standardHeaders: true,
@@ -116,9 +144,14 @@ export const scanResolveLimiter = rateLimit(withOptionalStore({
     keyGenerator: (req) => resolveRequesterKey(req),
     validate: { ip: false, xForwardedForHeader: false },
     skip: () => isTest,
-}, 'rate-limit:scan-resolve:'));
+        },
+        'rate-limit:scan-resolve:'
+    )
+);
 
-export const scanPickupLimiter = rateLimit(withOptionalStore({
+export const scanPickupLimiter = rateLimit(
+    withOptionalStore(
+        {
     windowMs: pickupWindowMs,
     max: 1,
     standardHeaders: true,
@@ -127,4 +160,7 @@ export const scanPickupLimiter = rateLimit(withOptionalStore({
     keyGenerator: (req) => `${resolveRequesterKey(req)}:${String(req.body?.qrToken || '')}`,
     validate: { ip: false, xForwardedForHeader: false },
     skip: () => isTest,
-}, 'rate-limit:scan-pickup:'));
+        },
+        'rate-limit:scan-pickup:'
+    )
+);

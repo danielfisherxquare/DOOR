@@ -9,6 +9,7 @@ import * as sceneJobService from '../inventory/inventory.spatial.scene-job.servi
 import * as spatialOsmService from '../inventory/inventory.spatial.osm.service.js';
 import * as spatialTerrainService from '../inventory/inventory.spatial.terrain.service.js';
 import * as generatedSceneService from '../inventory/inventory.spatial.generated-scene.service.js';
+import * as siteBakeService from '../inventory/inventory.spatial.site-bake.service.js';
 
 const router = express.Router();
 
@@ -577,6 +578,29 @@ router.delete('/terrain-work-zones/:zoneId', async (req, res, next) => {
         res.json({ success: true, data });
     } catch (error) {
         next(error);
+    }
+});
+
+router.post('/site-bake', async (req, res, next) => {
+    try {
+        const bbox = siteBakeService.parseSiteBakeBbox(req.body);
+        if (!bbox) {
+            return res.status(400).json({
+                success: false,
+                message: 'bbox 无效：需提供合法 WGS84 边界，且经纬跨度均不得超过 0.25°',
+            });
+        }
+
+        const data = await siteBakeService.bakeSiteScene(bbox, {
+            name: typeof req.body?.name === 'string' ? req.body.name : undefined,
+            orthophoto: {
+                zoom: req.body?.zoom,
+                maxTiles: req.body?.maxTiles,
+            },
+        });
+        return res.json({ success: true, data });
+    } catch (error) {
+        return next(error);
     }
 });
 

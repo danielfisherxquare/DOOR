@@ -11,9 +11,30 @@ export const PLATFORM_SCOPE_VALUE = '__platform_control__'
 export const ORG_OPERATION_SCOPE_VALUE = '__org_operation__'
 
 export const WORKSPACE_SURFACES = [
-  { key: 'app', label: '应用层', description: '名单、报销、证件、地图和仓储。', pathKey: 'lastAppPath', defaultPath: '/app', icon: 'apps' },
-  { key: 'ops', label: '执行层', description: '扫码、领取、发放、入库和出库。', pathKey: 'lastOpsPath', defaultPath: '/ops', icon: 'qr_code_scanner' },
-  { key: 'admin', label: '管理层', description: '机构、赛事、账号、权限和规则。', pathKey: 'lastAdminPath', defaultPath: '/admin', icon: 'admin_panel_settings' },
+  {
+    key: 'app',
+    label: '应用层',
+    description: '名单、报销、证件、地图和仓储。',
+    pathKey: 'lastAppPath',
+    defaultPath: '/app',
+    icon: 'apps',
+  },
+  {
+    key: 'ops',
+    label: '执行层',
+    description: '扫码、领取、发放、入库和出库。',
+    pathKey: 'lastOpsPath',
+    defaultPath: '/ops',
+    icon: 'qr_code_scanner',
+  },
+  {
+    key: 'admin',
+    label: '管理层',
+    description: '机构、赛事、账号、权限和规则。',
+    pathKey: 'lastAdminPath',
+    defaultPath: '/admin',
+    icon: 'admin_panel_settings',
+  },
 ]
 
 function toId(value) {
@@ -34,7 +55,7 @@ export function createWorkspaceSession(input = {}) {
   const scopeType = normalizeScopeType(input.scopeType, raceId)
   return {
     orgId: scopeType === 'platform' ? '' : toId(input.orgId),
-    orgName: scopeType === 'platform' ? (input.orgName || '系统平台') : (input.orgName || ''),
+    orgName: scopeType === 'platform' ? input.orgName || '系统平台' : input.orgName || '',
     raceId,
     raceName: input.raceName || '',
     scopeType,
@@ -145,13 +166,18 @@ export function canAccessWorkspaceSurface({ user, session, surface } = {}) {
 
 export function getAvailableWorkspaceSurfaces(user, session = null) {
   if (session) {
-    return WORKSPACE_SURFACES.filter((surface) => canAccessWorkspaceSurface({ user, session, surface: surface.key }))
+    return WORKSPACE_SURFACES.filter((surface) =>
+      canAccessWorkspaceSurface({ user, session, surface: surface.key })
+    )
   }
   return WORKSPACE_SURFACES.filter((surface) => canAccessSurface(user, surface.key))
 }
 
 export function resolveWorkspaceSwitchRedirect({ currentPath = '', user } = {}) {
-  const safeCurrentPath = typeof currentPath === 'string' && currentPath.startsWith('/') && !currentPath.startsWith('/login')
+  const safeCurrentPath =
+    typeof currentPath === 'string' &&
+    currentPath.startsWith('/') &&
+    !currentPath.startsWith('/login')
     ? currentPath
     : '/launcher'
   const surfaces = getAvailableWorkspaceSurfaces(user)
@@ -234,14 +260,23 @@ export function normalizeWorkspaceOptions(payload = {}) {
         ...organizations,
       ]
     : organizations
-  const currentScopeType = payload.current?.scopeType || (payload.current?.raceId ? 'race' : (isSuperAdmin && !payload.current?.orgId ? 'platform' : 'org'))
+  const currentScopeType =
+    payload.current?.scopeType ||
+    (payload.current?.raceId
+      ? 'race'
+      : isSuperAdmin && !payload.current?.orgId
+        ? 'platform'
+        : 'org')
 
   return {
     role: payload.role || '',
     canSwitchOrg: Boolean(payload.canSwitchOrg),
     canSwitchRace: Boolean(payload.canSwitchRace),
     current: {
-      orgId: currentScopeType === 'platform' ? PLATFORM_WORKSPACE_ID : normalizeOptionId(payload.current?.orgId),
+      orgId:
+        currentScopeType === 'platform'
+          ? PLATFORM_WORKSPACE_ID
+          : normalizeOptionId(payload.current?.orgId),
       raceId: normalizeOptionId(payload.current?.raceId),
       scopeType: currentScopeType,
     },

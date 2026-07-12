@@ -86,7 +86,7 @@
     align-items: center;
     gap: 4px;
     font-size: 12px;
-    color: var(--color-warning, #f59e0b);
+  color: var(--warning, #f59e0b);
     background: rgba(245, 158, 11, 0.1);
     padding: 4px 8px;
     border-radius: 8px;
@@ -157,7 +157,7 @@
     width: 40px;
     height: 40px;
     border: 3px solid var(--border-default, #e5e7eb);
-    border-top-color: var(--color-primary, #3b82f6);
+  border-top-color: var(--accent, #3b82f6);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -168,7 +168,9 @@
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .race-dashboard__error {
@@ -179,7 +181,7 @@
     background: rgba(239, 68, 68, 0.1);
     border: 1px solid rgba(239, 68, 68, 0.2);
     border-radius: 8px;
-    color: var(--color-danger, #ef4444);
+  color: var(--danger, #ef4444);
     margin-bottom: 16px;
 }
 
@@ -229,7 +231,7 @@
 }
 
 .race-dashboard__stat-card--highlight {
-    border-color: var(--color-success, #10b981);
+  border-color: var(--success, #10b981);
     background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), transparent);
 }
 
@@ -240,7 +242,7 @@
 
 .race-dashboard__stat-icon {
     font-size: 24px;
-    color: var(--color-primary, #3b82f6);
+  color: var(--accent, #3b82f6);
     opacity: 0.8;
 }
 
@@ -411,7 +413,7 @@
 }
 
 .race-dashboard__progress-fill {
-    background: var(--color-success, #10b981);
+  background: var(--success, #10b981);
     height: 100%;
     border-radius: 12px;
     transition: width 0.3s ease;
@@ -522,7 +524,7 @@
 }
 
 .race-dashboard__inventory-value--success {
-    color: var(--color-success, #10b981);
+  color: var(--success, #10b981);
 }
 
 .race-dashboard--fullscreen .race-dashboard__inventory-value--success {
@@ -530,7 +532,7 @@
 }
 
 .race-dashboard__inventory-value--warning {
-    color: var(--color-warning, #f59e0b);
+  color: var(--warning, #f59e0b);
 }
 
 .race-dashboard--fullscreen .race-dashboard__inventory-value--warning {
@@ -610,7 +612,7 @@
 
 .race-dashboard__credentials-stat .material-symbols-outlined {
     font-size: 20px;
-    color: var(--color-primary, #3b82f6);
+  color: var(--accent, #3b82f6);
 }
 
 .race-dashboard--fullscreen .race-dashboard__credentials-stat .material-symbols-outlined {
@@ -643,7 +645,7 @@
 }
 
 .race-dashboard__credentials-value--success {
-    color: var(--color-success, #10b981);
+  color: var(--success, #10b981);
 }
 
 .race-dashboard--fullscreen .race-dashboard__credentials-value--success {
@@ -740,7 +742,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--color-primary, #3b82f6);
+  background: var(--accent, #3b82f6);
     border-radius: 8px;
     color: #fff;
 }
@@ -800,7 +802,7 @@
 
 .race-dashboard__activity-action-text {
     font-size: 12px;
-    color: var(--color-success, #10b981);
+  color: var(--success, #10b981);
 }
 
 .race-dashboard--fullscreen .race-dashboard__activity-action-text {

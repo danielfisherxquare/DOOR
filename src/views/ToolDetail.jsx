@@ -1,7 +1,13 @@
 import { useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import useToolsStore from '../stores/toolsStore'
-import { CommandEmptyState, CommandNotice, CommandPanel, CommandStatusTag } from '../components/command/CommandPrimitives'
+import {
+  CommandEmptyState,
+  CommandNotice,
+  CommandPanel,
+  CommandStatusTag,
+} from '../components/command/CommandPrimitives'
+import '../styles/command-console.css'
 
 // 导入工具组件
 import MechanicalClock from '../components/tools/MechanicalClock'
@@ -9,8 +15,8 @@ import MechanicalClock3D from '../components/tools/MechanicalClock3D'
 
 // 工具组件映射
 const TOOL_COMPONENTS = {
-  'MechanicalClock': MechanicalClock,
-  'MechanicalClock3D': MechanicalClock3D,
+  MechanicalClock: MechanicalClock,
+  MechanicalClock3D: MechanicalClock3D,
 }
 
 function ToolDetail() {
@@ -32,7 +38,7 @@ function ToolDetail() {
   const statusText = {
     online: '在线',
     offline: '离线',
-    maintenance: '维护中'
+    maintenance: '维护中',
   }
 
   // 渲染工具内容
@@ -68,16 +74,9 @@ function ToolDetail() {
     // 默认占位内容
     return (
       <div className="tool-detail__placeholder">
-        <p className="tool-detail__placeholder-text">
-          工具功能区域 - 待对接后台服务
-        </p>
-        <p className="tool-detail__placeholder-api">
-          API 端点：{currentTool?.apiEndpoint}
-        </p>
-        <button
-          className="btn btn--primary"
-          onClick={handleInvoke}
-        >
+        <p className="tool-detail__placeholder-text">工具功能区域 - 待对接后台服务</p>
+        <p className="tool-detail__placeholder-api">API 端点：{currentTool?.apiEndpoint}</p>
+        <button className="btn btn--primary" onClick={handleInvoke}>
           测试调用
         </button>
       </div>
@@ -102,12 +101,17 @@ function ToolDetail() {
     const ToolComponent = TOOL_COMPONENTS[componentName]
     return (
       <div className="command-tool-fullscreen">
-        <button
-          onClick={() => navigate('/')}
-          className="command-tool-back"
-          title="返回首页"
+        <button onClick={() => navigate('/')} className="command-tool-back" title="返回首页">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="19" y1="12" x2="5" y2="12" />
             <polyline points="12 19 5 12 12 5" />
           </svg>
@@ -124,19 +128,34 @@ function ToolDetail() {
         <CommandPanel
           title={currentTool.name}
           subtitle={currentTool.description}
-          actions={(
+          actions={
             <div className="command-actions-row">
-              <Link to="/" className="btn btn--ghost">返回首页</Link>
-              <CommandStatusTag tone={currentTool.status === 'online' ? 'success' : currentTool.status === 'maintenance' ? 'warning' : 'danger'}>
+              <Link to="/" className="btn btn--ghost">
+                返回首页
+              </Link>
+              <CommandStatusTag
+                tone={
+                  currentTool.status === 'online'
+                    ? 'success'
+                    : currentTool.status === 'maintenance'
+                      ? 'warning'
+                      : 'danger'
+                }
+              >
                 {statusText[currentTool.status]}
               </CommandStatusTag>
             </div>
-          )}
+          }
         >
-          {currentTool.apiEndpoint ? <div className="command-token">{currentTool.apiEndpoint}</div> : null}
+          {currentTool.apiEndpoint ? (
+            <div className="command-token">{currentTool.apiEndpoint}</div>
+          ) : null}
         </CommandPanel>
 
-        <CommandPanel title="工具内容" subtitle="公开工具也对齐为轻量版指挥台语言，保留工具本体但统一外围壳层。">
+        <CommandPanel
+          title="工具内容"
+          subtitle="公开工具也对齐为轻量版指挥台语言，保留工具本体但统一外围壳层。"
+        >
           {renderToolContent()}
         </CommandPanel>
       </div>
