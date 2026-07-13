@@ -177,7 +177,7 @@ describe('API path ownership', () => {
       'src/components/map/CustomTileSourceWizard.tsx',
       'src/components/map/DownloadAreaPanel.tsx',
       'src/components/map/MapAdvancedPanel.tsx',
-      'src/components/map/MapView3D.tsx',
+      'src/components/map/osmBuildings.ts',
       'src/services/modelStorageService.ts',
       'src/stores/clockStore.js',
       'src/utils/map/focusZoneOsmBuildings.js',
