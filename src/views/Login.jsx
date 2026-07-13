@@ -5,6 +5,7 @@ import useWorkspaceStore from '../features/workspace/workspaceStore'
 import { createWorkspaceSession } from '../features/workspace/workspaceSession'
 import { resolveLoginDestination } from '../features/workspace/workspaceNavigation'
 import { requestRaw } from '../utils/request'
+import '../styles/login.css'
 
 const SERVICE_STATUS_LABELS = {
   checking: '正在检查服务',

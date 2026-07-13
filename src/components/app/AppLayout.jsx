@@ -9,6 +9,7 @@ import useSidebarMotion from '../shared/useSidebarMotion'
 import SurfaceShell from '../surface/SurfaceShell'
 import { showInfo } from '../../utils/toast'
 import AppSurfaceRoutes, { AppRouteGuard } from '../../routes/appRoutes'
+import '../../styles/command-console.css'
 import './app-layout.css'
 
 const StudioProjectPage = lazy(() => import('../../views/app/StudioProjectPage'))
