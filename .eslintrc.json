@@ -18,13 +18,7 @@
     "FileSystemDirectoryHandle": "readonly",
     "showDirectoryPicker": "readonly"
   },
-  "ignorePatterns": [
-    "dist/",
-    "node_modules/",
-    "server/",
-    "public/",
-    "*.config.js"
-  ],
+  "ignorePatterns": ["dist/", "node_modules/", "server/", "public/", "*.config.js"],
   "rules": {
     "react/jsx-uses-react": "off",
     "react/jsx-uses-vars": "error",
