@@ -11,6 +11,7 @@ if (!/(^test$|_test$|test_)/i.test(testDatabaseName)) {
 }
 process.env.DATABASE_URL = TEST_DATABASE_URL;
 process.env.NODE_ENV = 'test';
+process.env.AUTHZ_PROVIDER = 'local';
 process.env.JWT_SECRET ||= 'dev-only-do-not-use-in-production';
 
 const { default: knex } = await import('../src/db/knex.js');
@@ -76,6 +77,12 @@ describe('project-bound site mode transaction', () => {
             })
             .returning('*');
         userId = user.id;
+        await knex('user_module_access').insert({
+            user_id: userId,
+            org_id: orgId,
+            module_id: 'app:3d-studio',
+            granted_by: userId,
+        });
 
         sceneSnapshot = buildDirectScene('初始场景');
         const projectSnapshot = normalizeStudioSnapshot(sceneSnapshot, {
@@ -128,10 +135,17 @@ describe('project-bound site mode transaction', () => {
     });
 
     after(async () => {
-        if (databaseAvailable && orgId) {
-            await knex('organizations').where({ id: orgId }).del();
+        try {
+            if (databaseAvailable && userId) {
+                await knex('user_module_access').where({ user_id: userId }).del();
+                await knex('users').where({ id: userId }).del();
+            }
+            if (databaseAvailable && orgId) {
+                await knex('organizations').where({ id: orgId }).del();
+            }
+        } finally {
+            await knex.destroy();
         }
-        await knex.destroy();
     });
 
     it('returns a safe 400 when a generic snapshot write omits expectedRevision', async (t) => {
@@ -139,9 +153,9 @@ describe('project-bound site mode transaction', () => {
 
         const token = jwt.sign(
             {
-                userId: '33333333-3333-4333-8333-333333333333',
-                orgId: null,
-                role: 'super_admin',
+                userId,
+                orgId,
+                role: 'org_admin',
             },
             process.env.JWT_SECRET,
             { expiresIn: '5m' },
