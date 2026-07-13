@@ -1,4 +1,5 @@
 import * as repo from './inventory.spatial.repository.js';
+import { assertGenericWorkZoneMutationAllowed } from './inventory.spatial.site-mode-guard.js';
 
 const DEFAULT_OVERPASS_URLS = [
     'https://overpass-api.de/api/interpreter',
@@ -541,6 +542,7 @@ export function normalizeOverpassBuildings(overpassJson, focusZone, options = {}
 async function ensureScopedTerrainWorkZone(scope, zoneId) {
     const zone = await repo.getTerrainWorkZoneById(scope, zoneId);
     if (!zone) throw buildNotFoundError('地形工作区不存在');
+    assertGenericWorkZoneMutationAllowed(zone);
     return zone;
 }
 

@@ -16,6 +16,8 @@ const initialState = {
   sceneTreeOpen: false,
   projectName: '未命名项目',
   dirty: false,
+  changeVersion: 0,
+  savedVersion: 0,
   sceneType: 'warehouse',
   viewportView: 'iso',
   inferenceHint: null,
@@ -41,7 +43,18 @@ const useEditor = create((set, get) => ({
   toggleInspector: () => set((state) => ({ inspectorOpen: !state.inspectorOpen })),
   toggleSceneTree: () => set((state) => ({ sceneTreeOpen: !state.sceneTreeOpen })),
   setProjectName: (projectName) => set({ projectName }),
-  setDirty: (dirty) => set({ dirty }),
+  setDirty: (dirty) => set((state) => (
+    dirty
+      ? { dirty: true, changeVersion: state.changeVersion + 1 }
+      : { dirty: false, savedVersion: state.changeVersion }
+  )),
+  markSaved: (version) => set((state) => {
+    const savedVersion = Math.max(state.savedVersion, Number(version) || 0)
+    return {
+      savedVersion,
+      dirty: state.changeVersion > savedVersion,
+    }
+  }),
   setSceneType: (sceneType) => set({ sceneType }),
   setViewportView: (viewportView) => set({ viewportView }),
   setInferenceHint: (inferenceHint) => set({ inferenceHint }),

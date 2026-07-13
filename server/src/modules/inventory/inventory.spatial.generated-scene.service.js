@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as spatialRepo from './inventory.spatial.repository.js';
+import { assertGenericWorkZoneMutationAllowed } from './inventory.spatial.site-mode-guard.js';
 import * as studioRepo from './inventory.studio.repository.js';
 import * as sceneJobRepo from './inventory.spatial.scene-job.repository.js';
 import * as studioService from './inventory.studio.service.js';
@@ -326,6 +327,7 @@ export async function materializeGeneratedScenePackage(scope, actorUserId, scene
     const generatedScene = await ensureScopedGeneratedScene(scope, sceneId);
     const project = await ensureScopedProject(scope, generatedScene.projectId);
     const zone = await ensureScopedTerrainWorkZone(scope, generatedScene.focusZoneId);
+    assertGenericWorkZoneMutationAllowed(zone);
     const objects = await listFocusZoneSpatialObjects(scope, zone);
 
     const studioScene = buildFastFocusZoneStudioScene({

@@ -7,18 +7,24 @@
  *
  * 坐标与 model/siteBackdrop.js 的本地米制一致（x=东，z=北，y=上）。
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import {
+  buildSiteImageryReloadKey,
+  summarizeSiteImageryRuntime,
+} from '../model/siteBackdrop'
 
 const BUILDING_COLOR = '#d4dae3'
 const BUILDING_EDGE_COLOR = '#9aa6b6'
+const IGNORE_RUNTIME_UPDATE = () => {}
 
-function useTileTexture(url) {
+function useTileTexture(url, reloadKey, onStatus) {
   const [texture, setTexture] = useState(null)
   useEffect(() => {
     let alive = true
     let loadedTexture = null
     setTexture(null)
+    onStatus('loading')
     const loader = new THREE.TextureLoader()
     loader.setCrossOrigin('anonymous')
     loader.load(
@@ -31,21 +37,28 @@ function useTileTexture(url) {
         }
         loaded.colorSpace = THREE.SRGBColorSpace
         setTexture(loaded)
+        onStatus('loaded')
       },
       undefined,
-      () => {}
+      () => {
+        if (alive) onStatus('failed')
+      }
     )
     return () => {
       alive = false
       loadedTexture?.dispose()
     }
-  }, [url])
+  }, [onStatus, reloadKey, url])
   return texture
 }
 
 /** 单片卫星瓦片：用四角显式构造一个贴地的 XZ 平面，避免旋转带来的方向歧义 */
-function TilePlane({ url, rect, y = 0 }) {
-  const texture = useTileTexture(url)
+function TilePlane({ url, rect, y = 0, reloadKey, index, onTileStatus }) {
+  const reportStatus = useCallback(
+    (nextStatus) => onTileStatus(index, nextStatus),
+    [index, onTileStatus]
+  )
+  const texture = useTileTexture(url, reloadKey, reportStatus)
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry()
     const { minX, maxX, minZ, maxZ } = rect
@@ -68,28 +81,69 @@ function TilePlane({ url, rect, y = 0 }) {
   )
 }
 
-function SatelliteGround({ tiles }) {
-  if (!tiles?.length) return null
+function SatelliteGround({ tiles, reloadKey, onRuntimeChange }) {
+  const outcomesRef = useRef(new Map())
+  useEffect(() => {
+    const outcomes = Array.from(outcomesRef.current.values())
+    onRuntimeChange(summarizeSiteImageryRuntime({
+      loaded: outcomes.filter((value) => value === 'loaded').length,
+      failed: outcomes.filter((value) => value === 'failed').length,
+      total: tiles.length,
+    }))
+  }, [onRuntimeChange, reloadKey, tiles.length])
+  const handleTileStatus = useCallback((index, nextStatus) => {
+    if (nextStatus === 'loading') outcomesRef.current.delete(index)
+    else outcomesRef.current.set(index, nextStatus)
+    const outcomes = Array.from(outcomesRef.current.values())
+    onRuntimeChange(summarizeSiteImageryRuntime({
+      loaded: outcomes.filter((value) => value === 'loaded').length,
+      failed: outcomes.filter((value) => value === 'failed').length,
+      total: tiles.length,
+    }))
+  }, [onRuntimeChange, tiles.length])
+
+  if (!tiles.length) return null
   return (
     <group>
       {tiles.map((tile, index) => (
-        <TilePlane key={`${tile.url}-${index}`} url={tile.url} rect={tile.rect} y={-0.02} />
+        <TilePlane
+          key={`${tile.url}-${index}`}
+          url={tile.url}
+          rect={tile.rect}
+          y={-0.02}
+          reloadKey={reloadKey}
+          index={index}
+          onTileStatus={handleTileStatus}
+        />
       ))}
     </group>
   )
 }
 
 /** 把卫星瓦片合成为单张 CanvasTexture（覆盖瓦片并集范围），供地形 drape 使用 */
-function useCompositeTexture(tiles) {
+function useCompositeTexture(tiles, reloadKey, onRuntimeChange) {
   const [texture, setTexture] = useState(null)
   useEffect(() => {
     if (!tiles?.length) {
       setTexture(null)
+      onRuntimeChange(summarizeSiteImageryRuntime({ total: 0 }))
       return undefined
     }
     let alive = true
     let compositeTexture = null
+    let loadedCount = 0
+    let failedCount = 0
+    const reportRuntime = (terminalFailure = false) => {
+      if (!alive) return
+      onRuntimeChange(summarizeSiteImageryRuntime({
+        loaded: loadedCount,
+        failed: failedCount,
+        total: tiles.length,
+        terminalFailure,
+      }))
+    }
     setTexture(null)
+    reportRuntime()
     let unionMinX = Infinity
     let unionMaxX = -Infinity
     let unionMinZ = Infinity
@@ -110,6 +164,10 @@ function useCompositeTexture(tiles) {
     canvas.width = canvasW
     canvas.height = canvasH
     const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      reportRuntime(true)
+      return () => { alive = false }
+    }
     ctx.fillStyle = '#9fb0c3'
     ctx.fillRect(0, 0, canvasW, canvasH)
 
@@ -121,23 +179,33 @@ function useCompositeTexture(tiles) {
       try {
         dataUrl = canvas.toDataURL('image/jpeg', 0.92)
       } catch {
+        reportRuntime(true)
         return
       }
-      new THREE.TextureLoader().load(dataUrl, (tex) => {
-        compositeTexture = tex
-        if (!alive) {
-          tex.dispose()
-          return
-        }
-        tex.colorSpace = THREE.SRGBColorSpace
-        tex.needsUpdate = true
-        setTexture(tex)
-      })
+      new THREE.TextureLoader().load(
+        dataUrl,
+        (tex) => {
+          compositeTexture = tex
+          if (!alive) {
+            tex.dispose()
+            return
+          }
+          tex.colorSpace = THREE.SRGBColorSpace
+          tex.needsUpdate = true
+          setTexture(tex)
+          reportRuntime()
+        },
+        undefined,
+        () => reportRuntime(true)
+      )
     }
     tiles.forEach((tile) => {
       const img = new Image()
       img.crossOrigin = 'anonymous'
-      const done = () => {
+      const done = (loaded) => {
+        if (loaded) loadedCount += 1
+        else failedCount += 1
+        reportRuntime()
         remaining -= 1
         if (remaining === 0) finalize()
       }
@@ -147,27 +215,30 @@ function useCompositeTexture(tiles) {
         const py = ((unionMaxZ - tile.rect.maxZ) / unionDepth) * canvasH
         const pw = ((tile.rect.maxX - tile.rect.minX) / unionWidth) * canvasW
         const ph = ((tile.rect.maxZ - tile.rect.minZ) / unionDepth) * canvasH
+        let drewTile = true
         try {
           ctx.drawImage(img, px, py, pw, ph)
         } catch {
-          /* ignore */
+          drewTile = false
         }
-        done()
+        done(drewTile)
       }
-      img.onerror = done
+      img.onerror = () => {
+        if (alive) done(false)
+      }
       img.src = tile.url
     })
     return () => {
       alive = false
       compositeTexture?.dispose()
     }
-  }, [tiles])
+  }, [onRuntimeChange, reloadKey, tiles])
   return texture
 }
 
 /** 卫星纹理随地形起伏铺在地表（drape）：地形网格 + 合成卫星贴图 */
-function DrapedTerrain({ terrain, tiles }) {
-  const texture = useCompositeTexture(tiles)
+function DrapedTerrain({ terrain, tiles, reloadKey, onRuntimeChange }) {
+  const texture = useCompositeTexture(tiles, reloadKey, onRuntimeChange)
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(terrain.positions, 3))
@@ -239,14 +310,40 @@ function ReadonlyBuildings({ buildings }) {
   )
 }
 
-export default function SiteBackdrop({ data }) {
+export default function SiteBackdrop({
+  data,
+  imageryReloadToken = 0,
+  onImageryRuntimeChange = IGNORE_RUNTIME_UPDATE,
+}) {
+  const tiles = Array.isArray(data?.tiles) ? data.tiles : []
+  const imageryReloadKey = useMemo(
+    () => buildSiteImageryReloadKey(tiles, imageryReloadToken),
+    [imageryReloadToken, tiles]
+  )
+  useEffect(() => {
+    if (tiles.length === 0) {
+      onImageryRuntimeChange(summarizeSiteImageryRuntime({ total: 0 }))
+    }
+  }, [imageryReloadKey, onImageryRuntimeChange, tiles.length])
+
   if (!data) return null
   return (
     <group name="site-backdrop">
       {data.terrain ? (
-        <DrapedTerrain terrain={data.terrain} tiles={data.tiles} />
+        <DrapedTerrain
+          key={imageryReloadKey}
+          terrain={data.terrain}
+          tiles={tiles}
+          reloadKey={imageryReloadKey}
+          onRuntimeChange={onImageryRuntimeChange}
+        />
       ) : (
-        <SatelliteGround tiles={data.tiles} />
+        <SatelliteGround
+          key={imageryReloadKey}
+          tiles={tiles}
+          reloadKey={imageryReloadKey}
+          onRuntimeChange={onImageryRuntimeChange}
+        />
       )}
       <ReadonlyBuildings buildings={data.buildings} />
     </group>

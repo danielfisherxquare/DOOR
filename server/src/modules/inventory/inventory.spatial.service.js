@@ -1,3 +1,4 @@
+import knex from '../../db/knex.js';
 import * as repo from './inventory.spatial.repository.js';
 import * as studioRepo from './inventory.studio.repository.js';
 import {
@@ -6,6 +7,7 @@ import {
     resolveTerrainWorkZoneArtifactAbsolutePath,
 } from './inventory.spatial.export.js';
 import { buildTerrainWorkZoneExportPackage, buildTerrainWorkZonePublishManifest } from './inventory.spatial.publish.js';
+import { assertGenericWorkZoneMutationAllowed } from './inventory.spatial.site-mode-guard.js';
 
 const SPATIAL_OBJECT_TYPES = new Set([
     'arch',
@@ -86,6 +88,15 @@ function buildNotFoundError(message) {
 function buildBadRequestError(message) {
     const error = new Error(message);
     error.statusCode = 400;
+    return error;
+}
+
+function buildSpatialObjectChangedError(objectId) {
+    const error = new Error('空间对象的工作区关联已被其他请求修改，请重新载入后再试');
+    error.statusCode = 409;
+    error.expose = true;
+    error.publicCode = 'SPATIAL_OBJECT_CHANGED';
+    error.data = { objectId };
     return error;
 }
 
@@ -230,13 +241,19 @@ function normalizeSpatialObjectPayload(data, actorUserId, current = null) {
     };
 }
 
-async function syncTerrainWorkZoneIncludedObjects(scope, actorUserId, zone, includedObjectIds) {
+async function syncTerrainWorkZoneIncludedObjects(
+    scope,
+    actorUserId,
+    zone,
+    includedObjectIds,
+    db = knex,
+) {
     const desiredIds = ensureUniqueStringArray(includedObjectIds);
     const synchronizedIds = [];
     const synchronizedIdSet = new Set();
 
     for (const objectId of desiredIds) {
-        const object = await repo.getSpatialObjectById(scope, objectId);
+        const object = await repo.getSpatialObjectById(scope, objectId, db);
         if (!object || object.projectId !== zone.projectId) continue;
 
         synchronizedIds.push(object.id);
@@ -246,20 +263,20 @@ async function syncTerrainWorkZoneIncludedObjects(scope, actorUserId, zone, incl
             await repo.updateSpatialObject(scope, object.id, {
                 focusZoneId: zone.id,
                 updatedBy: actorUserId ?? null,
-            });
+            }, db);
         }
     }
 
     const currentlyLinkedObjects = await repo.listSpatialObjects(scope, zone.projectId, {
         focusZoneId: zone.id,
-    });
+    }, db);
 
     for (const object of currentlyLinkedObjects) {
         if (synchronizedIdSet.has(object.id)) continue;
         await repo.updateSpatialObject(scope, object.id, {
             focusZoneId: null,
             updatedBy: actorUserId ?? null,
-        });
+        }, db);
     }
 
     if (stringArraysEqual(zone.includedObjectIds, synchronizedIds)) {
@@ -272,38 +289,64 @@ async function syncTerrainWorkZoneIncludedObjects(scope, actorUserId, zone, incl
     return repo.updateTerrainWorkZone(scope, zone.id, {
         includedObjectIds: synchronizedIds,
         updatedBy: actorUserId ?? null,
-    });
+    }, db);
 }
 
-async function syncSpatialObjectFocusZoneMembership(scope, actorUserId, spatialObject, previousFocusZoneId, nextFocusZoneId) {
+async function syncSpatialObjectFocusZoneMembership(
+    scope,
+    actorUserId,
+    spatialObject,
+    previousFocusZoneId,
+    nextFocusZoneId,
+    db = knex,
+) {
     const objectId = spatialObject?.id;
     const projectId = spatialObject?.projectId;
     if (!objectId || !projectId) return;
 
     if (previousFocusZoneId && previousFocusZoneId !== nextFocusZoneId) {
-        const previousZone = await repo.getTerrainWorkZoneById(scope, previousFocusZoneId);
+        const previousZone = await repo.getTerrainWorkZoneById(scope, previousFocusZoneId, db);
         if (previousZone && previousZone.projectId === projectId) {
+            assertGenericWorkZoneMutationAllowed(previousZone);
             const previousIds = ensureUniqueStringArray(previousZone.includedObjectIds);
             const nextIds = previousIds.filter((item) => item !== objectId);
             if (!stringArraysEqual(previousIds, nextIds)) {
                 await repo.updateTerrainWorkZone(scope, previousZone.id, {
                     includedObjectIds: nextIds,
                     updatedBy: actorUserId ?? null,
-                });
+                }, db);
             }
         }
     }
 
     if (!nextFocusZoneId) return;
 
-    const nextZone = await ensureScopedTerrainWorkZone(scope, projectId, nextFocusZoneId);
+    const nextZone = await repo.getTerrainWorkZoneById(scope, nextFocusZoneId, db);
+    if (!nextZone || nextZone.projectId !== projectId) {
+        throw buildNotFoundError('focusZoneId 对应工作区不存在');
+    }
+    assertGenericWorkZoneMutationAllowed(nextZone);
     const zoneIds = ensureUniqueStringArray(nextZone.includedObjectIds);
     if (zoneIds.includes(objectId)) return;
 
     await repo.updateTerrainWorkZone(scope, nextZone.id, {
         includedObjectIds: [...zoneIds, objectId],
         updatedBy: actorUserId ?? null,
-    });
+    }, db);
+}
+
+async function lockGenericMembershipZones(scope, projectId, zoneIds, trx) {
+    const lockedZones = new Map();
+    const uniqueZoneIds = [...new Set(zoneIds.filter(Boolean))].sort();
+    for (const zoneId of uniqueZoneIds) {
+        const zone = await repo.getTerrainWorkZoneByIdForUpdate(scope, zoneId, trx);
+        if (!zone || zone.projectId !== projectId) {
+            throw buildNotFoundError('focusZoneId 对应工作区不存在');
+        }
+        assertGenericWorkZoneMutationAllowed(zone);
+        lockedZones.set(zoneId, zone);
+    }
+    return lockedZones;
 }
 
 function normalizeTerrainWorkZonePayload(data, actorUserId, current = null) {
@@ -348,33 +391,84 @@ export async function listProjectSpatialObjects(scope, projectId, filters = {}) 
 
 export async function createProjectSpatialObject(scope, actorUserId, projectId, data = {}) {
     await ensureScopedProject(scope, projectId);
-    await ensureScopedTerrainWorkZone(scope, projectId, data.focusZoneId);
-    const payload = normalizeSpatialObjectPayload(data, actorUserId);
-    const created = await repo.createSpatialObject({
-        ...payload,
-        projectId,
-        createdBy: actorUserId ?? null,
+    return knex.transaction(async (trx) => {
+        await lockGenericMembershipZones(scope, projectId, [data.focusZoneId], trx);
+        const payload = normalizeSpatialObjectPayload(data, actorUserId);
+        const created = await repo.createSpatialObject({
+            ...payload,
+            projectId,
+            createdBy: actorUserId ?? null,
+        }, trx);
+        await syncSpatialObjectFocusZoneMembership(
+            scope,
+            actorUserId,
+            created,
+            null,
+            created.focusZoneId,
+            trx,
+        );
+        return created;
     });
-    await syncSpatialObjectFocusZoneMembership(scope, actorUserId, created, null, created.focusZoneId);
-    return created;
 }
 
 export async function updateProjectSpatialObject(scope, actorUserId, objectId, data = {}) {
-    const current = await repo.getSpatialObjectById(scope, objectId);
-    if (!current) throw buildNotFoundError('空间对象不存在');
-    await ensureScopedTerrainWorkZone(scope, current.projectId, data.focusZoneId);
-    const payload = normalizeSpatialObjectPayload(data, actorUserId, current);
-    const updated = await repo.updateSpatialObject(scope, objectId, payload);
-    await syncSpatialObjectFocusZoneMembership(scope, actorUserId, updated, current.focusZoneId, updated.focusZoneId);
-    return updated;
+    return knex.transaction(async (trx) => {
+        const observed = await repo.getSpatialObjectById(scope, objectId, trx);
+        if (!observed) throw buildNotFoundError('空间对象不存在');
+        const nextFocusZoneId = data.focusZoneId !== undefined
+            ? data.focusZoneId
+            : observed.focusZoneId;
+        await lockGenericMembershipZones(
+            scope,
+            observed.projectId,
+            [observed.focusZoneId, nextFocusZoneId],
+            trx,
+        );
+        const current = await repo.getSpatialObjectByIdForUpdate(scope, objectId, trx);
+        if (!current) throw buildNotFoundError('空间对象不存在');
+        if (current.focusZoneId !== observed.focusZoneId) {
+            throw buildSpatialObjectChangedError(objectId);
+        }
+        const payload = normalizeSpatialObjectPayload(data, actorUserId, current);
+        const updated = await repo.updateSpatialObject(scope, objectId, payload, trx);
+        await syncSpatialObjectFocusZoneMembership(
+            scope,
+            actorUserId,
+            updated,
+            current.focusZoneId,
+            updated.focusZoneId,
+            trx,
+        );
+        return updated;
+    });
 }
 
 export async function deleteProjectSpatialObject(scope, objectId) {
-    const current = await repo.getSpatialObjectById(scope, objectId);
-    if (!current) throw buildNotFoundError('空间对象不存在');
-    await syncSpatialObjectFocusZoneMembership(scope, null, current, current.focusZoneId, null);
-    await repo.deleteSpatialObject(scope, objectId);
-    return { id: objectId };
+    return knex.transaction(async (trx) => {
+        const observed = await repo.getSpatialObjectById(scope, objectId, trx);
+        if (!observed) throw buildNotFoundError('空间对象不存在');
+        await lockGenericMembershipZones(
+            scope,
+            observed.projectId,
+            [observed.focusZoneId],
+            trx,
+        );
+        const current = await repo.getSpatialObjectByIdForUpdate(scope, objectId, trx);
+        if (!current) throw buildNotFoundError('空间对象不存在');
+        if (current.focusZoneId !== observed.focusZoneId) {
+            throw buildSpatialObjectChangedError(objectId);
+        }
+        await syncSpatialObjectFocusZoneMembership(
+            scope,
+            null,
+            current,
+            current.focusZoneId,
+            null,
+            trx,
+        );
+        await repo.deleteSpatialObject(scope, objectId, trx);
+        return { id: objectId };
+    });
 }
 
 export async function listProjectTerrainWorkZones(scope, projectId, filters = {}) {
@@ -388,6 +482,7 @@ export async function listProjectTerrainWorkZones(scope, projectId, filters = {}
 export async function createProjectTerrainWorkZone(scope, actorUserId, projectId, data = {}) {
     await ensureScopedProject(scope, projectId);
     const payload = normalizeTerrainWorkZonePayload(data, actorUserId);
+    assertGenericWorkZoneMutationAllowed(payload);
     const created = await repo.createTerrainWorkZone({
         ...payload,
         projectId,
@@ -403,25 +498,43 @@ export async function getProjectTerrainWorkZone(scope, zoneId) {
 }
 
 export async function updateProjectTerrainWorkZone(scope, actorUserId, zoneId, data = {}) {
-    const current = await repo.getTerrainWorkZoneById(scope, zoneId);
-    if (!current) throw buildNotFoundError('地形工作区不存在');
-    const payload = normalizeTerrainWorkZonePayload(data, actorUserId, current);
-    const updated = await repo.updateTerrainWorkZone(scope, zoneId, payload);
-    return syncTerrainWorkZoneIncludedObjects(scope, actorUserId, updated, updated.includedObjectIds);
+    return knex.transaction(async (trx) => {
+        const current = await repo.getTerrainWorkZoneByIdForUpdate(scope, zoneId, trx);
+        if (!current) throw buildNotFoundError('地形工作区不存在');
+        assertGenericWorkZoneMutationAllowed(current);
+        const payload = normalizeTerrainWorkZonePayload(data, actorUserId, current);
+        assertGenericWorkZoneMutationAllowed({ ...current, ...payload });
+        const updated = await repo.updateTerrainWorkZone(scope, zoneId, payload, trx);
+        return syncTerrainWorkZoneIncludedObjects(
+            scope,
+            actorUserId,
+            updated,
+            updated.includedObjectIds,
+            trx,
+        );
+    });
 }
 
 export async function deleteProjectTerrainWorkZone(scope, zoneId) {
-    const current = await repo.getTerrainWorkZoneById(scope, zoneId);
-    if (!current) throw buildNotFoundError('地形工作区不存在');
-    const linkedObjects = await repo.listSpatialObjects(scope, current.projectId, { focusZoneId: zoneId });
-    for (const object of linkedObjects) {
-        await repo.updateSpatialObject(scope, object.id, {
-            focusZoneId: null,
-            updatedBy: null,
-        });
-    }
-    await repo.deleteTerrainWorkZone(scope, zoneId);
-    return { id: zoneId };
+    return knex.transaction(async (trx) => {
+        const current = await repo.getTerrainWorkZoneByIdForUpdate(scope, zoneId, trx);
+        if (!current) throw buildNotFoundError('地形工作区不存在');
+        assertGenericWorkZoneMutationAllowed(current);
+        const linkedObjects = await repo.listSpatialObjects(
+            scope,
+            current.projectId,
+            { focusZoneId: zoneId },
+            trx,
+        );
+        for (const object of linkedObjects) {
+            await repo.updateSpatialObject(scope, object.id, {
+                focusZoneId: null,
+                updatedBy: null,
+            }, trx);
+        }
+        await repo.deleteTerrainWorkZone(scope, zoneId, trx);
+        return { id: zoneId };
+    });
 }
 
 async function listFocusZoneSpatialObjects(scope, zone) {
@@ -445,6 +558,7 @@ async function listFocusZoneSpatialObjects(scope, zone) {
 export async function generateTerrainWorkZonePublishManifest(scope, actorUserId, zoneId) {
     const zone = await repo.getTerrainWorkZoneById(scope, zoneId);
     if (!zone) throw buildNotFoundError('地形工作区不存在');
+    assertGenericWorkZoneMutationAllowed(zone);
 
     const spatialObjects = await listFocusZoneSpatialObjects(scope, zone);
     const manifest = buildTerrainWorkZonePublishManifest(zone, spatialObjects);

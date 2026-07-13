@@ -10,6 +10,7 @@
 
 const TILE_PROVIDER = 'esri_world_imagery';
 const WEB_MERCATOR_MAX_LATITUDE = 85.05112878;
+const MAX_ORTHOPHOTO_TILES = 256;
 const ESRI_WORLD_IMAGERY_TEMPLATE =
     'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 // 天地图影像 img_w：WGS84 / Web Mercator（与 OSM/Cesium 同坐标系，无 GCJ 偏移），需 tk
@@ -75,14 +76,25 @@ export function buildTiandituImageryTileUrl({ z, x, y }, tiandituKey) {
         .replace('{tk}', String(tiandituKey || ''));
 }
 
-/** 覆盖 bbox 的瓦片 {z,x,y} 列表（含边界瓦片） */
-export function tilesCoveringBbox(bbox, zoom) {
+function tileRangeForBbox(bbox, zoom) {
     const topLeft = lngLatToTile(bbox.west, bbox.north, zoom);
     const bottomRight = lngLatToTile(bbox.east, bbox.south, zoom);
     const minX = Math.min(topLeft.x, bottomRight.x);
     const maxX = Math.max(topLeft.x, bottomRight.x);
     const minY = Math.min(topLeft.y, bottomRight.y);
     const maxY = Math.max(topLeft.y, bottomRight.y);
+    return { minX, maxX, minY, maxY };
+}
+
+/** 不分配瓦片对象即可计算 bbox 覆盖数量，供服务端预算检查使用。 */
+export function countTilesCoveringBbox(bbox, zoom) {
+    const { minX, maxX, minY, maxY } = tileRangeForBbox(bbox, zoom);
+    return (maxX - minX + 1) * (maxY - minY + 1);
+}
+
+/** 覆盖 bbox 的瓦片 {z,x,y} 列表（含边界瓦片） */
+export function tilesCoveringBbox(bbox, zoom) {
+    const { minX, maxX, minY, maxY } = tileRangeForBbox(bbox, zoom);
 
     const tiles = [];
     for (let x = minX; x <= maxX; x += 1) {
@@ -108,11 +120,11 @@ function unionTileBounds(tiles) {
 }
 
 /** 在瓦片预算内自动挑选最高 zoom（瓦片越多越清晰，但要受 maxTiles 约束） */
-function pickZoomForBbox(bbox, maxTiles) {
-    for (let zoom = 21; zoom >= 1; zoom -= 1) {
-        if (tilesCoveringBbox(bbox, zoom).length <= maxTiles) return zoom;
+function pickZoomForBbox(bbox, maxTiles, maxZoom = 21) {
+    for (let zoom = maxZoom; zoom >= 1; zoom -= 1) {
+        if (countTilesCoveringBbox(bbox, zoom) <= maxTiles) return zoom;
     }
-    return 1;
+    return null;
 }
 
 /**
@@ -120,11 +132,17 @@ function pickZoomForBbox(bbox, maxTiles) {
  * 实际覆盖边界 coverBounds（瓦片并集，>= 请求 bbox）以及原始请求 bbox。
  */
 export function describeOrthophotoForBbox(bbox, options = {}) {
-    const maxTiles = clampInteger(options.maxTiles, 1, 4096, 48);
-    const zoom =
-        options.zoom != null
-            ? clampInteger(options.zoom, 1, 21, 16)
-            : pickZoomForBbox(bbox, maxTiles);
+    const maxTiles = clampInteger(options.maxTiles, 1, MAX_ORTHOPHOTO_TILES, 48);
+    const requestedZoom = options.zoom != null
+        ? clampInteger(options.zoom, 1, 21, 16)
+        : 21;
+    const zoom = pickZoomForBbox(bbox, maxTiles, requestedZoom);
+    if (zoom === null) {
+        const error = new Error(`正射影像范围至少需要 ${countTilesCoveringBbox(bbox, 1)} 张瓦片，超过预算 ${maxTiles}`);
+        error.statusCode = 400;
+        error.expose = true;
+        throw error;
+    }
 
     // 天地图需要 tk；缺 tk 时回退 Esri（保证总能出图）
     const useTianditu = options.provider === 'tianditu' && Boolean(options.tiandituKey);

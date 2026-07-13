@@ -11,6 +11,18 @@ import {
   buildOverpassBuildingQuery,
   normalizeOverpassBuildings,
 } from '../../src/utils/map/focusZoneOsmBuildings.js'
+import {
+  createBlankWarehouseScene,
+  getStudioHierarchy,
+  mergeWarehouseSceneIntoSnapshot,
+  normalizeStudioSnapshot,
+} from '../../src/utils/studioProjectUtils.js'
+import {
+  buildSiteModeSaveRequest,
+  createSiteProjectSnapshot,
+  hydrateSiteFocusZone,
+  resolveSiteBakePresentation,
+} from '../../src/utils/map/siteModePersistence.js'
 
 const focusZone = {
   id: 'zone-1',
@@ -265,4 +277,96 @@ test('empty focus zone still creates an openable boundary scene', () => {
   assert.ok(document.profiles.length >= 1)
   assert.ok(document.solids.some((solid) => solid.metadata?.objectType === 'focus_zone_floor'))
   assert.equal(document.metadata.warnings.length, 0)
+})
+
+test('new site project survives bake and first save through its persisted warehouse', () => {
+  const projectName = '赛事场地首次保存测试'
+  const projectSnapshot = createSiteProjectSnapshot({ name: projectName })
+  assert.deepEqual(
+    Object.keys(projectSnapshot).sort(),
+    Object.keys(createBlankWarehouseScene({ name: projectName, sceneType: 'outdoor-event' })).sort(),
+  )
+
+  const normalizedProject = normalizeStudioSnapshot(projectSnapshot, {
+    name: projectName,
+    sceneType: 'outdoor-event',
+    projectType: 'site',
+    geoAnchor: { longitude: 120, latitude: 30, height: 0 },
+  })
+  const projectWarehouse = getStudioHierarchy(normalizedProject).activeWarehouse
+  assert.ok(projectWarehouse?.id)
+
+  const bakedScene = buildFocusZoneStudioScene({
+    focusZone: {
+      ...focusZone,
+      snapshotJson: {
+        ...focusZone.snapshotJson,
+        osmBuildings: { source: 'none', count: 0, buildings: [] },
+        siteBake: { status: 'degraded', warnings: ['OSM 建筑不可用'] },
+      },
+    },
+    objects: [],
+  })
+  const request = buildSiteModeSaveRequest({
+    focusZoneId: focusZone.id,
+    snapshotJson: bakedScene,
+    expectedRevision: 2,
+    clientMutationId: 'first-site-save',
+  })
+
+  assert.equal(Object.hasOwn(request, 'warehouseId'), false)
+  const savedProject = mergeWarehouseSceneIntoSnapshot(
+    normalizedProject,
+    projectWarehouse.id,
+    request.snapshotJson,
+  )
+  const savedWarehouse = getStudioHierarchy(savedProject).activeWarehouse
+  assert.equal(savedWarehouse.id, projectWarehouse.id)
+  assert.equal(savedWarehouse.sceneSnapshot.editorDocument.metadata.source, 'gis-focus-zone')
+})
+
+test('site mode refresh restores persisted bake state and nested orthophoto', () => {
+  const persistedProviderStatus = {
+    imagery: { provider: 'xyz', status: 'ready', itemCount: 2, retryable: false },
+    terrain: { provider: 'flat', status: 'ready', itemCount: 1, retryable: false },
+    buildings: { provider: 'none', status: 'failed', itemCount: 0, retryable: true },
+  }
+  const hydratedZone = hydrateSiteFocusZone({
+    ...focusZone,
+    orthophoto: null,
+    snapshotJson: {
+      ...focusZone.snapshotJson,
+      orthophoto: { provider: 'xyz', tiles: [{ x: 1, y: 2, z: 16 }] },
+      osmBuildings: { source: 'none', count: 0, buildings: [] },
+      siteBake: {
+        status: 'degraded',
+        providerStatus: persistedProviderStatus,
+        warnings: ['OSM 建筑不可用'],
+      },
+    },
+  })
+  const presentation = resolveSiteBakePresentation({ focusZone: hydratedZone })
+
+  assert.equal(hydratedZone.orthophoto.provider, 'xyz')
+  assert.equal(presentation.providerStatus.imagery.provider, 'xyz')
+  assert.equal(presentation.providerStatus.buildings.status, 'failed')
+  assert.equal(presentation.bakeStatus, 'degraded')
+  assert.deepEqual(presentation.warnings, ['OSM 建筑不可用'])
+})
+
+test('site mode fallback does not report source none buildings as ready', () => {
+  const hydratedZone = hydrateSiteFocusZone({
+    ...focusZone,
+    orthophoto: null,
+    snapshotJson: {
+      ...focusZone.snapshotJson,
+      orthophoto: { provider: 'xyz', tiles: [{ x: 1, y: 2, z: 16 }] },
+      osmBuildings: { source: 'none', count: 0, buildings: [] },
+      siteBake: { providerStatus: {}, warnings: [] },
+    },
+  })
+  const presentation = resolveSiteBakePresentation({ focusZone: hydratedZone })
+
+  assert.equal(presentation.providerStatus.buildings.status, 'unavailable')
+  assert.equal(presentation.bakeStatus, 'degraded')
 })

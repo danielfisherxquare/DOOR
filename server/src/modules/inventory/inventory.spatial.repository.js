@@ -1,4 +1,5 @@
 import knex from '../../db/knex.js';
+import { assertGenericWorkZoneMutationAllowed } from './inventory.spatial.site-mode-guard.js';
 
 function toJsonbValue(value) {
     if (value === undefined) return undefined;
@@ -6,15 +7,25 @@ function toJsonbValue(value) {
     return JSON.stringify(value);
 }
 
-function scopedProjectIdsQuery(scope) {
-    const query = knex('inventory_3d_projects').select('id');
+function scopedProjectIdsQuery(scope, db = knex) {
+    const query = db('inventory_3d_projects').select('id');
     if (scope?.orgId) return query.where({ org_id: scope.orgId });
     if (scope?.ownerUserId) return query.where({ owner_user_id: scope.ownerUserId });
     return query.whereRaw('1 = 0');
 }
 
-function scopedRecordsQuery(tableName, scope) {
-    return knex(`${tableName} as records`).whereIn('records.project_id', scopedProjectIdsQuery(scope));
+function scopedRecordsQuery(tableName, scope, db = knex) {
+    return db(`${tableName} as records`).whereIn('records.project_id', scopedProjectIdsQuery(scope, db));
+}
+
+function applySiteModeTerrainWorkZonePredicate(query) {
+    return query.where((builder) => {
+        builder
+            .whereRaw("records.metadata->>'purpose' = 'site-mode'")
+            .orWhereRaw(
+                "jsonb_exists(COALESCE(records.snapshot_json, '{}'::jsonb), 'siteBake')"
+            );
+    });
 }
 
 function mapSpatialObject(row) {
@@ -62,6 +73,10 @@ function mapTerrainWorkZone(row) {
         includedObjectIds: row.included_object_ids,
         publishTarget: row.publish_target,
         snapshotJson: row.snapshot_json,
+        // site-bake persists the imagery descriptor with the zone snapshot.
+        // Surface it on the work-zone record as well so a normal GET can
+        // reconstruct the same satellite backdrop as the bake response.
+        orthophoto: row.snapshot_json?.orthophoto || null,
         metadata: row.metadata,
         status: row.status,
         createdBy: row.created_by,
@@ -71,8 +86,8 @@ function mapTerrainWorkZone(row) {
     };
 }
 
-export async function listSpatialObjects(scope, projectId, filters = {}) {
-    let query = scopedRecordsQuery('inventory_3d_event_spatial_objects', scope)
+export async function listSpatialObjects(scope, projectId, filters = {}, db = knex) {
+    let query = scopedRecordsQuery('inventory_3d_event_spatial_objects', scope, db)
         .where('records.project_id', projectId);
 
     if (filters.objectType) query = query.where('records.object_type', filters.objectType);
@@ -83,16 +98,25 @@ export async function listSpatialObjects(scope, projectId, filters = {}) {
     return rows.map(mapSpatialObject);
 }
 
-export async function getSpatialObjectById(scope, objectId) {
-    const row = await scopedRecordsQuery('inventory_3d_event_spatial_objects', scope)
+export async function getSpatialObjectById(scope, objectId, db = knex) {
+    const row = await scopedRecordsQuery('inventory_3d_event_spatial_objects', scope, db)
         .where('records.id', objectId)
         .first();
 
     return mapSpatialObject(row);
 }
 
-export async function createSpatialObject(data) {
-    const [row] = await knex('inventory_3d_event_spatial_objects')
+export async function getSpatialObjectByIdForUpdate(scope, objectId, trx) {
+    const row = await scopedRecordsQuery('inventory_3d_event_spatial_objects', scope, trx)
+        .where('records.id', objectId)
+        .forUpdate()
+        .first();
+
+    return mapSpatialObject(row);
+}
+
+export async function createSpatialObject(data, db = knex) {
+    const [row] = await db('inventory_3d_event_spatial_objects')
         .insert({
             project_id: data.projectId,
             focus_zone_id: data.focusZoneId ?? null,
@@ -121,7 +145,7 @@ export async function createSpatialObject(data) {
     return mapSpatialObject(row);
 }
 
-export async function updateSpatialObject(scope, objectId, data) {
+export async function updateSpatialObject(scope, objectId, data, db = knex) {
     const payload = { updated_at: knex.fn.now() };
 
     if (data.focusZoneId !== undefined) payload.focus_zone_id = data.focusZoneId;
@@ -144,7 +168,7 @@ export async function updateSpatialObject(scope, objectId, data) {
     if (data.status !== undefined) payload.status = data.status;
     if (data.updatedBy !== undefined) payload.updated_by = data.updatedBy;
 
-    const [row] = await scopedRecordsQuery('inventory_3d_event_spatial_objects', scope)
+    const [row] = await scopedRecordsQuery('inventory_3d_event_spatial_objects', scope, db)
         .where('records.id', objectId)
         .update(payload)
         .returning('*');
@@ -152,8 +176,8 @@ export async function updateSpatialObject(scope, objectId, data) {
     return mapSpatialObject(row);
 }
 
-export async function deleteSpatialObject(scope, objectId) {
-    const deleted = await scopedRecordsQuery('inventory_3d_event_spatial_objects', scope)
+export async function deleteSpatialObject(scope, objectId, db = knex) {
+    const deleted = await scopedRecordsQuery('inventory_3d_event_spatial_objects', scope, db)
         .where('records.id', objectId)
         .del();
 
@@ -171,16 +195,87 @@ export async function listTerrainWorkZones(scope, projectId, filters = {}) {
     return rows.map(mapTerrainWorkZone);
 }
 
-export async function getTerrainWorkZoneById(scope, zoneId) {
-    const row = await scopedRecordsQuery('inventory_3d_terrain_work_zones', scope)
+export async function getTerrainWorkZoneById(scope, zoneId, db = knex) {
+    const row = await scopedRecordsQuery('inventory_3d_terrain_work_zones', scope, db)
         .where('records.id', zoneId)
         .first();
 
     return mapTerrainWorkZone(row);
 }
 
-export async function createTerrainWorkZone(data) {
-    const [row] = await knex('inventory_3d_terrain_work_zones')
+export async function getTerrainWorkZoneByIdForUpdate(scope, zoneId, trx) {
+    const row = await scopedRecordsQuery('inventory_3d_terrain_work_zones', scope, trx)
+        .where('records.id', zoneId)
+        .forUpdate()
+        .first();
+
+    return mapTerrainWorkZone(row);
+}
+
+export async function findSiteModeTerrainWorkZone(
+    scope,
+    projectId,
+    { clientMutationId = null, sourceNodeId = null } = {},
+    db = knex,
+    { forUpdate = false } = {},
+) {
+    if (!clientMutationId && !sourceNodeId) return null;
+
+    const query = applySiteModeTerrainWorkZonePredicate(
+        scopedRecordsQuery('inventory_3d_terrain_work_zones', scope, db)
+            .where('records.project_id', projectId)
+    )
+        .where((builder) => {
+            if (clientMutationId) {
+                builder.orWhereRaw(
+                    "records.snapshot_json #>> '{siteBake,clientMutationId}' = ?",
+                    [clientMutationId],
+                );
+            }
+            if (sourceNodeId) {
+                builder.orWhereRaw("records.metadata->>'sourceNodeId' = ?", [sourceNodeId]);
+            }
+        })
+        .orderBy('records.updated_at', 'desc');
+    if (forUpdate) query.forUpdate();
+
+    return mapTerrainWorkZone(await query.first());
+}
+
+export async function findAnySiteModeTerrainWorkZone(
+    scope,
+    projectId,
+    db = knex,
+    { forUpdate = false } = {},
+) {
+    const query = applySiteModeTerrainWorkZonePredicate(
+        scopedRecordsQuery('inventory_3d_terrain_work_zones', scope, db)
+            .where('records.project_id', projectId)
+    ).orderBy('records.updated_at', 'desc');
+    if (forUpdate) query.forUpdate();
+    return mapTerrainWorkZone(await query.first());
+}
+
+export async function listSiteModeTerrainWorkZonesForProjects(
+    scope,
+    projectIds,
+    db = knex,
+) {
+    const normalizedProjectIds = [...new Set((projectIds || []).filter(Boolean))];
+    if (!normalizedProjectIds.length) return [];
+
+    const rows = await applySiteModeTerrainWorkZonePredicate(
+        scopedRecordsQuery('inventory_3d_terrain_work_zones', scope, db)
+            .whereIn('records.project_id', normalizedProjectIds)
+    )
+        .distinctOn('records.project_id')
+        .orderBy('records.project_id', 'asc')
+        .orderBy('records.updated_at', 'desc');
+    return rows.map(mapTerrainWorkZone);
+}
+
+export async function createTerrainWorkZone(data, db = knex) {
+    const [row] = await db('inventory_3d_terrain_work_zones')
         .insert({
             project_id: data.projectId,
             name: data.name,
@@ -203,7 +298,13 @@ export async function createTerrainWorkZone(data) {
     return mapTerrainWorkZone(row);
 }
 
-export async function updateTerrainWorkZone(scope, zoneId, data) {
+export async function updateTerrainWorkZone(
+    scope,
+    zoneId,
+    data,
+    db = knex,
+    { allowSiteModeMutation = false } = {},
+) {
     const payload = { updated_at: knex.fn.now() };
 
     if (data.name !== undefined) payload.name = data.name;
@@ -220,18 +321,50 @@ export async function updateTerrainWorkZone(scope, zoneId, data) {
     if (data.status !== undefined) payload.status = data.status;
     if (data.updatedBy !== undefined) payload.updated_by = data.updatedBy;
 
-    const [row] = await scopedRecordsQuery('inventory_3d_terrain_work_zones', scope)
-        .where('records.id', zoneId)
+    const query = scopedRecordsQuery('inventory_3d_terrain_work_zones', scope, db)
+        .where('records.id', zoneId);
+    if (!allowSiteModeMutation) {
+        query
+            .whereRaw("COALESCE(records.metadata->>'purpose', '') <> 'site-mode'")
+            .whereRaw(
+                "NOT jsonb_exists(COALESCE(records.snapshot_json, '{}'::jsonb), 'siteBake')"
+            );
+    }
+
+    const [row] = await query
         .update(payload)
         .returning('*');
+
+    if (!row && !allowSiteModeMutation) {
+        const latest = await getTerrainWorkZoneById(scope, zoneId, db);
+        if (latest) assertGenericWorkZoneMutationAllowed(latest);
+    }
 
     return mapTerrainWorkZone(row);
 }
 
-export async function deleteTerrainWorkZone(scope, zoneId) {
-    const deleted = await scopedRecordsQuery('inventory_3d_terrain_work_zones', scope)
-        .where('records.id', zoneId)
+export async function deleteTerrainWorkZone(
+    scope,
+    zoneId,
+    db = knex,
+    { allowSiteModeMutation = false } = {},
+) {
+    const query = scopedRecordsQuery('inventory_3d_terrain_work_zones', scope, db)
+        .where('records.id', zoneId);
+    if (!allowSiteModeMutation) {
+        query
+            .whereRaw("COALESCE(records.metadata->>'purpose', '') <> 'site-mode'")
+            .whereRaw(
+                "NOT jsonb_exists(COALESCE(records.snapshot_json, '{}'::jsonb), 'siteBake')"
+            );
+    }
+    const deleted = await query
         .del();
+
+    if (deleted === 0 && !allowSiteModeMutation) {
+        const latest = await getTerrainWorkZoneById(scope, zoneId, db);
+        if (latest) assertGenericWorkZoneMutationAllowed(latest);
+    }
 
     return deleted > 0;
 }

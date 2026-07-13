@@ -4,8 +4,15 @@
  */
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 
-import { buildSiteBackdropData } from '../../src/3d-studio/model/siteBackdrop.js'
+import {
+  buildSiteBackdropData,
+  buildSiteImageryReloadKey,
+  mergeSiteImageryRuntime,
+  sampleTerrainHeightAtLocalPoint,
+  summarizeSiteImageryRuntime,
+} from '../../src/3d-studio/model/siteBackdrop.js'
 
 const focusZone = {
   originWgs84: { longitude: 104.067, latitude: 30.6505 },
@@ -57,6 +64,7 @@ describe('buildSiteBackdropData', () => {
     assert.equal(data.buildings.length, 1)
     const b = data.buildings[0]
     assert.equal(b.height, 30)
+    assert.equal(b.baseY, 0, '无地形时建筑落在 y=0')
     assert.ok(Array.isArray(b.footprint) && b.footprint.length >= 3, 'footprint 至少 3 点')
     assert.ok(
       b.footprint.every((p) => Array.isArray(p) && p.length === 2),
@@ -115,6 +123,24 @@ describe('buildSiteBackdropData 地形 drape', () => {
     assert.equal(data.terrain.positions[4 * 3 + 1], 5)
   })
 
+  it('建筑按 footprint 中心贴合 terrain，并叠加 minHeightMeters', () => {
+    const building = focusZoneWithTerrain.snapshotJson.osmBuildings.buildings[0]
+    const data = buildSiteBackdropData({
+      ...focusZoneWithTerrain,
+      snapshotJson: {
+        ...focusZoneWithTerrain.snapshotJson,
+        osmBuildings: {
+          buildings: [{ ...building, minHeightMeters: 2 }],
+        },
+      },
+    })
+
+    assert.ok(
+      Math.abs(data.buildings[0].baseY - 7) < 0.001,
+      `建筑底高应为 5m terrain + 2m minHeight，实际 ${data.buildings[0].baseY}`
+    )
+  })
+
   it('UV 落在 [0,1] 内（卫星覆盖 >= 地形范围）', () => {
     const data = buildSiteBackdropData(focusZoneWithTerrain)
     for (let i = 0; i < data.terrain.uvs.length; i += 1) {
@@ -123,5 +149,87 @@ describe('buildSiteBackdropData 地形 drape', () => {
         `uv[${i}]=${data.terrain.uvs[i]}`
       )
     }
+  })
+})
+
+describe('sampleTerrainHeightAtLocalPoint', () => {
+  const terrainPatch = {
+    rows: 2,
+    cols: 2,
+    heightsRelative: [0, 10, 20, 30],
+    boundsMeters: { minX: 0, maxX: 10, minZ: 0, maxZ: 10 },
+  }
+
+  it('在规则网格内部进行双线性插值', () => {
+    assert.equal(sampleTerrainHeightAtLocalPoint(terrainPatch, 5, 5), 15)
+    assert.equal(sampleTerrainHeightAtLocalPoint(terrainPatch, 2.5, 7.5), 17.5)
+  })
+
+  it('超出范围时贴到边界，缺少 terrain 时回退到 0', () => {
+    assert.equal(sampleTerrainHeightAtLocalPoint(terrainPatch, -10, 20), 20)
+    assert.equal(sampleTerrainHeightAtLocalPoint(null, 5, 5), 0)
+  })
+})
+
+describe('site backdrop imagery runtime', () => {
+  const descriptorStatus = {
+    imagery: { provider: 'xyz', status: 'ready', itemCount: 3, retryable: false },
+    terrain: { provider: 'terrain', status: 'ready', itemCount: 1, retryable: false },
+    buildings: { provider: 'osm', status: 'ready', itemCount: 2, retryable: false },
+  }
+
+  it('任一瓦片失败立即降级，descriptor ready 不会覆盖 runtime', () => {
+    const runtime = summarizeSiteImageryRuntime({ loaded: 1, failed: 1, total: 3 })
+    const merged = mergeSiteImageryRuntime(descriptorStatus, runtime)
+
+    assert.equal(runtime.status, 'degraded')
+    assert.equal(merged.imagery.status, 'degraded')
+    assert.equal(merged.imagery.itemCount, 3)
+    assert.match(merged.imagery.message, /成功 1，失败 1/)
+  })
+
+  it('全部瓦片或最终合成纹理失败时标记 failed', () => {
+    const allTilesFailed = summarizeSiteImageryRuntime({ loaded: 0, failed: 3, total: 3 })
+    const compositeFailed = summarizeSiteImageryRuntime({
+      loaded: 3,
+      failed: 0,
+      total: 3,
+      terminalFailure: true,
+    })
+
+    assert.equal(allTilesFailed.status, 'failed')
+    assert.equal(compositeFailed.status, 'failed')
+    assert.equal(mergeSiteImageryRuntime(descriptorStatus, compositeFailed).imagery.status, 'failed')
+  })
+
+  it('纹理重试 token 生成新 key，但相同 descriptor 和 token 保持稳定', () => {
+    const tiles = focusZone.orthophoto.tiles
+    const first = buildSiteImageryReloadKey(tiles, 0)
+
+    assert.equal(buildSiteImageryReloadKey(tiles, 0), first)
+    assert.notEqual(buildSiteImageryReloadKey(tiles, 1), first)
+    assert.equal(first.includes(tiles[0].url), false, 'key 不暴露瓦片 URL 或查询凭据')
+  })
+
+  it('纹理重载是独立 UI 路径，不调用保存、重烘焙或 revision', async () => {
+    const source = await readFile('src/views/app/SiteModePage.jsx', 'utf8')
+    const start = source.indexOf('const handleReloadImagery')
+    const end = source.indexOf('const effectiveProviderStatus', start)
+    assert.ok(start > 0 && end > start)
+
+    const handler = source.slice(start, end)
+    assert.match(handler, /setImageryReloadToken/)
+    assert.doesNotMatch(handler, /siteModeApi|revision|handleSave|handleRebake/)
+  })
+
+  it('场景自动保存不重建底图或重新请求卫星瓦片', async () => {
+    const source = await readFile('src/views/app/SiteModePage.jsx', 'utf8')
+    const start = source.indexOf('const handleSave = useCallback')
+    const end = source.indexOf('const handleReloadConflict', start)
+    assert.ok(start > 0 && end > start)
+
+    const handler = source.slice(start, end)
+    assert.match(handler, /siteModeApi\.saveSiteMode/)
+    assert.doesNotMatch(handler, /setBackdrop|buildSiteBackdropData|setImageryReloadToken/)
   })
 })

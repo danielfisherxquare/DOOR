@@ -26,6 +26,7 @@ function mapProject(row) {
         sourceWarehouseId: row.source_warehouse_id,
         sourceOrgId: row.source_org_id,
         primaryAssetId: row.primary_asset_id,
+        revision: Number(row.revision || 1),
         thumbnailDataUrl: row.thumbnail_data_url,
         lastOpenedAt: row.last_opened_at,
         createdBy: row.created_by,
@@ -65,12 +66,24 @@ export async function listProjectsByScope(scope) {
     return rows.map(mapProject);
 }
 
-export async function getProjectById(scope, projectId) {
+export async function getProjectById(scope, projectId, db = knex) {
     const row = await applyProjectScope(
-        knex('inventory_3d_projects'),
+        db('inventory_3d_projects'),
         scope,
     )
         .andWhere({ id: projectId })
+        .first();
+
+    return mapProject(row);
+}
+
+export async function getProjectByIdForUpdate(scope, projectId, trx) {
+    const row = await applyProjectScope(
+        trx('inventory_3d_projects'),
+        scope,
+    )
+        .andWhere({ id: projectId })
+        .forUpdate()
         .first();
 
     return mapProject(row);
@@ -101,10 +114,17 @@ export async function createProject(data) {
     return mapProject(row);
 }
 
-export async function updateProject(scope, projectId, data) {
+export async function updateProject(
+    scope,
+    projectId,
+    data,
+    { expectedRevision = null, db = knex, incrementRevision = true } = {},
+) {
     const payload = {
         updated_at: knex.fn.now(),
     };
+
+    if (incrementRevision) payload.revision = db.raw('revision + 1');
 
     if (data.name !== undefined) payload.name = data.name;
     if (data.sceneType !== undefined) payload.scene_type = data.sceneType;
@@ -119,6 +139,28 @@ export async function updateProject(scope, projectId, data) {
     if (data.primaryAssetId !== undefined) payload.primary_asset_id = data.primaryAssetId;
     if (data.lastOpenedAt !== undefined) payload.last_opened_at = data.lastOpenedAt;
     if (data.updatedBy !== undefined) payload.updated_by = data.updatedBy;
+
+    const [row] = await applyProjectScope(
+        db('inventory_3d_projects'),
+        scope,
+    )
+        .andWhere({ id: projectId })
+        .modify((query) => {
+            if (expectedRevision !== null && expectedRevision !== undefined) {
+                query.andWhere('revision', expectedRevision);
+            }
+        })
+        .update(payload)
+        .returning('*');
+
+    return mapProject(row);
+}
+
+export async function touchProjectLastOpened(scope, projectId, actorUserId = null) {
+    const payload = {
+        last_opened_at: knex.fn.now(),
+    };
+    if (actorUserId) payload.updated_by = actorUserId;
 
     const [row] = await applyProjectScope(
         knex('inventory_3d_projects'),

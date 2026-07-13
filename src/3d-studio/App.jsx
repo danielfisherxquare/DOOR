@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import { clearSceneHistory, useScene } from '@pascal-app/core'
 import useViewer from '../../node_modules/@pascal-app/viewer/dist/store/use-viewer.js'
 import PascalViewer from './PascalViewer'
@@ -22,6 +22,12 @@ import MoveTool from './tools/MoveTool'
 import RotateTool from './tools/RotateTool'
 import MeasureTool from './tools/MeasureTool'
 import OpeningPlacementTool from './tools/OpeningPlacementTool'
+import {
+  pickStudioSaveEnvelope,
+  planDirtySave,
+  planStudioSaveSuccess,
+  shouldRetainStudioSaveEnvelope,
+} from './savePersistence'
 
 const VIEW_PRESETS = [
   { id: 'iso', label: '轴测' },
@@ -41,6 +47,29 @@ const GIS_PREVIEW_MAX_BUILDING_MAJOR_METERS = 240
 const GIS_PREVIEW_MAX_BUILDING_AREA_SQM = 20000
 const GIS_PREVIEW_MAX_RIBBON_MAJOR_METERS = 120
 const GIS_PREVIEW_MAX_RIBBON_ASPECT_RATIO = 12
+
+function isRevisionConflictError(error) {
+  return Boolean(
+    error
+    && typeof error === 'object'
+    && error.status === 409
+    && (error.apiCode === 'REVISION_CONFLICT' || error.response?.data?.code === 'REVISION_CONFLICT')
+  )
+}
+
+function getSaveStatusLabel({ status, revision, lastSavedAt, sourceContext }) {
+  const sourceLabel = sourceContext ? ` · ${sourceContext.label}` : ''
+  if (status === 'readonly') return `本地预览 · 修改不会保存${sourceLabel}`
+  if (status === 'saving') return `正在保存…${sourceLabel}`
+  if (status === 'conflict') return `版本冲突 · 远端已有新版本${sourceLabel}`
+  if (status === 'error') return `保存失败 · 修改仍保留${sourceLabel}`
+  if (status === 'dirty') return `有未保存修改${sourceLabel}`
+  const revisionLabel = revision > 0 ? ` · r${revision}` : ''
+  const timeLabel = lastSavedAt
+    ? ` · ${new Date(lastSavedAt).toLocaleTimeString('zh-CN', { hour12: false })}`
+    : ''
+  return `已保存${revisionLabel}${timeLabel}${sourceLabel}`
+}
 
 function ToolButton({ active, label, onClick, secondary = false }) {
   return (
@@ -504,6 +533,8 @@ export default function Studio3DApp({
   warehouseMeta = {},
   sourceContext,
   siteBackdrop = null,
+  siteBackdropReloadToken = 0,
+  onSiteBackdropImageryRuntimeChange,
   focusZoneContext = null,
   focusZoneObjectsContext = [],
   focusZoneObjectSummary = null,
@@ -515,18 +546,40 @@ export default function Studio3DApp({
   onSaveTemplate,
   onSaveAsset,
   onBack,
+  autoSaveDelayMs = 0,
+  saveRevision = 0,
+  onSaveStateChange,
+  externalSaveConflict = false,
+  externalMutationRef,
 }) {
+  const canSave = Boolean(onSave)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveStatus, setSaveStatus] = useState(canSave ? 'saved' : 'readonly')
+  const [saveError, setSaveError] = useState(null)
+  const [lastSavedAt, setLastSavedAt] = useState(null)
+  const [activeRevision, setActiveRevision] = useState(Number(saveRevision) || 0)
+  const [operationLocked, setOperationLocked] = useState(false)
   const sceneLoadedRef = useRef(false)
   const previousSceneKeyRef = useRef(null)
   const lastSceneChangeDocumentRef = useRef(null)
+  const saveInFlightRef = useRef(false)
+  const savePromiseRef = useRef(null)
+  const pendingSaveEnvelopeRef = useRef(null)
+  const queuedSaveRef = useRef(false)
+  const autoSaveTimerRef = useRef(null)
+  const handleSaveRef = useRef(null)
+  const saveStatusRef = useRef(canSave ? 'saved' : 'readonly')
+  const revisionRef = useRef(Number(saveRevision) || 0)
+  const operationLockRef = useRef(false)
+  const sceneGenerationRef = useRef(0)
   const setScene = useScene((state) => state.setScene)
   const clearScene = useScene((state) => state.clearScene)
 
   const activeTool = useEditor((state) => state.activeTool)
   const sketchMode = useEditor((state) => state.sketchMode)
   const dirty = useEditor((state) => state.dirty)
+  const changeVersion = useEditor((state) => state.changeVersion)
   const viewportView = useEditor((state) => state.viewportView)
   const inferenceHint = useEditor((state) => state.inferenceHint)
   const sceneTreeOpen = useEditor((state) => state.sceneTreeOpen)
@@ -538,6 +591,7 @@ export default function Studio3DApp({
   const setTool = useEditor((state) => state.setTool)
   const setSketchMode = useEditor((state) => state.setSketchMode)
   const setDirty = useEditor((state) => state.setDirty)
+  const markSaved = useEditor((state) => state.markSaved)
   const setProjectName = useEditor((state) => state.setProjectName)
   const setSceneType = useEditor((state) => state.setSceneType)
   const setViewportView = useEditor((state) => state.setViewportView)
@@ -587,9 +641,42 @@ export default function Studio3DApp({
     return () => useViewer.getState().setProjectId(null)
   }, [sceneKey, warehouseMeta.id])
 
+  const updateSaveStatus = useCallback((nextStatus) => {
+    saveStatusRef.current = nextStatus
+    setSaveStatus(nextStatus)
+  }, [])
+
+  useEffect(() => {
+    const nextRevision = Number(saveRevision) || 0
+    revisionRef.current = nextRevision
+    setActiveRevision(nextRevision)
+  }, [saveRevision])
+
+  useEffect(() => {
+    if (!externalSaveConflict) return
+    window.clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = null
+    queuedSaveRef.current = false
+    pendingSaveEnvelopeRef.current = null
+    setSaveError('远端项目已有新版本')
+    updateSaveStatus('conflict')
+  }, [externalSaveConflict, updateSaveStatus])
+
+  useEffect(() => {
+    onSaveStateChange?.({
+      status: saveStatus,
+      revision: activeRevision,
+      lastSavedAt,
+      error: saveError,
+      dirty,
+      changeVersion,
+    })
+  }, [activeRevision, changeVersion, dirty, lastSavedAt, onSaveStateChange, saveError, saveStatus])
+
   useEffect(() => {
     if (sceneLoadedRef.current && previousSceneKeyRef.current === sceneKey) return
     previousSceneKeyRef.current = sceneKey
+    sceneGenerationRef.current += 1
     sceneLoadedRef.current = true
     lastSceneChangeDocumentRef.current = null
     clearScene()
@@ -601,9 +688,15 @@ export default function Studio3DApp({
     setSceneType(sceneType)
     setViewportView('iso')
     setCameraMode('perspective')
+    updateSaveStatus(canSave ? 'saved' : 'readonly')
+    setSaveError(null)
+    setLastSavedAt(null)
+    queuedSaveRef.current = false
+    pendingSaveEnvelopeRef.current = null
     setLoading(false)
   }, [
     clearScene,
+    canSave,
     initialScene,
     loadFromScene,
     resetEditor,
@@ -614,6 +707,7 @@ export default function Studio3DApp({
     setScene,
     setSceneType,
     setViewportView,
+    updateSaveStatus,
     warehouseMeta.name,
   ])
 
@@ -650,28 +744,189 @@ export default function Studio3DApp({
     return () => clearTimeout(timer)
   }, [buildSnapshot, dirty, document, onSceneChange])
 
-  const handleSave = useCallback(async () => {
-    if (!onSave) return
-    setSaving(true)
-    try {
-      await onSave({ snapshotJson: buildSnapshot() })
-      setDirty(false)
-    } finally {
-      setSaving(false)
+  const handleSave = useCallback(({ allowWhileLocked = false } = {}) => {
+    if (!onSave || saveStatusRef.current === 'conflict') return null
+    if (operationLockRef.current && !allowWhileLocked) return null
+    if (saveInFlightRef.current) {
+      if (!allowWhileLocked) queuedSaveRef.current = true
+      return savePromiseRef.current
     }
-  }, [buildSnapshot, onSave, setDirty])
+
+    if (autoSaveTimerRef.current) {
+      window.clearTimeout(autoSaveTimerRef.current)
+      autoSaveTimerRef.current = null
+    }
+
+    const saveTask = (async () => {
+      const nextEnvelope = {
+        sceneGeneration: sceneGenerationRef.current,
+        saveVersion: useEditor.getState().changeVersion,
+        snapshotJson: buildSnapshot(),
+        expectedRevision: revisionRef.current,
+        clientMutationId:
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `studio-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+      }
+      const saveEnvelope = pickStudioSaveEnvelope(
+        pendingSaveEnvelopeRef.current,
+        nextEnvelope,
+      )
+      let allowQueuedSave = true
+      saveInFlightRef.current = true
+      setSaving(true)
+      setSaveError(null)
+      updateSaveStatus('saving')
+      try {
+        const result = await onSave({
+          snapshotJson: saveEnvelope.snapshotJson,
+          expectedRevision: saveEnvelope.expectedRevision,
+          clientMutationId: saveEnvelope.clientMutationId,
+        })
+        if (saveEnvelope.sceneGeneration !== sceneGenerationRef.current) {
+          return result
+        }
+        if (pendingSaveEnvelopeRef.current === saveEnvelope) {
+          pendingSaveEnvelopeRef.current = null
+        }
+        const nextRevision = Number(result?.revision ?? result?.project?.revision)
+        if (Number.isFinite(nextRevision)) {
+          revisionRef.current = nextRevision
+          setActiveRevision(nextRevision)
+        }
+        const savedAt = result?.savedAt || new Date().toISOString()
+        setLastSavedAt(savedAt)
+        const successPlan = planStudioSaveSuccess(
+          saveEnvelope,
+          useEditor.getState().changeVersion,
+          autoSaveDelayMs,
+        )
+        markSaved(successPlan.savedVersion)
+        if (successPlan.queueLatest) queuedSaveRef.current = true
+        updateSaveStatus(successPlan.hasNewerEdits ? 'dirty' : 'saved')
+        return result
+      } catch (error) {
+        if (saveEnvelope.sceneGeneration !== sceneGenerationRef.current) {
+          return null
+        }
+        const conflict = isRevisionConflictError(error)
+        if (shouldRetainStudioSaveEnvelope(error)) {
+          pendingSaveEnvelopeRef.current = saveEnvelope
+        } else if (pendingSaveEnvelopeRef.current === saveEnvelope) {
+          pendingSaveEnvelopeRef.current = null
+        }
+        allowQueuedSave = !conflict
+        setSaveError(error?.message || '保存失败')
+        updateSaveStatus(conflict ? 'conflict' : 'error')
+        return null
+      } finally {
+        saveInFlightRef.current = false
+        setSaving(false)
+        const shouldRunQueuedSave =
+          queuedSaveRef.current && allowQueuedSave && !operationLockRef.current
+        queuedSaveRef.current = false
+        if (shouldRunQueuedSave) {
+          autoSaveTimerRef.current = window.setTimeout(() => {
+            void handleSaveRef.current?.()
+          }, Math.max(Number(autoSaveDelayMs) || 0, 250))
+        }
+      }
+    })()
+    savePromiseRef.current = saveTask
+    void saveTask.finally(() => {
+      if (savePromiseRef.current === saveTask) {
+        savePromiseRef.current = null
+      }
+    })
+    return saveTask
+  }, [autoSaveDelayMs, buildSnapshot, markSaved, onSave, updateSaveStatus])
+
+  useEffect(() => {
+    handleSaveRef.current = handleSave
+  }, [handleSave])
+
+  const pauseAndFlush = useCallback(async () => {
+    operationLockRef.current = true
+    setOperationLocked(true)
+    window.clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = null
+    queuedSaveRef.current = false
+
+    const activeSave = savePromiseRef.current
+    if (activeSave) await activeSave
+
+    window.clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = null
+    queuedSaveRef.current = false
+    if (saveStatusRef.current === 'conflict') return false
+
+    if (useEditor.getState().dirty) {
+      await handleSaveRef.current?.({ allowWhileLocked: true })
+    }
+
+    return (
+      !useEditor.getState().dirty &&
+      saveStatusRef.current !== 'error' &&
+      saveStatusRef.current !== 'conflict'
+    )
+  }, [])
+
+  const resumeAfterExternalMutation = useCallback(() => {
+    operationLockRef.current = false
+    setOperationLocked(false)
+  }, [])
+
+  useImperativeHandle(externalMutationRef, () => ({
+    pauseAndFlush,
+    resume: resumeAfterExternalMutation,
+  }), [pauseAndFlush, resumeAfterExternalMutation])
+
+  useEffect(() => {
+    const plan = planDirtySave({
+      hasSaveHandler: Boolean(onSave),
+      dirty,
+      saveStatus: saveStatusRef.current,
+      autoSaveDelayMs,
+      saveInFlight: saveInFlightRef.current,
+      savePaused: operationLocked,
+    })
+    if (plan.markDirty) {
+      updateSaveStatus('dirty')
+    }
+    if (plan.queueAfterFlight) {
+      queuedSaveRef.current = true
+      return undefined
+    }
+    if (!plan.scheduleAutoSave) return undefined
+
+    window.clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      void handleSaveRef.current?.()
+    }, Number(autoSaveDelayMs))
+    return () => window.clearTimeout(autoSaveTimerRef.current)
+  }, [autoSaveDelayMs, changeVersion, dirty, onSave, operationLocked, updateSaveStatus])
+
+  useEffect(() => () => {
+    window.clearTimeout(autoSaveTimerRef.current)
+  }, [])
 
   useEffect(() => {
     const handleKeyDown = (event) => {
+      if (operationLockRef.current) {
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+          event.preventDefault()
+        }
+        return
+      }
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target?.tagName)) return
       const key = event.key.toLowerCase()
       const chord = event.ctrlKey || event.metaKey
       if (chord && (key === 'y' || (event.shiftKey && key === 'z'))) {
         event.preventDefault()
-        redo()
+        if (redo()) setDirty(true)
       } else if (chord && key === 'z') {
         event.preventDefault()
-        undo()
+        if (undo()) setDirty(true)
       } else if (chord && key === 's') {
         event.preventDefault()
         handleSave()
@@ -750,7 +1005,11 @@ export default function Studio3DApp({
   }
 
   return (
-    <div className="studio-shell">
+    <div
+      className={`studio-shell ${operationLocked ? 'is-operation-locked' : ''}`.trim()}
+      aria-busy={operationLocked}
+      inert={operationLocked ? true : undefined}
+    >
       <header className={`studio-toolbar ${compactChrome ? 'is-compact' : ''}`.trim()}>
         <div className="studio-toolbar__left">
           {onBack && !embedded ? (
@@ -760,8 +1019,13 @@ export default function Studio3DApp({
           ) : null}
           <div className="studio-title-block">
             <strong>{projectName}</strong>
-            <span>
-              {dirty ? '未保存' : '已保存'} {sourceContext ? `· ${sourceContext.label}` : ''}
+            <span className={`studio-save-state is-${saveStatus}`} role="status" aria-live="polite">
+              {getSaveStatusLabel({
+                status: saveStatus,
+                revision: activeRevision,
+                lastSavedAt,
+                sourceContext,
+              })}
             </span>
           </div>
         </div>
@@ -907,9 +1171,16 @@ export default function Studio3DApp({
               资产
             </button>
           ) : null}
-          <button className="studio-save-btn" disabled={saving} onClick={handleSave} type="button">
-            {saving ? '保存中...' : '保存'}
-          </button>
+          {onSave ? (
+            <button
+              className="studio-save-btn"
+              disabled={saving || saveStatus === 'conflict' || operationLocked}
+              onClick={() => void handleSave()}
+              type="button"
+            >
+              {saving ? '保存中...' : saveStatus === 'error' ? '重试保存' : '保存'}
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -953,7 +1224,13 @@ export default function Studio3DApp({
               />
             ) : (
               <PascalViewer
-                backdrop={siteBackdrop ? <SiteBackdrop data={siteBackdrop} /> : null}
+                backdrop={siteBackdrop ? (
+                  <SiteBackdrop
+                    data={siteBackdrop}
+                    imageryReloadToken={siteBackdropReloadToken}
+                    onImageryRuntimeChange={onSiteBackdropImageryRuntimeChange}
+                  />
+                ) : null}
                 defaultView="iso"
                 enableBvh={enableViewerBvh}
                 enableShadows={!useLightweightViewer}
@@ -990,8 +1267,14 @@ export default function Studio3DApp({
         <PropertyInspector />
       </div>
 
+      {operationLocked ? (
+        <div className="studio-operation-lock">正在保存当前修改并重新生成卫星场地…</div>
+      ) : null}
+
       <style>{`
-        .studio-shell { display: flex; flex-direction: column; height: 100%; background: #e9edf2; color: #1f2d3d; }
+        .studio-shell { position: relative; display: flex; flex-direction: column; height: 100%; background: #e9edf2; color: #1f2d3d; }
+        .studio-shell.is-operation-locked { cursor: wait; }
+        .studio-operation-lock { position: absolute; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(237, 241, 246, 0.72); color: #263b52; font-size: 13px; font-weight: 800; backdrop-filter: blur(2px); }
         .studio-loading { display: grid; place-items: center; height: 100%; color: #1f2d3d; font-weight: 700; }
         .studio-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border-bottom: 1px solid #cfd7e2; background: linear-gradient(180deg, #fbfcfd, #eef2f6); }
         .studio-toolbar.is-compact { padding: 6px 8px; gap: 8px; }
@@ -1002,6 +1285,9 @@ export default function Studio3DApp({
         .studio-title-block { display: grid; gap: 2px; }
         .studio-title-block strong { font-size: 14px; }
         .studio-title-block span { font-size: 11px; color: #5a6a7d; }
+        .studio-save-state.is-dirty, .studio-save-state.is-saving { color: var(--warning, #b45309); }
+        .studio-save-state.is-error, .studio-save-state.is-conflict { color: var(--danger, #b91c1c); }
+        .studio-save-state.is-saved { color: var(--success, #047857); }
         .studio-tool-btn, .studio-link-btn, .studio-save-btn { border: 1px solid #d5dbe4; background: #fff; color: #1f2d3d; min-height: 30px; padding: 0 10px; cursor: pointer; font-size: 12px; font-weight: 700; }
         .studio-tool-btn.is-active { background: #2f5ea5; border-color: #2f5ea5; color: #fff; }
         .studio-tool-btn.is-secondary { opacity: 0.92; }

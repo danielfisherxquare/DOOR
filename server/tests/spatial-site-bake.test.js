@@ -11,6 +11,7 @@ import {
     assembleSiteFocusZone,
     parseSiteBakeBbox,
 } from '../src/modules/inventory/inventory.spatial.site-bake.service.js';
+import { buildTerrainPatchForZone } from '../src/modules/inventory/inventory.spatial.terrain.service.js';
 
 const BBOX = { west: 104.06, south: 30.645, east: 104.074, north: 30.656 };
 
@@ -101,5 +102,51 @@ describe('assembleSiteFocusZone', () => {
         assert.equal(zone.zoneType, 'site');
         assert.equal(zone.snapshotJson.terrainPatch, null);
         assert.deepEqual(zone.snapshotJson.osmBuildings.buildings, []);
+    });
+});
+
+describe('DEM timeout contract', () => {
+    it('aborts a stalled DEM request before the client bake timeout', async () => {
+        const stalledFetch = async (_url, { signal }) => new Promise((_resolve, reject) => {
+            signal.addEventListener('abort', () => {
+                const error = new Error('aborted');
+                error.name = 'AbortError';
+                reject(error);
+            }, { once: true });
+        });
+
+        await assert.rejects(
+            buildTerrainPatchForZone({
+                clipPolygonWgs84: bboxToClipPolygon(BBOX),
+                originWgs84: bboxCenter(BBOX),
+                terrainResolution: 50,
+            }, { timeoutMs: 100 }, stalledFetch),
+            /公开 DEM 服务请求超时（100ms）/,
+        );
+    });
+
+    it('includes Retry-After backoff in the total DEM timeout', async () => {
+        let fetchCount = 0;
+        const rateLimitedFetch = async () => {
+            fetchCount += 1;
+            return {
+                ok: false,
+                status: 429,
+                headers: { get: () => '120' },
+            };
+        };
+        const startedAt = Date.now();
+
+        await assert.rejects(
+            buildTerrainPatchForZone({
+                clipPolygonWgs84: bboxToClipPolygon(BBOX),
+                originWgs84: bboxCenter(BBOX),
+                terrainResolution: 50,
+            }, { timeoutMs: 100 }, rateLimitedFetch),
+            /公开 DEM 服务请求超时（100ms）/,
+        );
+
+        assert.equal(fetchCount, 1, 'deadline must abort before another upstream request');
+        assert.ok(Date.now() - startedAt < 500, 'Retry-After must not extend the total timeout');
     });
 });

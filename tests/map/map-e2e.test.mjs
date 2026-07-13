@@ -18,6 +18,15 @@ const mockUser = {
   mustChangePassword: false,
   surfaceAccess: { app: true, admin: true, ops: true },
   scopedCapabilities: { inventory: ['3d_studio'] },
+  moduleAccess: ['app:home', 'app:profile', 'app:map', 'app:3d-studio'],
+  authzProfile: {
+    scopeType: 'org',
+    orgId: 'org-codex',
+    raceId: null,
+    surfaces: ['app', 'admin', 'ops'],
+    modules: ['app:home', 'app:profile', 'app:map', 'app:3d-studio'],
+    scopedCapabilities: { inventory: ['3d_studio'] },
+  },
   preferences: {},
 };
 
@@ -37,7 +46,13 @@ async function startViteServer() {
     [viteBin, '--host', '127.0.0.1', '--port', port, '--strictPort'],
     {
       cwd: repoRoot,
-      env: { ...process.env, BROWSER: 'none' },
+      env: {
+        ...process.env,
+        BROWSER: 'none',
+        // Keep the provider-failure fixture deterministic even when a developer
+        // has a valid token in a local .env file.
+        VITE_CESIUM_ION_TOKEN: 'invalid-e2e-token',
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   );
@@ -116,6 +131,14 @@ async function openMapPage(browser, baseUrl, options = {}) {
       });
       return;
     }
+    if (url.includes('/api/authz/profile')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, data: mockUser.authzProfile }),
+      });
+      return;
+    }
     if (url.includes('/api/profile/context-options')) {
       await route.fulfill({
         status: 200,
@@ -176,13 +199,51 @@ async function openMapPage(browser, baseUrl, options = {}) {
       },
       version: 0,
     }));
+    localStorage.setItem('workspace-session', JSON.stringify({
+      state: {
+        session: {
+          orgId: 'org-codex',
+          orgName: 'Codex Org',
+          raceId: '',
+          raceName: '',
+          scopeType: 'org',
+          surface: 'app',
+          lastAppPath: '/app/map',
+          lastOpsPath: '/ops',
+          lastAdminPath: '/admin',
+        },
+      },
+      version: 0,
+    }));
   }, mockUser);
 
-  await page.goto(`${baseUrl}/app/map${options.query || '?orgId=org-codex'}`, {
+  const targetPath = `/app/map${options.query || ''}`;
+  await page.goto(`${baseUrl}${targetPath}`, {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
-  await page.locator('.map-view-2d__panel--ovi-toolbar').waitFor({ state: 'visible', timeout: 20_000 });
+  await page.waitForFunction(
+    () => {
+      const state = JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state;
+      return state?.isAuthenticated === true && state?.user?.authzProfile?.modules?.includes('app:map');
+    },
+    null,
+    { timeout: 20_000 },
+  );
+  await page.evaluate((path) => {
+    if (`${window.location.pathname}${window.location.search}` === path) return;
+    window.history.pushState({}, '', path);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, targetPath);
+  try {
+    await page.locator('.map-view-2d__panel--ovi-toolbar').waitFor({ state: 'visible', timeout: 20_000 });
+  } catch (error) {
+    const pageText = await page.locator('body').innerText().catch(() => '');
+    throw new Error(
+      `${error.message}\nCurrent URL: ${page.url()}\nPage text: ${pageText.slice(0, 1200)}`,
+      { cause: error },
+    );
+  }
   const skipOnboarding = page.getByRole('button', { name: '跳过引导' });
   if (await skipOnboarding.isVisible().catch(() => false)) {
     await skipOnboarding.click();
@@ -234,7 +295,7 @@ function relevantConsoleErrors(errors) {
 
 async function drawAllShapesAndSave(browser, baseUrl, tempDir) {
   const { page, apiCalls, consoleErrors } = await openMapPage(browser, baseUrl, {
-    query: '?projectId=project-codex&orgId=org-codex',
+    query: '?projectId=project-codex',
   });
   try {
     await waitForFeatureCount(page, 0);
@@ -286,11 +347,20 @@ async function drawAllShapesAndSave(browser, baseUrl, tempDir) {
     assert.equal(exported.features.length, 6);
 
     await page.locator('.map-view-2d__tool-chip').filter({ hasText: '保存' }).click();
-    await page.waitForFunction(
-      () => Array.from(document.querySelectorAll('.map-view-2d__sync-pill')).some((node) => node.textContent?.includes('已同步')),
-      null,
-      { timeout: 12_000 },
-    );
+    try {
+      await page.waitForFunction(
+        () => Array.from(document.querySelectorAll('.map-view-2d__sync-pill')).some((node) => node.textContent?.includes('已同步')),
+        null,
+        { timeout: 12_000 },
+      );
+    } catch (error) {
+      const saveCalls = apiCalls.filter((call) => call.url.includes('/api/app/3d-studio'));
+      const pageText = await page.locator('body').innerText().catch(() => '');
+      throw new Error(
+        `${error.message}\nCurrent URL: ${page.url()}\n3D API calls: ${JSON.stringify(saveCalls)}\nPage text: ${pageText.slice(0, 1200)}`,
+        { cause: error },
+      );
+    }
     const savePosts = apiCalls.filter((call) =>
       call.method === 'POST' &&
       call.url.includes('/api/app/3d-studio/projects/project-codex/spatial-objects')
@@ -387,12 +457,65 @@ async function importObjectAndMeasurementWorkflows(browser, baseUrl, tempDir) {
   }
 }
 
+async function verifyRequired3dProviderFailureNeverReportsReady(browser, baseUrl) {
+  const { page, consoleErrors } = await openMapPage(browser, baseUrl);
+  try {
+    await page.route('https://api.cesium.com/**', async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: 'Unauthorized test fixture' }),
+      });
+    });
+    await page.locator('button[title^="视图:"]').click();
+    await page.locator('.map-controls__menu-item').filter({ hasText: '三维地球' }).click();
+    await page.locator('button[title^="OSM 白模"]').click();
+
+    const providerStatus = page.locator('[data-testid="map-provider-status"]');
+    try {
+      await providerStatus.waitFor({ state: 'visible', timeout: 30_000 });
+    } catch (error) {
+      const pageText = await page.locator('body').innerText().catch(() => '');
+      throw new Error(
+        `${error.message}\nCurrent URL: ${page.url()}\nConsole errors: ${JSON.stringify(consoleErrors)}\nPage text: ${pageText.slice(0, 1600)}`,
+        { cause: error },
+      );
+    }
+    try {
+      await page.locator(
+        '[data-provider="buildings"][data-status="unavailable"], [data-provider="buildings"][data-status="failed"]',
+      ).waitFor({
+        state: 'visible',
+        timeout: 10_000,
+      });
+    } catch (error) {
+      const providerHtml = await providerStatus.evaluate((node) => node.outerHTML).catch(() => '');
+      throw new Error(`${error.message}\nProvider HUD: ${providerHtml}`, { cause: error });
+    }
+
+    assert.notEqual(await providerStatus.getAttribute('data-status'), 'ready');
+    assert.equal(await page.locator('[data-experience-status="error"]').count(), 1);
+    assert.equal(await page.getByText('三维地球已就绪', { exact: true }).count(), 0);
+  } finally {
+    await page.close();
+  }
+}
+
 test('GIS map drawing, exchange, project save, and object workflows', { timeout: 180_000 }, async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), 'door-map-e2e-'));
   const { baseUrl, cleanup } = await startViteServer();
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--enable-webgl',
+      '--ignore-gpu-blocklist',
+      '--use-angle=swiftshader',
+      '--enable-unsafe-swiftshader',
+    ],
+  });
 
   try {
+    await verifyRequired3dProviderFailureNeverReportsReady(browser, baseUrl);
     await drawAllShapesAndSave(browser, baseUrl, tempDir);
     await importObjectAndMeasurementWorkflows(browser, baseUrl, tempDir);
   } finally {

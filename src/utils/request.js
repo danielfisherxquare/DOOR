@@ -63,10 +63,13 @@ function extractErrorMessage(error) {
 }
 
 function normalizeRequestError(error) {
+  const responseData = error.response?.data
   const normalized = new Error(extractErrorMessage(error))
   normalized.name = 'RequestError'
   normalized.status = error.response?.status
   normalized.code = error.code
+  normalized.apiCode = responseData?.code || null
+  normalized.details = responseData?.data || null
   normalized.response = error.response
   normalized.cause = error
   return normalized

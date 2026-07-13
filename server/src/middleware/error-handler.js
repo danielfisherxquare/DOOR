@@ -76,6 +76,9 @@ export function errorHandler(err, req, res, _next) {
     res.status(status).json({
         success: false,
         message,
+        ...(err.expose && err.publicCode ? { code: err.publicCode } : {}),
+        ...(err.expose && err.data ? { data: err.data } : {}),
+        ...(req.id ? { requestId: req.id } : {}),
         ...(env.NODE_ENV === 'development' && { stack: err.stack }),
     });
 }

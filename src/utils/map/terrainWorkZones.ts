@@ -35,6 +35,18 @@ function normalizePolygonGeometry(geometry: any): GeoJSON.Polygon | undefined {
   return nextGeometry;
 }
 
+export function isSiteModeBoundTerrainWorkZone(value: any): boolean {
+  return value?.siteModeBound === true
+    || value?.metadata?.purpose === 'site-mode'
+    || Boolean(value?.snapshotJson?.siteBake);
+}
+
+export function isInternalMapSelectionExportZone(value: any): boolean {
+  return value?.metadata?.internal === true
+    || value?.metadata?.purpose === 'map-selection-export'
+    || value?.metadata?.source === 'map-selection-export';
+}
+
 export function terrainWorkZoneToMapNode(zone: any): MapTreeNode {
   const preset = getTerrainWorkZonePreset(zone?.zoneType);
   const manifestSummary = zone?.publishTarget?.manifestSummary || null;
@@ -57,6 +69,7 @@ export function terrainWorkZoneToMapNode(zone: any): MapTreeNode {
     strokeOpacity: 0.95,
     focusZoneId: zone?.id || null,
     backendWorkZoneId: zone?.id || null,
+    siteModeBound: isSiteModeBoundTerrainWorkZone(zone),
     zoneType: zone?.zoneType || 'focus-zone',
     terrainResolution: zone?.terrainResolution ?? 2,
     terrainPatchGeneratedAt: zone?.metadata?.terrainPatchGeneratedAt || zone?.snapshotJson?.terrainPatch?.sampledAt || null,
@@ -104,6 +117,7 @@ export function terrainWorkZoneToGeoJSONFeature(zone: any, nodeId?: string): Geo
       fillOpacity: nextNode.fillOpacity,
       focusZoneId: nextNode.focusZoneId,
       backendWorkZoneId: nextNode.backendWorkZoneId,
+      siteModeBound: nextNode.siteModeBound,
       zoneType: nextNode.zoneType,
       terrainResolution: nextNode.terrainResolution,
       terrainPatchGeneratedAt: nextNode.terrainPatchGeneratedAt,

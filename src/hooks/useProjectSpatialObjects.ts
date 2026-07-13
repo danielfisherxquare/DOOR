@@ -2,7 +2,11 @@ import { useEffect } from 'react';
 import { useMapStore } from '../stores/mapStore';
 import studioProjectApi from '../services/studioProjectApi';
 import { spatialObjectToGeoJSONFeature, spatialObjectToMapNode } from '../utils/map/spatialObjects';
-import { terrainWorkZoneToGeoJSONFeature, terrainWorkZoneToMapNode } from '../utils/map/terrainWorkZones';
+import {
+  isInternalMapSelectionExportZone,
+  terrainWorkZoneToGeoJSONFeature,
+  terrainWorkZoneToMapNode,
+} from '../utils/map/terrainWorkZones';
 import { showError } from '../utils/toast';
 
 function normalizeStudioProjectId(projectId?: string | null) {
@@ -53,7 +57,9 @@ export default function useProjectSpatialObjects(projectId?: string | null, orgI
       .then(([spatialResponse, terrainResponse]) => {
         if (!active) return;
         const objects = Array.isArray(spatialResponse?.data) ? spatialResponse.data : [];
-        const zones = Array.isArray(terrainResponse?.data) ? terrainResponse.data : [];
+        const zones = Array.isArray(terrainResponse?.data)
+          ? terrainResponse.data.filter((zone) => !isInternalMapSelectionExportZone(zone))
+          : [];
         const syncedNodes = [
           ...zones.map((item) => terrainWorkZoneToMapNode(item)),
           ...objects.map((item) => spatialObjectToMapNode(item)),

@@ -11,6 +11,7 @@ import {
     tilesCoveringBbox,
     buildEsriWorldImageryTileUrl,
     buildTiandituImageryTileUrl,
+    countTilesCoveringBbox,
     describeOrthophotoForBbox,
 } from '../src/modules/inventory/inventory.spatial.orthophoto.service.js';
 
@@ -113,6 +114,21 @@ describe('describeOrthophotoForBbox', () => {
         const desc = describeOrthophotoForBbox(bbox, { maxTiles: 64 });
         assert.ok(desc.tiles.length <= 64, `tiles=${desc.tiles.length}`);
         assert.ok(desc.zoom >= 1 && desc.zoom <= 21);
+    });
+
+    it('显式高 zoom 也会降级到瓦片预算内，且计数不先分配百万对象', () => {
+        const largeBbox = { west: 104, south: 30, east: 104.25, north: 30.25 };
+        assert.ok(countTilesCoveringBbox(largeBbox, 21) > 1_000_000);
+
+        const desc = describeOrthophotoForBbox(largeBbox, { zoom: 21, maxTiles: 8 });
+        assert.ok(desc.zoom < 21);
+        assert.ok(desc.tiles.length <= 8, `tiles=${desc.tiles.length}`);
+    });
+
+    it('服务端硬上限不允许客户端请求无限瓦片对象', () => {
+        const largeBbox = { west: 104, south: 30, east: 104.25, north: 30.25 };
+        const desc = describeOrthophotoForBbox(largeBbox, { zoom: 21, maxTiles: 1_000_000_000 });
+        assert.ok(desc.tiles.length <= 256, `tiles=${desc.tiles.length}`);
     });
 
     it('provider=tianditu 时输出天地图瓦片 URL（带 tk）', () => {

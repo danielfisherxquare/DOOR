@@ -61,6 +61,11 @@ export default function MapObjectTree() {
   const confirmDelete = async () => {
     const node = pendingDelete;
     if (!node) return;
+    if (node.siteModeBound) {
+      showError('卫星场地区域已绑定 3D 项目，不能从图层树删除；可以先隐藏图层。');
+      setPendingDelete(null);
+      return;
+    }
     try {
       recordHistory();
       if (projectId && node.backendObjectId) {
@@ -179,7 +184,7 @@ export default function MapObjectTree() {
           <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>{node.visible === false ? 'visibility_off' : 'visibility'}</span>
         </button>
       )}
-      {node.type === 'feature' && node.source !== 'studio-derived' && (
+      {node.type === 'feature' && node.source !== 'studio-derived' && !node.siteModeBound && (
         <button
           className="btn btn--sm btn--icon btn--ghost"
           style={{ padding: '4px', height: '24px', width: '24px', color: 'var(--danger)' }}

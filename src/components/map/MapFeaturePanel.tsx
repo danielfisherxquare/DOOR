@@ -1,17 +1,27 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useMapStore } from '../../stores/mapStore'
 import MapAdvancedPanel from './MapAdvancedPanel'
 import { CommandDetailPane } from '../command/CommandPrimitives'
 import studioProjectApi from '../../services/studioProjectApi'
+import siteModeApi, {
+  createSiteMutationId,
+  type GeoJsonPolygon,
+  type UpsertSiteFocusZoneInput,
+} from '../../services/siteModeApi'
 import {
   getSpatialObjectLabel,
   mapNodeToSpatialObjectPayload,
 } from '../../utils/map/spatialObjects'
-import { getTerrainWorkZoneLabel, terrainWorkZoneToMapNode } from '../../utils/map/terrainWorkZones'
+import {
+  getTerrainWorkZoneLabel,
+  isSiteModeBoundTerrainWorkZone,
+  terrainWorkZoneToMapNode,
+} from '../../utils/map/terrainWorkZones'
 import { measureGeometry } from '../../utils/map/measurements'
 import { geometryToBbox } from '../../utils/map/geometryBbox'
 import { createBlankStudioScene } from '../../utils/studioProjectUtils'
+import { createSiteProjectSnapshot } from '../../utils/map/siteModePersistence'
 import { buildAppHref } from '../app/appConfig'
 import { showError, showSuccess } from '../../utils/toast'
 import './MapFeaturePanel.css'
@@ -45,7 +55,13 @@ export default function MapFeaturePanel({
   const [activeTab, setActiveTab] = useState<TabType>('properties')
   const [syncing, setSyncing] = useState(false)
   const [localProjectId, setLocalProjectId] = useState<string | null>(null)
+  const [exportWorkZoneBinding, setExportWorkZoneBinding] = useState<{
+    id: string
+    projectId: string
+    nodeId: string
+  } | null>(null)
   const [exportDiagnostics, setExportDiagnostics] = useState<any>(null)
+  const pendingSiteBakeMutationRef = useRef<{ key: string; id: string } | null>(null)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -66,6 +82,7 @@ export default function MapFeaturePanel({
 
   const isStudioDerived = node.source === 'studio-derived'
   const isTerrainWorkZone = node.source === 'terrain-work-zone' || Boolean(node.backendWorkZoneId)
+  const isSiteModeBound = isSiteModeBoundTerrainWorkZone(node)
   const activeWorkZoneId = node.backendWorkZoneId || node.focusZoneId || null
   const detailSubtitle = isTerrainWorkZone
     ? `工作区: ${getTerrainWorkZoneLabel(node.zoneType)}`
@@ -94,6 +111,10 @@ export default function MapFeaturePanel({
 
   const handleSync = async () => {
     if (!projectId || isStudioDerived) return
+    if (isSiteModeBound) {
+      showError('卫星场地区域必须使用“生成 / 更新卫星场地”，以同步重建参考数据和项目版本')
+      return
+    }
     setSyncing(true)
     try {
       let response
@@ -166,6 +187,10 @@ export default function MapFeaturePanel({
 
   const handleDeleteRemote = async () => {
     if (!projectId) return
+    if (isSiteModeBound) {
+      showError('卫星场地区域已绑定 3D 项目，不能从通用地图对象入口删除')
+      return
+    }
     setSyncing(true)
     try {
       if (isTerrainWorkZone) {
@@ -193,9 +218,10 @@ export default function MapFeaturePanel({
       sourceProjectId: targetProjectId || undefined,
       backendWorkZoneId: zoneRecord.id,
       focusZoneId: zoneRecord.id,
+      siteModeBound: isSiteModeBoundTerrainWorkZone(zoneRecord),
       zoneType: nextNode.zoneType,
       terrainResolution: nextNode.terrainResolution,
-      includedObjectIds: [],
+      includedObjectIds: nextNode.includedObjectIds,
       geometry: nextNode.geometry || node.geometry,
       terrainPatchGeneratedAt: nextNode.terrainPatchGeneratedAt,
       terrainHeightDeltaMeters: nextNode.terrainHeightDeltaMeters,
@@ -235,6 +261,7 @@ export default function MapFeaturePanel({
         jobRecord.generatedScene?.manifestJson?.stats?.osmBuildingCount ??
         undefined,
       generatedSceneOsmDiagnostics: osmDiagnostics || undefined,
+      syncStatus: 'synced',
     })
   }
 
@@ -303,17 +330,51 @@ export default function MapFeaturePanel({
       },
       metadata: {
         source: 'map-selection-export',
+        purpose: 'map-selection-export',
+        internal: true,
         sourceNodeId: node.id,
+        sourceSiteFocusZoneId: isSiteModeBound ? activeWorkZoneId : null,
         semanticObjectMode: 'disabled',
       },
       status: 'ready',
     }
-    const response = activeWorkZoneId
-      ? await studioProjectApi.updateTerrainWorkZone(activeWorkZoneId, payload, orgId || undefined)
+    let reusableExportZoneId = isSiteModeBound
+      ? exportWorkZoneBinding?.projectId === targetProjectId
+        && exportWorkZoneBinding?.nodeId === node.id
+        ? exportWorkZoneBinding.id
+        : null
+      : activeWorkZoneId
+    if (isSiteModeBound && !reusableExportZoneId) {
+      const zonesResponse = await studioProjectApi.listTerrainWorkZones(
+        targetProjectId,
+        {},
+        orgId || undefined
+      )
+      const exportZones = Array.isArray(zonesResponse?.data) ? zonesResponse.data : []
+      const existingExportZone = exportZones
+        .filter((zone) =>
+          zone?.metadata?.purpose === 'map-selection-export'
+          && zone?.metadata?.sourceSiteFocusZoneId === activeWorkZoneId
+        )
+        .sort((left, right) =>
+          String(right?.updatedAt || '').localeCompare(String(left?.updatedAt || ''))
+        )[0]
+      reusableExportZoneId = existingExportZone?.id || null
+    }
+    const response = reusableExportZoneId
+      ? await studioProjectApi.updateTerrainWorkZone(
+          reusableExportZoneId,
+          payload,
+          orgId || undefined
+        )
       : await studioProjectApi.createTerrainWorkZone(targetProjectId, payload, orgId || undefined)
     const zoneRecord = response?.data
     if (!zoneRecord?.id) throw new Error('工作区创建结果无效')
-    updateNodeFromWorkZone(zoneRecord, targetProjectId)
+    if (isSiteModeBound) {
+      setExportWorkZoneBinding({ id: zoneRecord.id, projectId: targetProjectId, nodeId: node.id })
+    } else {
+      updateNodeFromWorkZone(zoneRecord, targetProjectId)
+    }
     return zoneRecord
   }
 
@@ -328,7 +389,9 @@ export default function MapFeaturePanel({
       orgId || undefined
     )
     const updatedZone = result?.data?.zone || zoneRecord
-    updateNodeFromWorkZone(updatedZone, updatedZone.projectId || zoneRecord.projectId || projectId)
+    if (!isSiteModeBound) {
+      updateNodeFromWorkZone(updatedZone, updatedZone.projectId || zoneRecord.projectId || projectId)
+    }
     return updatedZone
   }
 
@@ -452,21 +515,136 @@ export default function MapFeaturePanel({
     }
   }
 
-  // 框选 → 卫星场地：用选区 bbox 直接进入场地模式编辑器（轻量同步烘焙，独立于上面的导出管线）
+  // 框选 → 卫星场地：先绑定真实项目与工作区，再进入可持久化的场地编辑器。
   const siteBbox = geometryToBbox(node.geometry)
-  const handleGenerateSiteScene = () => {
-    if (!siteBbox) {
+  const canGenerateSite = Boolean(siteBbox && node.geometry?.type === 'Polygon')
+
+  const ensureSiteProject = async () => {
+    if (projectId) {
+      const currentProject = await siteModeApi.getProject(projectId, orgId || undefined)
+      const supportsSiteMode = currentProject.sceneType === 'outdoor-event'
+        && ['site', 'mixed', 'venue'].includes(currentProject.projectType)
+      if (supportsSiteMode) return currentProject
+    }
+    if (!orgId) throw new Error('当前地图缺少机构上下文')
+    if (!siteBbox) throw new Error('当前选区缺少合法边界')
+
+    const projectName = `赛事场地 - ${node.name || '未命名选区'}`
+    const geoAnchor = {
+      longitude: (siteBbox.west + siteBbox.east) / 2,
+      latitude: (siteBbox.south + siteBbox.north) / 2,
+      height: 0,
+    }
+    const createdProject = await siteModeApi.createProject({
+      name: projectName,
+      sceneType: 'outdoor-event',
+      projectType: 'site',
+      status: 'draft',
+      sourceType: 'blank',
+      geoAnchor,
+      snapshotJson: createSiteProjectSnapshot({ name: projectName }),
+    }, orgId)
+
+    setLocalProjectId(createdProject.id)
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('projectId', createdProject.id)
+    nextParams.set('orgId', orgId)
+    if (raceId) nextParams.set('raceId', raceId)
+    setSearchParams(nextParams, { replace: true })
+    return createdProject
+  }
+
+  const buildSiteFocusZoneInput = (): UpsertSiteFocusZoneInput => {
+    if (!node.geometry || node.geometry.type !== 'Polygon' || !siteBbox) {
+      throw new Error('请选择一个矩形或面域选区再生成场地')
+    }
+
+    return {
+      name: node.name || '赛事场地重点区',
+      zoneType: 'focus-zone',
+      clipPolygonWgs84: node.geometry as GeoJsonPolygon,
+      originWgs84: {
+        longitude: (siteBbox.west + siteBbox.east) / 2,
+        latitude: (siteBbox.south + siteBbox.north) / 2,
+        height: 0,
+      },
+      terrainResolution: node.terrainResolution ?? 2,
+      includedObjectIds: node.includedObjectIds || [],
+      publishTarget: {
+        mode: 'focus-zone',
+        sourceNodeId: node.id,
+      },
+      metadata: {
+        source: 'map-feature-panel',
+        purpose: 'site-mode',
+        sourceNodeId: node.id,
+      },
+      status: 'ready',
+    }
+  }
+
+  const handleGenerateSiteScene = async () => {
+    if (!canGenerateSite) {
       showError('请选择一个矩形或面域选区再生成场地')
       return
     }
-    const href = buildAppHref('/3d-studio/site', { orgId: orgId || undefined })
-    const url = new URL(href, window.location.origin)
-    url.searchParams.set(
-      'bbox',
-      `${siteBbox.west},${siteBbox.south},${siteBbox.east},${siteBbox.north}`
-    )
-    if (node.name) url.searchParams.set('name', node.name)
-    navigate(url.pathname + url.search)
+
+    setSyncing(true)
+    try {
+      const targetProject = await ensureSiteProject()
+      const focusZoneInput = buildSiteFocusZoneInput()
+      const reusableFocusZoneId = activeWorkZoneId
+        && node.sourceProjectId === targetProject.id
+        ? activeWorkZoneId
+        : undefined
+      const mutationKey = JSON.stringify({
+        projectId: targetProject.id,
+        sourceNodeId: node.id,
+        focusZoneId: reusableFocusZoneId || null,
+        focusZone: focusZoneInput,
+      })
+      const pendingMutation = pendingSiteBakeMutationRef.current
+      const clientMutationId = pendingMutation?.key === mutationKey
+        ? pendingMutation.id
+        : createSiteMutationId()
+      pendingSiteBakeMutationRef.current = { key: mutationKey, id: clientMutationId }
+      const baked = await siteModeApi.bakeProjectSite(targetProject.id, {
+        ...(reusableFocusZoneId ? { focusZoneId: reusableFocusZoneId } : {}),
+        focusZone: focusZoneInput,
+        expectedRevision: targetProject.revision,
+        clientMutationId,
+      }, orgId || undefined)
+      pendingSiteBakeMutationRef.current = null
+
+      const bakedFocusZone = baked.focusZone || baked.workZone
+      updateNodeFromWorkZone(bakedFocusZone, targetProject.id)
+      if (baked.bakeStatus === 'failed') {
+        showError(
+          baked.warnings.length > 0
+            ? `场地项目已创建，但参考数据生成失败：${baked.warnings.join('；')}`
+            : '场地项目已创建，但卫星影像、地形与建筑参考数据均未生成'
+        )
+        return
+      }
+      const href = buildAppHref('/3d-studio/site', {
+        orgId: orgId || undefined,
+        raceId: raceId || undefined,
+      })
+      const url = new URL(href, window.location.origin)
+      url.searchParams.set('projectId', targetProject.id)
+      url.searchParams.set('focusZoneId', bakedFocusZone.id)
+      showSuccess(
+        baked.bakeStatus === 'degraded'
+          ? `场地已生成，${baked.warnings.length || 1} 项参考数据降级`
+          : '卫星场地已生成'
+      )
+      navigate(url.pathname + url.search)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '未知错误'
+      showError(`生成卫星场地失败：${message}`)
+    } finally {
+      setSyncing(false)
+    }
   }
 
   const getTabs = () => (
@@ -555,19 +733,24 @@ export default function MapFeaturePanel({
               </span>
             </div>
 
-            {siteBbox && (
+            {canGenerateSite && (
               <div className="feature-form-group">
                 <label>卫星场地</label>
                 <button
                   type="button"
                   className="btn btn--primary"
                   onClick={handleGenerateSiteScene}
-                  title="用当前选区生成卫星底图 + 地形 + 白模的可编辑场地"
+                  disabled={syncing}
+                  title="将当前选区绑定到真实项目，并生成卫星底图、地形与白模"
                 >
-                  生成卫星场地
+                  {syncing
+                    ? '正在生成场地…'
+                    : projectId
+                      ? '生成 / 更新卫星场地'
+                      : '创建场地项目并生成'}
                 </button>
                 <span className="feature-panel-help">
-                  在卫星底图上叠加白模建筑，直接搭建赛事现场结构。
+                  保存到机构共享项目，刷新或换浏览器后仍可继续编辑。
                 </span>
               </div>
             )}
@@ -668,6 +851,14 @@ export default function MapFeaturePanel({
                   )}
                 </div>
               </>
+            )}
+
+            {isSiteModeBound && (
+              <div className="feature-form-group">
+                <span className="feature-panel-help">
+                  此区域已绑定卫星场地。边界、名称或地形分辨率变更后，请点击“生成 / 更新卫星场地”；系统会重新获取参考数据并校验项目版本。
+                </span>
+              </div>
             )}
 
             {!isStudioDerived && (
@@ -779,7 +970,7 @@ export default function MapFeaturePanel({
               <span className="feature-panel-range-value">{node.fillOpacity ?? 0.3}</span>
             </div>
 
-            {!isStudioDerived && projectId && (
+            {!isStudioDerived && projectId && !isSiteModeBound && (
               <div className="feature-panel-actions">
                 <button
                   type="button"

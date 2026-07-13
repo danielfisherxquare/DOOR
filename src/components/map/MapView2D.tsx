@@ -448,6 +448,11 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
 
   function handleDeleteSelected() {
     if (!selectedFeatureNode) return;
+    if (selectedFeatureNode.siteModeBound) {
+      showError('卫星场地区域已绑定 3D 项目，不能从地图快捷删除；可以先隐藏图层。');
+      setDrawGuide('卫星场地区域未删除。请使用图层隐藏，或在项目流程中管理场地。');
+      return;
+    }
     recordHistory();
     deleteFeature(selectedFeatureNode.id);
     setDrawGuide(`已删除 ${selectedFeatureNode.name}。`);
@@ -940,12 +945,21 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
     const candidates = treeNodes.filter((node) =>
       node.type === 'feature' &&
       node.source !== 'studio-derived' &&
+      node.siteModeBound !== true &&
       node.geometry &&
       (dirtySet.has(node.id) || node.syncStatus === 'local' || node.syncStatus === 'dirty')
     );
 
     if (!candidates.length) {
-      setDrawGuide('没有需要保存的变更。');
+      const hasDirtySiteModeZone = treeNodes.some((node) =>
+        node.siteModeBound === true &&
+        (dirtySet.has(node.id) || node.syncStatus === 'dirty')
+      );
+      setDrawGuide(
+        hasDirtySiteModeZone
+          ? '卫星场地区域需要在属性面板点击“生成 / 更新卫星场地”。'
+          : '没有需要保存的变更。',
+      );
       return;
     }
 
@@ -1097,7 +1111,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
               <span className="material-symbols-outlined">content_paste</span>
               粘贴
             </button>
-            <button type="button" className="map-view-2d__tool-chip is-danger" onClick={handleDeleteSelected} disabled={!selectedFeatureNode}>
+            <button type="button" className="map-view-2d__tool-chip is-danger" onClick={handleDeleteSelected} disabled={!selectedFeatureNode || selectedFeatureNode.siteModeBound}>
               <span className="material-symbols-outlined">delete</span>
               删除
             </button>
@@ -1153,7 +1167,7 @@ export default function MapView2D({ onBrowseStateChange, browseSyncToken, browse
                   <button type="button" className="map-view-2d__ghost-btn" onClick={focusSelectedFeature}>
                     定位
                   </button>
-                  <button type="button" className="map-view-2d__ghost-btn is-danger" onClick={handleDeleteSelected}>
+                  <button type="button" className="map-view-2d__ghost-btn is-danger" onClick={handleDeleteSelected} disabled={selectedFeatureNode.siteModeBound}>
                     删除
                   </button>
                 </div>

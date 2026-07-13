@@ -9,7 +9,7 @@ import * as sceneJobService from '../inventory/inventory.spatial.scene-job.servi
 import * as spatialOsmService from '../inventory/inventory.spatial.osm.service.js';
 import * as spatialTerrainService from '../inventory/inventory.spatial.terrain.service.js';
 import * as generatedSceneService from '../inventory/inventory.spatial.generated-scene.service.js';
-import * as siteBakeService from '../inventory/inventory.spatial.site-bake.service.js';
+import * as siteModeService from '../inventory/inventory.spatial.site-mode.service.js';
 
 const router = express.Router();
 
@@ -214,7 +214,70 @@ router.put('/projects/:id/snapshot', async (req, res, next) => {
             buildProjectScope(req),
             req.authContext.userId,
             req.params.id,
-            req.body.snapshotJson
+            req.body.snapshotJson,
+            {
+                expectedRevision: req.body.expectedRevision,
+                clientMutationId: req.body.clientMutationId,
+            }
+        );
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 项目绑定的场地烘焙：结果持久化到 focus zone，并推进项目 revision。
+router.post('/projects/:projectId/site-bake', async (req, res, next) => {
+    try {
+        const data = await siteModeService.bakeProjectSite(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.projectId,
+            req.body
+        );
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 一次锁定读取项目、revision 与 focus zone，避免初始页面撕裂读。
+router.get('/projects/:projectId/site-mode', async (req, res, next) => {
+    try {
+        const data = await siteModeService.getProjectSiteMode(
+            buildProjectScope(req),
+            req.params.projectId,
+            req.query.focusZoneId
+        );
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 场地模式保存：同一事务内更新项目快照与 focus zone 的 warehouseScene。
+router.put('/projects/:projectId/site-mode', async (req, res, next) => {
+    try {
+        const data = await siteModeService.saveProjectSiteMode(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.projectId,
+            req.body
+        );
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 普通 focus zone 工作台保存：与项目快照原子提交，但不改变 zone 的用途语义。
+router.put('/projects/:projectId/focus-zone-workbench', async (req, res, next) => {
+    try {
+        const data = await siteModeService.saveProjectFocusZoneWorkbench(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.projectId,
+            req.body
         );
         res.json({ success: true, data });
     } catch (error) {
@@ -624,27 +687,13 @@ router.get('/generated-scenes/:sceneId', async (req, res, next) => {
     }
 });
 
-// 场地模式：从 bbox 同步烘焙「卫星正射底图 + 地形 + OSM 白模」为 focusZone 场景包
-router.post('/site-bake', async (req, res, next) => {
-    try {
-        const bbox = siteBakeService.parseSiteBakeBbox(req.body);
-        if (!bbox) {
-            return res.status(400).json({
-                success: false,
-                message: 'bbox 无效：需提供合法 WGS84 边界，且经纬跨度均不得超过 0.25°',
-            });
-        }
-        const result = await siteBakeService.bakeSiteScene(bbox, {
-            name: typeof req.body?.name === 'string' ? req.body.name : undefined,
-            orthophoto: {
-                zoom: req.body?.zoom,
-                maxTiles: req.body?.maxTiles,
-            },
-        });
-        res.json({ success: true, data: result });
-    } catch (error) {
-        next(error);
-    }
+// 旧的无项目烘焙入口已停用；所有场地必须绑定 project revision 与 focus zone。
+router.post('/site-bake', (_req, res) => {
+    res.status(410).json({
+        success: false,
+        code: 'PROJECT_BINDING_REQUIRED',
+        message: '该入口已停用，请使用项目绑定的 /projects/:projectId/site-bake',
+    });
 });
 
 router.get('/generated-scenes/:sceneId/download', async (req, res, next) => {

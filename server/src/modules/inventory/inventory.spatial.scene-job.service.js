@@ -5,6 +5,7 @@ import * as sceneJobRepo from './inventory.spatial.scene-job.repository.js';
 import * as osmService from './inventory.spatial.osm.service.js';
 import * as terrainService from './inventory.spatial.terrain.service.js';
 import * as generatedSceneService from './inventory.spatial.generated-scene.service.js';
+import { assertGenericWorkZoneMutationAllowed } from './inventory.spatial.site-mode-guard.js';
 
 const QUALITY_PRESETS = new Set(['fast', 'standard', 'precise']);
 const TARGET_TYPES = new Set(['studio', 'file']);
@@ -196,6 +197,7 @@ async function failJobAndScene(scope, actorUserId, job, generatedScene, error) {
 export async function createTerrainWorkZoneSceneExportJob(scope, actorUserId, projectId, zoneId, payload = {}) {
     const project = await ensureScopedProject(scope, projectId);
     const zone = await ensureScopedTerrainWorkZone(scope, project.id, zoneId);
+    assertGenericWorkZoneMutationAllowed(zone);
     const qualityPreset = normalizeQualityPreset(payload.qualityPreset);
     const targetType = normalizeTargetType(payload.targetType);
     const sourceHash = buildSourceHash(project, zone, qualityPreset);
