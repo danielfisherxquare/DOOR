@@ -30,6 +30,15 @@ services:
       disable: true
     environment:
       DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
+      NODE_ENV: ${NODE_ENV:-development}
+      ASSESSMENT_FIELD_ENCRYPTION_KEY: ${ASSESSMENT_FIELD_ENCRYPTION_KEY:-}
+      ASSESSMENT_SESSION_JWT_SECRET: ${ASSESSMENT_SESSION_JWT_SECRET:-}
+      ASSESSMENT_HASH_PEPPER: ${ASSESSMENT_HASH_PEPPER:-}
+      PII_ACTIVE_KEY_VERSION: ${PII_ACTIVE_KEY_VERSION:-v1}
+      PII_ENCRYPTION_KEY_V1: ${PII_ENCRYPTION_KEY_V1:-}
+      PII_HMAC_KEY_V1: ${PII_HMAC_KEY_V1:-}
+      PII_ENCRYPTION_KEY_V2: ${PII_ENCRYPTION_KEY_V2:-}
+      PII_HMAC_KEY_V2: ${PII_HMAC_KEY_V2:-}
     depends_on:
       postgres:
         condition: service_healthy
