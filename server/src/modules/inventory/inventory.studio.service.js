@@ -1,6 +1,7 @@
 import * as repo from './inventory.studio.repository.js';
 import * as assetRepo from './inventory.asset.repository.js';
 import * as inventoryRepo from './inventory.repository.js';
+import * as spatialRepo from './inventory.spatial.repository.js';
 import * as twinService from './inventory.twin.service.js';
 import * as raceRepo from '../races/race.repository.js';
 import { BUILTIN_STUDIO_ASSET_TEMPLATES } from './inventory.studio.catalog.js';
@@ -26,6 +27,7 @@ const PLACEMENT_STATUSES = new Set(['in-stock', 'reserved', 'deployed', 'returne
 const MAP_LAYER_TYPES = new Set(['basemap', 'geojson', 'floorplan', 'scan', 'route', 'note']);
 const RACE_BINDING_MODES = new Set(['reference']);
 const RACE_BINDING_STATUSES = new Set(['active', 'archived']);
+const PROJECT_SNAPSHOT_MUTATION_KEY = 'projectSnapshotMutation';
 
 function normalizeString(value, fieldName, { required = false, fallback = undefined } = {}) {
     if (value === undefined) {
@@ -106,6 +108,70 @@ function ensureProject(project) {
     return project;
 }
 
+function normalizeExpectedRevision(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const revision = Number(value);
+    if (!Number.isInteger(revision) || revision < 1) {
+        const error = new Error('expectedRevision 必须是大于等于 1 的整数');
+        error.statusCode = 400;
+        error.expose = true;
+        error.publicCode = 'INVALID_REVISION';
+        throw error;
+    }
+    return revision;
+}
+
+function normalizeOptionalClientMutationId(value) {
+    if (value === undefined || value === null || value === '') return null;
+    if (typeof value !== 'string') {
+        const error = new Error('clientMutationId 必须是字符串');
+        error.statusCode = 400;
+        error.expose = true;
+        error.publicCode = 'INVALID_MUTATION_ID';
+        throw error;
+    }
+    const clientMutationId = value.trim();
+    if (!clientMutationId || clientMutationId.length > 200) {
+        const error = new Error('clientMutationId 长度必须在 1 到 200 个字符之间');
+        error.statusCode = 400;
+        error.expose = true;
+        error.publicCode = 'INVALID_MUTATION_ID';
+        throw error;
+    }
+    return clientMutationId;
+}
+
+function buildRevisionRequiredError() {
+    const error = new Error('snapshotJson 写入缺少 expectedRevision，请重新载入项目');
+    error.statusCode = 400;
+    error.expose = true;
+    error.publicCode = 'REVISION_REQUIRED';
+    return error;
+}
+
+function buildProjectBindingRequiredError(projectId, focusZoneId) {
+    const error = new Error('该项目已绑定卫星场地，请从场地模式保存项目与场地快照');
+    error.statusCode = 409;
+    error.expose = true;
+    error.publicCode = 'PROJECT_BINDING_REQUIRED';
+    error.data = { projectId, focusZoneId };
+    return error;
+}
+
+function buildRevisionConflictError(projectId, expectedRevision, current) {
+    const error = new Error('项目已被其他窗口修改，请重新载入后再保存');
+    error.statusCode = 409;
+    error.expose = true;
+    error.publicCode = 'REVISION_CONFLICT';
+    error.data = {
+        projectId,
+        expectedRevision,
+        currentRevision: current?.revision ?? null,
+        currentProjectUpdatedAt: current?.updatedAt ?? null,
+    };
+    return error;
+}
+
 function normalizeSnapshot(snapshotJson, { sceneType, projectType, name, geoAnchor }) {
     if (!isPlainObject(snapshotJson)) throw new Error('snapshotJson must be an object');
     return normalizeStudioSnapshot(snapshotJson, { sceneType, projectType, name, geoAnchor });
@@ -113,6 +179,25 @@ function normalizeSnapshot(snapshotJson, { sceneType, projectType, name, geoAnch
 
 async function getScopedProject(scope, projectId) {
     return ensureProject(await repo.getProjectById(scope, projectId));
+}
+
+function withSiteFocusZone(project, siteModeZone) {
+    if (!project) return project;
+    return {
+        ...project,
+        siteFocusZoneId: siteModeZone?.id || null,
+    };
+}
+
+export async function assertGenericProjectSnapshotMutationAllowed(
+    scope,
+    projectId,
+    spatialRepository = spatialRepo,
+) {
+    const siteModeZone = await spatialRepository.findAnySiteModeTerrainWorkZone(scope, projectId);
+    if (siteModeZone) {
+        throw buildProjectBindingRequiredError(projectId, siteModeZone.id);
+    }
 }
 
 function findBuildingIndex(snapshot, buildingId) {
@@ -187,8 +272,16 @@ function normalizeHierarchySnapshot(project) {
     });
 }
 
-async function updateProjectWithSnapshot(scope, actorUserId, project, snapshotJson, extra = {}) {
-    return updateStudioProject(scope, actorUserId, project.id, {
+export async function updateProjectWithSnapshot(
+    scope,
+    actorUserId,
+    project,
+    snapshotJson,
+    extra = {},
+    dependencies = {},
+) {
+    const persistProject = dependencies.updateStudioProject || updateStudioProject;
+    return persistProject(scope, actorUserId, project.id, {
         name: extra.name ?? project.name,
         sceneType: extra.sceneType ?? project.sceneType,
         projectType: extra.projectType ?? project.projectType,
@@ -200,6 +293,7 @@ async function updateProjectWithSnapshot(scope, actorUserId, project, snapshotJs
         primaryAssetId: extra.primaryAssetId !== undefined ? extra.primaryAssetId : project.primaryAssetId,
         thumbnailDataUrl: extra.thumbnailDataUrl !== undefined ? extra.thumbnailDataUrl : project.thumbnailDataUrl,
         snapshotJson,
+        expectedRevision: project.revision,
     });
 }
 
@@ -249,8 +343,34 @@ function buildProjectPayload(scope, actorUserId, data = {}, current = null) {
     };
 }
 
+function keepOnlyExplicitProjectUpdateFields(payload, data = {}) {
+    const mutableFields = [
+        'name',
+        'sceneType',
+        'projectType',
+        'status',
+        'geoAnchor',
+        'snapshotJson',
+        'sourceType',
+        'sourceWarehouseId',
+        'sourceOrgId',
+        'primaryAssetId',
+        'thumbnailDataUrl',
+    ];
+    for (const field of mutableFields) {
+        if (data[field] === undefined) delete payload[field];
+    }
+    return payload;
+}
+
 export async function listStudioProjects(scope) {
-    return repo.listProjectsByScope(scope);
+    const projects = await repo.listProjectsByScope(scope);
+    const zones = await spatialRepo.listSiteModeTerrainWorkZonesForProjects(
+        scope,
+        projects.map((project) => project.id),
+    );
+    const zoneByProjectId = new Map(zones.map((zone) => [zone.projectId, zone]));
+    return projects.map((project) => withSiteFocusZone(project, zoneByProjectId.get(project.id)));
 }
 
 export async function createStudioProject(scope, actorUserId, data) {
@@ -261,16 +381,71 @@ export async function createStudioProject(scope, actorUserId, data) {
 
 export async function getStudioProject(scope, projectId, actorUserId = null) {
     ensureProject(await repo.getProjectById(scope, projectId));
-    return ensureProject(await repo.updateProject(scope, projectId, {
-        lastOpenedAt: new Date(),
-        updatedBy: actorUserId,
-    }));
+    const touched = ensureProject(await repo.touchProjectLastOpened(scope, projectId, actorUserId));
+    const siteModeZone = await spatialRepo.findAnySiteModeTerrainWorkZone(scope, projectId);
+    return withSiteFocusZone(touched, siteModeZone);
 }
 
-export async function updateStudioProject(scope, actorUserId, projectId, data) {
-    const current = await getScopedProject(scope, projectId);
-    const payload = buildProjectPayload(scope, actorUserId, data, current);
-    return ensureProject(await repo.updateProject(scope, projectId, payload));
+export async function updateStudioProject(
+    scope,
+    actorUserId,
+    projectId,
+    data,
+    dependencies = {},
+) {
+    const studioRepository = dependencies.studioRepo || repo;
+    const spatialRepository = dependencies.spatialRepo || spatialRepo;
+    const expectedRevision = normalizeExpectedRevision(data?.expectedRevision);
+    const clientMutationId = normalizeOptionalClientMutationId(data?.clientMutationId);
+    if (data?.snapshotJson !== undefined && expectedRevision === null) {
+        throw buildRevisionRequiredError();
+    }
+    const current = ensureProject(await studioRepository.getProjectById(scope, projectId));
+    if (
+        data?.snapshotJson !== undefined
+        && clientMutationId
+        && current.snapshotJson?.[PROJECT_SNAPSHOT_MUTATION_KEY]?.clientMutationId
+            === clientMutationId
+    ) {
+        return current;
+    }
+    if (data?.snapshotJson !== undefined) {
+        await assertGenericProjectSnapshotMutationAllowed(scope, projectId, spatialRepository);
+    }
+    if (expectedRevision !== null && current.revision !== expectedRevision) {
+        throw buildRevisionConflictError(projectId, expectedRevision, current);
+    }
+    const payload = keepOnlyExplicitProjectUpdateFields(
+        buildProjectPayload(scope, actorUserId, data, current),
+        data,
+    );
+    if (payload.snapshotJson !== undefined && clientMutationId) {
+        payload.snapshotJson = {
+            ...payload.snapshotJson,
+            [PROJECT_SNAPSHOT_MUTATION_KEY]: {
+                clientMutationId,
+                savedAt: new Date().toISOString(),
+            },
+        };
+    }
+    const updated = await studioRepository.updateProject(
+        scope,
+        projectId,
+        payload,
+        { expectedRevision },
+    );
+    if (!updated && expectedRevision !== null) {
+        const latest = await studioRepository.getProjectById(scope, projectId);
+        if (
+            clientMutationId
+            && latest?.snapshotJson?.[PROJECT_SNAPSHOT_MUTATION_KEY]?.clientMutationId
+                === clientMutationId
+        ) {
+            return latest;
+        }
+        throw buildRevisionConflictError(projectId, expectedRevision, latest);
+    }
+    return ensureProject(updated);
 }
 
 export async function deleteStudioProject(scope, projectId) {
@@ -309,7 +484,15 @@ export async function getStudioProjectSnapshot(scope, projectId) {
     });
 }
 
-export async function updateStudioProjectSnapshot(scope, actorUserId, projectId, snapshotJson) {
+export async function updateStudioProjectSnapshot(
+    scope,
+    actorUserId,
+    projectId,
+    snapshotJson,
+    { expectedRevision = null, clientMutationId = null } = {},
+) {
+    const normalizedExpectedRevision = normalizeExpectedRevision(expectedRevision);
+    if (normalizedExpectedRevision === null) throw buildRevisionRequiredError();
     const current = await getScopedProject(scope, projectId);
     return updateStudioProject(scope, actorUserId, projectId, {
         name: current.name,
@@ -317,6 +500,8 @@ export async function updateStudioProjectSnapshot(scope, actorUserId, projectId,
         projectType: current.projectType,
         geoAnchor: current.geoAnchor,
         snapshotJson,
+        expectedRevision: normalizedExpectedRevision,
+        clientMutationId,
     });
 }
 
@@ -626,13 +811,12 @@ export async function createProjectMapLayer(scope, actorUserId, projectId, data)
     if (index >= 0) layers[index] = layer;
     else layers.push(layer);
 
-    const updated = await updateStudioProject(scope, actorUserId, projectId, {
-        name: current.name,
-        sceneType: current.sceneType,
-        projectType: current.projectType,
-        geoAnchor: current.geoAnchor,
-        snapshotJson: { ...snapshot, mapLayers: layers },
-    });
+    const updated = await updateProjectWithSnapshot(
+        scope,
+        actorUserId,
+        current,
+        { ...snapshot, mapLayers: layers },
+    );
     return updated.snapshotJson.mapLayers || [];
 }
 

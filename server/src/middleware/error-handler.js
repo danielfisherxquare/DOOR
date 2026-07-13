@@ -72,6 +72,9 @@ function normalizeStatus(err, normalizedDbError) {
 
 function normalizeErrorCode(err, status, normalizedDbError) {
     if (normalizedDbError?.code) return normalizedDbError.code;
+    if (status < 500 && typeof err.publicCode === 'string' && /^[A-Z][A-Z0-9_]+$/.test(err.publicCode)) {
+        return err.publicCode;
+    }
     if (status < 500 && typeof err.code === 'string' && /^[A-Z][A-Z0-9_]+$/.test(err.code)) {
         return err.code;
     }
@@ -85,7 +88,7 @@ export function errorHandler(err, req, res, _next) {
     const message = err.expose
         ? err.message
         : (normalizedDbError?.expose ? normalizedDbError.message : '服务器内部错误');
-    const details = err.expose && err.details !== undefined ? err.details : undefined;
+    const details = err.expose ? (err.details ?? err.data) : undefined;
     const requestId = req.id || null;
 
     console.error(`[${req.id || '-'}] Error ${status}:`, err.message, `| ${req.method} ${req.originalUrl}`, req.params ? `params=${JSON.stringify(req.params)}` : '');
@@ -104,6 +107,9 @@ export function errorHandler(err, req, res, _next) {
         success: false,
         error,
         message,
+        ...(err.expose && err.publicCode ? { code: err.publicCode } : {}),
+        ...(err.expose && err.data !== undefined ? { data: err.data } : {}),
+        ...(err.expose && err.publicCode && requestId ? { requestId } : {}),
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
     });
 }

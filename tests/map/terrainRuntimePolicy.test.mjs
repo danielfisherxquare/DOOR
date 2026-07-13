@@ -86,6 +86,22 @@ test('globe experience status distinguishes startup, fallback, and ready states'
       instanceCount: 0,
       fallbackSourceCount: 0,
     }
+    const providerEntry = {
+      provider: 'test',
+      status: 'ready',
+      retryable: false,
+      attempt: 1,
+      generation: 1,
+    }
+    const readyProviders = {
+      overall: 'ready',
+      requiredProviders: ['imagery', 'terrain'],
+      sources: {
+        imagery: { ...providerEntry },
+        terrain: { ...providerEntry },
+        buildings: { ...providerEntry, status: 'unavailable' },
+      },
+    }
 
     assert.equal(policy.deriveGlobeExperienceStatus({
       hasRenderableSize: false,
@@ -95,6 +111,7 @@ test('globe experience status distinguishes startup, fallback, and ready states'
       runtimeLoadingCount: 0,
       expectedZoneCount: 0,
       summary: emptySummary,
+      providers: readyProviders,
     }).title, '正在启动地球视图')
 
     const fallback = policy.deriveGlobeExperienceStatus({
@@ -105,6 +122,7 @@ test('globe experience status distinguishes startup, fallback, and ready states'
       runtimeLoadingCount: 0,
       expectedZoneCount: 1,
       summary: { ...emptySummary, zoneCount: 1, fallbackReason: 'fps<24' },
+      providers: readyProviders,
     })
     assert.equal(fallback.tone, 'warn')
     assert.match(fallback.detail, /帧率偏低/)
@@ -117,9 +135,30 @@ test('globe experience status distinguishes startup, fallback, and ready states'
       runtimeLoadingCount: 0,
       expectedZoneCount: 1,
       summary: { ...emptySummary, zoneCount: 1 },
+      providers: readyProviders,
     })
     assert.equal(ready.tone, 'ready')
     assert.equal(ready.title, '重点区白模已就绪')
+
+    const failed = policy.deriveGlobeExperienceStatus({
+      hasRenderableSize: true,
+      viewerReady: true,
+      hasRenderedFrame: true,
+      tileLoadCount: 0,
+      runtimeLoadingCount: 0,
+      expectedZoneCount: 0,
+      summary: emptySummary,
+      providers: {
+        ...readyProviders,
+        overall: 'failed',
+        sources: {
+          ...readyProviders.sources,
+          terrain: { ...providerEntry, provider: 'ArcGIS Terrain', status: 'failed' },
+        },
+      },
+    })
+    assert.equal(failed.tone, 'error')
+    assert.match(failed.message, /ArcGIS Terrain/)
   } finally {
     await cleanup()
   }

@@ -1,4 +1,5 @@
 import type { MapRenderQuality } from '../../stores/mapStore'
+import type { MapProviderRuntimeSnapshot } from '../../utils/map/providerRuntimeStatus'
 
 const RUNTIME_DEGRADE_FPS = 24
 const RUNTIME_BALANCE_FPS = 36
@@ -31,7 +32,7 @@ export type TerrainWorkZoneRuntimeSummary = {
   fallbackSourceCount: number
 }
 
-export type GlobeStatusTone = 'loading' | 'ready' | 'warn'
+export type GlobeStatusTone = 'loading' | 'ready' | 'warn' | 'error'
 
 export type GlobeExperienceStatus = {
   visible: boolean
@@ -175,6 +176,7 @@ export function deriveGlobeExperienceStatus({
   runtimeLoadingCount,
   expectedZoneCount,
   summary,
+  providers,
 }: {
   hasRenderableSize: boolean
   viewerReady: boolean
@@ -183,6 +185,7 @@ export function deriveGlobeExperienceStatus({
   runtimeLoadingCount: number
   expectedZoneCount: number
   summary: TerrainWorkZoneRuntimeSummary
+  providers: MapProviderRuntimeSnapshot
 }): GlobeExperienceStatus {
   if (!hasRenderableSize || !viewerReady) {
     return {
@@ -195,7 +198,29 @@ export function deriveGlobeExperienceStatus({
     }
   }
 
-  if (!hasRenderedFrame || tileLoadCount > 0 || runtimeLoadingCount > 0) {
+  if (providers.overall === 'failed' || providers.overall === 'unavailable') {
+    const failedLabels = providers.requiredProviders
+      .map((key) => providers.sources[key])
+      .filter((entry) => entry.status === 'failed' || entry.status === 'unavailable')
+      .map((entry) => entry.provider)
+    return {
+      visible: true,
+      eyebrow: '三维资源',
+      title: providers.overall === 'unavailable' ? '必要资源尚不可用' : '三维资源加载失败',
+      message: failedLabels.length > 0
+        ? `${failedLabels.join('、')}未能连接，场景不会标记为已就绪。`
+        : '必要的三维资源未能连接，场景不会标记为已就绪。',
+      detail: '请查看下方资源状态；可重试的服务会提供单独的重试入口。',
+      tone: 'error',
+    }
+  }
+
+  if (
+    providers.overall === 'loading'
+    || !hasRenderedFrame
+    || tileLoadCount > 0
+    || runtimeLoadingCount > 0
+  ) {
     const hasPendingFocusZones = expectedZoneCount > 0 || summary.zoneCount > 0
     return {
       visible: true,
@@ -206,6 +231,17 @@ export function deriveGlobeExperienceStatus({
         : '正在拉取底图和地形数据，首次进入可能需要几秒。',
       detail: '如果画面暂时发黑，请等待资源流入；仍无内容时可先切回 2D 或把画质调到“平衡”。',
       tone: 'loading',
+    }
+  }
+
+  if (providers.overall === 'degraded') {
+    return {
+      visible: true,
+      eyebrow: '三维资源',
+      title: '场景正在降级运行',
+      message: '至少一个必要资源正在使用备用数据或只完成了部分加载。',
+      detail: '当前画面仍可浏览，但地形、底图或建筑可能不完整。',
+      tone: 'warn',
     }
   }
 

@@ -9,7 +9,7 @@ import * as sceneJobService from '../inventory/inventory.spatial.scene-job.servi
 import * as spatialOsmService from '../inventory/inventory.spatial.osm.service.js';
 import * as spatialTerrainService from '../inventory/inventory.spatial.terrain.service.js';
 import * as generatedSceneService from '../inventory/inventory.spatial.generated-scene.service.js';
-import * as siteBakeService from '../inventory/inventory.spatial.site-bake.service.js';
+import * as siteModeService from '../inventory/inventory.spatial.site-mode.service.js';
 
 const router = express.Router();
 
@@ -184,7 +184,75 @@ router.get('/projects/:id/snapshot', async (req, res, next) => {
 
 router.put('/projects/:id/snapshot', async (req, res, next) => {
     try {
-        const data = await studioService.updateStudioProjectSnapshot(buildProjectScope(req), req.authContext.userId, req.params.id, req.body.snapshotJson);
+        const data = await studioService.updateStudioProjectSnapshot(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.id,
+            req.body.snapshotJson,
+            {
+                expectedRevision: req.body.expectedRevision,
+                clientMutationId: req.body.clientMutationId,
+            },
+        );
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 项目绑定的场地烘焙：结果持久化到 focus zone，并推进项目 revision。
+router.post('/projects/:projectId/site-bake', async (req, res, next) => {
+    try {
+        const data = await siteModeService.bakeProjectSite(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.projectId,
+            req.body,
+        );
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 一次锁定读取项目、revision 与 focus zone，避免初始页面撕裂读。
+router.get('/projects/:projectId/site-mode', async (req, res, next) => {
+    try {
+        const data = await siteModeService.getProjectSiteMode(
+            buildProjectScope(req),
+            req.params.projectId,
+            req.query.focusZoneId,
+        );
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 场地模式保存：同一事务内更新项目快照与 focus zone 的 warehouseScene。
+router.put('/projects/:projectId/site-mode', async (req, res, next) => {
+    try {
+        const data = await siteModeService.saveProjectSiteMode(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.projectId,
+            req.body,
+        );
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 普通 focus zone 工作台保存：与项目快照原子提交，但不改变 zone 的用途语义。
+router.put('/projects/:projectId/focus-zone-workbench', async (req, res, next) => {
+    try {
+        const data = await siteModeService.saveProjectFocusZoneWorkbench(
+            buildProjectScope(req),
+            req.authContext.userId,
+            req.params.projectId,
+            req.body,
+        );
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -466,6 +534,18 @@ router.get('/generated-scenes/:sceneId', async (req, res, next) => {
     } catch (error) {
         next(error);
     }
+});
+
+// 旧的无项目烘焙入口已停用；所有场地必须绑定 project revision 与 focus zone。
+router.post('/site-bake', (_req, _res, next) => {
+    next(Object.assign(
+        new Error('该入口已停用，请使用项目绑定的 /projects/:projectId/site-bake'),
+        {
+            statusCode: 410,
+            expose: true,
+            publicCode: 'PROJECT_BINDING_REQUIRED',
+        },
+    ));
 });
 
 router.get('/generated-scenes/:sceneId/download', async (req, res, next) => {

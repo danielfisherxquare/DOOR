@@ -1,15 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Studio3DApp } from '../../3d-studio'
+import {
+  buildFocusZoneWorkbenchSaveRequest,
+  withExpectedRevision,
+} from '../../3d-studio/savePersistence'
 import { buildAppHref } from '../../components/app/appConfig'
 import { BUILTIN_RACK_TEMPLATES } from '../../data/builtinRackTemplates'
 import { twinApi } from '../../services/inventoryApi'
+import siteModeApi, { createSiteMutationId } from '../../services/siteModeApi'
 import studioProjectApi from '../../services/studioProjectApi'
 import { getTemplateSceneSnapshot, inferObjectTypeFromText } from '../../utils/map/assetTemplates'
 import useAuthStore from '../../stores/authStore'
 import { buildFocusZoneWorkbenchContext, extractFocusZoneTerrainPatch, extractFocusZoneWorkbenchScene } from '../../utils/map/focusZoneContext'
 import { buildFocusZoneObjectContext, summarizeFocusZoneObjects } from '../../utils/map/focusZoneSpatialObjects'
 import { buildFocusZoneStudioScene, getFocusZoneSceneImportState } from '../../utils/map/focusZoneStudioScene'
+import { isSiteModeBoundTerrainWorkZone } from '../../utils/map/terrainWorkZones'
 import { generateThumbnail } from '../../utils/shareUtils'
 import {
   createBlankStudioScene,
@@ -128,7 +134,6 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
   const [focusZoneObjects, setFocusZoneObjects] = useState([])
   const [assetTemplates, setAssetTemplates] = useState([])
   const [terrainPatchGenerating, setTerrainPatchGenerating] = useState(false)
-  const initialFocusZoneSnapshotPersistedRef = useRef(new Set())
   const editorModeLabel = useMemo(() => getEditorModeLabel(project?.projectType || requestedProjectType), [project?.projectType, requestedProjectType])
   const focusZoneContext = useMemo(() => (
     focusZone ? buildFocusZoneWorkbenchContext(focusZone) : null
@@ -192,13 +197,45 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
     setLoading(true)
     try {
       const result = await studioProjectApi.getProject(effectiveProjectId, orgId || undefined)
-      applyProjectData(result.data)
+      const projectRecord = result.data
+      const mayHaveSiteMode = !requestedFocusZoneId
+        && projectRecord?.sceneType === 'outdoor-event'
+        && ['site', 'mixed', 'venue'].includes(projectRecord?.projectType)
+      if (mayHaveSiteMode) {
+        const zonesResponse = await studioProjectApi.listTerrainWorkZones(
+          effectiveProjectId,
+          {},
+          orgId || undefined,
+        )
+        const siteFocusZone = (Array.isArray(zonesResponse?.data) ? zonesResponse.data : [])
+          .find((zone) => isSiteModeBoundTerrainWorkZone(zone))
+        if (siteFocusZone?.id) {
+          const href = buildAppHref('/3d-studio/site', { orgId })
+          const url = new URL(href, window.location.origin)
+          url.searchParams.set('projectId', effectiveProjectId)
+          url.searchParams.set('focusZoneId', siteFocusZone.id)
+          navigate(url.pathname + url.search, { replace: true })
+          return
+        }
+      }
+      applyProjectData(projectRecord)
     } catch (error) {
       showError(`加载 3D 项目失败：${error.message}`)
     } finally {
       setLoading(false)
     }
-  }, [applyProjectData, buildProjectOptions, effectiveProjectId, mode, orgId, requestedProjectType, requestedSceneType, requestedWarehouseId])
+  }, [
+    applyProjectData,
+    buildProjectOptions,
+    effectiveProjectId,
+    mode,
+    navigate,
+    orgId,
+    requestedFocusZoneId,
+    requestedProjectType,
+    requestedSceneType,
+    requestedWarehouseId,
+  ])
 
   useEffect(() => {
     loadProject()
@@ -280,7 +317,13 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
   useEffect(() => {
     let active = true
 
-    if (!focusZone || !requestedFocusZoneId || terrainPatchGenerating || extractFocusZoneTerrainPatch(focusZone)) {
+    if (
+      !focusZone
+      || !requestedFocusZoneId
+      || terrainPatchGenerating
+      || isSiteModeBoundTerrainWorkZone(focusZone)
+      || extractFocusZoneTerrainPatch(focusZone)
+    ) {
       return () => {
         active = false
       }
@@ -398,67 +441,6 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
     savedFocusZoneScene,
   ])
 
-  useEffect(() => {
-    if (
-      !requestedFocusZoneId
-      || !focusZone?.id
-      || !generatedFocusZoneScene
-      || savedFocusZoneScene
-      || terrainPatchGenerating
-      || !extractFocusZoneTerrainPatch(focusZone)
-    ) return
-    if (initialFocusZoneSnapshotPersistedRef.current.has(focusZone.id)) return
-
-    let active = true
-    initialFocusZoneSnapshotPersistedRef.current.add(focusZone.id)
-    const savedAt = new Date().toISOString()
-
-    studioProjectApi.updateTerrainWorkZone(focusZone.id, {
-      snapshotJson: {
-        ...(focusZone.snapshotJson || {}),
-        kind: 'studio-focus-zone-snapshot',
-        focusZoneId: focusZone.id,
-        projectId: project?.id || effectiveProjectId || null,
-        savedAt,
-        generatedFrom: 'gis-focus-zone-import',
-        sceneType: generatedFocusZoneScene.sceneType,
-        warehouseId: generatedFocusZoneScene.warehouse?.id || null,
-        warehouseName: generatedFocusZoneScene.warehouse?.name || null,
-        warehouseScene: generatedFocusZoneScene,
-        focusZoneContext: focusZoneContext || null,
-      },
-      metadata: {
-        ...(focusZone.metadata || {}),
-        studioInitialSnapshotGeneratedAt: savedAt,
-        studioGeometrySource: 'gis-focus-zone-import',
-      },
-      status: 'ready',
-    }, orgId || undefined)
-      .then((result) => {
-        if (!active || !result?.data) return
-        setFocusZone(result.data)
-      })
-      .catch((error) => {
-        if (!active) return
-        initialFocusZoneSnapshotPersistedRef.current.delete(focusZone.id)
-        console.warn('[StudioProjectPage] Failed to persist generated focus-zone scene:', error)
-      })
-
-    return () => {
-      active = false
-    }
-  }, [
-    effectiveProjectId,
-    focusZone,
-    focusZoneContext,
-    generatedFocusZoneScene,
-    orgId,
-    project?.id,
-    requestedFocusZoneId,
-    savedFocusZoneScene,
-    terrainPatchGenerating,
-  ])
-
   const warehouseMeta = useMemo(() => {
     if (!editableHierarchy.activeWarehouse) return null
     return {
@@ -483,7 +465,11 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
     })
   }, [])
 
-  const persistSnapshot = useCallback(async (nextSnapshot) => {
+  const persistSnapshot = useCallback(async (
+    nextSnapshot,
+    expectedRevision = null,
+    clientMutationId = null,
+  ) => {
     const projectOptions = buildProjectOptions(project)
     const name = getProjectNameFromScene(nextSnapshot, project?.name || projectOptions.name)
     const thumbnailDataUrl = safeGenerateThumbnail(nextSnapshot)
@@ -507,21 +493,26 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
       return createdProject
     }
 
-    const result = await studioProjectApi.updateProject(project.id, {
+    const result = await studioProjectApi.updateProject(project.id, withExpectedRevision({
       name,
       sceneType: project.sceneType,
       projectType: project.projectType,
       geoAnchor: nextSnapshot.site?.geoAnchor || null,
       thumbnailDataUrl,
       snapshotJson: nextSnapshot,
-    }, orgId || undefined)
+      clientMutationId,
+    }, expectedRevision ?? project.revision), orgId || undefined)
     setProject(result.data)
     setSnapshot(ensureDirectEditorSnapshot(result.data?.snapshotJson || nextSnapshot, buildProjectOptions(result.data)))
     showSuccess('3D 项目已保存')
     return result.data
   }, [buildProjectOptions, navigate, orgId, project])
 
-  const handleWorkbenchSave = useCallback(async ({ snapshotJson }) => {
+  const handleWorkbenchSave = useCallback(async ({
+    snapshotJson,
+    expectedRevision,
+    clientMutationId,
+  }) => {
     if (!editableSnapshot) return
     const warehouseId = editableHierarchy.activeWarehouse?.id
     if (!warehouseId) {
@@ -532,47 +523,60 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
     setSnapshot(nextSnapshot)
 
     try {
-      await persistSnapshot(nextSnapshot)
       if (requestedFocusZoneId) {
-        const savedAt = new Date().toISOString()
-        const zoneResult = await studioProjectApi.updateTerrainWorkZone(requestedFocusZoneId, {
-          snapshotJson: {
-            ...(focusZone?.snapshotJson || {}),
-            kind: 'studio-focus-zone-snapshot',
+        const boundProjectId = project?.id || effectiveProjectId
+        if (!boundProjectId) throw new Error('重点区工作台缺少绑定项目')
+
+        const result = await siteModeApi.saveFocusZoneWorkbench(
+          boundProjectId,
+          buildFocusZoneWorkbenchSaveRequest({
             focusZoneId: requestedFocusZoneId,
-            projectId: project?.id || effectiveProjectId || null,
-            savedAt,
-            sceneType: nextSnapshot.sceneType,
             warehouseId,
-            warehouseName: editableHierarchy.activeWarehouse?.name || null,
-            warehouseScene: snapshotJson,
-            focusZoneContext: focusZoneContext || null,
-          },
-          metadata: {
-            ...(focusZone?.metadata || {}),
-            lastWorkbenchSaveAt: savedAt,
-            sourceWarehouseId: warehouseId,
-          },
-          status: 'ready',
-        }, orgId || undefined)
-        if (zoneResult?.data) {
-          setFocusZone(zoneResult.data)
+            snapshotJson,
+            expectedRevision: expectedRevision ?? project?.revision,
+            clientMutationId: clientMutationId || createSiteMutationId(),
+          }),
+          orgId || undefined,
+        )
+        const savedProject = result.project
+        const savedFocusZone = result.focusZone || result.workZone
+        setProject(savedProject)
+        setSnapshot(ensureDirectEditorSnapshot(
+          savedProject?.snapshotJson || nextSnapshot,
+          buildProjectOptions(savedProject),
+        ))
+        setFocusZone(savedFocusZone)
+        showSuccess('重点区 3D 场景已保存')
+        return {
+          project: savedProject,
+          revision: Number(result.revision ?? savedProject?.revision) || 0,
+          savedAt: savedProject?.updatedAt || new Date().toISOString(),
         }
+      }
+
+      const savedProject = await persistSnapshot(
+        nextSnapshot,
+        expectedRevision,
+        clientMutationId,
+      )
+      return {
+        project: savedProject,
+        revision: Number(savedProject?.revision) || 0,
+        savedAt: savedProject?.updatedAt || new Date().toISOString(),
       }
     } catch (error) {
       showError(`保存 3D 项目失败：${error.message}`)
       throw error
     }
   }, [
+    buildProjectOptions,
     effectiveProjectId,
     editableHierarchy.activeWarehouse?.id,
-    editableHierarchy.activeWarehouse?.name,
     editableSnapshot,
-    focusZone,
-    focusZoneContext,
     orgId,
     persistSnapshot,
     project?.id,
+    project?.revision,
     requestedFocusZoneId,
   ])
 
@@ -761,6 +765,7 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
           embedded
           onSceneChange={handleDesignerSceneChange}
           onSave={handleWorkbenchSave}
+          saveRevision={Number(project?.revision) || 0}
           onSaveTemplate={handleSaveAssetTemplate}
           onSaveAsset={handleSavePrimaryAsset}
         />

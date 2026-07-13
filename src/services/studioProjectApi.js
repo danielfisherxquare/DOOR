@@ -24,10 +24,10 @@ const studioProjectApi = {
     request.post(`${basePath}/projects/${id}/primary-asset`, data, { params: withOrgId(orgId) }),
   getSnapshot: (id, orgId) =>
     request.get(`${basePath}/projects/${id}/snapshot`, { params: withOrgId(orgId) }),
-  updateSnapshot: (id, snapshotJson, orgId) =>
+  updateSnapshot: (id, snapshotJson, expectedRevision, clientMutationId, orgId) =>
     request.put(
       `${basePath}/projects/${id}/snapshot`,
-      { snapshotJson },
+      { snapshotJson, expectedRevision, clientMutationId },
       { params: withOrgId(orgId) }
     ),
   listBuildings: (projectId, orgId) =>
@@ -159,12 +159,6 @@ const studioProjectApi = {
     request.post(`${basePath}/generated-scenes/${sceneId}/import-to-studio`, data, {
       params: withOrgId(orgId),
     }),
-  bakeSite: (bbox, { name, zoom, maxTiles } = {}, orgId) =>
-    request.post(
-      `${basePath}/site-bake`,
-      { bbox, name, zoom, maxTiles },
-      { params: withOrgId(orgId) }
-    ),
   getTerrainWorkZoneRuntimePreview: (zoneId, orgId) =>
     request.get(`${basePath}/terrain-work-zones/${zoneId}/runtime-preview`, {
       params: withOrgId(orgId),

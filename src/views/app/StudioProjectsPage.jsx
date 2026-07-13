@@ -5,6 +5,7 @@ import studioProjectApi from '../../services/studioProjectApi'
 import { buildAppHref } from '../../components/app/appConfig'
 import { resolveSurfaceOrgId } from '../../utils/surfaceContext'
 import { showError, showSuccess } from '../../utils/toast'
+import { isSiteModeBoundTerrainWorkZone } from '../../utils/map/terrainWorkZones'
 import './studio-projects.css'
 
 function formatDate(value) {
@@ -82,6 +83,41 @@ export default function StudioProjectsPage() {
     }
   }
 
+  async function handleOpenProject(project) {
+    try {
+      if (project.siteFocusZoneId) {
+        const href = buildAppHref('/3d-studio/site', { orgId })
+        const url = new URL(href, window.location.origin)
+        url.searchParams.set('projectId', project.id)
+        url.searchParams.set('focusZoneId', project.siteFocusZoneId)
+        navigate(url.pathname + url.search)
+        return
+      }
+      const mayHaveSiteMode = project.sceneType === 'outdoor-event'
+        && ['site', 'mixed', 'venue'].includes(project.projectType)
+      if (mayHaveSiteMode) {
+        const zonesResponse = await studioProjectApi.listTerrainWorkZones(
+          project.id,
+          {},
+          orgId || undefined,
+        )
+        const siteFocusZone = (Array.isArray(zonesResponse?.data) ? zonesResponse.data : [])
+          .find((zone) => isSiteModeBoundTerrainWorkZone(zone))
+        if (siteFocusZone?.id) {
+          const href = buildAppHref('/3d-studio/site', { orgId })
+          const url = new URL(href, window.location.origin)
+          url.searchParams.set('projectId', project.id)
+          url.searchParams.set('focusZoneId', siteFocusZone.id)
+          navigate(url.pathname + url.search)
+          return
+        }
+      }
+      navigate(buildAppHref(`/3d-studio/${project.id}`, { orgId }))
+    } catch (error) {
+      showError(`打开项目失败：${error.message}`)
+    }
+  }
+
   async function handleDelete(projectId) {
     if (!window.confirm('删除后无法恢复，确认删除这个项目吗？')) return
     try {
@@ -146,10 +182,10 @@ export default function StudioProjectsPage() {
             新建场地白模
           </Link>
           <Link
-            to={buildAppHref('/3d-studio/site', { orgId })}
+            to={buildAppHref('/map', { orgId })}
             className="studio-projects__primary-action"
           >
-            卫星场地模式
+            从 GIS 框选卫星场地
           </Link>
         </div>
       </section>
@@ -195,7 +231,7 @@ export default function StudioProjectsPage() {
                 <button
                   type="button"
                   className="studio-projects__card-hit"
-                  onClick={() => navigate(buildAppHref(`/3d-studio/${project.id}`, { orgId }))}
+                  onClick={() => void handleOpenProject(project)}
                   aria-label={`打开 ${project.name}`}
                 />
                 <div className="studio-projects__card-top">
@@ -221,7 +257,7 @@ export default function StudioProjectsPage() {
                 <div className="studio-projects__card-actions">
                   <button
                     type="button"
-                    onClick={() => navigate(buildAppHref(`/3d-studio/${project.id}`, { orgId }))}
+                    onClick={() => void handleOpenProject(project)}
                   >
                     打开
                   </button>

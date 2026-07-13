@@ -55,6 +55,34 @@ describe('error response contract', () => {
         assert.match(response.body.error.requestId, /^[0-9a-f-]{36}$/i);
     });
 
+    it('adds legacy publicCode/data fields without changing the structured error', async () => {
+        const app = createErrorApp(() => Object.assign(new Error('项目已被其他窗口修改'), {
+            statusCode: 409,
+            expose: true,
+            publicCode: 'REVISION_CONFLICT',
+            data: { expectedRevision: 1, currentRevision: 2 },
+        }));
+
+        const response = await request(app)
+            .get('/failure')
+            .set('x-request-id', 'req-legacy-409')
+            .expect(409);
+
+        assert.deepEqual(response.body, {
+            success: false,
+            error: {
+                code: 'REVISION_CONFLICT',
+                message: '项目已被其他窗口修改',
+                details: { expectedRevision: 1, currentRevision: 2 },
+                requestId: 'req-legacy-409',
+            },
+            message: '项目已被其他窗口修改',
+            code: 'REVISION_CONFLICT',
+            data: { expectedRevision: 1, currentRevision: 2 },
+            requestId: 'req-legacy-409',
+        });
+    });
+
     it('hides internal messages, codes, stacks, and details', async () => {
         const app = createErrorApp(() => Object.assign(new Error('private connection string'), {
             code: 'ECONNREFUSED',

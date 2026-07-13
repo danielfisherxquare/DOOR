@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
-import { useMapStore, type HiddenOsmBuilding, type MapRenderQuality } from '../../stores/mapStore';
+import { useMapStore, type HiddenOsmBuilding } from '../../stores/mapStore';
 import { useModelStore, type PlacedModel } from '../../stores/modelStore';
 import useAuthStore from '../../stores/authStore';
 import studioProjectApi from '../../services/studioProjectApi';
@@ -23,15 +23,12 @@ import {
   normalizeCesiumTemplateUrl,
 } from '../../utils/map/tileLayer';
 import {
-  applyOsmBuildingsStyle,
-  buildOverpassQuery,
-  createOsmBuildingsStyle,
+  applyOsmTilesetPresentation,
   extractPickedOsmBuilding,
   getOsmBuildingLabel,
-  getOverpassEndpointLabel,
   getPickedObjects,
-  getViewportBBox,
-  overpassToGeoJson,
+  startOverpassBuildingManager,
+  syncReferenceBuildings,
 } from './osmBuildings';
 import {
   deriveGlobeExperienceStatus,
@@ -40,6 +37,19 @@ import {
   type TerrainWorkZoneRuntimePolicy,
   type TerrainWorkZoneRuntimeSummary,
 } from './terrainRuntimePolicy';
+import {
+  classifyProviderError,
+  classifyTerrainFallbackFailure,
+  createProviderRuntimeSources,
+  deriveProviderOverallStatus,
+  deriveTileRequestRuntimeStatus,
+  observeFirstSuccessfulTileRequest,
+  type ClassifiedProviderError,
+  type MapProviderKey,
+  type MapProviderRuntimeEntry,
+  type MapProviderRuntimeSources,
+} from '../../utils/map/providerRuntimeStatus';
+import MapProviderStatusHud from './MapProviderStatusHud';
 
 interface MapView3DProps {
   onBrowseStateChange?: (state: MapBrowseState) => void;
@@ -57,7 +67,6 @@ const CAMERA_WHEEL_NOTIFY_DELAY_MS = 140;
 const CESIUM_TARGET_FRAME_RATE = 120;
 const FPS_SAMPLE_INTERVAL_MS = 500;
 const FPS_IDLE_RESET_DELAY_MS = FPS_SAMPLE_INTERVAL_MS * 3;
-const OSM_BUILDINGS_MAX_SCREEN_SPACE_ERROR = 16;
 const MAX_INSTANCING_PREVIEW_MODELS = 96;
 const MAX_TEMPLATE_FANOUT_MODELS = 48;
 const ARCGIS_TERRAIN_URL =
@@ -65,23 +74,6 @@ const ARCGIS_TERRAIN_URL =
 
 let arcGisTerrainProviderPromise: Promise<Cesium.TerrainProvider> | null = null;
 let worldTerrainProviderPromise: Promise<Cesium.TerrainProvider> | null = null;
-
-// ── 三方OSM：Overpass API 视口查询 ─────────────────────────────────────────
-const OVERPASS_API_ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://lz4.overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-];
-const OVERPASS_MIN_CAMERA_HEIGHT = 3000; // 低于此高度才加载（米）
-const OVERPASS_DEBOUNCE_MS = 5000;       // 视口变化后等待 ms 再请求（Overpass 限制 ~10s/req）
-const OVERPASS_COOLDOWN_MS = 12000;      // 两次请求之间的最小间隔
-const OVERPASS_RETRY_BASE_MS = 15000;    // 429 退避重试基础等待时间
-const OVERPASS_MAX_RETRIES = 2;          // 429 最大重试次数
-const OVERPASS_FAILURE_BACKOFF_MS = 45000;
-const OVERPASS_REQUEST_TIMEOUT_MS = 12000;
-const OVERPASS_DEFAULT_HEIGHT = 10;      // 缺少高度数据时的默认值（米）
-const OVERPASS_BUILDING_COLOR = Cesium.Color.fromCssColorString('#D0E4F0').withAlpha(0.75);
-const OVERPASS_BUILDING_OUTLINE_COLOR = Cesium.Color.fromCssColorString('#8AB4D0').withAlpha(0.4);
 
 // Google Earth 风格：海拔自适应缩放
 const ZOOM_BASE_MIN = 1.04;           // 贴地时的缩放系数（极慢）
@@ -99,7 +91,6 @@ const AUTO_TILT_BLEND_FACTOR = 0.12;         // 每次缩放事件的混合步�
 const ORBIT_SENSITIVITY_X = 1.4;       // 水平拖拽 → heading 灵敏度
 const ORBIT_SENSITIVITY_Y_DEG = 120;   // 垂直拖拽 → pitch 灵敏度（度）
 
-type TilesetRef = MutableRefObject<Cesium.Cesium3DTileset | null>;
 type PickedEntityLike = {
   id?: unknown;
 };
@@ -190,6 +181,15 @@ function getWorldTerrainProvider(): Promise<Cesium.TerrainProvider> {
   }
 
   return worldTerrainProviderPromise;
+}
+
+function resetTerrainProviderPromise(providerId: string): void {
+  if (providerId === 'cesium-world-terrain') {
+    worldTerrainProviderPromise = null;
+    return;
+  }
+
+  arcGisTerrainProviderPromise = null;
 }
 
 function getOrgIdFromLocation(): string | undefined {
@@ -677,129 +677,63 @@ function configureCesiumCameraController(viewer: Cesium.Viewer): void {
   viewer.camera.constrainedAxis = Cesium.Cartesian3.UNIT_Z;
 }
 
-function syncReferenceBuildings(
-  viewer: Cesium.Viewer,
-  buildingStyle: string,
-  hiddenOsmBuildings: HiddenOsmBuilding[],
-  renderQuality: MapRenderQuality,
-  osmBuildingsRef: TilesetRef,
-  google3dTilesetRef: TilesetRef,
-): void {
-  const removeOsmBuildings = () => {
-    if (osmBuildingsRef.current) {
-      viewer.scene.primitives.remove(osmBuildingsRef.current);
-      osmBuildingsRef.current = null;
-      console.log('[MapView3D] OSM Buildings unloaded');
-    }
-  };
-
-  const removeGoogle3d = () => {
-    if (google3dTilesetRef.current) {
-      viewer.scene.primitives.remove(google3dTilesetRef.current);
-      google3dTilesetRef.current = null;
-      console.log('[MapView3D] Google Photorealistic 3D Tiles unloaded');
-    }
-  };
-
-  const applyStableTilesetState = (tileset: Cesium.Cesium3DTileset) => {
-    tileset.modelMatrix = Cesium.Matrix4.clone(Cesium.Matrix4.IDENTITY);
-    tileset.enableCollision = false;
-    viewer.scene.requestRender();
-  };
-
-  const applyOsmPerformancePreset = (tileset: Cesium.Cesium3DTileset) => {
-    // Favor stable silhouettes over aggressive view-dependent refinement.
-    tileset.maximumScreenSpaceError = renderQuality.osmScreenSpaceError || OSM_BUILDINGS_MAX_SCREEN_SPACE_ERROR;
-    tileset.dynamicScreenSpaceError = false;
-    tileset.progressiveResolutionHeightFraction = 0.0;
-    tileset.cullRequestsWhileMoving = false;
-    tileset.preloadFlightDestinations = true;
-    tileset.skipLevelOfDetail = false;
-    tileset.foveatedScreenSpaceError = false;
-    tileset.foveatedTimeDelay = 0.0;
-    tileset.showOutline = renderQuality.showOsmOutline;
-  };
-
-  if (buildingStyle === 'osm') {
-    removeGoogle3d();
-    if (osmBuildingsRef.current) {
-      applyOsmPerformancePreset(osmBuildingsRef.current);
-      applyOsmBuildingsStyle(viewer, osmBuildingsRef.current, hiddenOsmBuildings);
-      return;
-    }
-    if (!osmBuildingsRef.current) {
-      Cesium.createOsmBuildingsAsync({
-        style: createOsmBuildingsStyle(hiddenOsmBuildings),
-        enableShowOutline: renderQuality.showOsmOutline,
-        showOutline: renderQuality.showOsmOutline,
-      })
-        .then((tileset) => {
-          if (viewer.isDestroyed()) {
-            tileset.destroy();
-            return;
-          }
-          applyStableTilesetState(tileset);
-          applyOsmPerformancePreset(tileset);
-          applyOsmBuildingsStyle(viewer, tileset, hiddenOsmBuildings);
-          viewer.scene.primitives.add(tileset);
-          osmBuildingsRef.current = tileset;
-          console.log('[MapView3D] OSM Buildings loaded successfully');
-        })
-        .catch((err) => {
-          console.error('[MapView3D] Failed to load OSM Buildings:', err);
-        });
-    }
-    return;
-  }
-
-  if (buildingStyle === 'google3d') {
-    removeOsmBuildings();
-    if (!google3dTilesetRef.current) {
-      Cesium.createGooglePhotorealistic3DTileset()
-        .then((tileset) => {
-          if (viewer.isDestroyed()) {
-            tileset.destroy();
-            return;
-          }
-          applyStableTilesetState(tileset);
-          viewer.scene.primitives.add(tileset);
-          google3dTilesetRef.current = tileset;
-          console.log('[MapView3D] Google Photorealistic 3D Tiles loaded successfully');
-        })
-        .catch((err) => {
-          console.error('[MapView3D] Failed to load Google Photorealistic 3D Tiles:', err);
-        });
-    }
-    return;
-  }
-
-  if (buildingStyle === 'osmGeoJson') {
-    // GeoJSON 瓦片由独立的 useEffect 管理，这里只需清理 3D Tiles
-    removeOsmBuildings();
-    removeGoogle3d();
-    return;
-  }
-
-  removeOsmBuildings();
-  removeGoogle3d();
-  viewer.scene.requestRender();
+type CesiumImagerySource = {
+  provider: Cesium.ImageryProvider
+  debugLabel: string
+  debugUrl: string
+  requestedId: string
+  activeId: string
+  fallbackReason: string | null
 }
 
-type CesiumImagerySource = {
-  provider: Cesium.ImageryProvider;
-  debugLabel: string;
-  debugUrl: string;
-};
+function observeFirstImageryTileSuccess(
+  provider: Cesium.ImageryProvider,
+  onFirstSuccess: () => void
+): () => void {
+  const originalRequestImage = provider.requestImage
+  const observedRequestImage = observeFirstSuccessfulTileRequest<
+    [number, number, number, Cesium.Request?], Cesium.ImageryTypes>(
+    (x: number, y: number, level: number, request?: Cesium.Request) =>
+      originalRequestImage.call(provider, x, y, level, request),
+    onFirstSuccess
+  )
+  provider.requestImage = observedRequestImage
+  return () => {
+    if (provider.requestImage === observedRequestImage) {
+      provider.requestImage = originalRequestImage
+    }
+  }
+}
+
+function observeFirstTerrainTileSuccess(
+  provider: Cesium.TerrainProvider,
+  onFirstSuccess: () => void
+): () => void {
+  const originalRequestTileGeometry = provider.requestTileGeometry
+  const observedRequestTileGeometry = observeFirstSuccessfulTileRequest<
+    [number, number, number, Cesium.Request?], Cesium.TerrainData>(
+    (x: number, y: number, level: number, request?: Cesium.Request) =>
+      originalRequestTileGeometry.call(provider, x, y, level, request),
+    onFirstSuccess
+  )
+  provider.requestTileGeometry = observedRequestTileGeometry
+  return () => {
+    if (provider.requestTileGeometry === observedRequestTileGeometry) {
+      provider.requestTileGeometry = originalRequestTileGeometry
+    }
+  }
+}
 
 function createCesiumImageryProvider(tileStyle: string): CesiumImagerySource {
-  const webMercatorTilingScheme = new Cesium.WebMercatorTilingScheme();
-  
-  const source = PRESET_TILE_SOURCES.find((s) => s.id === tileStyle);
+  const webMercatorTilingScheme = new Cesium.WebMercatorTilingScheme()
+  const source = PRESET_TILE_SOURCES.find((s) => s.id === tileStyle)
+  let fallbackReason = source ? null : `未找到图源 ${tileStyle}`
 
   if (source) {
     const availabilityIssue = getTileSourceAvailabilityIssue(source, '3DGlobe');
 
     if (availabilityIssue) {
+      fallbackReason = availabilityIssue
       if (import.meta.env.DEV) {
         console.warn('[MapView3D] Skipping unavailable imagery source', {
           tileStyle,
@@ -818,7 +752,10 @@ function createCesiumImageryProvider(tileStyle: string): CesiumImagerySource {
           }),
           debugLabel: 'OSM 开源底图',
           debugUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        };
+          requestedId: tileStyle,
+          activeId: source.id,
+          fallbackReason: null,
+        }
       }
 
       const normalizedUrl = normalizeCesiumTemplateUrl(source);
@@ -833,7 +770,10 @@ function createCesiumImageryProvider(tileStyle: string): CesiumImagerySource {
         }),
         debugLabel: source.name,
         debugUrl: normalizedUrl,
-      };
+        requestedId: tileStyle,
+        activeId: source.id,
+        fallbackReason: null,
+      }
     }
   }
 
@@ -847,8 +787,12 @@ function createCesiumImageryProvider(tileStyle: string): CesiumImagerySource {
       enablePickFeatures: false,
     }),
     debugLabel: 'Light',
-    debugUrl: 'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-  };
+    debugUrl:
+      'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    requestedId: tileStyle,
+    activeId: 'esri-light-gray-fallback',
+    fallbackReason: fallbackReason || '所选底图不可用',
+  }
 }
 
 function syncExtrudedFeatures(
@@ -1239,7 +1183,6 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
   const onBrowseStateChangeRef = useRef(onBrowseStateChange);
   const isUpdatingRef = useRef(false);
   const syncReleaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const terrainSyncTokenRef = useRef(0);
   const osmBuildingsRef = useRef<Cesium.Cesium3DTileset | null>(null);
   const google3dTilesetRef = useRef<Cesium.Cesium3DTileset | null>(null);
   const entityMapRef = useRef<Map<string, Cesium.Entity>>(new Map());
@@ -1254,6 +1197,56 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
   const [hasRenderedFrame, setHasRenderedFrame] = useState(false);
   const [runtimeLoadingCount, setRuntimeLoadingCount] = useState(0);
   const [terrainTileLoadCount, setTerrainTileLoadCount] = useState(0);
+  const providerGenerationRef = useRef<Record<MapProviderKey, number>>({
+    imagery: 0,
+    terrain: 0,
+    buildings: 0,
+  });
+  const [providerSources, setProviderSources] = useState<MapProviderRuntimeSources>(() =>
+    createProviderRuntimeSources(),
+  );
+  const [providerRetryTokens, setProviderRetryTokens] = useState<Record<MapProviderKey, number>>({
+    imagery: 0,
+    terrain: 0,
+    buildings: 0,
+  });
+
+  const beginProviderLoad = useCallback(
+    (key: MapProviderKey, provider: string, requestedId: string): number => {
+      const generation = providerGenerationRef.current[key] + 1;
+      providerGenerationRef.current[key] = generation;
+      setProviderSources((current) => ({
+        ...current,
+        [key]: {
+          ...current[key],
+          provider,
+          status: 'loading',
+          message: '正在连接服务',
+          retryable: false,
+          requestedId,
+          activeId: null,
+          errorCode: null,
+          attempt: current[key].attempt + 1,
+          generation,
+          pending: undefined,
+          itemCount: undefined,
+        },
+      }));
+      return generation;
+    },
+    [],
+  );
+
+  const updateProviderStatus = useCallback(
+    (key: MapProviderKey, generation: number, patch: Partial<MapProviderRuntimeEntry>) => {
+      if (providerGenerationRef.current[key] !== generation) return;
+      setProviderSources((current) => {
+        if (current[key].generation !== generation) return current;
+        return { ...current, [key]: { ...current[key], ...patch } };
+      });
+    },
+    [],
+  );
 
   const tileStyle = useMapStore((s) => s.tileStyle);
   const drawnFeatures = useMapStore((s) => s.drawnFeatures);
@@ -1274,6 +1267,24 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
   const { placedModels, selectedPlacedModelId, selectPlacedModel, updatePlacement } = useModelStore();
   const notifyBuildingMoved = useMapStore((s) => s.notifyBuildingMoved);
   const hiddenOsmBuildingKeys = new Set(hiddenOsmBuildings.map((item) => item.key));
+  const providerRuntimeStatus = useMemo(
+    () => deriveProviderOverallStatus(providerSources, buildingStyle !== 'none'),
+    [buildingStyle, providerSources],
+  );
+  const retryProvider = useCallback((key: MapProviderKey) => {
+    const viewer = viewerRef.current;
+    if (key === 'terrain') {
+      resetTerrainProviderPromise(buildingStyle === 'osm' ? 'cesium-world-terrain' : 'arcgis-terrain');
+    }
+    if (key === 'buildings' && viewer && !viewer.isDestroyed()) {
+      for (const ref of [osmBuildingsRef, google3dTilesetRef]) {
+        if (ref.current) viewer.scene.primitives.remove(ref.current);
+        ref.current = null;
+      }
+      viewer.scene.requestRender();
+    }
+    setProviderRetryTokens((current) => ({ ...current, [key]: current[key] + 1 }));
+  }, [buildingStyle]);
   const terrainWorkZoneRuntimePolicy = useMemo(
     () => resolveTerrainWorkZoneRuntimePolicy(renderQuality, renderFps),
     [renderQuality, renderFps],
@@ -1523,6 +1534,9 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
       setTerrainTileLoadCount(0);
       setRuntimeLoadingCount(0);
       setRenderFps(null);
+      providerGenerationRef.current.imagery += 1;
+      providerGenerationRef.current.terrain += 1;
+      providerGenerationRef.current.buildings += 1;
       viewer.destroy();
       viewerRef.current = null;
       if (import.meta.env.DEV) {
@@ -1539,9 +1553,11 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
     viewer.targetFrameRate = CESIUM_TARGET_FRAME_RATE;
     viewer.resolutionScale = renderQuality.resolutionScale;
     viewer.scene.postProcessStages.fxaa.enabled = renderQuality.fxaaEnabled;
-    viewer.scene.globe.maximumScreenSpaceError = renderQuality.terrainScreenSpaceError;
+    viewer.scene.globe.maximumScreenSpaceError = buildingStyle === 'osm'
+      ? Math.max(renderQuality.terrainScreenSpaceError, 4.0)
+      : renderQuality.terrainScreenSpaceError;
     viewer.scene.requestRender();
-  }, [renderQuality, viewerReadyToken]);
+  }, [buildingStyle, renderQuality, viewerReadyToken]);
 
   // 根据 buildingStyle 切换地形源：
   // - OSM 白模：必须使用 Cesium World Terrain + depthTest=true
@@ -1555,336 +1571,350 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
     const viewer = viewerRef.current;
     if (!viewer || viewer.isDestroyed()) return;
 
-    const syncToken = terrainSyncTokenRef.current + 1;
-    terrainSyncTokenRef.current = syncToken;
-    const useWorldTerrain = buildingStyle === 'osm';
-    viewer.scene.globe.depthTestAgainstTerrain = useWorldTerrain;
+    const useWorldTerrain = buildingStyle === 'osm'
+    const requestedId = useWorldTerrain ? 'cesium-world-terrain' : 'arcgis-terrain'
+    const requestedProvider = useWorldTerrain ? 'Cesium World Terrain' : 'ArcGIS Terrain'
+    const generation = beginProviderLoad('terrain', requestedProvider, requestedId)
+    let disposed = false
+    let removeTerrainErrorListener: (() => void) | null = null
+    let removeTerrainSuccessObserver: (() => void) | null = null
+    viewer.scene.globe.depthTestAgainstTerrain = useWorldTerrain
 
-    // OSM 模式下适当降低地形网格精度，让地面视觉上更平滑
-    // 但不会影响建筑贴地（建筑位置由 3D Tiles 数据决定，不依赖实时地形 LOD）
-    if (useWorldTerrain) {
-      viewer.scene.globe.maximumScreenSpaceError = Math.max(
-        renderQuality.terrainScreenSpaceError,
-        4.0,
-      );
-    } else {
-      viewer.scene.globe.maximumScreenSpaceError = renderQuality.terrainScreenSpaceError;
+    const isCurrent = () =>
+      !disposed && !viewer.isDestroyed() && providerGenerationRef.current.terrain === generation
+
+    const applyTerrainProvider = (
+      terrainProvider: Cesium.TerrainProvider,
+      activeId: string,
+      provider: string,
+      successStatus: 'ready' | 'degraded',
+      successMessage: string,
+      retryable: boolean,
+      errorCode: MapProviderRuntimeEntry['errorCode'] = null
+    ) => {
+      if (!isCurrent()) return
+      removeTerrainErrorListener?.()
+      removeTerrainSuccessObserver?.()
+      let tileErrorCount = 0
+      let hasSuccessfulTile = false
+      let lastTileError: ClassifiedProviderError | null = null
+      removeTerrainSuccessObserver = observeFirstTerrainTileSuccess(terrainProvider, () => {
+        if (!isCurrent()) return
+        hasSuccessfulTile = true
+        updateProviderStatus('terrain', generation, {
+          provider,
+          status: deriveTileRequestRuntimeStatus(
+            { hasSuccessfulTile, failedTileCount: tileErrorCount },
+            successStatus
+          ),
+          activeId,
+          message: lastTileError?.message || successMessage,
+          retryable: lastTileError?.retryable ?? retryable,
+          errorCode: lastTileError?.code ?? errorCode,
+        })
+      })
+      removeTerrainErrorListener = terrainProvider.errorEvent.addEventListener((error: unknown) => {
+        if (!isCurrent()) return
+        tileErrorCount += 1
+        const classified = classifyProviderError(error)
+        lastTileError = classified
+        updateProviderStatus('terrain', generation, {
+          provider,
+          status: deriveTileRequestRuntimeStatus({
+            hasSuccessfulTile,
+            failedTileCount: tileErrorCount,
+          }),
+          message: classified.message,
+          retryable: classified.retryable,
+          errorCode: classified.code,
+        })
+      })
+      viewer.terrainProvider = terrainProvider
+      viewer.scene.requestRender()
+      updateProviderStatus('terrain', generation, {
+        provider,
+        status: successStatus === 'ready' ? 'loading' : 'degraded',
+        activeId,
+        message: successStatus === 'ready'
+          ? '正在等待首个地形瓦片'
+          : `${successMessage}，正在等待首个地形瓦片`,
+        retryable,
+        errorCode,
+      })
     }
 
-    const terrainProviderPromise = useWorldTerrain
-      ? getWorldTerrainProvider()
-      : getArcGisTerrainProvider();
+    void (async () => {
+      if (useWorldTerrain && !cesiumIonToken) {
+        try {
+          const fallbackProvider = await getArcGisTerrainProvider()
+          applyTerrainProvider(
+            fallbackProvider,
+            'arcgis-terrain',
+            'ArcGIS Terrain（备用）',
+            'degraded',
+            '未配置 Cesium ion 凭据，已使用 ArcGIS 地形',
+            false,
+            'missing-credentials'
+          )
+        } catch (fallbackError) {
+          if (!isCurrent()) return
+          applyTerrainProvider(
+            new Cesium.EllipsoidTerrainProvider(),
+            'ellipsoid-terrain',
+            '无高程地表（备用）',
+            'degraded',
+            '在线地形不可用，已使用无高程地表',
+            true,
+            classifyProviderError(fallbackError).code
+          )
+        }
+        return
+      }
 
-    terrainProviderPromise
-      .then((terrainProvider) => {
-        if (viewer.isDestroyed() || terrainSyncTokenRef.current !== syncToken) {
-          return;
+      try {
+        const terrainProvider = await (useWorldTerrain
+          ? getWorldTerrainProvider()
+          : getArcGisTerrainProvider())
+        applyTerrainProvider(
+          terrainProvider,
+          requestedId,
+          requestedProvider,
+          'ready',
+          '首个地形瓦片已加载',
+          false
+        )
+      } catch (error) {
+        if (!isCurrent()) return
+        const classified = classifyProviderError(error)
+        let terminalFailure = classified
+        console.error(`[MapView3D] Failed to load ${requestedProvider}:`, error)
+
+        if (useWorldTerrain) {
+          try {
+            const fallbackProvider = await getArcGisTerrainProvider()
+            applyTerrainProvider(
+              fallbackProvider,
+              'arcgis-terrain',
+              'ArcGIS Terrain（备用）',
+              'degraded',
+              `${classified.message}，已切换到 ArcGIS 地形`,
+              classified.retryable,
+              classified.code
+            )
+            return
+          } catch (fallbackError) {
+            console.error('[MapView3D] Failed to load ArcGIS terrain fallback:', fallbackError)
+            terminalFailure = classifyTerrainFallbackFailure(error, fallbackError)
+          }
         }
 
-        viewer.terrainProvider = terrainProvider;
-        viewer.scene.requestRender();
-      })
-      .catch((err) => {
-        if (terrainSyncTokenRef.current !== syncToken) {
-          return;
-        }
+        applyTerrainProvider(
+          new Cesium.EllipsoidTerrainProvider(),
+          'ellipsoid-terrain',
+          '无高程地表（备用）',
+          'degraded',
+          `${terminalFailure.message}，已使用无高程地表`,
+          terminalFailure.retryable,
+          terminalFailure.code
+        )
+      }
+    })()
 
-        console.error(
-          `[MapView3D] Failed to load ${useWorldTerrain ? 'Cesium World Terrain' : 'ArcGIS terrain'}:`,
-          err,
-        );
-      });
-  }, [buildingStyle, renderQuality.terrainScreenSpaceError, viewerReadyToken]);
+    return () => {
+      disposed = true
+      removeTerrainErrorListener?.()
+      removeTerrainSuccessObserver?.()
+    }
+  }, [
+    beginProviderLoad,
+    buildingStyle,
+    providerRetryTokens.terrain,
+    updateProviderStatus,
+    viewerReadyToken,
+  ])
 
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer || viewer.isDestroyed()) return;
 
-    let debugLabel = tileStyle;
-    let debugUrl = '';
+    let debugLabel = tileStyle
+    const selectedSource = PRESET_TILE_SOURCES.find((source) => source.id === tileStyle)
+    const generation = beginProviderLoad('imagery', selectedSource?.name || tileStyle, tileStyle)
+    let disposed = false
+    let removeImageryErrorListener: (() => void) | null = null
+    let removeImagerySuccessObserver: (() => void) | null = null
 
     try {
-      viewer.imageryLayers.removeAll(true);
-      const imagerySource = createCesiumImageryProvider(tileStyle);
-      const imageryProvider = imagerySource.provider;
-      debugLabel = imagerySource.debugLabel;
-      debugUrl = imagerySource.debugUrl;
+      viewer.imageryLayers.removeAll(true)
+      const imagerySource = createCesiumImageryProvider(tileStyle)
+      const imageryProvider = imagerySource.provider
+      debugLabel = imagerySource.debugLabel
+      let tileErrorCount = 0
+      let hasSuccessfulTile = false
+      let lastTileError: ClassifiedProviderError | null = null
+      const successStatus = imagerySource.fallbackReason ? 'degraded' : 'ready'
+      const successMessage = imagerySource.fallbackReason
+        ? `${imagerySource.fallbackReason}，已使用备用底图`
+        : '首个影像瓦片已加载'
 
-      imageryProvider.errorEvent.addEventListener((error: unknown) => {
+      removeImagerySuccessObserver = observeFirstImageryTileSuccess(imageryProvider, () => {
+        if (disposed || providerGenerationRef.current.imagery !== generation) return
+        hasSuccessfulTile = true
+        updateProviderStatus('imagery', generation, {
+          provider: debugLabel,
+          status: deriveTileRequestRuntimeStatus(
+            { hasSuccessfulTile, failedTileCount: tileErrorCount },
+            successStatus
+          ),
+          activeId: imagerySource.activeId,
+          message: lastTileError?.message || successMessage,
+          retryable: lastTileError?.retryable ?? Boolean(imagerySource.fallbackReason),
+          errorCode: lastTileError?.code ?? null,
+        })
+      })
+
+      removeImageryErrorListener = imageryProvider.errorEvent.addEventListener((error: unknown) => {
+        if (disposed || providerGenerationRef.current.imagery !== generation) return
+        tileErrorCount += 1
+        const classified = classifyProviderError(error)
+        lastTileError = classified
+        updateProviderStatus('imagery', generation, {
+          provider: debugLabel,
+          status: deriveTileRequestRuntimeStatus({
+            hasSuccessfulTile,
+            failedTileCount: tileErrorCount,
+          }),
+          message: classified.message,
+          retryable: classified.retryable,
+          errorCode: classified.code,
+        })
         if (import.meta.env.DEV) {
           console.warn('[MapView3D] Imagery tile error', {
             tileStyle,
             provider: debugLabel,
-            url: debugUrl,
             error,
-          });
-          return;
+          })
+        } else {
+          console.warn(`[MapView3D] Imagery tile error: ${tileStyle} (${debugLabel})`)
         }
+      })
 
-        console.warn(`[MapView3D] Imagery tile error: ${tileStyle} (${debugLabel})`);
-      });
-
-      viewer.imageryLayers.addImageryProvider(imageryProvider);
-      viewer.scene.requestRender();
+      viewer.imageryLayers.addImageryProvider(imageryProvider)
+      viewer.scene.requestRender()
+      updateProviderStatus('imagery', generation, {
+        provider: debugLabel,
+        status: successStatus === 'ready' ? 'loading' : 'degraded',
+        activeId: imagerySource.activeId,
+        message: imagerySource.fallbackReason
+          ? `${successMessage}，正在等待首个影像瓦片`
+          : '正在等待首个影像瓦片',
+        retryable: Boolean(imagerySource.fallbackReason),
+        errorCode: null,
+      })
     } catch (err) {
+      const classified = classifyProviderError(err)
+      updateProviderStatus('imagery', generation, {
+        provider: debugLabel,
+        status: 'failed',
+        activeId: null,
+        message: classified.message,
+        retryable: classified.retryable,
+        errorCode: classified.code,
+      })
       console.error('[MapView3D] Failed to add imagery:', {
         tileStyle,
         provider: debugLabel,
-        url: debugUrl,
         error: err,
       });
     }
-  }, [tileStyle, viewerReadyToken]);
+
+    return () => {
+      disposed = true
+      removeImageryErrorListener?.()
+      removeImagerySuccessObserver?.()
+    }
+  }, [
+    beginProviderLoad,
+    providerRetryTokens.imagery,
+    tileStyle,
+    updateProviderStatus,
+    viewerReadyToken,
+  ])
 
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer || viewer.isDestroyed()) return;
 
-    syncReferenceBuildings(
-      viewer,
-      buildingStyle,
-      hiddenOsmBuildings,
-      renderQuality,
-      osmBuildingsRef,
-      google3dTilesetRef,
-    );
-  }, [buildingStyle, hiddenOsmBuildings, renderQuality, viewerReadyToken]);
+    if (buildingStyle === 'osmGeoJson') return
+
+    const providerLabel =
+      buildingStyle === 'osm'
+        ? 'OSM 白模'
+        : buildingStyle === 'google3d'
+          ? 'Google 真实 3D'
+          : '建筑参考层'
+    const generation = beginProviderLoad('buildings', providerLabel, buildingStyle)
+
+    if (buildingStyle === 'none' || buildingStyle === 'amap') {
+      updateProviderStatus('buildings', generation, {
+        provider: providerLabel,
+        status: 'unavailable',
+        activeId: null,
+        message: buildingStyle === 'none' ? '未启用建筑参考层' : '高德白模仅支持高德三维视图',
+        retryable: false,
+        errorCode: null,
+      })
+    }
+
+    return syncReferenceBuildings(viewer, buildingStyle, osmBuildingsRef, google3dTilesetRef, {
+      ionTokenAvailable: Boolean(cesiumIonToken),
+      isCurrent: () => providerGenerationRef.current.buildings === generation,
+      onStatus: (patch) => updateProviderStatus('buildings', generation, patch),
+      getHiddenOsmBuildings: () => useMapStore.getState().hiddenOsmBuildings,
+      getRenderQuality: () => useMapStore.getState().renderQuality,
+    })
+  }, [
+    beginProviderLoad,
+    buildingStyle,
+    providerRetryTokens.buildings,
+    updateProviderStatus,
+    viewerReadyToken,
+  ])
+
+  useEffect(() => {
+    const viewer = viewerRef.current
+    const osmTileset = osmBuildingsRef.current
+    if (
+      buildingStyle !== 'osm' ||
+      !viewer ||
+      viewer.isDestroyed() ||
+      !osmTileset ||
+      osmTileset.isDestroyed()
+    ) {
+      return
+    }
+
+    applyOsmTilesetPresentation(viewer, osmTileset, hiddenOsmBuildings, renderQuality)
+  }, [buildingStyle, hiddenOsmBuildings, renderQuality, viewerReadyToken])
 
   // ── 三方OSM：Overpass API 视口查询 ────────────────────────────────────────
   useEffect(() => {
     const viewer = viewerRef.current;
-    if (!viewer || viewer.isDestroyed()) return;
+    if (!viewer || viewer.isDestroyed() || buildingStyle !== 'osmGeoJson') return;
 
-    const tilesMap = osmGeoJsonTilesRef.current;
+    const generation = beginProviderLoad('buildings', '三方 OSM', 'osm-overpass');
+    return startOverpassBuildingManager(viewer, osmGeoJsonTilesRef.current, {
+      isCurrent: () => providerGenerationRef.current.buildings === generation,
+      onStatus: (patch) => updateProviderStatus('buildings', generation, patch),
+    });
+  }, [
+    beginProviderLoad,
+    buildingStyle,
+    providerRetryTokens.buildings,
+    updateProviderStatus,
+    viewerReadyToken,
+  ]);
 
-    // 清理所有已加载的 DataSource
-    const clearAllGeoJsonData = () => {
-      for (const [key, ds] of tilesMap) {
-        try { viewer.dataSources.remove(ds, true); } catch { /* ignore */ }
-        tilesMap.delete(key);
-      }
-    };
-
-    // 如果不是 osmGeoJson 模式，清理并退出
-    if (buildingStyle !== 'osmGeoJson') {
-      clearAllGeoJsonData();
-      return;
-    }
-
-    let disposed = false;
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let currentAbort: AbortController | null = null;
-    let lastBBoxKey = '';
-    let lastRequestTime = 0;
-    let retryCount = 0;
-    let activeEndpointIndex = 0;
-    let blockedUntil = 0;
-
-    const scheduleRetry = (reason: string) => {
-      if (retryCount < OVERPASS_MAX_RETRIES) {
-        retryCount++;
-        activeEndpointIndex = (activeEndpointIndex + 1) % OVERPASS_API_ENDPOINTS.length;
-        const retryDelay = OVERPASS_RETRY_BASE_MS * Math.pow(2, retryCount - 1);
-        const nextEndpoint = getOverpassEndpointLabel(OVERPASS_API_ENDPOINTS[activeEndpointIndex]);
-        console.warn(
-          `[MapView3D] Overpass ${reason}: retry #${retryCount} in ${retryDelay / 1000}s via ${nextEndpoint}`,
-        );
-        lastBBoxKey = '';
-        if (retryTimer) clearTimeout(retryTimer);
-        retryTimer = setTimeout(() => syncBuildingsForViewport(true), retryDelay);
-        return true;
-      }
-
-      blockedUntil = Date.now() + OVERPASS_FAILURE_BACKOFF_MS;
-      console.warn(
-        `[MapView3D] Overpass ${reason}: paused for ${OVERPASS_FAILURE_BACKOFF_MS / 1000}s after ${OVERPASS_MAX_RETRIES} retries`,
-      );
-      return false;
-    };
-
-    const syncBuildingsForViewport = (isRetry = false) => {
-      if (disposed || viewer.isDestroyed()) return;
-
-      const remainingBlockTime = blockedUntil - Date.now();
-      if (remainingBlockTime > 0) {
-        if (!isRetry) {
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(
-            () => syncBuildingsForViewport(false),
-            remainingBlockTime + 500,
-          );
-        }
-        return;
-      }
-
-      // cooldown 保护：非重试时检查距上次请求的间隔
-      if (!isRetry) {
-        const timeSinceLast = Date.now() - lastRequestTime;
-        if (timeSinceLast < OVERPASS_COOLDOWN_MS && lastRequestTime > 0) {
-          // 延迟到 cooldown 结束后再执行
-          if (debounceTimer) clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(() => syncBuildingsForViewport(false), OVERPASS_COOLDOWN_MS - timeSinceLast + 500);
-          return;
-        }
-        retryCount = 0; // 非重试请求重置计数
-      }
-
-      const cameraHeight = viewer.camera.positionCartographic?.height || 100_000;
-
-      // 太高时清空数据
-      if (cameraHeight > OVERPASS_MIN_CAMERA_HEIGHT) {
-        clearAllGeoJsonData();
-        viewer.scene.requestRender();
-        return;
-      }
-
-      const bbox = getViewportBBox(viewer);
-      if (!bbox) return;
-
-      // 构建 bbox key，避免重复请求
-      const bboxKey = `${bbox.south.toFixed(5)},${bbox.west.toFixed(5)},${bbox.north.toFixed(5)},${bbox.east.toFixed(5)}`;
-      if (bboxKey === lastBBoxKey) return;
-      lastBBoxKey = bboxKey;
-
-      // 取消上一个请求
-      if (currentAbort) {
-        currentAbort.abort();
-        currentAbort = null;
-      }
-
-      const controller = new AbortController();
-      currentAbort = controller;
-      lastRequestTime = Date.now();
-      const endpointUrl = OVERPASS_API_ENDPOINTS[activeEndpointIndex];
-      const endpointLabel = getOverpassEndpointLabel(endpointUrl);
-      let didTimeout = false;
-      const timeoutHandle = setTimeout(() => {
-        didTimeout = true;
-        controller.abort();
-      }, OVERPASS_REQUEST_TIMEOUT_MS);
-
-      const query = buildOverpassQuery(bbox);
-      console.log(
-        `[MapView3D] Overpass: querying bbox ${bboxKey} via ${endpointLabel}${isRetry ? ` (retry #${retryCount})` : ''}`,
-      );
-
-      fetch(endpointUrl, {
-        method: 'POST',
-        body: `data=${encodeURIComponent(query)}`,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        signal: controller.signal,
-      })
-        .then((res) => {
-          clearTimeout(timeoutHandle);
-          if ([429, 502, 503, 504].includes(res.status)) {
-            scheduleRetry(`HTTP ${res.status}`);
-            return Promise.reject(new DOMException('Transient Overpass failure', 'AbortError'));
-          }
-          if (!res.ok) throw new Error(`Overpass HTTP ${res.status}`);
-          return res.json();
-        })
-        .then((overpassData) => {
-          if (disposed || viewer.isDestroyed()) return;
-          clearTimeout(timeoutHandle);
-          currentAbort = null;
-          blockedUntil = 0;
-          retryCount = 0;
-
-          const geojson = overpassToGeoJson(overpassData);
-          if (geojson.features.length === 0) {
-            console.log('[MapView3D] Overpass: no buildings in viewport');
-            return;
-          }
-
-          console.log(`[MapView3D] Overpass: ${geojson.features.length} buildings loaded`);
-
-          return Cesium.GeoJsonDataSource.load(geojson, {
-            clampToGround: true,
-            stroke: OVERPASS_BUILDING_OUTLINE_COLOR,
-            fill: OVERPASS_BUILDING_COLOR,
-            strokeWidth: 1,
-          });
-        })
-        .then((dataSource) => {
-          if (!dataSource || disposed || viewer.isDestroyed()) return;
-
-          // 为每个建筑设置拉伸高度
-          for (const entity of dataSource.entities.values) {
-            if (entity.polygon) {
-              const props = entity.properties;
-              let height = OVERPASS_DEFAULT_HEIGHT;
-
-              if (props) {
-                const hVal = props.height?.getValue(Cesium.JulianDate.now());
-                const levelsKey = props['building:levels'] || props.levels;
-                const levelsVal = levelsKey?.getValue?.(Cesium.JulianDate.now());
-                if (typeof hVal === 'number' && hVal > 0) {
-                  height = hVal;
-                } else if (typeof hVal === 'string' && parseFloat(hVal) > 0) {
-                  height = parseFloat(hVal);
-                } else if (typeof levelsVal === 'number' && levelsVal > 0) {
-                  height = levelsVal * 3;
-                } else if (typeof levelsVal === 'string' && parseInt(levelsVal, 10) > 0) {
-                  height = parseInt(levelsVal, 10) * 3;
-                }
-              }
-
-              entity.polygon.heightReference = Cesium.HeightReference.CLAMP_TO_GROUND as unknown as Cesium.Property;
-              entity.polygon.extrudedHeight = new Cesium.ConstantProperty(height);
-              entity.polygon.extrudedHeightReference = Cesium.HeightReference.RELATIVE_TO_GROUND as unknown as Cesium.Property;
-              entity.polygon.material = OVERPASS_BUILDING_COLOR as unknown as Cesium.MaterialProperty;
-              entity.polygon.outline = new Cesium.ConstantProperty(true);
-              entity.polygon.outlineColor = new Cesium.ConstantProperty(OVERPASS_BUILDING_OUTLINE_COLOR);
-              entity.polygon.outlineWidth = new Cesium.ConstantProperty(1);
-            }
-          }
-
-          // 清除旧数据后添加新数据
-          clearAllGeoJsonData();
-          viewer.dataSources.add(dataSource);
-          tilesMap.set(bboxKey, dataSource);
-          viewer.scene.requestRender();
-        })
-        .catch((err) => {
-          clearTimeout(timeoutHandle);
-          currentAbort = null;
-          if (didTimeout) {
-            scheduleRetry(`timeout @ ${endpointLabel}`);
-            return;
-          }
-          if (err instanceof TypeError) {
-            scheduleRetry(`network error @ ${endpointLabel}`);
-            return;
-          }
-          if (err.name !== 'AbortError') {
-            console.warn('[MapView3D] Overpass query failed:', err.message);
-          }
-        });
-    };
-
-    // debounce 包装
-    const debouncedSync = () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(syncBuildingsForViewport, OVERPASS_DEBOUNCE_MS);
-    };
-
-    // 首次加载 + 监听相机移动
-    syncBuildingsForViewport();
-    const moveEndListener = viewer.camera.moveEnd.addEventListener(debouncedSync);
-
-    console.log('[MapView3D] Overpass building manager started');
-
-    return () => {
-      disposed = true;
-      moveEndListener();
-      if (debounceTimer) clearTimeout(debounceTimer);
-      if (retryTimer) clearTimeout(retryTimer);
-      if (currentAbort) currentAbort.abort();
-      clearAllGeoJsonData();
-      console.log('[MapView3D] Overpass building manager stopped');
-    };
-  }, [buildingStyle, viewerReadyToken]);
 
   useEffect(() => {
     const viewer = viewerRef.current;
@@ -2320,6 +2350,7 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
     runtimeLoadingCount,
     expectedZoneCount: previewableRuntimeZoneCount,
     summary: runtimePreviewSummary,
+    providers: providerRuntimeStatus,
   });
   const displayZoneCount = Math.max(runtimePreviewSummary.zoneCount, previewableRuntimeZoneCount);
   const showRuntimeResourceMeta = runtimePreviewSummary.sourceCount > 0 || displayZoneCount > 0;
@@ -2337,7 +2368,7 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
       />
 
       {globeExperienceStatus.visible && (
-        <div className={`map-runtime-preview-hud is-${globeExperienceStatus.tone}`.trim()}>
+        <div className={`map-runtime-preview-hud is-${globeExperienceStatus.tone}`.trim()} data-experience-status={globeExperienceStatus.tone}>
           <div className="map-runtime-preview-hud__eyebrow">{globeExperienceStatus.eyebrow}</div>
           <div className="map-runtime-preview-hud__title">{globeExperienceStatus.title}</div>
           <div className="map-runtime-preview-hud__subline">
@@ -2365,6 +2396,7 @@ export default function MapView3D({ onBrowseStateChange, browseSyncToken, browse
               {globeExperienceStatus.detail}
             </div>
           )}
+          <MapProviderStatusHud value={providerRuntimeStatus} onRetry={retryProvider} />
         </div>
       )}
 

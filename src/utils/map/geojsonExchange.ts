@@ -57,6 +57,7 @@ export function buildMapFeatureCollection(
         templateId: node?.templateId || props.templateId,
         backendObjectId: node?.backendObjectId || props.backendObjectId,
         backendWorkZoneId: node?.backendWorkZoneId || props.backendWorkZoneId,
+        siteModeBound: node?.siteModeBound ?? props.siteModeBound ?? false,
         syncStatus: node?.syncStatus || props.syncStatus,
       },
     };

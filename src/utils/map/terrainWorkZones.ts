@@ -24,6 +24,7 @@ interface TerrainWorkZoneSummary {
 
 export interface TerrainWorkZoneDto {
   id: string;
+  siteModeBound?: boolean;
   projectId?: string | null;
   name?: string | null;
   zoneType?: MapTreeNode['zoneType'];
@@ -32,6 +33,9 @@ export interface TerrainWorkZoneDto {
   includedObjectIds?: string[] | null;
   metadata?: {
     mapNodeId?: string | null;
+    purpose?: string | null;
+    internal?: boolean | null;
+    source?: string | null;
     terrainPatchGeneratedAt?: string | null;
     terrainHeightDeltaMeters?: number | null;
     publishManifestGeneratedAt?: string | null;
@@ -42,6 +46,7 @@ export interface TerrainWorkZoneDto {
     geometrySource?: string | null;
   } | null;
   snapshotJson?: {
+    siteBake?: unknown;
     terrainPatch?: {
       sampledAt?: string | null;
       heightDeltaMeters?: number | null;
@@ -86,6 +91,32 @@ function normalizePolygonGeometry(geometry: TerrainWorkZoneDto['clipPolygonWgs84
   return nextGeometry;
 }
 
+interface SiteModeZoneMarker {
+  siteModeBound?: boolean;
+  metadata?: {
+    purpose?: string | null;
+    internal?: boolean | null;
+    source?: string | null;
+  } | null;
+  snapshotJson?: {
+    siteBake?: unknown;
+  } | null;
+}
+
+export function isSiteModeBoundTerrainWorkZone(value: unknown): boolean {
+  const marker = value as SiteModeZoneMarker | null | undefined;
+  return marker?.siteModeBound === true
+    || marker?.metadata?.purpose === 'site-mode'
+    || Boolean(marker?.snapshotJson?.siteBake);
+}
+
+export function isInternalMapSelectionExportZone(value: unknown): boolean {
+  const marker = value as SiteModeZoneMarker | null | undefined;
+  return marker?.metadata?.internal === true
+    || marker?.metadata?.purpose === 'map-selection-export'
+    || marker?.metadata?.source === 'map-selection-export';
+}
+
 export function terrainWorkZoneToMapNode(zone: TerrainWorkZoneDto): MapTreeNode {
   const preset = getTerrainWorkZonePreset(zone?.zoneType);
   const manifestSummary = zone?.publishTarget?.manifestSummary || null;
@@ -108,6 +139,7 @@ export function terrainWorkZoneToMapNode(zone: TerrainWorkZoneDto): MapTreeNode 
     strokeOpacity: 0.95,
     focusZoneId: zone?.id || null,
     backendWorkZoneId: zone?.id || null,
+    siteModeBound: isSiteModeBoundTerrainWorkZone(zone),
     zoneType: zone?.zoneType || 'focus-zone',
     terrainResolution: zone?.terrainResolution ?? 2,
     terrainPatchGeneratedAt: zone?.metadata?.terrainPatchGeneratedAt || zone?.snapshotJson?.terrainPatch?.sampledAt || null,
@@ -155,6 +187,7 @@ export function terrainWorkZoneToGeoJSONFeature(zone: TerrainWorkZoneDto, nodeId
       fillOpacity: nextNode.fillOpacity,
       focusZoneId: nextNode.focusZoneId,
       backendWorkZoneId: nextNode.backendWorkZoneId,
+      siteModeBound: nextNode.siteModeBound,
       zoneType: nextNode.zoneType,
       terrainResolution: nextNode.terrainResolution,
       terrainPatchGeneratedAt: nextNode.terrainPatchGeneratedAt,

@@ -1,4 +1,5 @@
 import * as repo from './inventory.spatial.repository.js';
+import { assertGenericWorkZoneMutationAllowed } from './inventory.spatial.site-mode-guard.js';
 
 const OPEN_TOPO_DATA_API_URL = process.env.OPEN_TOPO_DATA_API_URL || 'https://api.opentopodata.org/v1/srtm90m';
 const OPEN_TOPO_DATA_INTERPOLATION = process.env.OPEN_TOPO_DATA_INTERPOLATION || 'bilinear';
@@ -7,6 +8,10 @@ const OPEN_TOPO_DATA_MAX_SAMPLES = Math.max(Number(process.env.OPEN_TOPO_DATA_MA
 const OPEN_TOPO_DATA_MAX_GRID_DIMENSION = Math.max(Number(process.env.OPEN_TOPO_DATA_MAX_GRID_DIMENSION) || 32, 8);
 const OPEN_TOPO_DATA_RETRY_COUNT = Math.max(Number(process.env.OPEN_TOPO_DATA_RETRY_COUNT) || 2, 0);
 const OPEN_TOPO_DATA_RETRY_DELAY_MS = Math.max(Number(process.env.OPEN_TOPO_DATA_RETRY_DELAY_MS) || 800, 100);
+const OPEN_TOPO_DATA_TIMEOUT_MS = Math.min(
+    Math.max(Number(process.env.OPEN_TOPO_DATA_TIMEOUT_MS) || 25000, 100),
+    60000,
+);
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -34,9 +39,37 @@ function round(value, digits = 4) {
     return Number(pickNumber(value, 0).toFixed(digits));
 }
 
-function sleep(ms) {
-    return new Promise((resolve) => {
-        setTimeout(resolve, ms);
+function buildAbortError() {
+    const error = new Error('The operation was aborted');
+    error.name = 'AbortError';
+    return error;
+}
+
+function withAbortSignal(promise, signal) {
+    if (signal?.aborted) return Promise.reject(buildAbortError());
+    if (!signal) return promise;
+
+    return new Promise((resolve, reject) => {
+        const abort = () => reject(buildAbortError());
+        signal.addEventListener('abort', abort, { once: true });
+        Promise.resolve(promise).then(resolve, reject).finally(() => {
+            signal.removeEventListener('abort', abort);
+        });
+    });
+}
+
+function sleep(ms, signal) {
+    if (signal?.aborted) return Promise.reject(buildAbortError());
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            signal?.removeEventListener?.('abort', abort);
+            resolve();
+        }, Math.max(0, ms));
+        const abort = () => {
+            clearTimeout(timeoutId);
+            reject(buildAbortError());
+        };
+        signal?.addEventListener?.('abort', abort, { once: true });
     });
 }
 
@@ -194,13 +227,27 @@ async function sampleElevationsFromOpenTopoData(samplePoints, options = {}, fetc
         throw new Error('当前运行环境缺少 fetch，无法请求公开 DEM 服务');
     }
 
+    const timeoutMs = clamp(
+        pickNumber(options.timeoutMs, OPEN_TOPO_DATA_TIMEOUT_MS),
+        100,
+        60000,
+    );
+    const controller = new AbortController();
+    const deadlineAt = Date.now() + timeoutMs;
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const externalSignal = options.signal;
+    const abortFromExternal = () => controller.abort();
+    if (externalSignal?.aborted) controller.abort();
+    externalSignal?.addEventListener?.('abort', abortFromExternal, { once: true });
+
     const heights = [];
     const chunks = chunkArray(samplePoints, OPEN_TOPO_DATA_BATCH_SIZE);
-    for (const chunk of chunks) {
+    try {
+      for (const chunk of chunks) {
         let lastStatus = 0;
         let response = null;
         for (let attempt = 0; attempt <= OPEN_TOPO_DATA_RETRY_COUNT; attempt += 1) {
-            response = await fetchImpl(OPEN_TOPO_DATA_API_URL, {
+            response = await withAbortSignal(fetchImpl(OPEN_TOPO_DATA_API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -208,7 +255,8 @@ async function sampleElevationsFromOpenTopoData(samplePoints, options = {}, fetc
                     interpolation: options.interpolation || OPEN_TOPO_DATA_INTERPOLATION,
                     nodata_value: -9999,
                 }),
-            });
+                signal: controller.signal,
+            }), controller.signal);
             lastStatus = response.status;
             if (response.ok) break;
             if (attempt >= OPEN_TOPO_DATA_RETRY_COUNT || ![429, 500, 502, 503, 504].includes(response.status)) {
@@ -218,12 +266,16 @@ async function sampleElevationsFromOpenTopoData(samplePoints, options = {}, fetc
             const retryDelayMs = retryAfterSeconds > 0
                 ? retryAfterSeconds * 1000
                 : OPEN_TOPO_DATA_RETRY_DELAY_MS * (attempt + 1);
-            await sleep(retryDelayMs);
+            const remainingMs = Math.max(0, deadlineAt - Date.now());
+            await sleep(Math.min(retryDelayMs, remainingMs), controller.signal);
         }
         if (!response?.ok) {
             throw new Error(`公开 DEM 服务请求失败：HTTP ${lastStatus || 'unknown'}`);
         }
-        const payload = await response.json();
+        const payload = await withAbortSignal(
+            Promise.resolve().then(() => response.json()),
+            controller.signal,
+        );
         if (payload?.status !== 'OK' || !Array.isArray(payload?.results)) {
             throw new Error(`公开 DEM 服务返回异常：${payload?.error || payload?.status || 'unknown error'}`);
         }
@@ -231,6 +283,15 @@ async function sampleElevationsFromOpenTopoData(samplePoints, options = {}, fetc
             const elevation = pickNumber(item?.elevation, Number.NaN);
             heights.push(Number.isFinite(elevation) && elevation !== -9999 ? elevation : null);
         });
+      }
+    } catch (error) {
+        if (controller.signal.aborted && !externalSignal?.aborted) {
+            throw new Error(`公开 DEM 服务请求超时（${timeoutMs}ms）`);
+        }
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+        externalSignal?.removeEventListener?.('abort', abortFromExternal);
     }
     return heights;
 }
@@ -395,6 +456,7 @@ export function terrainPatchToTerrainMesh(terrainPatch) {
 async function ensureScopedTerrainWorkZone(scope, zoneId) {
     const zone = await repo.getTerrainWorkZoneById(scope, zoneId);
     if (!zone) throw buildNotFoundError('地形工作区不存在');
+    assertGenericWorkZoneMutationAllowed(zone);
     return zone;
 }
 

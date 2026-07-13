@@ -93,7 +93,7 @@ export async function uploadModel(
     formData.append('model', file);
     formData.append('name', file.name);
 
-    const data = await request.post(MODEL_API_PATH, formData, {
+    const data = await request.post<{ model?: ModelInfo }>(MODEL_API_PATH, formData, {
       onUploadProgress: (event) => {
         if (!onProgress || !event.total) return;
         onProgress(Math.round((event.loaded / event.total) * 100));
@@ -159,7 +159,7 @@ export async function listModels(): Promise<ModelInfo[]> {
   }
 
   try {
-    return await request.get(MODEL_API_PATH);
+    return await request.get<ModelInfo[]>(MODEL_API_PATH);
   } catch (error) {
     console.error('Failed to list models:', error);
     return [];
@@ -176,7 +176,7 @@ export async function getModel(id: string): Promise<ModelInfo | null> {
   }
 
   try {
-    return await request.get(`${MODEL_API_PATH}/${id}`);
+    return await request.get<ModelInfo>(`${MODEL_API_PATH}/${id}`);
   } catch (error) {
     if (typeof error === 'object' && error && 'status' in error && error.status === 404) return null;
     console.error('Failed to get model:', error);

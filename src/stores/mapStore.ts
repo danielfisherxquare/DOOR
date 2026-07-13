@@ -130,6 +130,7 @@ export interface MapTreeNode {
   focusZoneId?: string | null;
   backendObjectId?: string | null;
   backendWorkZoneId?: string | null;
+  siteModeBound?: boolean;
   zoneType?: 'focus-zone' | 'terrain-clip' | 'corridor-zone';
   terrainResolution?: number | null;
   terrainPatchGeneratedAt?: string | null;
@@ -400,6 +401,7 @@ export const useMapStore = create<MapState>()(
             focusZoneId: newNode.focusZoneId,
             backendObjectId: newNode.backendObjectId,
             backendWorkZoneId: newNode.backendWorkZoneId,
+            siteModeBound: newNode.siteModeBound,
             zoneType: newNode.zoneType,
             terrainResolution: newNode.terrainResolution,
             terrainPatchGeneratedAt: newNode.terrainPatchGeneratedAt,
