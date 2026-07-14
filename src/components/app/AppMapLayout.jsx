@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMapStore } from '../../stores/mapStore'
 import MapErrorBoundary from '../map/MapErrorBoundary'
@@ -11,6 +11,7 @@ import { showSuccess } from '../../utils/toast'
 import { buildAppHref } from './appConfig'
 import SpatialProjectCreateDialog from './spatial/SpatialProjectCreateDialog'
 import SpatialProjectViewSwitch from './spatial/SpatialProjectViewSwitch'
+import SpatialProjectWorkflowRail from './spatial/SpatialProjectWorkflowRail'
 import './app-map-layout.css'
 
 const MapView = lazy(() => import('../map/MapView'))
@@ -57,6 +58,20 @@ function normalizeStudioProjectId(projectId) {
   return normalized
 }
 
+function appendSearchParams(href, entries) {
+  const [pathname, search = ''] = href.split('?')
+  const params = new URLSearchParams(search)
+  Object.entries(entries).forEach(([key, value]) => {
+    if (value) params.set(key, value)
+  })
+  const nextSearch = params.toString()
+  return nextSearch ? `${pathname}?${nextSearch}` : pathname
+}
+
+function isAreaGeometry(geometry) {
+  return geometry?.type === 'Polygon' || geometry?.type === 'MultiPolygon'
+}
+
 export default function AppMapLayout({ context }) {
   const location = useLocation()
   const navigate = useNavigate()
@@ -66,7 +81,13 @@ export default function AppMapLayout({ context }) {
   const browseState = useMapStore((state) => state.browseState)
   const renderQuality = useMapStore((state) => state.renderQuality)
   const sidebarOpen = useMapStore((state) => state.sidebarOpen)
+  const treeNodes = useMapStore((state) => state.treeNodes)
   const toggleSidebar = useMapStore((state) => state.toggleSidebar)
+  const setViewMode = useMapStore((state) => state.setViewMode)
+  const setTileStyle = useMapStore((state) => state.setTileStyle)
+  const setActiveDrawTool = useMapStore((state) => state.setActiveDrawTool)
+  const setSelectedNodeId = useMapStore((state) => state.setSelectedNodeId)
+  const setPropsPanelNodeId = useMapStore((state) => state.setPropsPanelNodeId)
   const setRenderQualityPreset = useMapStore((state) => state.setRenderQualityPreset)
   const updateRenderQuality = useMapStore((state) => state.updateRenderQuality)
   const [qualityPanelOpen, setQualityPanelOpen] = useState(false)
@@ -95,7 +116,42 @@ export default function AppMapLayout({ context }) {
   )
   const projectId = normalizeStudioProjectId(searchParams.get('projectId'))
   const createSiteDialogOpen = searchParams.get('createMode') === 'event-site' && !projectId
-  const modelHref = projectId ? buildAppHref(`/3d-studio/${projectId}`, context) : buildAppHref('/3d-studio', context)
+  const areaNode = useMemo(
+    () => treeNodes.find((node) => node.type === 'feature' && isAreaGeometry(node.geometry)) || null,
+    [treeNodes],
+  )
+  const siteNode = useMemo(
+    () => treeNodes.find((node) => node.siteModeBound || node.focusZoneId) || null,
+    [treeNodes],
+  )
+  const focusZoneId = searchParams.get('focusZoneId')
+    || siteNode?.focusZoneId
+    || siteNode?.backendWorkZoneId
+    || null
+  const eventSiteWorkflow = searchParams.get('workflow') === 'event-site'
+    || Boolean(focusZoneId)
+    || Boolean(siteNode?.siteModeBound)
+  const modelHref = projectId && eventSiteWorkflow && focusZoneId
+    ? appendSearchParams(buildAppHref('/3d-studio/site', context), { projectId, focusZoneId })
+    : projectId
+      ? buildAppHref(`/3d-studio/${projectId}`, context)
+      : buildAppHref('/3d-studio', context)
+  const modelDisabled = eventSiteWorkflow && !focusZoneId
+  const workflowStep = !areaNode ? 'locate' : focusZoneId ? 'edit' : 'generate'
+  const workflowCompletedSteps = [
+    ...(areaNode ? ['locate'] : []),
+    ...(focusZoneId ? ['generate'] : []),
+  ]
+  const workflowActionLabel = workflowStep === 'locate'
+    ? '绘制场地区域'
+    : workflowStep === 'generate'
+      ? '准备生成参考数据'
+      : '进入实体布置'
+  const workflowStatusText = workflowStep === 'locate'
+    ? '在卫星图上圈定赛事现场范围，完成后保存图形。'
+    : workflowStep === 'generate'
+      ? '已找到场地区域；下一步会打开属性面板，使用现有“生成卫星场地”动作。'
+      : '卫星影像、地形和建筑参考数据已绑定，可继续布置赛事实体。'
   const projectHint = projectId
     ? '当前编辑会同步到项目与工作区'
     : '当前处于草图模式，进入 3D 前请先打开一个项目'
@@ -126,6 +182,9 @@ export default function AppMapLayout({ context }) {
 
       const nextUrl = new URL(buildAppHref('/map', context), window.location.origin)
       nextUrl.searchParams.set('projectId', createdProject.id)
+      nextUrl.searchParams.set('workflow', 'event-site')
+      setViewMode('2D')
+      setTileStyle('esri_world_imagery')
       navigate(`${nextUrl.pathname}${nextUrl.search}`, { replace: true })
       showSuccess(`空间项目“${createdProject.name}”已创建`)
     } catch (error) {
@@ -133,11 +192,35 @@ export default function AppMapLayout({ context }) {
     } finally {
       setCreateProjectSubmitting(false)
     }
-  }, [browseState.centerWgs84, context, navigate])
+  }, [browseState.centerWgs84, context, navigate, setTileStyle, setViewMode])
 
   const handleCancelSiteProject = useCallback(() => {
     navigate(buildAppHref('/3d-studio', context), { replace: true })
   }, [context, navigate])
+
+  const handleWorkflowAction = useCallback(() => {
+    if (workflowStep === 'locate') {
+      setViewMode('2D')
+      setActiveDrawTool('polygon')
+      if (!sidebarOpen) toggleSidebar()
+      return
+    }
+
+    if (workflowStep === 'generate' && areaNode) {
+      setSelectedNodeId(areaNode.id)
+      setPropsPanelNodeId(areaNode.id)
+      if (!sidebarOpen) toggleSidebar()
+    }
+  }, [
+    areaNode,
+    setActiveDrawTool,
+    setPropsPanelNodeId,
+    setSelectedNodeId,
+    setViewMode,
+    sidebarOpen,
+    toggleSidebar,
+    workflowStep,
+  ])
 
   useEffect(() => {
     if (!qualityPanelOpen) return
@@ -165,7 +248,9 @@ export default function AppMapLayout({ context }) {
   return (
     <div className="app-map-layout">
       <main className="app-map-layout__content">
-        <section className="app-map-layout__canvas-shell">
+        <section
+          className={`app-map-layout__canvas-shell ${projectId && eventSiteWorkflow ? 'has-workflow' : ''}`.trim()}
+        >
           <div className="app-map-layout__canvas-header">
             <div className="app-map-layout__canvas-heading">
               <Link
@@ -192,6 +277,8 @@ export default function AppMapLayout({ context }) {
                 activeView="map"
                 mapHref={`${location.pathname}${location.search}`}
                 modelHref={modelHref}
+                modelDisabled={modelDisabled}
+                modelDisabledReason="完成场地区域绘制并生成参考数据后，可进入实体编辑"
               />
               <button
                 type="button"
@@ -343,6 +430,17 @@ export default function AppMapLayout({ context }) {
               )}
             </div>
           </div>
+
+          {projectId && eventSiteWorkflow ? (
+            <SpatialProjectWorkflowRail
+              activeStep={workflowStep}
+              completedSteps={workflowCompletedSteps}
+              primaryActionLabel={workflowActionLabel}
+              onPrimaryAction={workflowStep === 'edit' ? undefined : handleWorkflowAction}
+              primaryActionHref={workflowStep === 'edit' ? modelHref : undefined}
+              statusText={workflowStatusText}
+            />
+          ) : null}
 
           <div className="app-map-layout__canvas-frame">
             <MapErrorBoundary>

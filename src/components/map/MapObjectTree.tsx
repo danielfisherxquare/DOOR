@@ -238,7 +238,7 @@ export default function MapObjectTree() {
       <div className="tree-content" style={{ marginTop: '-8px' }}>
         {visibleNodes.length === 0 ? (
           <CommandEmptyState
-            icon="edit"
+            icon={<span className="material-symbols-outlined" aria-hidden="true">edit</span>}
             title="暂无图形"
             description="使用左侧工具在地图上绘制"
           />

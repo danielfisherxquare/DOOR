@@ -187,6 +187,7 @@ export default function SiteModePage() {
     const url = new URL(href, window.location.origin)
     if (projectId) url.searchParams.set('projectId', projectId)
     if (focusZoneId) url.searchParams.set('focusZoneId', focusZoneId)
+    url.searchParams.set('workflow', 'event-site')
     navigate(url.pathname + url.search)
   }, [focusZoneId, navigate, orgId, projectId, raceId, saveState.dirty, saveState.status])
 

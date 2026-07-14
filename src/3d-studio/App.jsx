@@ -73,12 +73,14 @@ function getSaveStatusLabel({ status, revision, lastSavedAt, sourceContext }) {
   return `已保存${revisionLabel}${timeLabel}${sourceLabel}`
 }
 
-function ToolButton({ active, label, onClick, secondary = false }) {
+function ToolButton({ active, label, onClick, secondary = false, title = '' }) {
   return (
     <button
       className={`studio-tool-btn ${active ? 'is-active' : ''} ${secondary ? 'is-secondary' : ''}`.trim()}
       onClick={onClick}
       type="button"
+      aria-pressed={active}
+      title={title || label}
     >
       {label}
     </button>
@@ -1033,122 +1035,157 @@ export default function Studio3DApp({
         </div>
 
         <div className="studio-toolbar__center">
-          <div className="studio-toolbar__group">
-            <ToolButton
-              active={activeTool === TOOL_TYPES.SELECT}
-              label="Select"
-              onClick={() => setTool(TOOL_TYPES.SELECT)}
-            />
-            <ToolButton
-              active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'line'}
-              label="Sketch"
-              onClick={() => {
-                setTool(TOOL_TYPES.SKETCH)
-                setSketchMode('line')
-              }}
-            />
-            <ToolButton
-              active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'rect'}
-              label="Rect"
-              onClick={() => {
-                setTool(TOOL_TYPES.SKETCH)
-                setSketchMode('rect')
-              }}
-              secondary
-            />
-            <ToolButton
-              active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'arc'}
-              label="Arc"
-              onClick={() => {
-                setTool(TOOL_TYPES.SKETCH)
-                setSketchMode('arc')
-              }}
-              secondary
-            />
-            <ToolButton
-              active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'circle'}
-              label="Circle"
-              onClick={() => {
-                setTool(TOOL_TYPES.SKETCH)
-                setSketchMode('circle')
-              }}
-              secondary
-            />
-            <ToolButton
-              active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'bezier'}
-              label="Bezier"
-              onClick={() => {
-                setTool(TOOL_TYPES.SKETCH)
-                setSketchMode('bezier')
-              }}
-              secondary
-            />
-            <ToolButton
-              active={activeTool === TOOL_TYPES.PUSHPULL}
-              label="Push/Pull"
-              onClick={() => setTool(TOOL_TYPES.PUSHPULL)}
-            />
-            <ToolButton active={false} label="Sweep" onClick={handleSweep} secondary />
-            <ToolButton active={false} label="Loft" onClick={handleLoft} secondary />
-            <ToolButton
-              active={activeTool === TOOL_TYPES.MOVE}
-              label="Move"
-              onClick={() => setTool(TOOL_TYPES.MOVE)}
-            />
-            <ToolButton
-              active={activeTool === TOOL_TYPES.ROTATE}
-              label="Rotate"
-              onClick={() => setTool(TOOL_TYPES.ROTATE)}
-            />
-            <ToolButton
-              active={activeTool === TOOL_TYPES.MEASURE}
-              label="Measure"
-              onClick={() => setTool(TOOL_TYPES.MEASURE)}
-            />
+          <div className="studio-toolbar__cluster">
+            <span className="studio-toolbar__cluster-label">选择</span>
+            <div className="studio-toolbar__group">
+              <ToolButton
+                active={activeTool === TOOL_TYPES.SELECT}
+                label="选择"
+                onClick={() => setTool(TOOL_TYPES.SELECT)}
+              />
+            </div>
           </div>
 
-          <div className="studio-toolbar__group">
-            {VIEW_PRESETS.map((view) => (
+          <div className="studio-toolbar__cluster">
+            <span className="studio-toolbar__cluster-label">绘制</span>
+            <div className="studio-toolbar__group">
               <ToolButton
-                key={view.id}
-                active={viewportView === view.id}
-                label={view.label}
+                active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'line'}
+                label="线"
                 onClick={() => {
-                  setViewportView(view.id)
-                  setCameraMode(view.id === 'top' ? 'orthographic' : 'perspective')
+                  setTool(TOOL_TYPES.SKETCH)
+                  setSketchMode('line')
                 }}
               />
-            ))}
-            <ToolButton
-              active={cameraMode === 'orthographic'}
-              label={cameraMode === 'orthographic' ? '平行' : '透视'}
-              onClick={handleProjectionToggle}
-            />
-            <ToolButton active={showGrid} label="网格" onClick={() => setShowGrid(!showGrid)} />
+              <ToolButton
+                active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'rect'}
+                label="矩形"
+                onClick={() => {
+                  setTool(TOOL_TYPES.SKETCH)
+                  setSketchMode('rect')
+                }}
+                secondary
+              />
+              <ToolButton
+                active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'arc'}
+                label="圆弧"
+                onClick={() => {
+                  setTool(TOOL_TYPES.SKETCH)
+                  setSketchMode('arc')
+                }}
+                secondary
+              />
+              <ToolButton
+                active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'circle'}
+                label="圆"
+                onClick={() => {
+                  setTool(TOOL_TYPES.SKETCH)
+                  setSketchMode('circle')
+                }}
+                secondary
+              />
+              <ToolButton
+                active={activeTool === TOOL_TYPES.SKETCH && sketchMode === 'bezier'}
+                label="贝塞尔"
+                onClick={() => {
+                  setTool(TOOL_TYPES.SKETCH)
+                  setSketchMode('bezier')
+                }}
+                secondary
+              />
+            </div>
+          </div>
+
+          <div className="studio-toolbar__cluster">
+            <span className="studio-toolbar__cluster-label">成型</span>
+            <div className="studio-toolbar__group">
+              <ToolButton
+                active={activeTool === TOOL_TYPES.PUSHPULL}
+                label="推拉"
+                onClick={() => setTool(TOOL_TYPES.PUSHPULL)}
+              />
+              <ToolButton active={false} label="扫掠" onClick={handleSweep} secondary />
+              <ToolButton active={false} label="放样" onClick={handleLoft} secondary />
+            </div>
+          </div>
+
+          <div className="studio-toolbar__cluster">
+            <span className="studio-toolbar__cluster-label">变换</span>
+            <div className="studio-toolbar__group">
+              <ToolButton
+                active={activeTool === TOOL_TYPES.MOVE}
+                label="移动"
+                onClick={() => setTool(TOOL_TYPES.MOVE)}
+              />
+              <ToolButton
+                active={activeTool === TOOL_TYPES.ROTATE}
+                label="旋转"
+                onClick={() => setTool(TOOL_TYPES.ROTATE)}
+              />
+            </div>
+          </div>
+
+          <div className="studio-toolbar__cluster">
+            <span className="studio-toolbar__cluster-label">测量</span>
+            <div className="studio-toolbar__group">
+              <ToolButton
+                active={activeTool === TOOL_TYPES.MEASURE}
+                label="测量"
+                onClick={() => setTool(TOOL_TYPES.MEASURE)}
+              />
+            </div>
+          </div>
+
+          <div className="studio-toolbar__cluster">
+            <span className="studio-toolbar__cluster-label">视图</span>
+            <div className="studio-toolbar__group">
+              {VIEW_PRESETS.map((view) => (
+                <ToolButton
+                  key={view.id}
+                  active={viewportView === view.id}
+                  label={view.label}
+                  onClick={() => {
+                    setViewportView(view.id)
+                    setCameraMode(view.id === 'top' ? 'orthographic' : 'perspective')
+                  }}
+                />
+              ))}
+              <ToolButton
+                active={cameraMode === 'orthographic'}
+                label={cameraMode === 'orthographic' ? '平行' : '透视'}
+                onClick={handleProjectionToggle}
+              />
+              <ToolButton active={showGrid} label="网格" onClick={() => setShowGrid(!showGrid)} />
+            </div>
           </div>
         </div>
 
         <div className="studio-toolbar__right">
-          <ToolButton
-            active={selectionMode === 'object'}
-            label="对象"
-            onClick={() => setSelectionMode('object')}
-          />
-          <ToolButton
-            active={selectionMode === 'face'}
-            label="面"
-            onClick={() => setSelectionMode('face')}
-          />
-          <ToolButton
-            active={selectionMode === 'edge'}
-            label="边"
-            onClick={() => setSelectionMode('edge')}
-          />
-          <ToolButton
-            active={selectionMode === 'vertex'}
-            label="点"
-            onClick={() => setSelectionMode('vertex')}
-          />
+          <div className="studio-toolbar__cluster">
+            <span className="studio-toolbar__cluster-label">选择级别</span>
+            <div className="studio-toolbar__group">
+              <ToolButton
+                active={selectionMode === 'object'}
+                label="对象"
+                onClick={() => setSelectionMode('object')}
+              />
+              <ToolButton
+                active={selectionMode === 'face'}
+                label="面"
+                onClick={() => setSelectionMode('face')}
+              />
+              <ToolButton
+                active={selectionMode === 'edge'}
+                label="边"
+                onClick={() => setSelectionMode('edge')}
+              />
+              <ToolButton
+                active={selectionMode === 'vertex'}
+                label="点"
+                onClick={() => setSelectionMode('vertex')}
+              />
+            </div>
+          </div>
           <button className="studio-link-btn" onClick={toggleSceneTree} type="button">
             {sceneTreeOpen ? '隐藏树' : '场景树'}
           </button>
@@ -1274,26 +1311,30 @@ export default function Studio3DApp({
       ) : null}
 
       <style>{`
-        .studio-shell { position: relative; display: flex; flex-direction: column; height: 100%; background: #e9edf2; color: #1f2d3d; }
+        .studio-shell { position: relative; display: flex; flex-direction: column; height: 100%; background: var(--layer-bg-secondary, var(--bg-secondary, #f0eded)); color: var(--layer-text-primary, var(--text-primary, #1b1c1c)); }
         .studio-shell.is-operation-locked { cursor: wait; }
         .studio-operation-lock { position: absolute; inset: 0; z-index: 80; display: grid; place-items: center; background: rgba(237, 241, 246, 0.72); color: #263b52; font-size: 13px; font-weight: 800; backdrop-filter: blur(2px); }
-        .studio-loading { display: grid; place-items: center; height: 100%; color: #1f2d3d; font-weight: 700; }
-        .studio-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border-bottom: 1px solid #cfd7e2; background: linear-gradient(180deg, #fbfcfd, #eef2f6); }
+        .studio-loading { display: grid; place-items: center; height: 100%; color: var(--layer-text-primary, var(--text-primary, #1b1c1c)); font-weight: 700; }
+        .studio-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border-bottom: 1px solid var(--layer-border, var(--border, #e7e5e4)); background: linear-gradient(180deg, var(--layer-surface, var(--surface, #fff)), var(--layer-bg-secondary, var(--bg-secondary, #f0eded))); }
         .studio-toolbar.is-compact { padding: 6px 8px; gap: 8px; }
         .studio-toolbar__left, .studio-toolbar__center, .studio-toolbar__right { display: flex; align-items: center; gap: 8px; }
-        .studio-toolbar__center { flex: 1; justify-content: center; flex-wrap: wrap; }
-        .studio-toolbar__group { display: flex; align-items: center; gap: 6px; padding-right: 10px; border-right: 1px solid #d6dde7; }
-        .studio-toolbar__group:last-child { border-right: none; padding-right: 0; }
+        .studio-toolbar__center { flex: 1; align-items: stretch; justify-content: center; flex-wrap: wrap; }
+        .studio-toolbar__cluster { display: grid; align-content: center; gap: 3px; padding-right: 8px; border-right: 1px solid var(--layer-border, var(--border, #e7e5e4)); }
+        .studio-toolbar__cluster:last-child { border-right: none; padding-right: 0; }
+        .studio-toolbar__cluster-label { color: var(--layer-text-muted, var(--text-muted, #78716c)); font-family: var(--font-headline, sans-serif); font-size: 9px; font-weight: 800; letter-spacing: 0.1em; line-height: 1; text-transform: uppercase; }
+        .studio-toolbar__group { display: flex; align-items: center; gap: 4px; }
         .studio-title-block { display: grid; gap: 2px; }
         .studio-title-block strong { font-size: 14px; }
-        .studio-title-block span { font-size: 11px; color: #5a6a7d; }
+        .studio-title-block span { font-size: 11px; color: var(--layer-text-secondary, var(--text-secondary, #454747)); }
         .studio-save-state.is-dirty, .studio-save-state.is-saving { color: var(--warning, #b45309); }
         .studio-save-state.is-error, .studio-save-state.is-conflict { color: var(--danger, #b91c1c); }
         .studio-save-state.is-saved { color: var(--success, #047857); }
-        .studio-tool-btn, .studio-link-btn, .studio-save-btn { border: 1px solid #d5dbe4; background: #fff; color: #1f2d3d; min-height: 30px; padding: 0 10px; cursor: pointer; font-size: 12px; font-weight: 700; }
-        .studio-tool-btn.is-active { background: #2f5ea5; border-color: #2f5ea5; color: #fff; }
+        .studio-tool-btn, .studio-link-btn, .studio-save-btn { border: 1px solid var(--layer-border-strong, var(--border-strong, #d6d3d1)); border-radius: 0; background: var(--layer-surface, var(--surface, #fff)); color: var(--layer-text-primary, var(--text-primary, #1b1c1c)); min-height: 30px; padding: 0 9px; cursor: pointer; font-size: 12px; font-weight: 700; }
+        .studio-tool-btn:hover, .studio-link-btn:hover { border-color: var(--layer-border-accent, var(--border-accent)); background: var(--layer-surface-hover, var(--surface-hover)); }
+        .studio-tool-btn:focus-visible, .studio-link-btn:focus-visible, .studio-save-btn:focus-visible { outline: 2px solid color-mix(in srgb, var(--layer-accent, var(--accent)) 72%, white 28%); outline-offset: 2px; }
+        .studio-tool-btn.is-active { background: var(--layer-accent, var(--accent)); border-color: var(--layer-accent, var(--accent)); color: var(--layer-text-on-accent, var(--text-on-accent, #fff)); }
         .studio-tool-btn.is-secondary { opacity: 0.92; }
-        .studio-save-btn { background: #edf6ee; border-color: #bfd7c2; color: #2d5a38; }
+        .studio-save-btn { background: var(--success-soft, #ecfdf5); border-color: color-mix(in srgb, var(--success, #059669) 35%, var(--layer-border, var(--border))); color: var(--success, #059669); }
         .studio-main { display: flex; flex: 1; min-height: 0; }
         .studio-canvas-shell { position: relative; flex: 1; min-width: 0; }
         .studio-canvas { height: 100%; background: linear-gradient(180deg, #f1f4f8, #e7ebf0); }

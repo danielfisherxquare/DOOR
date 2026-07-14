@@ -1,0 +1,189 @@
+.spatial-project-workflow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 58px;
+  padding: 8px 12px;
+  background:
+    var(--grid-pattern),
+    var(--layer-surface, var(--surface));
+  background-size: 24px 24px;
+  border-bottom: 1px solid var(--layer-border, var(--border));
+}
+
+.spatial-project-workflow__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(132px, 1fr));
+  flex: 1 1 560px;
+  max-width: 720px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spatial-project-workflow__step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-top: 1px solid var(--layer-border, var(--border));
+  border-bottom: 1px solid var(--layer-border, var(--border));
+  color: var(--layer-text-muted, var(--text-muted));
+  font-family: var(--font-headline, sans-serif);
+  font-size: var(--font-size-caption, 11px);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.spatial-project-workflow__step:first-child {
+  border-left: 1px solid var(--layer-border, var(--border));
+}
+
+.spatial-project-workflow__step:last-child {
+  border-right: 1px solid var(--layer-border, var(--border));
+}
+
+.spatial-project-workflow__step + .spatial-project-workflow__step::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 0;
+  width: 1px;
+  background: var(--layer-border, var(--border));
+}
+
+.spatial-project-workflow__step.is-active {
+  color: var(--layer-text-primary, var(--text-primary));
+  background: var(--layer-accent-soft, var(--accent-soft));
+  box-shadow: inset 0 -2px 0 var(--layer-accent, var(--accent));
+}
+
+.spatial-project-workflow__step.is-complete {
+  color: var(--success);
+}
+
+.spatial-project-workflow__index {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border: 1px solid currentColor;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.spatial-project-workflow__index .material-symbols-outlined {
+  font-size: 15px;
+}
+
+.spatial-project-workflow__next {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.spatial-project-workflow__status {
+  max-width: 320px;
+  margin: 0;
+  color: var(--layer-text-secondary, var(--text-secondary));
+  font-size: var(--font-size-caption, 11px);
+  line-height: 1.45;
+  text-align: right;
+}
+
+.spatial-project-workflow__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--layer-accent, var(--accent));
+  background: var(--layer-accent, var(--accent));
+  color: var(--layer-text-on-accent, var(--text-on-accent));
+  font-size: var(--font-size-sm, 13px);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.spatial-project-workflow__action:hover {
+  border-color: var(--layer-accent-hover, var(--accent-hover));
+  background: var(--layer-accent-hover, var(--accent-hover));
+}
+
+.spatial-project-workflow__action:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--layer-accent, var(--accent)) 72%, white 28%);
+  outline-offset: 2px;
+}
+
+.spatial-project-workflow__action:disabled {
+  border-color: var(--layer-border-strong, var(--border-strong));
+  background: var(--layer-bg-tertiary, var(--bg-tertiary));
+  color: var(--layer-text-disabled, var(--text-disabled));
+  cursor: not-allowed;
+}
+
+.spatial-project-workflow__action .material-symbols-outlined {
+  font-size: 17px;
+}
+
+@media (max-width: 1024px) {
+  .spatial-project-workflow {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .spatial-project-workflow__steps {
+    flex-basis: auto;
+    width: 100%;
+    max-width: none;
+  }
+
+  .spatial-project-workflow__next {
+    justify-content: space-between;
+  }
+
+  .spatial-project-workflow__status {
+    max-width: none;
+    text-align: left;
+  }
+}
+
+@media (max-width: 720px) {
+  .spatial-project-workflow__steps {
+    grid-template-columns: 1fr;
+  }
+
+  .spatial-project-workflow__step {
+    display: none;
+    border: 1px solid var(--layer-border, var(--border));
+  }
+
+  .spatial-project-workflow__step.is-active {
+    display: flex;
+  }
+
+  .spatial-project-workflow__step + .spatial-project-workflow__step::before {
+    display: none;
+  }
+
+  .spatial-project-workflow__next {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .spatial-project-workflow__action {
+    width: 100%;
+  }
+}

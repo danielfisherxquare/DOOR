@@ -151,6 +151,10 @@
   box-shadow: var(--shadow-sm);
 }
 
+.app-map-layout__canvas-shell.has-workflow {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
 .app-map-layout__canvas-header {
   display: flex;
   justify-content: space-between;

@@ -10,6 +10,10 @@ export interface SpatialProjectViewSwitchProps {
   mapHref: string
   /** 保留当前项目与重点区域上下文的实体编辑地址。 */
   modelHref: string
+  /** 参考数据尚未生成时，阻止误入空白实体编辑器。 */
+  modelDisabled?: boolean
+  /** 解释实体编辑暂不可用的原因。 */
+  modelDisabledReason?: string
   /** 可选的附加样式类，用于嵌入不同编辑器标题栏。 */
   className?: string
 }
@@ -27,6 +31,8 @@ export default function SpatialProjectViewSwitch({
   activeView,
   mapHref,
   modelHref,
+  modelDisabled = false,
+  modelDisabledReason = '',
   className = '',
 }: SpatialProjectViewSwitchProps) {
   const hrefByView: Record<SpatialProjectView, string> = {
@@ -41,6 +47,27 @@ export default function SpatialProjectViewSwitch({
     >
       {VIEW_OPTIONS.map((option) => {
         const isActive = activeView === option.key
+        const isDisabled = option.key === 'model' && modelDisabled
+        const content = (
+          <>
+            <span className="material-symbols-outlined" aria-hidden="true">{option.icon}</span>
+            <span>{option.label}</span>
+          </>
+        )
+
+        if (isDisabled) {
+          return (
+            <span
+              key={option.key}
+              className="spatial-project-view-switch__item is-disabled"
+              aria-disabled="true"
+              title={modelDisabledReason}
+            >
+              {content}
+            </span>
+          )
+        }
+
         return (
           <Link
             key={option.key}
@@ -48,8 +75,7 @@ export default function SpatialProjectViewSwitch({
             className={`spatial-project-view-switch__item ${isActive ? 'is-active' : ''}`.trim()}
             aria-current={isActive ? 'page' : undefined}
           >
-            <span className="material-symbols-outlined" aria-hidden="true">{option.icon}</span>
-            <span>{option.label}</span>
+            {content}
           </Link>
         )
       })}

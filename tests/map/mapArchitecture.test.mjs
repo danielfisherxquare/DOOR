@@ -29,6 +29,7 @@ test('map workspace uses the shared spatial project view switch and keeps 3D met
 test('new event sites create a real project before map and 3D editing diverge', async () => {
   const layoutSource = await readFile(new URL('src/components/app/AppMapLayout.jsx', rootUrl), 'utf8')
   const dialogSource = await readFile(new URL('src/components/app/spatial/SpatialProjectCreateDialog.tsx', rootUrl), 'utf8')
+  const workflowSource = await readFile(new URL('src/components/app/spatial/SpatialProjectWorkflowRail.tsx', rootUrl), 'utf8')
   const onboardingSource = await readFile(new URL('src/components/map/MapOnboarding.tsx', rootUrl), 'utf8')
 
   assert.match(layoutSource, /searchParams\.get\('createMode'\) === 'event-site'/)
@@ -36,7 +37,15 @@ test('new event sites create a real project before map and 3D editing diverge', 
   assert.match(layoutSource, /projectType: 'site'/)
   assert.match(layoutSource, /geoAnchor: \{/)
   assert.match(layoutSource, /nextUrl\.searchParams\.set\('projectId', createdProject\.id\)/)
+  assert.match(layoutSource, /nextUrl\.searchParams\.set\('workflow', 'event-site'\)/)
+  assert.match(layoutSource, /setTileStyle\('esri_world_imagery'\)/)
+  assert.match(layoutSource, /modelDisabled=\{modelDisabled\}/)
+  assert.match(layoutSource, /<SpatialProjectWorkflowRail/)
   assert.match(dialogSource, /role="dialog"/)
   assert.match(dialogSource, /创建并进入地图/)
+  assert.match(workflowSource, /卫星选址/)
+  assert.match(workflowSource, /生成参考数据/)
+  assert.match(workflowSource, /实体布置/)
+  assert.match(workflowSource, /aria-live="polite"/)
   assert.match(onboardingSource, /!completed && !projectId && !createMode/)
 })

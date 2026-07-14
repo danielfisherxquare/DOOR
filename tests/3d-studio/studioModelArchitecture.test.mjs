@@ -38,3 +38,15 @@ test('new spatial projects do not leak the literal new route segment into map pr
   assert.match(source, /const effectiveProjectId = isNewProjectRoute \? null : routeProjectId \|\| projectId/)
   assert.match(source, /if \(effectiveProjectId\) nextUrl\.searchParams\.set\('projectId', effectiveProjectId\)/)
 })
+
+test('3D studio toolbar uses localized professional groups and accessible tool state', async () => {
+  const source = await readFile(new URL('src/3d-studio/App.jsx', rootUrl), 'utf8')
+
+  for (const label of ['选择', '绘制', '成型', '变换', '测量', '视图', '选择级别']) {
+    assert.match(source, new RegExp(`studio-toolbar__cluster-label">${label}<`))
+  }
+  for (const englishLabel of ['Select', 'Sketch', 'Push/Pull', 'Sweep', 'Loft', 'Move', 'Rotate', 'Measure']) {
+    assert.doesNotMatch(source, new RegExp(`label="${englishLabel.replace('/', '\\/')}"`))
+  }
+  assert.match(source, /aria-pressed=\{active\}/)
+})
