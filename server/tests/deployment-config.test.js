@@ -106,7 +106,10 @@ test('container build uses the canonical workspace lockfile', () => {
     /build:\s*\n\s+context: \.\.\s*\n\s+dockerfile: server\/Dockerfile/,
   );
   assert.match(dockerfile, /COPY package\.json package-lock\.json/);
-  assert.match(dockerfile, /npm ci --omit=dev --workspace=arcspro-server/);
+  assert.match(
+    dockerfile,
+    /npm ci --omit=dev --include=optional --workspace=arcspro-server/,
+  );
   assert.match(dockerfile, /COPY packages\/contracts\/ packages\/contracts\//);
   assert.match(dockerfile, /WORKDIR \/app\/server/);
 });
