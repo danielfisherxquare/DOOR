@@ -12,10 +12,10 @@
 /* Hero Section - 深色面板风格 */
 .studio-projects__hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.9fr);
+  grid-template-columns: minmax(0, 1.55fr) minmax(360px, 0.95fr);
   gap: 20px;
-  align-items: stretch;
-  padding: 24px;
+  align-items: center;
+  padding: 20px 24px;
   background: var(--layer-panel, #1c1917);
   border-left: 4px solid var(--layer-accent, #D4A017);
   color: var(--layer-text-on-dark, #fafaf9);
@@ -50,6 +50,7 @@
 
 .studio-projects__actions {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   align-content: center;
 }
@@ -68,6 +69,15 @@
   text-transform: uppercase;
   text-decoration: none;
   transition: background 150ms ease, border-color 150ms ease;
+}
+
+.studio-projects__primary-action {
+  grid-column: 1 / -1;
+  gap: 8px;
+}
+
+.studio-projects__primary-action .material-symbols-outlined {
+  font-size: 19px;
 }
 
 .studio-projects__primary-action {
@@ -138,6 +148,35 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 4px;
+}
+
+.studio-projects__section-kicker {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+  font-size: var(--font-size-eyebrow);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--layer-accent, #d4a017);
+}
+
+.studio-projects__section--secondary {
+  padding-top: 16px;
+  border-top: 1px solid var(--layer-border, #e7e5e4);
+}
+
+.studio-projects__section-count {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  background: var(--layer-bg-secondary, #f0eeeb);
+  border: 1px solid var(--layer-border, #e7e5e4);
+  font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+  font-size: var(--font-size-caption);
+  font-weight: 700;
+  color: var(--layer-text-secondary, #57534e);
 }
 
 .studio-projects__section-header h3 {
@@ -333,5 +372,15 @@
 
   .studio-projects__stats {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .studio-projects__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-projects__primary-action {
+    grid-column: auto;
   }
 }

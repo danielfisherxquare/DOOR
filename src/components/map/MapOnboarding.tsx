@@ -18,8 +18,8 @@ interface OnboardingStep {
 const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
-    title: '欢迎进入 GIS 工作台',
-    description: '这里是中奥致远赛事管理系统的宏观空间视图，用来查看底图、图层、锚点和场地上下文，并与空间工作台连续切换。',
+    title: '欢迎进入地图规划',
+    description: '先在卫星地图上确认赛事场地，再绘制区域、点位和空间对象；需要白模或实体布置时，可直接切到同一项目的实体编辑。',
     icon: 'map',
   },
   {
@@ -61,13 +61,14 @@ export default function MapOnboarding() {
   const [visible, setVisible] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const projectId = searchParams.get('projectId');
+  const createMode = searchParams.get('createMode');
 
   useEffect(() => {
     const completed = localStorage.getItem(STORAGE_KEY);
-    if (!completed && !projectId) {
+    if (!completed && !projectId && !createMode) {
       setVisible(true);
     }
-  }, [projectId]);
+  }, [createMode, projectId]);
 
   useEffect(() => {
     if (!visible) return undefined;
@@ -120,7 +121,7 @@ export default function MapOnboarding() {
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label="地图工作台引导"
+        aria-label="地图规划引导"
       >
         <button
           type="button"
@@ -130,7 +131,7 @@ export default function MapOnboarding() {
         >
           <span className="material-symbols-outlined">close</span>
         </button>
-        <div className="onboarding-kicker">地图工作台引导</div>
+        <div className="onboarding-kicker">地图规划引导</div>
         {/* 进度指示器 */}
         <div className="onboarding-progress">
           {ONBOARDING_STEPS.map((_, index) => (
@@ -166,7 +167,7 @@ export default function MapOnboarding() {
 
             {isLastStep ? (
               <button className="onboarding-btn primary" onClick={handleFinish}>
-                进入工作台
+                进入地图规划
               </button>
             ) : (
               <button className="onboarding-btn primary" onClick={handleNext}>

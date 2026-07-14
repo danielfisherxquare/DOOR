@@ -20,3 +20,21 @@ test('push pull height label uses the browser document instead of the modeling d
   assert.doesNotMatch(source, /<PushPullHeightLabel[^>]+document=\{document\}/)
   assert.match(source, /const domDocument = globalThis\.document/)
 })
+
+test('spatial project shell does not reuse the inner 3D editor shell class', async () => {
+  const pageSource = await readFile(new URL('src/views/app/StudioProjectPage.jsx', rootUrl), 'utf8')
+  const styles = await readFile(new URL('src/views/app/studio-workspace.css', rootUrl), 'utf8')
+
+  assert.match(pageSource, /spatial-project-editor spatial-project-editor--direct/)
+  assert.doesNotMatch(pageSource, /studio-shell studio-shell--direct/)
+  assert.match(styles, /\.spatial-project-editor--direct/)
+  assert.doesNotMatch(styles, /^\.studio-shell\s*\{/m)
+})
+
+test('new spatial projects do not leak the literal new route segment into map project state', async () => {
+  const source = await readFile(new URL('src/views/app/StudioProjectPage.jsx', rootUrl), 'utf8')
+
+  assert.match(source, /const isNewProjectRoute = mode === 'new' \|\| routeProjectId === 'new' \|\| projectId === 'new'/)
+  assert.match(source, /const effectiveProjectId = isNewProjectRoute \? null : routeProjectId \|\| projectId/)
+  assert.match(source, /if \(effectiveProjectId\) nextUrl\.searchParams\.set\('projectId', effectiveProjectId\)/)
+})

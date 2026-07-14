@@ -3,14 +3,14 @@
    GIS / 3D Studio 统一壳层
    ======================================== */
 
-.studio-shell {
+.spatial-project-editor {
   display: grid;
   grid-template-columns: var(--sidebar-width-lg) minmax(0, 1fr);
   gap: 16px;
   min-height: calc(100vh - 280px);
 }
 
-.studio-shell--direct {
+.spatial-project-editor--direct {
   position: fixed;
   inset: 0;
   z-index: var(--z-base);
@@ -24,7 +24,7 @@
     var(--layer-bg-secondary, #f6f3ee);
 }
 
-.studio-shell--empty {
+.spatial-project-editor--empty {
   display: grid;
   place-items: center;
   min-height: 60vh;

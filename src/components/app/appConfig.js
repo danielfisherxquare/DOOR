@@ -121,6 +121,7 @@ export const APP_NAV_GROUPS = [
         label: 'GIS 地图',
         description: '地理信息与空间数据管理',
         cardDescription: '浏览地图、绘制图形、管理图层数据，支持 2D/3D 视图切换和离线区域下载。',
+        hideWhenSpatialWorkspaceAvailable: true,
       },
       {
         key: 'three-studio',
@@ -128,9 +129,9 @@ export const APP_NAV_GROUPS = [
         moduleId: '3d-studio',
         icon: 'view_in_ar',
         shortLabel: 'SP',
-        label: '空间工作台',
-        description: '场地地图、仓库模型和资产绑定',
-        cardDescription: '管理场地地图、仓库模型、资产部署和运营绑定。',
+        label: '空间项目',
+        description: '赛事场地规划、三维展示和资产布置',
+        cardDescription: '在同一个项目里完成卫星地图选址、二维规划、三维校验和赛事物件布置。',
         requiredCapability: { scope: 'inventory', capability: '3d_studio' },
       },
       {
@@ -142,6 +143,7 @@ export const APP_NAV_GROUPS = [
         label: '轨迹地形模型',
         description: 'GPX 轨迹地形预览与打印模型导出',
         cardDescription: '上传赛事 GPX，生成轨迹地形 3D 预览，并导出 STL/GLB 打印文件。',
+        hideWhenSpatialWorkspaceAvailable: true,
       },
     ],
   },
@@ -337,9 +339,9 @@ export const APP_ROUTE_META = [
   { key: 'reimbursement-projects', path: '/app/reimbursements/projects', title: '报销项目管理', summary: '集中维护自己的报销项目，支持创建、编辑、清空和删除。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
   { key: 'reimbursement', path: '/app/reimbursements', title: '我的报销', summary: '管理自己的报销项目、识别结果和导出。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
   { key: 'design-requests', path: '/app/design-requests', title: '设计工作台', summary: '查看设计需求、关联赛事、参考样例和进度，并上传完成图。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
-  { key: 'map', path: '/app/map', title: 'GIS 地图', summary: '浏览地图、绘制图形、管理图层数据。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
-  { key: 'three-studio', path: '/app/3d-studio', title: '空间工作台', summary: '管理场地地图、仓库结构、资产部署和运营绑定。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
-  { key: 'terrain-model', path: '/app/terrain-model', title: '轨迹地形模型', summary: '上传赛事 GPX，生成可预览和导出的地形轨迹模型。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
+  { key: 'map', path: '/app/map', title: '地图规划', summary: '在空间项目中浏览卫星地图、绘制区域并管理图层数据。', groupKey: 'workspace', sectionLabel: '空间项目', surfaceCode: 'APP' },
+  { key: 'three-studio', path: '/app/3d-studio', title: '空间项目', summary: '管理赛事场地、三维场景、空间对象和项目版本。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
+  { key: 'terrain-model', path: '/app/terrain-model', title: '地形与导出', summary: '为当前空间项目生成可预览和导出的轨迹地形模型。', groupKey: 'workspace', sectionLabel: '空间项目', surfaceCode: 'APP' },
   { key: 'credential-center', path: '/app/credential-center', title: '证件中心', summary: '处理证件申请、审核和状态追踪。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP' },
   { key: 'credential-requests', path: '/app/credential/requests', title: '申请与建单', summary: '查看用户申请，也可以由管理员直接建单。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP', needsRace: true },
   { key: 'credential-review', path: '/app/credential/review', title: '审核中心', summary: '连续处理审核、驳回和通过后的后续动作。', groupKey: 'credential', sectionLabel: '证件流程', surfaceCode: 'APP', needsRace: true },
@@ -497,15 +499,32 @@ function isAllowed(item, options) {
   return options.hasCapability(item.requiredCapability.scope, item.requiredCapability.capability)
 }
 
+function hasSpatialWorkspaceEntryAccess(options) {
+  const workspaceGroup = APP_NAV_GROUPS.find((group) => group.key === 'workspace')
+  const spatialWorkspaceItem = workspaceGroup?.items.find((item) => item.key === 'three-studio')
+  if (!workspaceGroup || !spatialWorkspaceItem) return false
+  return hasNavigationModuleAccess(workspaceGroup, spatialWorkspaceItem, options.user)
+    && isAllowed(spatialWorkspaceItem, options)
+}
+
+function isSupersededSpatialEntry(item, spatialWorkspaceAvailable) {
+  return spatialWorkspaceAvailable && item.hideWhenSpatialWorkspaceAvailable === true
+}
+
 export function getAppNavGroups(optionsOrHasCapability) {
   const options = normalizeAccessOptions(optionsOrHasCapability)
+  const spatialWorkspaceAvailable = !options.includeUnauthorized
+    && hasSpatialWorkspaceEntryAccess(options)
 
   return APP_NAV_GROUPS
     .map((group) => ({
       ...group,
       items: group.items.filter((item) => (
-        options.includeUnauthorized
-        || (hasNavigationModuleAccess(group, item, options.user) && isAllowed(item, options))
+        !isSupersededSpatialEntry(item, spatialWorkspaceAvailable)
+        && (
+          options.includeUnauthorized
+          || (hasNavigationModuleAccess(group, item, options.user) && isAllowed(item, options))
+        )
       )),
     }))
     .filter((group) => group.items.length > 0)
@@ -534,11 +553,13 @@ export function buildAppHref(routePath, { orgId, raceId } = {}) {
  */
 export function getAppPortalCards(optionsOrHasCapability) {
   const options = normalizeAccessOptions(optionsOrHasCapability)
+  const spatialWorkspaceAvailable = hasSpatialWorkspaceEntryAccess(options)
 
   return APP_NAV_GROUPS
     .flatMap((group) => group.items.map((item) => ({ group, item })))
     .filter(({ group, item }) => (
-      hasNavigationModuleAccess(group, item, options.user)
+      !isSupersededSpatialEntry(item, spatialWorkspaceAvailable)
+      && hasNavigationModuleAccess(group, item, options.user)
       && isAllowed(item, options)
     ))
     .map(({ item }) => item)

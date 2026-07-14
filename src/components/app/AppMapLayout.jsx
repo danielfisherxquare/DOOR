@@ -1,11 +1,16 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMapStore } from '../../stores/mapStore'
 import MapErrorBoundary from '../map/MapErrorBoundary'
 import MapControls from '../map/MapControls'
 import MapOnboarding from '../map/MapOnboarding'
 import { useLegacyTileCacheMigration } from '../../hooks/useLegacyTileCacheMigration'
+import siteModeApi from '../../services/siteModeApi'
+import { createSiteProjectSnapshot } from '../../utils/map/siteModePersistence'
+import { showSuccess } from '../../utils/toast'
 import { buildAppHref } from './appConfig'
+import SpatialProjectCreateDialog from './spatial/SpatialProjectCreateDialog'
+import SpatialProjectViewSwitch from './spatial/SpatialProjectViewSwitch'
 import './app-map-layout.css'
 
 const MapView = lazy(() => import('../map/MapView'))
@@ -53,15 +58,20 @@ function normalizeStudioProjectId(projectId) {
 }
 
 export default function AppMapLayout({ context }) {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const renderFps = useMapStore((state) => state.renderFps)
   const viewMode = useMapStore((state) => state.viewMode)
+  const browseState = useMapStore((state) => state.browseState)
   const renderQuality = useMapStore((state) => state.renderQuality)
   const sidebarOpen = useMapStore((state) => state.sidebarOpen)
   const toggleSidebar = useMapStore((state) => state.toggleSidebar)
   const setRenderQualityPreset = useMapStore((state) => state.setRenderQualityPreset)
   const updateRenderQuality = useMapStore((state) => state.updateRenderQuality)
   const [qualityPanelOpen, setQualityPanelOpen] = useState(false)
+  const [createProjectSubmitting, setCreateProjectSubmitting] = useState(false)
+  const [createProjectError, setCreateProjectError] = useState(null)
   const qualityPanelRef = useRef(null)
   useLegacyTileCacheMigration('AppMapLayout')
 
@@ -84,11 +94,50 @@ export default function AppMapLayout({ context }) {
     OSM_SSE_MAX,
   )
   const projectId = normalizeStudioProjectId(searchParams.get('projectId'))
-  const studioHref = projectId ? buildAppHref(`/3d-studio/${projectId}`, context) : buildAppHref('/3d-studio', context)
-  const studioLinkLabel = projectId ? '进入当前项目工作台' : '先打开项目工作台'
+  const createSiteDialogOpen = searchParams.get('createMode') === 'event-site' && !projectId
+  const modelHref = projectId ? buildAppHref(`/3d-studio/${projectId}`, context) : buildAppHref('/3d-studio', context)
   const projectHint = projectId
     ? '当前编辑会同步到项目与工作区'
     : '当前处于草图模式，进入 3D 前请先打开一个项目'
+  const defaultProjectName = context?.raceName ? `${context.raceName} 赛事场地` : '赛事场地项目'
+
+  const handleCreateSiteProject = useCallback(async (name) => {
+    setCreateProjectSubmitting(true)
+    setCreateProjectError(null)
+    try {
+      const [latitude, longitude] = browseState.centerWgs84
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        throw new Error('当前地图中心无效，请返回空间项目后重试')
+      }
+
+      const createdProject = await siteModeApi.createProject({
+        name,
+        sceneType: 'outdoor-event',
+        projectType: 'site',
+        status: 'draft',
+        sourceType: 'blank',
+        geoAnchor: {
+          longitude,
+          latitude,
+          height: 0,
+        },
+        snapshotJson: createSiteProjectSnapshot({ name }),
+      }, context?.orgId || undefined)
+
+      const nextUrl = new URL(buildAppHref('/map', context), window.location.origin)
+      nextUrl.searchParams.set('projectId', createdProject.id)
+      navigate(`${nextUrl.pathname}${nextUrl.search}`, { replace: true })
+      showSuccess(`空间项目“${createdProject.name}”已创建`)
+    } catch (error) {
+      setCreateProjectError(error instanceof Error ? error.message : '创建空间项目失败，请稍后重试')
+    } finally {
+      setCreateProjectSubmitting(false)
+    }
+  }, [browseState.centerWgs84, context, navigate])
+
+  const handleCancelSiteProject = useCallback(() => {
+    navigate(buildAppHref('/3d-studio', context), { replace: true })
+  }, [context, navigate])
 
   useEffect(() => {
     if (!qualityPanelOpen) return
@@ -119,23 +168,31 @@ export default function AppMapLayout({ context }) {
         <section className="app-map-layout__canvas-shell">
           <div className="app-map-layout__canvas-header">
             <div className="app-map-layout__canvas-heading">
-              <Link to={buildAppHref('', context)} className="app-map-layout__back" title="返回工作台">
+              <Link
+                to={buildAppHref('/3d-studio', context)}
+                className="app-map-layout__back"
+                title="返回空间项目"
+              >
                 <span className="material-symbols-outlined">arrow_back</span>
-                <span className="app-map-layout__back-text">返回工作台</span>
+                <span className="app-map-layout__back-text">返回空间项目</span>
               </Link>
               <div className="app-map-layout__title-block">
                 <div className="app-map-layout__title-row">
-                  <span className="app-map-layout__eyebrow">空间工作台</span>
-                  <h1 className="app-map-layout__title">GIS 地图</h1>
-                  <span className="app-map-layout__badge is-accent">地图模式</span>
+                  <span className="app-map-layout__eyebrow">空间项目</span>
+                  <h1 className="app-map-layout__title">地图规划</h1>
+                  <span className="app-map-layout__badge is-accent">
+                    {viewMode === '3DGlobe' ? '三维场景' : '二维规划'}
+                  </span>
                 </div>
                 <div className={`app-map-layout__hint ${projectId ? 'is-project' : 'is-draft'}`.trim()}>
                   {projectHint}
                 </div>
               </div>
-              <Link to={studioHref} className="app-map-layout__studio-link">
-                {studioLinkLabel}
-              </Link>
+              <SpatialProjectViewSwitch
+                activeView="map"
+                mapHref={`${location.pathname}${location.search}`}
+                modelHref={modelHref}
+              />
               <button
                 type="button"
                 className="app-map-layout__sidebar-toggle"
@@ -149,7 +206,9 @@ export default function AppMapLayout({ context }) {
             </div>
             <div className="app-map-layout__canvas-meta">
               <MapControls variant="inline" showHint={false} />
-              <div ref={qualityPanelRef} className="app-map-layout__quality-entry">
+              {viewMode === '3DGlobe' && (
+                <>
+                  <div ref={qualityPanelRef} className="app-map-layout__quality-entry">
                 <button
                   type="button"
                   className={`app-map-layout__canvas-chip app-map-layout__canvas-chip--action ${qualityPanelOpen ? 'is-active' : ''}`.trim()}
@@ -272,14 +331,16 @@ export default function AppMapLayout({ context }) {
                     </label>
                   </div>
                 )}
-              </div>
+                  </div>
 
-              <span
-                className={`app-map-layout__canvas-chip app-map-layout__canvas-chip--metric ${fpsToneClass}`.trim()}
-                title="Cesium 3D 实时帧率"
-              >
-                FPS {fpsValue == null ? '--' : fpsValue}
-              </span>
+                  <span
+                    className={`app-map-layout__canvas-chip app-map-layout__canvas-chip--metric ${fpsToneClass}`.trim()}
+                    title="Cesium 3D 实时帧率"
+                  >
+                    FPS {fpsValue == null ? '--' : fpsValue}
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
@@ -298,6 +359,14 @@ export default function AppMapLayout({ context }) {
           </div>
         </section>
       </main>
+      <SpatialProjectCreateDialog
+        open={createSiteDialogOpen}
+        defaultName={defaultProjectName}
+        submitting={createProjectSubmitting}
+        error={createProjectError}
+        onSubmit={handleCreateSiteProject}
+        onCancel={handleCancelSiteProject}
+      />
     </div>
   )
 }

@@ -1,0 +1,56 @@
+.spatial-project-view-switch {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-height: 40px;
+  padding: 3px;
+  background: var(--layer-bg-secondary, #f0eeeb);
+  border: 1px solid var(--layer-border, #e7e5e4);
+}
+
+.spatial-project-view-switch__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 112px;
+  min-height: 32px;
+  padding: 0 12px;
+  color: var(--layer-text-secondary, #57534e);
+  font-family: var(--font-headline, 'Space Grotesk', sans-serif);
+  font-size: var(--font-size-eyebrow, 11px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+  white-space: nowrap;
+}
+
+.spatial-project-view-switch__item:hover {
+  color: var(--layer-text-primary, #1c1917);
+  background: var(--layer-surface-hover, #faf9f7);
+}
+
+.spatial-project-view-switch__item.is-active {
+  color: var(--layer-text-on-accent, #422006);
+  background: var(--layer-accent, #d4a017);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--layer-accent-active, #9a7209) 72%, transparent);
+}
+
+.spatial-project-view-switch__item:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--layer-accent, #d4a017) 72%, white 28%);
+  outline-offset: 2px;
+}
+
+.spatial-project-view-switch__item .material-symbols-outlined {
+  font-size: 18px;
+}
+
+@media (max-width: 720px) {
+  .spatial-project-view-switch {
+    width: 100%;
+  }
+
+  .spatial-project-view-switch__item {
+    min-width: 0;
+  }
+}

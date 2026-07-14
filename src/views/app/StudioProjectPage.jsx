@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Studio3DApp } from '../../3d-studio'
 import {
   buildFocusZoneWorkbenchSaveRequest,
   withExpectedRevision,
 } from '../../3d-studio/savePersistence'
 import { buildAppHref } from '../../components/app/appConfig'
+import SpatialProjectViewSwitch from '../../components/app/spatial/SpatialProjectViewSwitch'
 import { BUILTIN_RACK_TEMPLATES } from '../../data/builtinRackTemplates'
 import { twinApi } from '../../services/inventoryApi'
 import siteModeApi, { createSiteMutationId } from '../../services/siteModeApi'
@@ -108,9 +109,11 @@ function safeGenerateThumbnail(snapshot) {
 }
 
 export default function StudioProjectPage({ mode = 'existing', routeProjectId = null }) {
+  const location = useLocation()
   const navigate = useNavigate()
   const { projectId } = useParams()
-  const effectiveProjectId = routeProjectId || projectId
+  const isNewProjectRoute = mode === 'new' || routeProjectId === 'new' || projectId === 'new'
+  const effectiveProjectId = isNewProjectRoute ? null : routeProjectId || projectId
   const [searchParams] = useSearchParams()
   const user = useAuthStore((state) => state.user)
   const orgId = resolveSurfaceOrgId(searchParams, user)
@@ -676,7 +679,7 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
 
   if (!orgId) {
     return (
-      <div className="studio-shell studio-shell--empty">
+      <div className="spatial-project-editor spatial-project-editor--empty">
         <section className="studio-shell__empty-card">
           <div className="studio-shell__eyebrow">3D 编辑器</div>
           <h2>缺少机构上下文</h2>
@@ -688,7 +691,7 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
 
   if (loading) {
     return (
-      <div className="studio-shell studio-shell--empty">
+      <div className="spatial-project-editor spatial-project-editor--empty">
         <section className="studio-shell__empty-card">
           <div className="studio-shell__eyebrow">3D 编辑器</div>
           <h2>正在打开编辑器</h2>
@@ -700,7 +703,7 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
 
   if (!editableSnapshot || !warehouseMeta) {
     return (
-      <div className="studio-shell studio-shell--empty">
+      <div className="spatial-project-editor spatial-project-editor--empty">
         <section className="studio-shell__empty-card">
           <div className="studio-shell__eyebrow">3D 编辑器</div>
           <h2>当前项目没有可编辑场景</h2>
@@ -722,14 +725,14 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
   const studioSceneKey = `${project?.id || `draft:${requestedProjectType}:${requestedSceneType}`}:${requestedFocusZoneId || 'root'}:${focusZone?.updatedAt || 'base'}`
 
   return (
-    <div className="studio-shell studio-shell--direct">
+    <div className="spatial-project-editor spatial-project-editor--direct">
       <header className="studio-shell__immersive-header">
         <div className="studio-shell__immersive-heading">
           <button type="button" className="studio-shell__ghost" onClick={() => navigate(listHref)}>
-            返回工作台
+            返回空间项目
           </button>
           <div className="studio-shell__immersive-title">
-            <div className="studio-shell__eyebrow">空间工作台</div>
+            <div className="studio-shell__eyebrow">空间项目 · 实体编辑</div>
             <h1>{studioTitle}</h1>
           </div>
           <span className="studio-shell__meta-chip is-accent">编辑模式</span>
@@ -742,9 +745,11 @@ export default function StudioProjectPage({ mode = 'existing', routeProjectId = 
         </div>
 
         <div className="studio-shell__immersive-actions">
-          <Link to={mapHref} className="studio-shell__ghost">
-            进入 GIS 地图
-          </Link>
+          <SpatialProjectViewSwitch
+            activeView="model"
+            mapHref={mapHref}
+            modelHref={`${location.pathname}${location.search}`}
+          />
         </div>
       </header>
 

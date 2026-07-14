@@ -97,6 +97,25 @@ describe('module access helper', () => {
     assert.equal(withCapability.includes('three-studio'), true)
   })
 
+  it('shows one spatial project entry when the unified workspace is available', () => {
+    const user = {
+      role: 'race_admin',
+      moduleAccess: ['app:home', 'app:profile', 'app:map', 'app:3d-studio'],
+    }
+    const options = { user, hasCapability: () => true }
+
+    const navKeys = getAppNavGroups(options)
+      .flatMap((group) => group.items.map((item) => item.key))
+    const portalKeys = getAppPortalCards(options).map((item) => item.key)
+
+    assert.ok(navKeys.includes('three-studio'))
+    assert.equal(navKeys.includes('map'), false)
+    assert.equal(navKeys.includes('terrain-model'), false)
+    assert.ok(portalKeys.includes('three-studio'))
+    assert.equal(portalKeys.includes('map'), false)
+    assert.equal(portalKeys.includes('terrain-model'), false)
+  })
+
   it('lets an explicitly granted race operator use 3D studio without opening it to users', () => {
     assert.equal(hasCapability('race_admin', 'inventory', '3d_studio'), true)
     assert.equal(hasCapability('user', 'inventory', '3d_studio'), false)

@@ -39,12 +39,17 @@ export default function StudioProjectsPage() {
   const orgId = resolveSurfaceOrgId(searchParams, user)
   const buildStudioNewHref = useCallback(
     (projectType, sceneType) => {
-    const baseHref = buildAppHref('/3d-studio/new', { orgId })
-    const joiner = baseHref.includes('?') ? '&' : '?'
-    return `${baseHref}${joiner}projectType=${projectType}&sceneType=${sceneType}`
+      const baseHref = buildAppHref('/3d-studio/new', { orgId })
+      const joiner = baseHref.includes('?') ? '&' : '?'
+      return `${baseHref}${joiner}projectType=${projectType}&sceneType=${sceneType}`
     },
-    [orgId]
+    [orgId],
   )
+  const eventSiteHref = useMemo(() => {
+    const baseHref = buildAppHref('/map', { orgId })
+    const joiner = baseHref.includes('?') ? '&' : '?'
+    return `${baseHref}${joiner}createMode=event-site`
+  }, [orgId])
 
   const loadProjects = useCallback(async () => {
     setLoading(true)
@@ -62,14 +67,23 @@ export default function StudioProjectsPage() {
     loadProjects()
   }, [loadProjects])
 
-  const stats = useMemo(() => {
-    const importedCount = projects.filter((item) => item.sourceType === 'warehouse-import').length
-    const assetCount = projects.filter((item) => item.projectType === 'asset').length
+  const projectSummary = useMemo(() => {
+    const isWarehouseProject = (item) => (
+      item.projectType === 'warehouse' || item.sourceType === 'warehouse-import'
+    )
+    const warehouseProjects = projects.filter(isWarehouseProject)
+    const spatialProjects = projects.filter((item) => !isWarehouseProject(item))
+    const assetCount = spatialProjects.filter((item) => item.projectType === 'asset').length
+    const sceneCount = spatialProjects.length - assetCount
     return {
-      total: projects.length,
-      imported: importedCount,
-      blank: projects.length - importedCount,
-      asset: assetCount,
+      spatialProjects,
+      warehouseProjects,
+      stats: {
+        total: projects.length,
+        scene: sceneCount,
+        asset: assetCount,
+        warehouse: warehouseProjects.length,
+      },
     }
   }, [projects])
 
@@ -129,13 +143,74 @@ export default function StudioProjectsPage() {
     }
   }
 
+  function renderProjectGrid(projectItems, emptyTitle, emptySummary) {
+    if (projectItems.length === 0) {
+      return (
+        <div className="studio-projects__empty">
+          <strong>{emptyTitle}</strong>
+          <span>{emptySummary}</span>
+        </div>
+      )
+    }
+
+    return (
+      <div className="studio-projects__grid">
+        {projectItems.map((project) => (
+          <article key={project.id} className="studio-projects__card">
+            <button
+              type="button"
+              className="studio-projects__card-hit"
+              onClick={() => void handleOpenProject(project)}
+              aria-label={`打开 ${project.name}`}
+            />
+            <div className="studio-projects__card-top">
+              <span className="studio-projects__card-badge">
+                {getProjectTypeLabel(project.projectType || project.sceneType)}
+              </span>
+              <span className="studio-projects__card-source">
+                {project.sourceType === 'warehouse-import' ? '仓库导入' : '空间项目'}
+              </span>
+            </div>
+            <h4>{project.name}</h4>
+            <p>
+              {project.projectType === 'asset'
+                ? '可复用的赛事 3D 资产，可用于帐篷、拱门、舞台等现场物件。'
+                : project.sourceType === 'warehouse-import'
+                  ? `来源仓库 #${project.sourceWarehouseId || '-'}`
+                  : '在同一项目中继续地图规划、三维校验和现场物件布置。'}
+            </p>
+            <div className="studio-projects__meta">
+              <span>更新于 {formatDate(project.updatedAt)}</span>
+              <span>最近打开 {formatDate(project.lastOpenedAt)}</span>
+            </div>
+            <div className="studio-projects__card-actions">
+              <button type="button" onClick={() => void handleOpenProject(project)}>
+                打开
+              </button>
+              <button type="button" onClick={() => handleDuplicate(project.id)}>
+                复制
+              </button>
+              <button
+                type="button"
+                className="is-danger"
+                onClick={() => handleDelete(project.id)}
+              >
+                删除
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    )
+  }
+
   if (!orgId) {
     return (
       <div className="studio-projects">
         <section className="studio-projects__hero">
           <div>
-            <div className="studio-projects__eyebrow">空间工作台</div>
-            <h2 className="studio-projects__title">机构共享工作区需要机构上下文</h2>
+            <div className="studio-projects__eyebrow">空间项目</div>
+            <h2 className="studio-projects__title">空间项目需要机构上下文</h2>
             <p className="studio-projects__summary">
               请使用机构管理员账号进入，或者在地址里附带 `?orgId=...` 打开机构共享项目。
             </p>
@@ -149,69 +224,41 @@ export default function StudioProjectsPage() {
     <div className="studio-projects">
       <section className="studio-projects__hero">
         <div>
-          <div className="studio-projects__eyebrow">空间工作台</div>
-          <h2 className="studio-projects__title">直接打开的 3D 白模编辑器</h2>
+          <div className="studio-projects__eyebrow">空间项目</div>
+          <h2 className="studio-projects__title">从卫星地图开始搭建赛事现场</h2>
           <p className="studio-projects__summary">
-            现在新项目会直接进入 3D
-            编辑器，不再要求先走地图放置、建筑结构或仓库前置流程。旧项目和导入项目也可以继续在同一个编辑器里打开。
+            一个项目承载地图选址、二维规划、三维建筑和赛事物件。先确定场地，再在同一场景里完成展示与交付。
           </p>
         </div>
         <div className="studio-projects__actions">
           <Link
-            to={buildStudioNewHref('warehouse', 'warehouse')}
+            to={eventSiteHref}
             className="studio-projects__primary-action"
           >
-            新建仓储白模
-          </Link>
-          <Link
-            to={buildStudioNewHref('asset', 'outdoor-event')}
-            className="studio-projects__secondary-action"
-          >
-            新建3D资产
+            <span className="material-symbols-outlined" aria-hidden="true">add_location_alt</span>
+            新建赛事场地
           </Link>
           <Link
             to={buildStudioNewHref('venue', 'outdoor-event')}
             className="studio-projects__secondary-action"
           >
-            新建场馆白模
+            新建场馆
           </Link>
           <Link
-            to={buildStudioNewHref('site', 'outdoor-event')}
+            to={buildStudioNewHref('asset', 'outdoor-event')}
             className="studio-projects__secondary-action"
           >
-            新建场地白模
+            创建 3D 资产
           </Link>
-          <Link
-            to={buildAppHref('/map', { orgId })}
-            className="studio-projects__primary-action"
-          >
-            从 GIS 框选卫星场地
-          </Link>
-        </div>
-      </section>
-
-      <section className="studio-projects__stats">
-        <div className="studio-projects__stat-card">
-          <span>项目总数</span>
-          <strong>{stats.total}</strong>
-        </div>
-        <div className="studio-projects__stat-card">
-          <span>空白起步</span>
-          <strong>{stats.blank}</strong>
-        </div>
-        <div className="studio-projects__stat-card">
-          <span>3D资产</span>
-          <strong>{stats.asset}</strong>
-        </div>
-        <div className="studio-projects__stat-card">
-          <span>仓库导入</span>
-          <strong>{stats.imported}</strong>
         </div>
       </section>
 
       <section className="studio-projects__section">
         <div className="studio-projects__section-header">
-          <h3>我的项目</h3>
+          <div>
+            <span className="studio-projects__section-kicker">最近使用</span>
+            <h3>赛事场地与资产</h3>
+          </div>
           <button type="button" className="studio-projects__refresh" onClick={loadProjects}>
             刷新
           </button>
@@ -219,64 +266,48 @@ export default function StudioProjectsPage() {
 
         {loading ? (
           <div className="studio-projects__empty">正在加载项目列表…</div>
-        ) : projects.length === 0 ? (
-          <div className="studio-projects__empty">
-            <strong>还没有 3D 项目</strong>
-            <span>从空白场景开始，或者从空间中心导入一个仓库视图。</span>
-          </div>
         ) : (
-          <div className="studio-projects__grid">
-            {projects.map((project) => (
-              <article key={project.id} className="studio-projects__card">
-                <button
-                  type="button"
-                  className="studio-projects__card-hit"
-                  onClick={() => void handleOpenProject(project)}
-                  aria-label={`打开 ${project.name}`}
-                />
-                <div className="studio-projects__card-top">
-                  <span className="studio-projects__card-badge">
-                    {getProjectTypeLabel(project.projectType || project.sceneType)}
-                  </span>
-                  <span className="studio-projects__card-source">
-                    {project.sourceType === 'warehouse-import' ? '仓库导入' : '空白项目'}
-                  </span>
-                </div>
-                <h4>{project.name}</h4>
-                <p>
-                  {project.projectType === 'asset'
-                    ? '独立 3D 资产工作区，可用于帐篷、拱门、舞台等标准件建模。'
-                    : project.sourceType === 'warehouse-import'
-                    ? `来源仓库 #${project.sourceWarehouseId || '-'}`
-                    : '机构共享项目，可直接在应用层继续编辑和保存。'}
-                </p>
-                <div className="studio-projects__meta">
-                  <span>更新于 {formatDate(project.updatedAt)}</span>
-                  <span>最近打开 {formatDate(project.lastOpenedAt)}</span>
-                </div>
-                <div className="studio-projects__card-actions">
-                  <button
-                    type="button"
-                    onClick={() => void handleOpenProject(project)}
-                  >
-                    打开
-                  </button>
-                  <button type="button" onClick={() => handleDuplicate(project.id)}>
-                    复制
-                  </button>
-                  <button
-                    type="button"
-                    className="is-danger"
-                    onClick={() => handleDelete(project.id)}
-                  >
-                    删除
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
+          renderProjectGrid(
+            projectSummary.spatialProjects,
+            '还没有空间项目',
+            '从“新建赛事场地”开始，在卫星地图上确定第一个现场范围。',
+          )
         )}
       </section>
+
+      <section className="studio-projects__stats" aria-label="空间项目统计">
+        <div className="studio-projects__stat-card">
+          <span>项目总数</span>
+          <strong>{projectSummary.stats.total}</strong>
+        </div>
+        <div className="studio-projects__stat-card">
+          <span>场地与场馆</span>
+          <strong>{projectSummary.stats.scene}</strong>
+        </div>
+        <div className="studio-projects__stat-card">
+          <span>3D 资产</span>
+          <strong>{projectSummary.stats.asset}</strong>
+        </div>
+      </section>
+
+      {projectSummary.warehouseProjects.length > 0 && (
+        <section className="studio-projects__section studio-projects__section--secondary">
+          <div className="studio-projects__section-header">
+            <div>
+              <span className="studio-projects__section-kicker">仓储管理</span>
+              <h3>仓储数字孪生项目</h3>
+            </div>
+            <span className="studio-projects__section-count">
+              {projectSummary.stats.warehouse} 个
+            </span>
+          </div>
+          {renderProjectGrid(
+            projectSummary.warehouseProjects,
+            '没有仓储项目',
+            '仓储数字孪生项目会从仓储空间中心进入。',
+          )}
+        </section>
+      )}
     </div>
   )
 }

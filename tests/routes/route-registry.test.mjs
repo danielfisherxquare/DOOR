@@ -87,6 +87,14 @@ describe('surface route registries', () => {
     assert.equal(getAppRouteMeta('/app/profile').groupKey, 'account')
   })
 
+  it('treats map and terrain routes as views inside the spatial project workflow', () => {
+    assert.equal(getAppRouteMeta('/app/3d-studio').title, '空间项目')
+    assert.equal(getAppRouteMeta('/app/map').title, '地图规划')
+    assert.equal(getAppRouteMeta('/app/map').sectionLabel, '空间项目')
+    assert.equal(getAppRouteMeta('/app/terrain-model').title, '地形与导出')
+    assert.equal(getAppRouteMeta('/app/terrain-model').sectionLabel, '空间项目')
+  })
+
   it('routes app credential issuance to the real issuance workspace', () => {
     const route = APP_ROUTE_REGISTRY.find((item) => item.key === 'credential-issue')
     assert.equal(route?.componentKey, 'credential-issue')
