@@ -1725,8 +1725,34 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .matching-modal-overlay {
+    align-items: flex-end;
+  }
+
+  .matching-modal--mobile-wizard {
+    position: relative;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    max-height: min(86dvh, 720px);
+    border-radius: 16px 16px 0 0;
+  }
+
   .matching-modal__content {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .matching-modal__wizard-step {
+    display: grid;
+    gap: 10px;
+  }
+
+  .matching-modal__match-btn,
+  .matching-modal__reject-btn,
+  .matching-modal__nav-btn {
+    min-height: 44px;
   }
 }
 
@@ -2756,6 +2782,224 @@
 .reimbursement-tool__content {
   flex: 1;
   min-height: 0;
+}
+
+.reimbursement-tool__mobile-content {
+  display: none;
+}
+
+.reimbursement-tool__desktop-content {
+  display: block;
+}
+
+.reimbursement-mobile-home {
+  display: grid;
+  gap: 14px;
+}
+
+.reimbursement-mobile-home__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reimbursement-mobile-home__actions .btn {
+  min-height: 48px;
+}
+
+.reimbursement-mobile-home__notice,
+.reimbursement-mobile-home__warning {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.reimbursement-mobile-home__section {
+  display: grid;
+  gap: 10px;
+}
+
+.reimbursement-mobile-home__section h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+}
+
+.mobile-ocr-queue,
+.mobile-review-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.mobile-ocr-queue__header,
+.mobile-review-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mobile-ocr-queue__header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+}
+
+.mobile-ocr-queue__header span,
+.mobile-ocr-queue__copy span,
+.mobile-review-card__title span {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.mobile-ocr-queue__notice,
+.mobile-ocr-queue__empty {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted, rgba(15, 23, 42, 0.04));
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.mobile-ocr-queue__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-subtle, rgba(15, 23, 42, 0.08));
+}
+
+.mobile-ocr-queue__copy,
+.mobile-review-card__title {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mobile-ocr-queue__copy strong,
+.mobile-review-card__title strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-review-card__fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.mobile-review-card__fields div {
+  display: grid;
+  gap: 2px;
+}
+
+.mobile-review-card__fields dt {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.mobile-review-card__fields dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.mobile-review-card__issues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mobile-review-card__issues span {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-light);
+  color: var(--warning);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.mobile-review-card__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.reimbursement-mobile-record-card {
+  border-radius: var(--radius-md);
+}
+
+.reimbursement-mobile-record-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.reimbursement-mobile-record-card__edit-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.reimbursement-mobile-record-card__edit-field {
+  display: grid;
+  gap: 6px;
+}
+
+.reimbursement-mobile-record-card__edit-field span {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.reimbursement-mobile-record-card__edit-field input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.reimbursement-mobile-record-card__issues {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reimbursement-mobile-record-card__issues span {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-light);
+  color: var(--warning);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .reimbursement-tool__mobile-content {
+    display: block;
+  }
+
+  .reimbursement-tool__desktop-content {
+    display: none;
+  }
+
+  .mobile-review-card__fields {
+    grid-template-columns: 1fr;
+  }
 }
 
 .reimbursement-tool__tabs {

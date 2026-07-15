@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import useReimbursementStore from '../../../stores/reimbursementStore';
+import { AppH5DataCard, AppH5DataTable, AppH5StatusTag } from '../../../components/app/AppH5Surface';
 import {
   formatOcrDuration,
   formatOcrImageSavings,
@@ -17,6 +18,11 @@ import {
 } from '../utils/ocrMetrics';
 
 const TABLE_COLUMN_COUNT = 14;
+
+function formatCurrency(value) {
+  const number = Number(value || 0);
+  return number ? `¥${number.toLocaleString()}` : '-';
+}
 
 function normalizeGroupValue(value, fallback = '未分类') {
   const trimmed = String(value || '').trim();
@@ -377,6 +383,117 @@ function BatchEditModal({ visible, selectedRecords, onClose, onSave }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function MobileEditField({ label, type = 'text', value, onChange }) {
+  return (
+    <label className="reimbursement-mobile-record-card__edit-field">
+      <span>{label}</span>
+      <input type={type} value={value || ''} onChange={onChange} />
+    </label>
+  );
+}
+
+function ReimbursementMobileRecordCard({
+  record,
+  selected,
+  quality,
+  attachmentCount,
+  editing,
+  editData,
+  onToggle,
+  onEdit,
+  onEditDataChange,
+  onSave,
+  onCancel,
+  onDelete,
+}) {
+  const amount = Number(record.expense || record.income || 0);
+  const tone = quality.reviewStatus.needsReview || quality.exportIssues.length > 0 ? 'warning' : 'success';
+  const statusText = tone === 'success' ? '可导出' : '需处理';
+
+  return (
+    <AppH5DataCard
+      className={selected ? 'reimbursement-mobile-record-card is-selected' : 'reimbursement-mobile-record-card'}
+      eyebrow={record.payment_date || '未填日期'}
+      title={record.description || record.company || '未命名报销'}
+      meta={<AppH5StatusTag tone={tone}>{statusText}</AppH5StatusTag>}
+      fields={editing ? [] : [
+        { key: 'amount', label: '金额', value: amount ? `¥${amount.toLocaleString()}` : '-' },
+        { key: 'reporter', label: '报销人', value: record.reporter },
+        { key: 'category', label: '类别', value: [record.category, record.sub_category].filter(Boolean).join(' / ') },
+        { key: 'company', label: '开票公司', value: record.company },
+        { key: 'attachments', label: '附件', value: attachmentCount ? `${attachmentCount} 个` : '-' },
+      ]}
+      actions={editing ? (
+        <>
+          <button type="button" className="btn btn--primary btn--sm" onClick={onSave}>保存</button>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={onCancel}>取消</button>
+        </>
+      ) : (
+        <>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => onToggle(record.id)}>
+            {selected ? '取消选择' : '选择'}
+          </button>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => onEdit(record)}>编辑</button>
+          <button type="button" className="btn btn--danger btn--sm" onClick={() => onDelete(record.id)}>删除</button>
+        </>
+      )}
+    >
+      {editing ? (
+        <div className="reimbursement-mobile-record-card__edit-grid">
+          <MobileEditField
+            label="日期"
+            type="date"
+            value={editData.payment_date}
+            onChange={(event) => onEditDataChange({ ...editData, payment_date: event.target.value })}
+          />
+          <MobileEditField
+            label="大类"
+            value={editData.category}
+            onChange={(event) => onEditDataChange({ ...editData, category: event.target.value })}
+          />
+          <MobileEditField
+            label="子类"
+            value={editData.sub_category}
+            onChange={(event) => onEditDataChange({ ...editData, sub_category: event.target.value })}
+          />
+          <MobileEditField
+            label="摘要"
+            value={editData.description}
+            onChange={(event) => onEditDataChange({ ...editData, description: event.target.value })}
+          />
+          <MobileEditField
+            label="收入"
+            type="number"
+            value={editData.income}
+            onChange={(event) => onEditDataChange({ ...editData, income: parseFloat(event.target.value) || null })}
+          />
+          <MobileEditField
+            label="支出"
+            type="number"
+            value={editData.expense}
+            onChange={(event) => onEditDataChange({ ...editData, expense: parseFloat(event.target.value) || null })}
+          />
+          <MobileEditField
+            label="报销人"
+            value={editData.reporter}
+            onChange={(event) => onEditDataChange({ ...editData, reporter: event.target.value })}
+          />
+          <MobileEditField
+            label="开票公司"
+            value={editData.company}
+            onChange={(event) => onEditDataChange({ ...editData, company: event.target.value })}
+          />
+        </div>
+      ) : null}
+      {!editing && quality.exportIssues.length > 0 ? (
+        <div className="reimbursement-mobile-record-card__issues">
+          {quality.exportIssues.slice(0, 3).map((label) => <span key={label}>{label}</span>)}
+        </div>
+      ) : null}
+    </AppH5DataCard>
   );
 }
 
@@ -761,7 +878,32 @@ function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null 
         )}
       </div>
 
-      <div className="reimbursement-table__container">
+      <AppH5DataTable
+        className="reimbursement-table__container"
+        mobileCards={sortedRecords.map((record) => {
+          const quality = recordQualityMap.get(record.id) || {
+            reviewStatus: getOcrReviewStatus(record),
+            exportIssues: getRecordExportIssueLabels(record, 0, records),
+          };
+          return (
+            <ReimbursementMobileRecordCard
+              key={record.id}
+              record={record}
+              selected={selectedIds.has(record.id)}
+              quality={quality}
+              attachmentCount={getAttachments(record.id).length}
+              editing={editingId === record.id}
+              editData={editingId === record.id ? editData : record}
+              onToggle={toggleSelect}
+              onEdit={startEdit}
+              onEditDataChange={setEditData}
+              onSave={saveEdit}
+              onCancel={cancelEdit}
+              onDelete={handleDelete}
+            />
+          );
+        })}
+      >
         <table>
           <thead>
             <tr>
@@ -876,7 +1018,7 @@ function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null 
                         onChange={(e) => setEditData({ ...editData, income: parseFloat(e.target.value) || null })}
                       />
                     ) : (
-                      record.income ? `¥${record.income.toLocaleString()}` : '-'
+                      formatCurrency(record.income)
                     )}
                   </td>
                   <td className="cell-amount cell-expense">
@@ -887,7 +1029,7 @@ function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null 
                         onChange={(e) => setEditData({ ...editData, expense: parseFloat(e.target.value) || null })}
                       />
                     ) : (
-                      record.expense ? `¥${record.expense.toLocaleString()}` : '-'
+                      formatCurrency(record.expense)
                     )}
                   </td>
                   <td>
@@ -958,7 +1100,7 @@ function ReimbursementTable({ focusRecordId = null, onFocusRecordHandled = null 
             })}
           </tbody>
         </table>
-      </div>
+      </AppH5DataTable>
 
       <BatchEditModal
         visible={showBatchEdit}

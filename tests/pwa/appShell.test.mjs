@@ -67,6 +67,7 @@ describe('中奥致远 H5 app shell', () => {
     assert.match(appLayout, /workspace-main__install-hint/)
     assert.match(appLayout, /一键安装到桌面/)
     assert.match(appLayout, /添加到主屏幕/)
+    assert.match(appLayout, /primaryKeys = \['dashboard', 'reimbursement', 'import', 'inventory-workbench'\]/)
     assert.doesNotMatch(appLayout, /return \(primaryItems\.length >= 4 \? primaryItems : flatNavItems\)\.slice\(0, 4\)[\s\S]*return \(primaryItems\.length >= 4 \? primaryItems : flatNavItems\)\.slice\(0, 4\)/)
 
     assert.match(appCss, /@media \(max-width: 768px\)/)

@@ -135,3 +135,40 @@ test('export actions expose busy and failure feedback instead of raw promise han
   assert.ok(!table.includes('onClick={exportToExcel}'), 'Excel export should not attach the raw async store function');
   assert.ok(!table.includes('onClick={exportWithImages}'), 'ZIP export should not attach the raw async store function');
 });
+
+test('reimbursement module exposes mobile capture and card-first surfaces', () => {
+  const page = read('src/views/reimbursement/ReimbursementTool.jsx');
+  const mobileShell = read('src/views/reimbursement/components/ReimbursementMobileHome.jsx');
+  const table = read('src/views/reimbursement/components/ReimbursementTable.jsx');
+  const css = read('src/views/reimbursement/reimbursement.css');
+
+  assert.ok(page.includes('ReimbursementMobileHome'), 'ReimbursementTool should render a mobile workflow surface');
+  assert.ok(mobileShell.includes('capture="environment"'), 'mobile capture should hint rear camera capture');
+  assert.ok(mobileShell.includes('MobileOcrQueue'), 'mobile flow should render an OCR queue');
+  assert.ok(mobileShell.includes('MobileReviewCard'), 'mobile flow should render review cards');
+  assert.ok(table.includes('AppH5DataTable'), 'record table should use the shared responsive table primitive');
+  assert.ok(table.includes('mobileCards='), 'record table should provide mobile cards');
+  assert.ok(css.includes('.reimbursement-mobile-home'), 'mobile reimbursement shell should have concrete styles');
+});
+
+test('mobile reimbursement queue preserves OCR review and upload metadata', () => {
+  const queue = read('src/views/reimbursement/components/MobileOcrQueue.jsx');
+  const card = read('src/views/reimbursement/components/MobileReviewCard.jsx');
+  const store = read('src/stores/reimbursementStore.js');
+
+  assert.ok(queue.includes("file.status === 'ocr_processing'"), 'mobile queue should keep processing files visible and locked');
+  assert.ok(queue.includes('recognizeFromFile(projectId, file.id, false, { refresh: false })'), 'mobile queue should use the existing paid OCR recognition path');
+  assert.ok(card.includes('getOcrReviewStatus'), 'mobile review cards should show OCR review status');
+  assert.ok(card.includes('getRecordExportIssueLabels'), 'mobile review cards should keep export risk labels visible');
+  assert.ok(store.includes("metadata = {}"), 'importToPreview should accept optional upload metadata');
+  assert.ok(store.includes("formData.append('sourceDevice'"), 'mobile camera uploads should preserve sourceDevice metadata');
+});
+
+test('matching center supports mobile wizard layout', () => {
+  const modal = read('src/views/reimbursement/components/MatchingCenterModal.jsx');
+  const css = read('src/views/reimbursement/reimbursement.css');
+
+  assert.ok(modal.includes('matching-modal__wizard-step'), 'matching modal should expose wizard sections');
+  assert.ok(css.includes('.matching-modal--mobile-wizard'), 'matching modal should have mobile wizard class');
+  assert.ok(css.includes('bottom: 0'), 'mobile matching modal should behave like a bottom sheet');
+});

@@ -18,6 +18,7 @@ import './reimbursement.css'
 import ProjectSelector from './components/ProjectSelector';
 import PreviewWorkspace from './components/PreviewWorkspace';
 import ReimbursementTable from './components/ReimbursementTable';
+import ReimbursementMobileHome from './components/ReimbursementMobileHome';
 import LlmConfigModal from './components/LlmConfigModal';
 import MatchingCenterModal from './components/MatchingCenterModal';
 import AttachmentManager from './components/AttachmentManager';
@@ -214,14 +215,28 @@ function ReimbursementTool() {
             <AttachmentManager projectId={activeProjectId} />
           ) : (
             <div className="reimbursement-tool__content">
-              <PreviewWorkspace
-                projectId={activeProjectId}
-                onOpenRecord={(recordId) => {
-                  setFocusRecordId(recordId)
-                  setShowRecords(true)
-                  setShowAttachments(false)
-                }}
-              />
+              <div className="reimbursement-tool__mobile-content">
+                <ReimbursementMobileHome
+                  projectId={activeProjectId}
+                  records={records}
+                  pendingMatches={pendingMatches}
+                  onOpenRecord={(recordId) => {
+                    setFocusRecordId(recordId)
+                    setShowRecords(true)
+                    setShowAttachments(false)
+                  }}
+                />
+              </div>
+              <div className="reimbursement-tool__desktop-content">
+                <PreviewWorkspace
+                  projectId={activeProjectId}
+                  onOpenRecord={(recordId) => {
+                    setFocusRecordId(recordId)
+                    setShowRecords(true)
+                    setShowAttachments(false)
+                  }}
+                />
+              </div>
             </div>
           )}
         </>
