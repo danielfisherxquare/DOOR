@@ -353,6 +353,22 @@ describe('workspace session', () => {
     )
   })
 
+  it('treats a missing workspace session as unavailable instead of throwing', () => {
+    const user = {
+      authzProfile: {
+        scopeType: 'org',
+        orgId: 'org-a',
+        raceId: null,
+        surfaces: ['app'],
+      },
+    }
+
+    assert.equal(canCommitWorkspaceProfile(user.authzProfile, null), false)
+    assert.equal(getWorkspaceProfileRefreshParams(null), null)
+    assert.equal(getWorkspaceProfileKey(null), '')
+    assert.equal(canAccessWorkspaceSurface({ user, session: null, surface: 'app' }), false)
+  })
+
   it('builds explicit authz profile refresh params from the active workspace', () => {
     assert.deepEqual(
       getWorkspaceProfileRefreshParams(

@@ -186,6 +186,7 @@ test('reimbursement mobile route renders without horizontal overflow', async () 
   try {
     await installApiMocks(page);
     await page.goto(baseUrl + '/app/reimbursements', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForSelector('.reimbursement-mobile-shell', { timeout: 15000 });
     await page.waitForSelector('.reimbursement-mobile-home', { timeout: 15000 });
     await page.waitForSelector('.mobile-ocr-queue', { timeout: 15000 });
     await page.waitForTimeout(500);
@@ -197,6 +198,10 @@ test('reimbursement mobile route renders without horizontal overflow', async () 
         scrollWidth: document.documentElement.scrollWidth,
         innerWidth: window.innerWidth,
         hasMobileHome: Boolean(document.querySelector('.reimbursement-mobile-home')),
+        hasMobileShell: Boolean(document.querySelector('.reimbursement-mobile-shell')),
+        hasMobileSummary: Boolean(document.querySelector('.reimbursement-mobile-project-card')),
+        hasMoreActions: Boolean(document.querySelector('.reimbursement-mobile-more')),
+        hasVisibleDesktopTabs: Boolean([...document.querySelectorAll('.app-h5-tabs')].some((node) => getComputedStyle(node).display !== 'none')),
         hasQueue: Boolean(document.querySelector('.mobile-ocr-queue')),
         hasReviewCard: Boolean(document.querySelector('.mobile-review-card')),
         hasDock: Boolean(document.querySelector('.workspace-mobile-dock')),
@@ -204,6 +209,15 @@ test('reimbursement mobile route renders without horizontal overflow', async () 
         desktopDisplay: desktopContent ? getComputedStyle(desktopContent).display : '',
       };
     });
+
+    await page.getByRole('button', { name: '更多操作' }).click();
+    await page.waitForSelector('.reimbursement-mobile-action-sheet.is-open', { timeout: 5000 });
+    const actionSheetMetrics = await page.evaluate(() => ({
+      hasProjectManagement: Boolean([...document.querySelectorAll('.reimbursement-mobile-action-sheet button')].some((node) => node.textContent.includes('项目管理'))),
+      hasModelConfig: Boolean([...document.querySelectorAll('.reimbursement-mobile-action-sheet button')].some((node) => node.textContent.includes('模型配置'))),
+      hasRecordsEntry: Boolean([...document.querySelectorAll('.reimbursement-mobile-action-sheet button')].some((node) => node.textContent.includes('报销明细'))),
+    }));
+    await page.getByRole('button', { name: '关闭更多操作' }).click();
 
     await page.getByRole('button', { name: '处理冲突' }).click();
     await page.waitForSelector('.matching-modal--mobile-wizard', { timeout: 5000 });
@@ -219,7 +233,7 @@ test('reimbursement mobile route renders without horizontal overflow', async () 
     });
     await page.locator('.matching-modal__close').click();
 
-    await page.getByRole('tab', { name: /报销明细/ }).click();
+    await page.getByRole('button', { name: /报销明细/ }).click();
     await page.waitForSelector('.reimbursement-mobile-record-card', { timeout: 5000 });
     const recordMetrics = await page.evaluate(() => {
       const tableScroll = document.querySelector('.app-h5-table-scroll');
@@ -236,12 +250,19 @@ test('reimbursement mobile route renders without horizontal overflow', async () 
     await page.screenshot({ path: screenshotPath, fullPage: true });
 
     assert.equal(homeMetrics.hasMobileHome, true, 'mobile reimbursement home should render');
+    assert.equal(homeMetrics.hasMobileShell, true, 'mobile task-first reimbursement shell should render');
+    assert.equal(homeMetrics.hasMobileSummary, true, 'mobile project summary should render');
+    assert.equal(homeMetrics.hasMoreActions, true, 'low-frequency actions should move behind More actions on mobile');
+    assert.equal(homeMetrics.hasVisibleDesktopTabs, false, 'desktop H5 tabs should not occupy the mobile home first screen');
     assert.equal(homeMetrics.hasQueue, true, 'mobile OCR queue should render');
     assert.equal(homeMetrics.hasReviewCard, true, 'mobile review cards should render');
     assert.equal(homeMetrics.hasDock, true, 'app mobile dock should render');
     assert.equal(homeMetrics.mobileDisplay, 'block', 'mobile reimbursement surface should be visible');
     assert.equal(homeMetrics.desktopDisplay, 'none', 'desktop preview workspace should be hidden on phone viewport');
     assert.ok(homeMetrics.scrollWidth <= homeMetrics.innerWidth + 1, 'mobile import view should not overflow horizontally');
+    assert.equal(actionSheetMetrics.hasProjectManagement, true, 'mobile more sheet should expose project management');
+    assert.equal(actionSheetMetrics.hasModelConfig, true, 'mobile more sheet should expose model configuration');
+    assert.equal(actionSheetMetrics.hasRecordsEntry, true, 'mobile more sheet should expose records entry');
     assert.equal(modalMetrics.overlayAlignItems, 'flex-end', 'matching modal overlay should align as bottom sheet');
     assert.equal(modalMetrics.bottom, '0px', 'matching modal should be anchored to bottom');
     assert.equal(modalMetrics.hasPaymentStep, true, 'matching modal should show payment wizard step');
@@ -252,7 +273,7 @@ test('reimbursement mobile route renders without horizontal overflow', async () 
     assert.ok(recordMetrics.scrollWidth <= recordMetrics.innerWidth + 1, 'mobile record view should not overflow horizontally');
     assert.deepEqual(consoleErrors, [], 'render should not emit console or page errors');
 
-    writeFileSync(reportPath, JSON.stringify({ homeMetrics, modalMetrics, recordMetrics, screenshotPath }, null, 2));
+    writeFileSync(reportPath, JSON.stringify({ homeMetrics, actionSheetMetrics, modalMetrics, recordMetrics, screenshotPath }, null, 2));
   } finally {
     await browser.close();
   }

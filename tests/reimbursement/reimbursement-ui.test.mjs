@@ -164,6 +164,19 @@ test('mobile reimbursement queue preserves OCR review and upload metadata', () =
   assert.ok(store.includes("formData.append('sourceDevice'"), 'mobile camera uploads should preserve sourceDevice metadata');
 });
 
+test('project switching stays available during background reimbursement loading', () => {
+  const selector = read('src/views/reimbursement/components/ProjectSelector.jsx');
+
+  assert.ok(
+    selector.includes('canSwitchProjects'),
+    'ProjectSelector should derive select availability from loaded project options',
+  );
+  assert.ok(
+    !selector.includes('disabled={isLoading}'),
+    'ProjectSelector should not disable switching because unrelated reimbursement work is loading',
+  );
+});
+
 test('matching center supports mobile wizard layout', () => {
   const modal = read('src/views/reimbursement/components/MatchingCenterModal.jsx');
   const css = read('src/views/reimbursement/reimbursement.css');

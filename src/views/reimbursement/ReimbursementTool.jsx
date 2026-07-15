@@ -39,6 +39,98 @@ const SettingsIcon = () => (
   </svg>
 )
 
+const formatMoney = (value) => {
+  const numericValue = Number(value || 0)
+  return numericValue.toLocaleString('zh-CN', {
+    minimumFractionDigits: numericValue % 1 === 0 ? 0 : 1,
+    maximumFractionDigits: 1,
+  })
+}
+
+function ReimbursementMobileShell({
+  activeProject,
+  attachmentCount,
+  hasLlmConfig,
+  pendingMatches,
+  showMobileActions,
+  onToggleMobileActions,
+  onCloseMobileActions,
+  onOpenProjectManager,
+  onOpenRecords,
+  onOpenAttachments,
+  onOpenConfig,
+  onOpenMatchingCenter,
+  children,
+}) {
+  const recordCount = Number(activeProject?.record_count || 0)
+  const expenseTotal = Number(activeProject?.total_expense || 0)
+  const pendingMatchCount = pendingMatches?.length || 0
+
+  return (
+    <section className="reimbursement-mobile-shell" aria-label="手机报销首页">
+      <article className="reimbursement-mobile-project-card">
+        <div className="reimbursement-mobile-project-card__topline">
+          <span className={`reimbursement-mobile-project-card__status ${hasLlmConfig ? 'is-ready' : 'is-warning'}`}>
+            {hasLlmConfig ? '已配置' : '需配置'}
+          </span>
+          <button
+            type="button"
+            className="reimbursement-mobile-more"
+            onClick={onToggleMobileActions}
+            aria-expanded={showMobileActions}
+          >
+            更多操作
+          </button>
+        </div>
+
+        <div className="reimbursement-mobile-project-card__selector">
+          <ProjectSelector />
+        </div>
+
+        <div className="reimbursement-mobile-project-card__metrics" aria-label="项目摘要">
+          <span>支出 ¥{formatMoney(expenseTotal)}</span>
+          <span>{recordCount} 条明细</span>
+          <span>{attachmentCount} 张票据</span>
+        </div>
+
+        <div className="reimbursement-mobile-project-card__shortcuts">
+          <button type="button" onClick={onOpenRecords}>报销明细 {recordCount}</button>
+          <button type="button" onClick={onOpenAttachments}>票据管理 {attachmentCount}</button>
+        </div>
+      </article>
+
+      {!hasLlmConfig ? (
+        <button type="button" className="reimbursement-mobile-alert" onClick={onOpenConfig}>
+          模型未配置，先完成 OCR 设置
+        </button>
+      ) : null}
+
+      {pendingMatchCount > 0 ? (
+        <button type="button" className="reimbursement-mobile-alert" onClick={onOpenMatchingCenter}>
+          处理冲突：{pendingMatchCount} 笔付款凭证待匹配
+        </button>
+      ) : null}
+
+      {children}
+
+      <div className={`reimbursement-mobile-action-sheet ${showMobileActions ? 'is-open' : ''}`} aria-hidden={!showMobileActions}>
+        <div className="reimbursement-mobile-action-sheet__panel" role="dialog" aria-label="更多报销操作">
+          <div className="reimbursement-mobile-action-sheet__header">
+            <strong>更多操作</strong>
+            <button type="button" onClick={onCloseMobileActions}>关闭更多操作</button>
+          </div>
+          <div className="reimbursement-mobile-action-sheet__grid">
+            <button type="button" onClick={onOpenProjectManager}>项目管理</button>
+            <button type="button" onClick={onOpenRecords}>报销明细</button>
+            <button type="button" onClick={onOpenAttachments}>票据管理</button>
+            <button type="button" onClick={onOpenConfig}>模型配置</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function ReimbursementTool() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -60,6 +152,7 @@ function ReimbursementTool() {
   const [showMatchingCenter, setShowMatchingCenter] = useState(false)
   const [showRecords, setShowRecords] = useState(false)
   const [showAttachments, setShowAttachments] = useState(false)
+  const [showMobileActions, setShowMobileActions] = useState(false)
   const [focusRecordId, setFocusRecordId] = useState(null)
   const isProjectManager = location.pathname === '/app/reimbursements/projects'
 
@@ -91,6 +184,36 @@ function ReimbursementTool() {
     },
   ]
 
+  const openProjectManager = () => {
+    setShowMobileActions(false)
+    navigate({
+      pathname: isProjectManager ? '/app/reimbursements' : '/app/reimbursements/projects',
+      search: location.search,
+    })
+  }
+
+  const openRecordsView = () => {
+    setShowMobileActions(false)
+    setShowRecords(true)
+    setShowAttachments(false)
+  }
+
+  const openAttachmentsView = () => {
+    setShowMobileActions(false)
+    setShowRecords(false)
+    setShowAttachments(true)
+  }
+
+  const openLlmConfig = () => {
+    setShowMobileActions(false)
+    setShowLlmConfig(true)
+  }
+
+  const openMatchingCenter = () => {
+    setShowMobileActions(false)
+    setShowMatchingCenter(true)
+  }
+
   // 获取项目列表
   useEffect(() => {
     fetchSettings().catch(() => undefined)
@@ -119,10 +242,7 @@ function ReimbursementTool() {
             )}
             <button
               className="btn btn--ghost"
-              onClick={() => navigate({
-                pathname: isProjectManager ? '/app/reimbursements' : '/app/reimbursements/projects',
-                search: location.search,
-              })}
+              onClick={openProjectManager}
             >
               {isProjectManager ? '返回工作区' : '项目管理'}
             </button>
@@ -132,7 +252,7 @@ function ReimbursementTool() {
               </span>
               <button
                 className={`btn ${hasLlmConfig ? 'btn--ghost' : 'btn--primary'}`}
-                onClick={() => setShowLlmConfig(true)}
+                onClick={openLlmConfig}
               >
                 <SettingsIcon />
                 模型配置
@@ -148,7 +268,7 @@ function ReimbursementTool() {
           </AppH5Notice>
         ) : null}
 
-        {isLoading ? <AppH5Notice tone="info">正在加载报销项目和识别配置...</AppH5Notice> : null}
+        {isLoading && !activeProjectId ? <AppH5Notice tone="info">正在加载报销项目和识别配置...</AppH5Notice> : null}
 
         {/* 未配置模型警告 - 借鉴Admin的admin-state-banner */}
         {activeProjectId && !hasLlmConfig && !isLoading ? (
@@ -159,7 +279,7 @@ function ReimbursementTool() {
             </span>
             <button
               className="btn btn--sm btn--primary"
-              onClick={() => setShowLlmConfig(true)}
+              onClick={openLlmConfig}
             >
               立即配置
             </button>
@@ -186,7 +306,7 @@ function ReimbursementTool() {
         <>
           {/* 待匹配项提示 */}
           {pendingMatches.length > 0 && !showRecords && !showAttachments && (
-            <AppH5Panel title="待处理冲突" summary="存在无法自动匹配的付款凭证，需要手动确认。" tone="warning">
+            <AppH5Panel title="待处理冲突" summary="存在无法自动匹配的付款凭证，需要手动确认。" tone="warning" className="reimbursement-desktop-conflict-panel">
               <div className="reimbursement-alert reimbursement-alert--warning">
                 <span className="reimbursement-alert__icon">⚠️</span>
                 <span className="reimbursement-alert__text">
@@ -194,7 +314,7 @@ function ReimbursementTool() {
                 </span>
                 <button
                   className="btn btn--primary btn--sm"
-                  onClick={() => setShowMatchingCenter(true)}
+                  onClick={openMatchingCenter}
                 >
                   处理冲突
                 </button>
@@ -203,7 +323,9 @@ function ReimbursementTool() {
           )}
 
           {/* 统一标签栏 */}
-          <AppH5Tabs items={reimbursementTabs} ariaLabel="报销视图" />
+          <div className="reimbursement-desktop-tabs">
+            <AppH5Tabs items={reimbursementTabs} ariaLabel="报销视图" />
+          </div>
 
           {/* 内容区域 */}
           {showRecords ? (
@@ -216,16 +338,32 @@ function ReimbursementTool() {
           ) : (
             <div className="reimbursement-tool__content">
               <div className="reimbursement-tool__mobile-content">
-                <ReimbursementMobileHome
-                  projectId={activeProjectId}
-                  records={records}
+                <ReimbursementMobileShell
+                  activeProject={activeProject}
+                  attachmentCount={attachmentCount}
+                  hasLlmConfig={hasLlmConfig}
                   pendingMatches={pendingMatches}
-                  onOpenRecord={(recordId) => {
-                    setFocusRecordId(recordId)
-                    setShowRecords(true)
-                    setShowAttachments(false)
-                  }}
-                />
+                  showMobileActions={showMobileActions}
+                  onToggleMobileActions={() => setShowMobileActions((value) => !value)}
+                  onCloseMobileActions={() => setShowMobileActions(false)}
+                  onOpenProjectManager={openProjectManager}
+                  onOpenRecords={openRecordsView}
+                  onOpenAttachments={openAttachmentsView}
+                  onOpenConfig={openLlmConfig}
+                  onOpenMatchingCenter={openMatchingCenter}
+                >
+                  <ReimbursementMobileHome
+                    projectId={activeProjectId}
+                    records={records}
+                    pendingMatches={pendingMatches}
+                    onOpenMatchingCenter={openMatchingCenter}
+                    onOpenRecord={(recordId) => {
+                      setFocusRecordId(recordId)
+                      setShowRecords(true)
+                      setShowAttachments(false)
+                    }}
+                  />
+                </ReimbursementMobileShell>
               </div>
               <div className="reimbursement-tool__desktop-content">
                 <PreviewWorkspace

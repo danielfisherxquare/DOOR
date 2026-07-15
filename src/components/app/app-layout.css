@@ -1313,9 +1313,9 @@
   }
 
   .workspace-main__topbar {
-    gap: 8px;
+    gap: 6px;
     justify-content: flex-start;
-    padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+    padding: calc(6px + env(safe-area-inset-top)) 10px 6px;
   }
 
   .workspace-main__topbar-left {
@@ -1345,9 +1345,9 @@
   }
 
   .workspace-main__install-btn {
-    width: 44px;
-    height: 44px;
-    min-height: 44px;
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
     justify-content: center;
     padding: 0;
   }
@@ -1360,13 +1360,14 @@
   .workspace-main__topbar-btn,
   .context-square-entry__trigger,
   .workspace-main__topbar-avatar {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
   }
 
   .workspace-context-display {
     flex: 1 1 auto;
     width: auto;
+    min-height: 40px;
     min-width: 0;
     max-width: none;
     grid-template-columns: 20px minmax(0, 1fr) 16px;
@@ -1392,29 +1393,31 @@
   }
 
   .workspace-main__page-header {
-    padding: 16px 14px 12px;
+    padding: 8px 10px 6px;
   }
 
   .workspace-main__page-header-inner {
-    border-left-width: 4px;
-    padding-left: 12px;
+    border-left-width: 3px;
+    padding-left: 9px;
+  }
+
+  .workspace-main__eyebrow-row {
+    display: none;
   }
 
   .workspace-main__title {
-    font-size: 1.35rem;
+    font-size: 1.14rem;
     letter-spacing: 0;
   }
 
   .workspace-main__summary {
-    margin-top: 6px;
-    font-size: 12px;
-    line-height: 1.5;
+    display: none;
   }
 
   .workspace-main__content {
     overflow: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 12px 12px;
+    padding: 8px 10px;
     padding-bottom: calc(76px + env(safe-area-inset-bottom));
   }
 

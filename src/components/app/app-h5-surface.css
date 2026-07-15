@@ -1,11 +1,15 @@
 .app-h5-surface {
   display: grid;
   gap: 18px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .app-h5-surface__header {
   display: grid;
   gap: 16px;
+  min-width: 0;
+  max-width: 100%;
   padding: 20px;
   border: 1px solid var(--layer-border, #e7e5e4);
   background:
@@ -51,11 +55,15 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .app-h5-surface__body {
   display: grid;
   gap: 18px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .app-h5-metric-strip {
@@ -659,15 +667,45 @@
 
 @media (max-width: 768px) {
   .app-h5-surface {
-    gap: 14px;
+    gap: 10px;
   }
 
   .app-h5-surface__header {
-    padding: 16px;
+    gap: 10px;
+    padding: 12px;
+    box-shadow: none;
+  }
+
+  .app-h5-surface__copy {
+    gap: 4px;
+  }
+
+  .app-h5-surface__eyebrow {
+    font-size: 10px;
   }
 
   .app-h5-surface__title {
-    font-size: 1.35rem;
+    font-size: 1.18rem;
+  }
+
+  .app-h5-surface__summary {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .app-h5-surface__actions,
+  .app-h5-surface__body {
+    gap: 10px;
+  }
+
+  .app-h5-panel {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .app-h5-empty {
+    gap: 6px;
+    padding: 22px 12px;
   }
 
   .app-h5-metric-strip {

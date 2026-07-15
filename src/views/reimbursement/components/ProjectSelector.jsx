@@ -21,6 +21,7 @@ function ProjectSelector({ showCreate = false }) {
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [newShortName, setNewShortName] = useState('');
+  const canSwitchProjects = projects.length > 0;
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -117,8 +118,12 @@ function ProjectSelector({ showCreate = false }) {
       <select
         className="project-selector__select"
         value={activeProjectId || ''}
-        onChange={(e) => switchProject(e.target.value)}
-        disabled={isLoading}
+        onChange={(e) => {
+          const nextProjectId = e.target.value;
+          if (!nextProjectId || nextProjectId === activeProjectId) return;
+          switchProject(nextProjectId);
+        }}
+        disabled={!canSwitchProjects}
       >
         {projects.map((project) => (
           <option key={project.id} value={project.id}>

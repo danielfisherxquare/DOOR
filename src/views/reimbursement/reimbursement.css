@@ -1851,12 +1851,139 @@
 
 /* 响应式补充 - 配置区域 */
 @media (max-width: 768px) {
+  .reimbursement-page {
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  .reimbursement-page .app-h5-surface__header {
+    display: none;
+    padding: 10px;
+    border-left: 0;
+    border-right: 0;
+    background: var(--surface, #ffffff);
+  }
+
+  .reimbursement-page .app-h5-surface__copy {
+    display: none;
+  }
+
+  .reimbursement-page .app-h5-surface__summary {
+    display: none;
+  }
+
   .reimbursement-header-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
     gap: 8px;
   }
 
+  .reimbursement-header-actions > .btn:first-child {
+    display: none;
+  }
+
+  .reimbursement-header-actions > .btn:first-child + .btn {
+    grid-column: 1 / -1;
+  }
+
+  .reimbursement-header-actions .project-selector + .btn {
+    display: none;
+  }
+
+  .reimbursement-header-actions > .btn,
+  .reimbursement-header-actions .project-selector > .btn,
+  .reimbursement-header-actions .reimbursement-config-area > .btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding-inline: 10px;
+    justify-content: center;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+
+  .reimbursement-header-actions .project-selector {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 40px 52px;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .reimbursement-header-actions .project-selector__select {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding-left: 12px;
+    padding-right: 34px;
+    font-size: 13px;
+    letter-spacing: 0;
+  }
+
+  .reimbursement-header-actions .project-selector__stats {
+    grid-column: 1 / -1;
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .reimbursement-header-actions .project-selector__stats .badge {
+    min-width: 0;
+    min-height: 30px;
+    justify-content: center;
+    padding-inline: 8px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    letter-spacing: 0;
+  }
+
   .reimbursement-config-area {
-    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 8px;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .reimbursement-config-area .config-status-badge {
+    min-height: 40px;
+    padding-inline: 8px;
+    white-space: nowrap;
+  }
+
+  .reimbursement-page .app-h5-notice,
+  .reimbursement-page .app-h5-tabs,
+  .reimbursement-tool__content,
+  .reimbursement-tool__mobile-content,
+  .reimbursement-mobile-home {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .reimbursement-page .app-h5-tabs__tab {
+    min-width: 116px;
+  }
+
+  .reimbursement-mobile-home__actions {
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reimbursement-mobile-home__actions .btn {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
   }
 
   .reimbursement-warning-banner {
@@ -2792,6 +2919,194 @@
   display: block;
 }
 
+.reimbursement-desktop-tabs {
+  display: block;
+}
+
+.reimbursement-mobile-shell {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.reimbursement-mobile-project-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.reimbursement-mobile-project-card__topline,
+.reimbursement-mobile-project-card__metrics,
+.reimbursement-mobile-project-card__shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.reimbursement-mobile-project-card__topline {
+  justify-content: space-between;
+}
+
+.reimbursement-mobile-project-card__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reimbursement-mobile-project-card__status.is-ready {
+  border-color: color-mix(in srgb, var(--success, #059669) 24%, var(--border));
+  background: color-mix(in srgb, var(--success, #059669) 10%, white);
+  color: var(--success, #059669);
+}
+
+.reimbursement-mobile-project-card__status.is-warning {
+  border-color: color-mix(in srgb, var(--warning, #f59e0b) 28%, var(--border));
+  background: color-mix(in srgb, var(--warning, #f59e0b) 12%, white);
+  color: var(--warning, #d97706);
+}
+
+.reimbursement-mobile-more,
+.reimbursement-mobile-action-sheet button,
+.reimbursement-mobile-project-card__shortcuts button,
+.reimbursement-mobile-alert {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.reimbursement-mobile-more {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.reimbursement-mobile-project-card__selector {
+  min-width: 0;
+}
+
+.reimbursement-mobile-project-card__selector .project-selector {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.reimbursement-mobile-project-card__selector .project-selector__select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding-left: 12px;
+  padding-right: 36px;
+  font-size: 16px;
+}
+
+.reimbursement-mobile-project-card__selector .project-selector > .btn,
+.reimbursement-mobile-project-card__selector .project-selector__stats {
+  display: none;
+}
+
+.reimbursement-mobile-project-card__metrics {
+  flex-wrap: wrap;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.reimbursement-mobile-project-card__metrics span {
+  min-width: 0;
+  padding-right: 8px;
+  border-right: 1px solid var(--border-subtle, rgba(15, 23, 42, 0.1));
+}
+
+.reimbursement-mobile-project-card__metrics span:last-child {
+  border-right: 0;
+}
+
+.reimbursement-mobile-project-card__shortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reimbursement-mobile-project-card__shortcuts button,
+.reimbursement-mobile-alert {
+  min-height: 40px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.reimbursement-mobile-alert {
+  width: 100%;
+  text-align: left;
+  border-color: color-mix(in srgb, var(--warning, #f59e0b) 30%, var(--border));
+  background: color-mix(in srgb, var(--warning, #f59e0b) 9%, white);
+  color: var(--warning, #a16207);
+}
+
+.reimbursement-mobile-action-sheet {
+  display: none;
+}
+
+.reimbursement-mobile-action-sheet.is-open {
+  position: fixed;
+  inset: 0;
+  z-index: 34;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 12px;
+  padding-bottom: calc(78px + env(safe-area-inset-bottom));
+  background: rgba(28, 25, 23, 0.28);
+}
+
+.reimbursement-mobile-action-sheet__panel {
+  display: grid;
+  gap: 12px;
+  width: min(100%, 390px);
+  max-height: min(60vh, 420px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 16px 42px rgba(28, 25, 23, 0.16);
+}
+
+.reimbursement-mobile-action-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reimbursement-mobile-action-sheet__header button {
+  min-height: 34px;
+  padding: 0 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.reimbursement-mobile-action-sheet__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.reimbursement-mobile-action-sheet__grid button {
+  min-height: 44px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
 .reimbursement-mobile-home {
   display: grid;
   gap: 14px;
@@ -2809,6 +3124,8 @@
 
 .reimbursement-mobile-home__notice,
 .reimbursement-mobile-home__warning {
+  width: 100%;
+  text-align: left;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -2989,6 +3306,12 @@
 }
 
 @media (max-width: 768px) {
+  .reimbursement-desktop-tabs,
+  .reimbursement-desktop-tabs .app-h5-tabs,
+  .reimbursement-desktop-conflict-panel {
+    display: none;
+  }
+
   .reimbursement-tool__mobile-content {
     display: block;
   }
