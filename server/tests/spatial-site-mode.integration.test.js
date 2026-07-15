@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
 
-const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL
+const TEST_DATABASE_URL = process.env.DATABASE_URL
+    || process.env.TEST_DATABASE_URL
     || 'postgres://door:door_dev@127.0.0.1:5432/door_test';
 const testDatabaseName = new URL(TEST_DATABASE_URL).pathname.replace(/^\//, '');
 if (!/(^test$|_test$|test_)/i.test(testDatabaseName)) {

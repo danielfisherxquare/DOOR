@@ -41,3 +41,15 @@ test('default server test command uses the isolated PostgreSQL runner', async ()
     assert.match(packageJson.scripts.test, /run-isolated-tests\.mjs/);
     assert.doesNotMatch(packageJson.scripts.test, /tests\/\*\.test\.js/);
 });
+
+test('site-mode integration uses the isolated database injected by the runner', async () => {
+    const source = await readFile(
+        new URL('./spatial-site-mode.integration.test.js', import.meta.url),
+        'utf8',
+    );
+
+    assert.match(
+        source,
+        /const TEST_DATABASE_URL = process\.env\.DATABASE_URL\s+\|\| process\.env\.TEST_DATABASE_URL/,
+    );
+});
