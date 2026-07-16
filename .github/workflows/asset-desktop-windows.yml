@@ -57,7 +57,7 @@ jobs:
 
       - name: Verify installers and write checksums
         shell: pwsh
-        run: ./script/build_windows.ps1 -VerifyOnly
+        run: ./script/build_windows.ps1 -VerifyOnly -SmokeLaunch
 
       - name: Upload checksum manifest
         uses: actions/upload-artifact@v4

@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [switch]$SkipInstall,
-    [switch]$VerifyOnly
+    [switch]$VerifyOnly,
+    [switch]$SmokeLaunch
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,6 +44,26 @@ if (-not ($Installers | Where-Object Extension -eq '.msi')) {
 }
 if (-not ($Installers | Where-Object { $_.Extension -eq '.exe' -and $_.Name -match 'setup' })) {
     throw 'Windows NSIS setup executable was not produced'
+}
+
+if ($SmokeLaunch) {
+    $Executable = Get-ChildItem -Path (Join-Path $TauriDir 'target') -Recurse -File -Filter 'arcspro-asset-desktop.exe' |
+        Where-Object { $_.FullName -match '[\\/]release[\\/]' } |
+        Select-Object -First 1
+    if (-not $Executable) { throw 'Windows desktop executable was not produced' }
+
+    $Process = Start-Process -FilePath $Executable.FullName -PassThru
+    try {
+        Start-Sleep -Seconds 8
+        $Process.Refresh()
+        if ($Process.HasExited) {
+            throw "Windows desktop process exited during smoke test with code $($Process.ExitCode)"
+        }
+    } finally {
+        $Process.Refresh()
+        if (-not $Process.HasExited) { Stop-Process -Id $Process.Id -Force }
+    }
+    Write-Host 'Windows desktop launch smoke test passed'
 }
 
 New-Item -ItemType Directory -Path $ArtifactDir -Force | Out-Null
