@@ -4,6 +4,12 @@ function dbOrDefault(db) {
     return db || knex;
 }
 
+function mapActor(row, prefix) {
+    const id = row[`${prefix}_user_id`];
+    if (!id) return null;
+    return { id, username: row[`${prefix}_username`] || '已停用账号' };
+}
+
 export function mapAsset(row, tags = []) {
     if (!row) return null;
     return {
@@ -25,6 +31,8 @@ export function mapAsset(row, tags = []) {
         thumbnailUrl: row.thumbnail_key ? `/api/app/assets/${row.id}/thumbnail` : null,
         downloadUrl: `/api/app/assets/${row.id}/download`,
         tags,
+        createdBy: mapActor(row, 'created_by'),
+        updatedBy: mapActor(row, 'updated_by'),
         deletedAt: row.deleted_at,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -40,6 +48,10 @@ const assetSelect = [
     'asset_objects.thumbnail_key',
     'asset_objects.width',
     'asset_objects.height',
+    'creator.id as created_by_user_id',
+    'creator.username as created_by_username',
+    'updater.id as updated_by_user_id',
+    'updater.username as updated_by_username',
 ];
 
 export async function ensureDefaultLibrary(context, db) {
@@ -187,12 +199,12 @@ async function tagsForAssets(assetIds, db) {
     const rows = await dbOrDefault(db)('asset_tag_links as atl')
         .join('asset_tags as at', 'at.id', 'atl.tag_id')
         .whereIn('atl.asset_id', assetIds)
-        .select('atl.asset_id', 'at.id', 'at.name', 'at.color')
+        .select('atl.asset_id', 'at.id', 'at.name', 'at.color', 'at.revision')
         .orderBy('at.name');
     const result = new Map();
     for (const row of rows) {
         const values = result.get(row.asset_id) || [];
-        values.push({ id: row.id, name: row.name, color: row.color });
+        values.push({ id: row.id, name: row.name, color: row.color, revision: row.revision });
         result.set(row.asset_id, values);
     }
     return result;
@@ -202,6 +214,8 @@ export async function listAssets(context, query) {
     const library = query.libraryId ? { id: query.libraryId } : await ensureDefaultLibrary(context);
     let builder = knex('assets')
         .join('asset_objects', 'asset_objects.id', 'assets.object_id')
+        .leftJoin('users as creator', 'creator.id', 'assets.created_by')
+        .leftJoin('users as updater', 'updater.id', 'assets.updated_by')
         .where('assets.org_id', context.orgId)
         .where('assets.library_id', library.id)
         .select(assetSelect);
@@ -240,6 +254,8 @@ export async function getAsset(context, assetId, db) {
     const query = dbOrDefault(db);
     const row = await query('assets')
         .join('asset_objects', 'asset_objects.id', 'assets.object_id')
+        .leftJoin('users as creator', 'creator.id', 'assets.created_by')
+        .leftJoin('users as updater', 'updater.id', 'assets.updated_by')
         .where('assets.org_id', context.orgId)
         .where('assets.id', assetId)
         .select(assetSelect)
@@ -267,8 +283,13 @@ export async function listAssetVersions(context, assetId) {
     if (!exists) return null;
     const rows = await knex('asset_versions as av')
         .join('asset_objects as ao', 'ao.id', 'av.object_id')
+        .leftJoin('users as creator', 'creator.id', 'av.created_by')
         .where('av.asset_id', assetId)
-        .select('av.id', 'av.version', 'av.file_name', 'av.created_by', 'av.created_at', 'ao.size', 'ao.sha256', 'ao.mime_type', 'ao.width', 'ao.height')
+        .select(
+            'av.id', 'av.version', 'av.file_name', 'av.created_at',
+            'ao.size', 'ao.sha256', 'ao.mime_type', 'ao.width', 'ao.height',
+            'creator.id as created_by_user_id', 'creator.username as created_by_username',
+        )
         .orderBy('av.version', 'desc');
     return rows.map((row) => ({
         id: row.id,
@@ -279,7 +300,7 @@ export async function listAssetVersions(context, assetId) {
         mimeType: row.mime_type,
         width: row.width,
         height: row.height,
-        createdBy: row.created_by,
+        createdBy: mapActor(row, 'created_by'),
         createdAt: row.created_at,
         downloadUrl: `/api/app/assets/${assetId}/versions/${row.id}/download`,
     }));

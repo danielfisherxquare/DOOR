@@ -10,8 +10,19 @@ import {
   type DesktopSession,
 } from './asset-api'
 import { loadLocalIndex, saveLocalIndex, type PersistedQueueItem } from './local-index'
-import type { AssetItem } from '@arcspro/asset-client'
+import type { AssetFolder, AssetItem, AssetTag } from '@arcspro/asset-client'
 import { AssetPreviewDialog, AssetThumbnail } from './AssetPreviewDialog'
+import {
+  AssetInspector,
+  AssetLibrarySidebar,
+  AssetToolbar,
+  BulkOrganizeBar,
+  folderNameById,
+  useSelectedAssets,
+  type FolderFilter,
+  type KindFilter,
+  type SortOption,
+} from './AssetOrganizer'
 
 type QueueItem = PersistedQueueItem
 
@@ -37,6 +48,10 @@ function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message
   if (typeof error === 'string') return error
   return '未知错误'
+}
+
+function errorStatus(error: unknown): number {
+  return typeof error === 'object' && error !== null && 'status' in error && typeof error.status === 'number' ? error.status : 0
 }
 
 async function collectFiles(directory: string): Promise<string[]> {
@@ -71,6 +86,17 @@ export default function App() {
   const [assetLinks, setAssetLinks] = useState<Record<string, { assetId: string; revision: number }>>({})
   const [indexReady, setIndexReady] = useState(false)
   const [previewAsset, setPreviewAsset] = useState<AssetItem | null>(null)
+  const [folders, setFolders] = useState<AssetFolder[]>([])
+  const [tags, setTags] = useState<AssetTag[]>([])
+  const [libraryId, setLibraryId] = useState('')
+  const [activeFolder, setActiveFolder] = useState<FolderFilter>('all')
+  const [activeTag, setActiveTag] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [kind, setKind] = useState<KindFilter>('all')
+  const [sort, setSort] = useState<SortOption>('updated-desc')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [inspectedAssetId, setInspectedAssetId] = useState<string | null>(null)
+  const [organizing, setOrganizing] = useState(false)
   const fingerprintsRef = useRef(fingerprints)
   const assetLinksRef = useRef(assetLinks)
   const client = useMemo(() => session ? desktopAssetClient(session) : null, [session])
@@ -86,6 +112,8 @@ export default function App() {
     if (!client) throw new Error('素材库尚未连接')
     return client.getThumbnail(asset.id)
   }, [client])
+  const selectedAssets = useSelectedAssets(assets, selectedIds)
+  const inspectedAsset = assets.find((asset) => asset.id === inspectedAssetId) || null
 
   useEffect(() => { fingerprintsRef.current = fingerprints }, [fingerprints])
   useEffect(() => { assetLinksRef.current = assetLinks }, [assetLinks])
@@ -110,11 +138,29 @@ export default function App() {
     saveLocalIndex({ serverUrl, syncFolder, cursor, fingerprints, assetLinks, queue }).catch((indexError) => setError(`本地同步索引保存失败：${errorMessage(indexError)}`))
   }, [assetLinks, cursor, fingerprints, indexReady, queue, serverUrl, syncFolder])
 
+  async function refreshContext() {
+    if (!client) return
+    try {
+      const context = await client.getContext()
+      setFolders(context.folders)
+      setTags(context.tags)
+      setLibraryId(context.libraries.find((library) => library.isDefault)?.id || context.libraries[0]?.id || '')
+    } catch (requestError) { setError(errorMessage(requestError)) }
+  }
+
   async function refresh() {
     if (!client) return
     try {
-      const result = await client.listAssets({ limit: 100 })
+      const result = await client.listAssets({
+        limit: 100,
+        ...(activeFolder !== 'all' ? { folderId: activeFolder } : {}),
+        ...(activeTag ? { tags: [activeTag] } : {}),
+        ...(search.trim() ? { search: search.trim() } : {}),
+        ...(kind !== 'all' ? { kinds: [kind] } : {}),
+        sort,
+      })
       setAssets(result.items)
+      setSelectedIds((current) => new Set([...current].filter((id) => result.items.some((asset) => asset.id === id))))
       let nextCursor = cursor
       let page
       do {
@@ -125,7 +171,8 @@ export default function App() {
     } catch (requestError) { setError(errorMessage(requestError)) }
   }
 
-  useEffect(() => { refresh() }, [client])
+  useEffect(() => { refreshContext() }, [client])
+  useEffect(() => { refresh() }, [client, activeFolder, activeTag, search, kind, sort])
 
   useEffect(() => {
     if (!syncFolder) return undefined
@@ -224,6 +271,78 @@ export default function App() {
     } catch (downloadError) { setError(errorMessage(downloadError)) }
   }
 
+  async function createFolder(name: string, parentId: string | null) {
+    if (!client || !libraryId) return
+    try {
+      await client.createFolder({ libraryId, parentId, name })
+      await refreshContext()
+    } catch (requestError) { setError(errorMessage(requestError)) }
+  }
+
+  async function renameFolder(folder: AssetFolder, name: string) {
+    if (!client) return
+    try {
+      await client.patchFolder(folder.id, { baseRevision: folder.revision, name })
+      await refreshContext()
+    } catch (requestError) {
+      setError(errorStatus(requestError) === 409 ? '文件夹已被其他成员修改，已刷新最新内容。' : errorMessage(requestError))
+      await refreshContext()
+    }
+  }
+
+  async function createTag(name: string, color: string) {
+    if (!client) return
+    try {
+      await client.createTag({ name, color })
+      await refreshContext()
+    } catch (requestError) { setError(errorMessage(requestError)) }
+  }
+
+  async function saveAsset(asset: AssetItem, patch: { name: string; folderId: string | null; note: string | null; rating: number | null; tagIds: string[] }) {
+    if (!client) return
+    try {
+      const updated = await client.patchAsset(asset.id, { baseRevision: asset.revision, ...patch })
+      setAssets((current) => current.map((item) => item.id === updated.id ? updated : item))
+    } catch (requestError) {
+      setError(errorStatus(requestError) === 409 ? '该素材已被其他成员修改，已加载最新版本，请重新确认后保存。' : errorMessage(requestError))
+      await refresh()
+    }
+  }
+
+  async function organizeSelected(operation: (asset: AssetItem) => Promise<AssetItem>) {
+    if (selectedAssets.length === 0) return
+    setOrganizing(true)
+    const results = await Promise.allSettled(selectedAssets.map(operation))
+    const updated = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])
+    const failed = results.length - updated.length
+    setAssets((current) => current.map((asset) => updated.find((item) => item.id === asset.id) || asset))
+    setSelectedIds(new Set())
+    setOrganizing(false)
+    if (failed) setError(`${failed} 个素材未能整理，可能已被其他成员更新。列表已刷新。`)
+    await refresh()
+  }
+
+  async function moveSelected(folderId: string | null) {
+    if (!client) return
+    await organizeSelected((asset) => client.patchAsset(asset.id, { baseRevision: asset.revision, folderId }))
+  }
+
+  async function tagSelected(tagId: string) {
+    if (!client) return
+    await organizeSelected((asset) => client.patchAsset(asset.id, {
+      baseRevision: asset.revision,
+      tagIds: [...new Set([...asset.tags.map((tag) => tag.id), tagId])],
+    }))
+  }
+
+  function toggleAsset(assetId: string, selected: boolean) {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (selected) next.add(assetId); else next.delete(assetId)
+      return next
+    })
+  }
+
   if (!session) {
     return (
       <main className="desktop-login">
@@ -283,30 +402,59 @@ export default function App() {
       {error && <div className="desktop-error" role="alert">{error}<button onClick={() => setError('')}>&times;</button></div>}
       <div className="desktop-workspace">
         <aside>
-          <h2>本地同步</h2>
-          <button onClick={chooseFolder} className="secondary">选择文件夹</button>
-          <code>{syncFolder || '尚未选择'}</code>
-          <small className="index-status">{indexReady ? `本地索引已保存 · 游标 ${cursor} · ${Object.keys(assetLinks).length} 个云端映射` : '正在载入本地索引…'}</small>
-          <button onClick={enqueueDirectory} disabled={!syncFolder}>扫描本地文件</button>
-          <button onClick={runQueue} disabled={!queue.some((item) => item.state !== 'completed')}>开始同步 ({queue.filter((item) => item.state !== 'completed').length})</button>
-          <h2>同步队列</h2>
-          <div className="queue-list">
-            {queue.slice(-8).map((item) => <div key={item.id}><span>{item.path.split(/[\\/]/).pop()}</span><progress value={item.progress} max="1" /><small>{item.state === 'failed' ? item.error : item.state}</small></div>)}
-            {queue.length === 0 && <p>监听目录变化后，新文件会出现在这里。</p>}
-          </div>
+          <AssetLibrarySidebar
+            folders={folders}
+            tags={tags}
+            activeFolder={activeFolder}
+            activeTag={activeTag}
+            onFolderSelect={setActiveFolder}
+            onTagSelect={setActiveTag}
+            onCreateFolder={createFolder}
+            onRenameFolder={renameFolder}
+            onCreateTag={createTag}
+          />
+          <details className="sync-panel">
+            <summary>本地同步与队列</summary>
+            <button onClick={chooseFolder} className="secondary">选择文件夹</button>
+            <code>{syncFolder || '尚未选择'}</code>
+            <small className="index-status">{indexReady ? `本地索引已保存 · 游标 ${cursor} · ${Object.keys(assetLinks).length} 个云端映射` : '正在载入本地索引…'}</small>
+            <button onClick={enqueueDirectory} disabled={!syncFolder}>扫描本地文件</button>
+            <button onClick={runQueue} disabled={!queue.some((item) => item.state !== 'completed')}>开始同步 ({queue.filter((item) => item.state !== 'completed').length})</button>
+            <div className="queue-list">
+              {queue.slice(-8).map((item) => <div key={item.id}><span>{item.path.split(/[\\/]/).pop()}</span><progress value={item.progress} max="1" /><small>{item.state === 'failed' ? item.error : item.state}</small></div>)}
+              {queue.length === 0 && <p>监听目录变化后，新文件会出现在这里。</p>}
+            </div>
+          </details>
         </aside>
         <section className="desktop-assets">
-          <div className="section-title"><div><small>CLOUD LIBRARY</small><h2>{assets.length} 个素材</h2></div><button className="secondary" onClick={refresh}>刷新</button></div>
+          <div className="section-title"><div><small>CLOUD LIBRARY</small><h2>{assets.length} 个素材</h2><p>{activeFolder === 'all' ? '全部文件夹' : activeFolder === 'root' ? '未归类' : folderNameById(folders, activeFolder)}{activeTag ? ` · #${tags.find((tag) => tag.id === activeTag)?.name || '标签'}` : ''}</p></div></div>
+          <AssetToolbar
+            search={search}
+            kind={kind}
+            sort={sort}
+            resultCount={assets.length}
+            allSelected={assets.length > 0 && assets.every((asset) => selectedIds.has(asset.id))}
+            onSearchChange={setSearch}
+            onKindChange={setKind}
+            onSortChange={setSort}
+            onSelectAll={(selected) => setSelectedIds(selected ? new Set(assets.map((asset) => asset.id)) : new Set())}
+            onRefresh={() => { refreshContext(); refresh() }}
+          />
+          <BulkOrganizeBar count={selectedAssets.length} folders={folders} tags={tags} busy={organizing} onMove={moveSelected} onAddTag={tagSelected} onClear={() => setSelectedIds(new Set())} />
           <div className="desktop-grid">
             {assets.map((asset) => <article key={asset.id}>
+              <label className="asset-select" title="选择素材"><input type="checkbox" checked={selectedIds.has(asset.id)} onChange={(event) => toggleAsset(asset.id, event.target.checked)} /><span /></label>
               <AssetThumbnail asset={asset} loadThumbnail={loadThumbnail} loadConverted={loadConverted} onOpen={() => setPreviewAsset(asset)} />
               <strong title={asset.name}>{asset.name}</strong>
-              <span>{(asset.size / 1024 / 1024).toFixed(1)} MB · r{asset.revision}</span>
-              <div className="asset-card-actions"><button className="secondary" onClick={() => setPreviewAsset(asset)}>预览</button><button onClick={() => download(asset)}>下载</button></div>
+              <span>{(asset.size / 1024 / 1024).toFixed(1)} MB · r{asset.revision} · {asset.createdBy?.username || '未知账号'} 上传</span>
+              <div className="asset-card-tags">{asset.tags.slice(0, 3).map((tag) => <i key={tag.id} style={{ borderColor: tag.color }}>{tag.name}</i>)}</div>
+              <div className="asset-card-actions"><button className="secondary" onClick={() => setPreviewAsset(asset)}>预览</button><button className="secondary" onClick={() => setInspectedAssetId(asset.id)}>整理</button><button onClick={() => download(asset)}>下载</button></div>
             </article>)}
+            {assets.length === 0 && <div className="empty-library"><strong>这里还没有素材</strong><span>可以切换文件夹或筛选条件，也可以从本地同步面板上传文件。</span></div>}
           </div>
         </section>
       </div>
+      {inspectedAsset && <AssetInspector asset={inspectedAsset} folders={folders} tags={tags} onClose={() => setInspectedAssetId(null)} onSave={saveAsset} />}
       <AssetPreviewDialog asset={previewAsset} onClose={() => setPreviewAsset(null)} onDownload={download} loadOriginal={loadOriginal} loadConverted={loadConverted} />
     </main>
   )

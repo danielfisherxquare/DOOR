@@ -1,5 +1,6 @@
 export interface AssetTag { id: string; name: string; color: string; revision: number }
 export interface AssetFolder { id: string; libraryId: string; parentId: string | null; name: string; revision: number }
+export interface AssetActor { id: string; username: string }
 export interface AssetVersion {
   id: string
   version: number
@@ -9,7 +10,7 @@ export interface AssetVersion {
   mimeType: string
   width: number | null
   height: number | null
-  createdBy: string | null
+  createdBy: AssetActor | null
   createdAt: string
   downloadUrl: string
 }
@@ -33,6 +34,8 @@ export interface AssetItem {
   thumbnailUrl: string | null
   downloadUrl: string
   tags: AssetTag[]
+  createdBy: AssetActor | null
+  updatedBy: AssetActor | null
   deletedAt: string | null
   createdAt: string
   updatedAt: string
@@ -48,7 +51,7 @@ export interface AssetClient {
   deleteTag(tagId: string, baseRevision: number): Promise<{ id: string }>
   uploadFile(file: File, options?: { libraryId?: string; folderId?: string | null; onProgress?: (event: AssetUploadProgress) => void }): Promise<AssetItem>
   uploadNewVersion(assetId: string, baseRevision: number, file: File, options?: { onProgress?: (event: AssetUploadProgress) => void }): Promise<AssetItem>
-  patchAsset(assetId: string, patch: Record<string, unknown>): Promise<AssetItem>
+  patchAsset(assetId: string, patch: { baseRevision: number; name?: string; folderId?: string | null; note?: string | null; rating?: number | null; tagIds?: string[] }): Promise<AssetItem>
   deleteAsset(assetId: string, baseRevision: number): Promise<{ id: string; revision: number }>
   pullChanges(cursor?: string, limit?: number): Promise<{ changes: unknown[]; tombstones: unknown[]; nextCursor: string; hasMore: boolean; serverTime: string }>
   pushChanges(changes: unknown[]): Promise<unknown>
