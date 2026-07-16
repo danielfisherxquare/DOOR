@@ -1,11 +1,11 @@
 :root { font-family: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; color: #1b1c1c; background: #f0eded; font-synthesis: none; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 720px; min-height: 100vh; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 button { min-height: 40px; padding: 8px 14px; color: white; background: #d8262c; border: 1px solid #d8262c; cursor: pointer; font-weight: 700; }
 button.secondary { color: #1b1c1c; background: white; border-color: #d6d3d1; }
 button:disabled { opacity: .45; cursor: not-allowed; }
-button:focus-visible, input:focus-visible { outline: 3px solid rgba(216,38,44,.35); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(216,38,44,.35); outline-offset: 2px; }
 .brand-mark { width: 42px; height: 42px; display: grid; place-items: center; color: white; background: #d8262c; font: 800 13px/1 ui-monospace, monospace; }
 .eyebrow, header small, .section-title small { color: #78716c; font: 700 10px/1 ui-monospace, monospace; letter-spacing: .12em; }
 .desktop-login { min-height: 100vh; display: grid; place-items: center; background: linear-gradient(135deg, #1c1917 0 46%, #f0eded 46%); }
@@ -14,7 +14,11 @@ button:focus-visible, input:focus-visible { outline: 3px solid rgba(216,38,44,.3
 .desktop-login section > p:not(.eyebrow) { color: #57534e; }
 .desktop-login form, .desktop-login label { display: grid; gap: 8px; }
 .desktop-login form { gap: 16px; margin-top: 24px; }
-input { min-height: 42px; padding: 8px 10px; border: 1px solid #d6d3d1; background: #fafaf9; }
+input, select { min-height: 42px; padding: 8px 10px; border: 1px solid #d6d3d1; background: #fafaf9; }
+input:disabled { color: #78716c; background: #f5f5f4; }
+.desktop-login-note { padding: 10px 12px; color: #44403c; background: #f5f5f4; border-left: 3px solid #d8262c; font-size: 13px; line-height: 1.5; }
+.desktop-login-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.desktop-login-actions button { flex: 1; }
 .desktop-error { display: flex; gap: 10px; padding: 10px 14px; color: #991b1b; background: #fee2e2; }
 .desktop-error button { min-height: 0; margin-left: auto; padding: 0 4px; color: inherit; background: transparent; border: 0; }
 .desktop-shell { min-height: 100vh; }

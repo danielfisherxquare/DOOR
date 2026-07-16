@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { open } from '@tauri-apps/plugin-dialog'
 import { readDir, readFile, stat, watch, writeFile } from '@tauri-apps/plugin-fs'
 import { basename, join } from '@tauri-apps/api/path'
-import { desktopAssetClient, login, type DesktopSession } from './asset-api'
+import {
+  createDesktopSession,
+  desktopAssetClient,
+  login,
+  type DesktopPendingOrganizationSelection,
+  type DesktopSession,
+} from './asset-api'
 import { loadLocalIndex, saveLocalIndex, type PersistedQueueItem } from './local-index'
 
 interface AssetItem {
@@ -20,6 +26,12 @@ function mimeType(name: string) {
   const extension = name.split('.').pop()?.toLowerCase()
   const types: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml', mp4: 'video/mp4', pdf: 'application/pdf', psd: 'application/octet-stream' }
   return types[extension || ''] || 'application/octet-stream'
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  return '未知错误'
 }
 
 async function collectFiles(directory: string): Promise<string[]> {
@@ -43,6 +55,8 @@ export default function App() {
   const [serverUrl, setServerUrl] = useState('https://www.arcspro.work:18443')
   const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
+  const [pendingOrganization, setPendingOrganization] = useState<DesktopPendingOrganizationSelection | null>(null)
+  const [selectedOrgId, setSelectedOrgId] = useState('')
   const [error, setError] = useState('')
   const [assets, setAssets] = useState<AssetItem[]>([])
   const [syncFolder, setSyncFolder] = useState('')
@@ -69,13 +83,13 @@ export default function App() {
       setAssetLinks(index.assetLinks)
       setQueue(index.queue)
       setIndexReady(true)
-    }).catch((indexError) => active && setError(`本地同步索引载入失败：${(indexError as Error).message}`))
+    }).catch((indexError) => active && setError(`本地同步索引载入失败：${errorMessage(indexError)}`))
     return () => { active = false }
   }, [])
 
   useEffect(() => {
     if (!indexReady) return
-    saveLocalIndex({ serverUrl, syncFolder, cursor, fingerprints, assetLinks, queue }).catch((indexError) => setError(`本地同步索引保存失败：${(indexError as Error).message}`))
+    saveLocalIndex({ serverUrl, syncFolder, cursor, fingerprints, assetLinks, queue }).catch((indexError) => setError(`本地同步索引保存失败：${errorMessage(indexError)}`))
   }, [assetLinks, cursor, fingerprints, indexReady, queue, serverUrl, syncFolder])
 
   async function refresh() {
@@ -90,7 +104,7 @@ export default function App() {
         nextCursor = page.nextCursor
       } while (page.hasMore)
       setCursor(nextCursor)
-    } catch (requestError) { setError((requestError as Error).message) }
+    } catch (requestError) { setError(errorMessage(requestError)) }
   }
 
   useEffect(() => { refresh() }, [client])
@@ -113,27 +127,37 @@ export default function App() {
         const existing = new Set(current.filter((item) => item.state !== 'completed').map((item) => item.path))
         return [...current, ...additions.filter((item) => !existing.has(item.path))]
       })
-    }, { recursive: true, delayMs: 800 }).then((stop) => { unwatch = stop })
+    }, { recursive: true, delayMs: 800 })
+      .then((stop) => { unwatch = stop })
+      .catch((watchError) => setError(`无法监听同步文件夹：${errorMessage(watchError)}`))
     return () => unwatch?.()
   }, [syncFolder])
 
   async function chooseFolder() {
-    const selected = await open({ directory: true, multiple: false, title: '选择素材同步文件夹' })
-    if (typeof selected === 'string') setSyncFolder(selected)
+    try {
+      const selected = await open({ directory: true, recursive: true, multiple: false, title: '选择素材同步文件夹' })
+      if (typeof selected === 'string') setSyncFolder(selected)
+    } catch (folderError) {
+      setError(`无法选择同步文件夹：${errorMessage(folderError)}`)
+    }
   }
 
   async function enqueueDirectory() {
     if (!syncFolder) return
-    const paths = await collectFiles(syncFolder)
-    const additions: QueueItem[] = []
-    for (const path of paths) {
-      const nextFingerprint = await fingerprint(path)
-      if (fingerprintsRef.current[path] !== nextFingerprint) additions.push({ id: crypto.randomUUID(), path, state: 'queued', progress: 0, fingerprint: nextFingerprint })
+    try {
+      const paths = await collectFiles(syncFolder)
+      const additions: QueueItem[] = []
+      for (const path of paths) {
+        const nextFingerprint = await fingerprint(path)
+        if (fingerprintsRef.current[path] !== nextFingerprint) additions.push({ id: crypto.randomUUID(), path, state: 'queued', progress: 0, fingerprint: nextFingerprint })
+      }
+      setQueue((current) => {
+        const existing = new Set(current.filter((item) => item.state !== 'completed').map((item) => item.path))
+        return [...current.filter((item) => item.state !== 'completed'), ...additions.filter((item) => !existing.has(item.path))]
+      })
+    } catch (scanError) {
+      setError(`无法扫描同步文件夹：${errorMessage(scanError)}`)
     }
-    setQueue((current) => {
-      const existing = new Set(current.filter((item) => item.state !== 'completed').map((item) => item.path))
-      return [...current.filter((item) => item.state !== 'completed'), ...additions.filter((item) => !existing.has(item.path))]
-    })
   }
 
   async function runQueue() {
@@ -157,7 +181,7 @@ export default function App() {
         setFingerprints((current) => ({ ...current, [pending.path]: uploadedFingerprint }))
         setAssetLinks((current) => ({ ...current, [pending.path]: { assetId: uploaded.id, revision: uploaded.revision } }))
       } catch (uploadError) {
-        setQueue((current) => current.map((item) => item.id === pending.id ? { ...item, state: 'failed', error: (uploadError as Error).message } : item))
+        setQueue((current) => current.map((item) => item.id === pending.id ? { ...item, state: 'failed', error: errorMessage(uploadError) } : item))
       }
     }
     await refresh()
@@ -171,9 +195,15 @@ export default function App() {
       const target = await join(syncFolder, asset.name)
       await writeFile(target, bytes)
       const downloadedFingerprint = await fingerprint(target)
-      setFingerprints((current) => ({ ...current, [target]: downloadedFingerprint }))
-      setAssetLinks((current) => ({ ...current, [target]: { assetId: asset.id, revision: asset.revision } }))
-    } catch (downloadError) { setError((downloadError as Error).message) }
+      const downloadedLink = { assetId: asset.id, revision: asset.revision }
+      fingerprintsRef.current = { ...fingerprintsRef.current, [target]: downloadedFingerprint }
+      assetLinksRef.current = { ...assetLinksRef.current, [target]: downloadedLink }
+      setFingerprints(fingerprintsRef.current)
+      setAssetLinks(assetLinksRef.current)
+      setQueue((current) => current.map((item) => item.path === target && item.state !== 'completed'
+        ? { ...item, state: 'completed', progress: 1, error: undefined, fingerprint: downloadedFingerprint }
+        : item))
+    } catch (downloadError) { setError(errorMessage(downloadError)) }
   }
 
   if (!session) {
@@ -187,13 +217,39 @@ export default function App() {
           <form onSubmit={async (event) => {
             event.preventDefault()
             setError('')
-            try { setSession(await login(serverUrl, account, password)); setPassword('') } catch (loginError) { setError((loginError as Error).message) }
+            try {
+              if (pendingOrganization) {
+                setSession(createDesktopSession(pendingOrganization, selectedOrgId))
+                setPendingOrganization(null)
+                return
+              }
+              const result = await login(serverUrl, account, password)
+              setPassword('')
+              if (result.kind === 'session') {
+                setSession(result.session)
+                return
+              }
+              setPendingOrganization(result.pending)
+              setSelectedOrgId(result.pending.organizations[0]?.id || '')
+            } catch (loginError) { setError(errorMessage(loginError)) }
           }}>
-            <label>ArcSpro 服务地址<input value={serverUrl} onChange={(event) => setServerUrl(event.target.value)} type="url" required /></label>
-            <label>账号<input value={account} onChange={(event) => setAccount(event.target.value)} autoComplete="username" required /></label>
-            <label>密码<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" required /></label>
+            <label>DOOR 服务地址<input value={serverUrl} onChange={(event) => { setServerUrl(event.target.value); setPendingOrganization(null) }} type="url" required disabled={Boolean(pendingOrganization)} /></label>
+            {pendingOrganization ? <>
+              <div className="desktop-login-note">已验证账号 <strong>{pendingOrganization.userName}</strong>，请选择要连接的团队机构。</div>
+              <label>团队机构
+                <select value={selectedOrgId} onChange={(event) => setSelectedOrgId(event.target.value)} required>
+                  {pendingOrganization.organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
+                </select>
+              </label>
+            </> : <>
+              <label>账号<input value={account} onChange={(event) => setAccount(event.target.value)} autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} required /></label>
+              <label>密码<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" required /></label>
+            </>}
             {error && <div className="desktop-error" role="alert">{error}</div>}
-            <button type="submit" disabled={!indexReady}>{indexReady ? '登录并同步' : '正在载入本地索引…'}</button>
+            <div className="desktop-login-actions">
+              {pendingOrganization && <button type="button" className="secondary" onClick={() => { setPendingOrganization(null); setSelectedOrgId(''); setError('') }}>切换账号</button>}
+              <button type="submit" disabled={!indexReady || (Boolean(pendingOrganization) && !selectedOrgId)}>{indexReady ? (pendingOrganization ? '进入团队素材库' : '登录并同步') : '正在载入本地索引…'}</button>
+            </div>
           </form>
         </section>
       </main>

@@ -349,7 +349,7 @@ PUBLIC_BASE_URL=https://door.example.com
 FRONTEND_URL=https://door.example.com
 
 # CORS 允许的完整 origin（逗号分隔；非默认端口必须保留端口号）
-CORS_ORIGIN=https://door.example.com,http://203.0.113.10
+CORS_ORIGIN=https://door.example.com,http://203.0.113.10,tauri://localhost
 
 # Nginx 模板变量
 NGINX_SERVER_NAME=door.example.com
@@ -374,8 +374,9 @@ DASHSCOPE_BASE_URL=https://coding.dashscope.aliyuncs.com/v1
 ```
 
 > [!CAUTION]
-> `CORS_ORIGIN` 必须和浏览器地址栏的 origin 完全一致。例如页面从
-> `https://door.example.com:8443` 打开，就应填写 `https://door.example.com:8443`。
+> `CORS_ORIGIN` 必须和调用端的 origin 完全一致。例如页面从
+> `https://door.example.com:8443` 打开，就应填写 `https://door.example.com:8443`；
+> ArcSpro Assets 桌面客户端还需要加入 `tauri://localhost`。
 
 ---
 
