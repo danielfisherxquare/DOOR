@@ -370,7 +370,7 @@ export default function App() {
               setSelectedOrgId(result.pending.organizations[0]?.id || '')
             } catch (loginError) { setError(errorMessage(loginError)) }
           }}>
-            <label>DOOR 服务地址<input value={serverUrl} onChange={(event) => { setServerUrl(event.target.value); setPendingOrganization(null) }} type="url" required disabled={Boolean(pendingOrganization)} /></label>
+            <label>ArcSpro 服务地址<input value={serverUrl} onChange={(event) => { setServerUrl(event.target.value); setPendingOrganization(null) }} type="url" required disabled={Boolean(pendingOrganization)} /></label>
             {pendingOrganization ? <>
               <div className="desktop-login-note">已验证账号 <strong>{pendingOrganization.userName}</strong>，请选择要连接的团队机构。</div>
               <label>团队机构

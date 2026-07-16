@@ -93,7 +93,7 @@ function createTransport(session: DesktopSession, binary = false) {
         body: data === undefined ? undefined : (isForm ? data : JSON.stringify(data)),
       })
     } catch {
-      throw new Error('无法连接团队素材库，请检查 DOOR 服务地址或网络连接')
+      throw new Error('无法连接团队素材库，请检查 ArcSpro 服务地址或网络连接')
     }
     const payload = binary ? await response.blob() : await readJson(response)
     if (!response.ok) {
@@ -140,7 +140,7 @@ export async function login(serverUrl: string, account: string, password: string
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ login: account, password }),
     },
-    '无法连接 DOOR 服务，请检查服务地址、网络或客户端跨域配置',
+    '无法连接 ArcSpro 服务，请检查服务地址、网络或客户端跨域配置',
   )
   const body = asRecord(payload)
   if (!response.ok || body?.success !== true) {
