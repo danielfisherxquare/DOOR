@@ -25,8 +25,12 @@ describe('asset sync core', () => {
       },
     }
     const store = {
-      async applyRemoteBatch(batch) { batches.push(batch) },
-      async setCursor(cursor) { cursorWrites.push(cursor) },
+      async applyRemoteBatch(batch) {
+        batches.push(batch)
+      },
+      async setCursor(cursor) {
+        cursorWrites.push(cursor)
+      },
     }
     assert.equal(await pullUntilCurrent({ client, store }), '2')
     assert.deepEqual(calls, ['0', '1'])

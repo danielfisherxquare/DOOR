@@ -10,15 +10,19 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [{
-      "label": "main",
-      "title": "ArcSpro Assets",
-      "width": 1280,
-      "height": 820,
-      "minWidth": 720,
-      "minHeight": 560
-    }],
-    "security": { "csp": "default-src 'self'; connect-src 'self' https://www.arcspro.work:18443 http://127.0.0.1:* http://192.168.1.97:*; img-src 'self' blob: data:; media-src 'self' blob:; frame-src 'self' blob:; object-src 'self' blob:; font-src 'self' blob:; style-src 'self' 'unsafe-inline'" }
+    "windows": [
+      {
+        "label": "main",
+        "title": "ArcSpro Assets",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 720,
+        "minHeight": 560
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' https://www.arcspro.work:18443 http://127.0.0.1:* http://192.168.1.97:*; img-src 'self' blob: data:; media-src 'self' blob:; frame-src 'self' blob:; object-src 'self' blob:; font-src 'self' blob:; style-src 'self' 'unsafe-inline'"
+    }
   },
   "bundle": {
     "active": true,
