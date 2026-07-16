@@ -32,6 +32,7 @@ const EXPECTED_MOUNTS = {
     interview: ['/api/app/interviews'],
     inventory: ['/api/app/warehouse'],
     'design-requests': ['/api/app/design-requests', '/api/app/approvals'],
+    assets: ['/api/app/assets'],
   },
   ops: {
     warehouse: ['/api/ops/warehouse'],

@@ -11,6 +11,7 @@ export const ALL_MODULES = Object.freeze({
     { id: 'app:map', name: 'GIS地图', isDefault: false },
     { id: 'app:reimbursements', name: '报销管理', isDefault: false },
     { id: 'app:design-requests', name: '设计工作台', isDefault: false },
+    { id: 'app:assets', name: '素材库', isDefault: false },
     { id: 'app:3d-studio', name: '3D工作室', isDefault: false },
     { id: 'app:credentials', name: '证件流程', isDefault: false },
     { id: 'app:inventory', name: '仓储作业', isDefault: false },

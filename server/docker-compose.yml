@@ -2,7 +2,7 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: door
+      POSTGRES_DB: ${POSTGRES_DB:-door}
       POSTGRES_USER: door
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-door_dev}
     volumes:
@@ -23,13 +23,29 @@ services:
       interval: 5s
       retries: 5
 
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: [ "server", "/data", "--console-address", ":9001" ]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-arcspro}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-arcspro_dev_only}
+    volumes:
+      # 四人团队的素材原文件持久化在宿主机，不随容器删除。
+      - ${ASSET_DATA_HOST_DIR:-./asset-data}:/data
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   migrate:
     image: arcspro-server-app:latest
     command: [ "npm", "run", "migrate" ]
     healthcheck:
       disable: true
     environment:
-      DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
+      DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/${POSTGRES_DB:-door}
       NODE_ENV: ${NODE_ENV:-development}
       ASSESSMENT_FIELD_ENCRYPTION_KEY: ${ASSESSMENT_FIELD_ENCRYPTION_KEY:-}
       ASSESSMENT_SESSION_JWT_SECRET: ${ASSESSMENT_SESSION_JWT_SECRET:-}
@@ -53,7 +69,7 @@ services:
     ports:
       - "${APP_PORT:-3001}:3001"
     environment:
-      DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
+      DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/${POSTGRES_DB:-door}
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
       ASSESSMENT_FIELD_ENCRYPTION_KEY: ${ASSESSMENT_FIELD_ENCRYPTION_KEY:-}
       ASSESSMENT_SESSION_JWT_SECRET: ${ASSESSMENT_SESSION_JWT_SECRET:-}
@@ -88,6 +104,13 @@ services:
       REIMBURSEMENT_OCR_MODEL_NAME: ${REIMBURSEMENT_OCR_MODEL_NAME:-qwen3.5-plus}
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      ASSET_OBJECT_STORAGE_PROVIDER: ${ASSET_OBJECT_STORAGE_PROVIDER:-minio}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-arcspro}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-arcspro_dev_only}
+      MINIO_BUCKET: ${MINIO_BUCKET:-arcspro-assets}
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,6 +118,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      minio:
+        condition: service_healthy
     healthcheck:
       test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:3001/api/health/ready || exit 1" ]
       interval: 30s
@@ -113,7 +138,7 @@ services:
     healthcheck:
       disable: true
     environment:
-      DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
+      DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/${POSTGRES_DB:-door}
       JWT_SECRET: ${JWT_SECRET:-dev_secret}
       ASSESSMENT_FIELD_ENCRYPTION_KEY: ${ASSESSMENT_FIELD_ENCRYPTION_KEY:-}
       ASSESSMENT_SESSION_JWT_SECRET: ${ASSESSMENT_SESSION_JWT_SECRET:-}
@@ -139,6 +164,13 @@ services:
       REIMBURSEMENT_OCR_MODEL_NAME: ${REIMBURSEMENT_OCR_MODEL_NAME:-qwen3.5-plus}
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      ASSET_OBJECT_STORAGE_PROVIDER: ${ASSET_OBJECT_STORAGE_PROVIDER:-minio}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-arcspro}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-arcspro_dev_only}
+      MINIO_BUCKET: ${MINIO_BUCKET:-arcspro-assets}
     volumes:
       - ./storage:/app/server/storage
     depends_on:
@@ -148,6 +180,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      minio:
+        condition: service_healthy
 
   # 自动备份：每 6 小时调用现有备份脚本，与 Web 后台完全集成
   pg-backup:
@@ -155,7 +189,7 @@ services:
     healthcheck:
       disable: true
     environment:
-      DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/door
+      DATABASE_URL: postgres://door:${POSTGRES_PASSWORD:-door_dev}@postgres:5432/${POSTGRES_DB:-door}
       BACKUP_DIR: ${BACKUP_DIR:-/backups}
       BACKUP_RETENTION_COUNT: ${BACKUP_RETENTION_COUNT:-20}
       DB_OPS_LOCK_DIR: ${DB_OPS_LOCK_DIR:-/backups/.db-ops.lock}

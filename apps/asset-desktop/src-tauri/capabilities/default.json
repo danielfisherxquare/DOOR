@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main-capability",
+  "description": "User-selected asset folders and local sync state",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "store:default",
+    "fs:default",
+    "fs:allow-watch",
+    "fs:allow-unwatch"
+  ]
+}

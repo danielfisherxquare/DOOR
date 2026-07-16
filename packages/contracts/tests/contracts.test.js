@@ -4,6 +4,7 @@ import { describe, it } from 'node:test'
 import {
   ApiError,
   ALL_MODULES,
+  ASSET_ERROR_CODES,
   RECORD_EXACT_FILTER_FIELDS,
   RECORD_FILTER_FIELDS,
   RECORD_SORT_FIELDS,
@@ -14,6 +15,10 @@ import {
   isApiErrorResponse,
   isWorkspaceScopeType,
   listAllModuleIds,
+  parseAssetFolderCreate,
+  parseAssetTagCreate,
+  parseAssetUploadInit,
+  parseAssetVersionUploadInit,
 } from '../src/index.js'
 
 describe('shared contracts', () => {
@@ -27,7 +32,7 @@ describe('shared contracts', () => {
   it('keeps module IDs unique and aligned with their surface', () => {
     const moduleIds = listAllModuleIds()
 
-    assert.equal(moduleIds.length, 32)
+    assert.equal(moduleIds.length, 33)
     assert.equal(new Set(moduleIds).size, moduleIds.length)
     assert.deepEqual(Object.keys(ALL_MODULES), SURFACES)
 
@@ -39,6 +44,40 @@ describe('shared contracts', () => {
         assert.equal(typeof module.isDefault, 'boolean')
       }
     }
+  })
+
+  it('validates asset upload contracts before data reaches either client', () => {
+    const input = parseAssetUploadInit({
+      fileName: 'finish-line.png',
+      mimeType: 'image/png',
+      size: 128,
+      sha256: 'a'.repeat(64),
+      clientMutationId: 'desktop-1',
+    })
+
+    assert.equal(input.fileName, 'finish-line.png')
+    assert.equal(ASSET_ERROR_CODES.conflict, 'ASSET_REVISION_CONFLICT')
+    assert.throws(() => parseAssetUploadInit({ ...input, sha256: 'bad' }))
+  })
+
+  it('validates collaborative folder, tag, and version contracts', () => {
+    assert.deepEqual(parseAssetFolderCreate({ name: 'KV 主视觉' }), {
+      name: 'KV 主视觉',
+    })
+    assert.deepEqual(parseAssetTagCreate({ name: '已交付' }), {
+      name: '已交付',
+      color: '#d8262c',
+    })
+    const version = parseAssetVersionUploadInit({
+      fileName: 'poster-v2.psd',
+      mimeType: 'application/octet-stream',
+      size: 4096,
+      sha256: 'b'.repeat(64),
+      clientMutationId: 'version-2',
+      baseRevision: 3,
+    })
+    assert.equal(version.baseRevision, 3)
+    assert.throws(() => parseAssetTagCreate({ name: '错误颜色', color: 'red' }))
   })
 
   it('creates a stable success response without inventing metadata', () => {

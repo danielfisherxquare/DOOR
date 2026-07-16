@@ -72,7 +72,7 @@ function normalizeStatus(err, normalizedDbError) {
 
 function normalizeErrorCode(err, status, normalizedDbError) {
     if (normalizedDbError?.code) return normalizedDbError.code;
-    if (status < 500 && typeof err.publicCode === 'string' && /^[A-Z][A-Z0-9_]+$/.test(err.publicCode)) {
+    if (err.expose && typeof err.publicCode === 'string' && /^[A-Z][A-Z0-9_]+$/.test(err.publicCode)) {
         return err.publicCode;
     }
     if (status < 500 && typeof err.code === 'string' && /^[A-Z][A-Z0-9_]+$/.test(err.code)) {

@@ -50,8 +50,8 @@ const orgSeeds = [
         ],
         members: [
             { code: 'EAST-001', username: 'east.admin', name: '林子昂', role: 'org_admin', title: '部门经理', position: '赛事总监', department: '赛事运营部', type: 'employee', idNo: '310101199001011234', phone: '13800010001', modules: ['admin:races', 'admin:members', 'admin:bib-tracking', 'admin:credentials', 'admin:finance', 'admin:inventory'] },
-            { code: 'EAST-014', username: 'east.ops', name: '顾清禾', role: 'race_admin', title: '高级员工', position: '现场执行经理', department: '执行交付组', type: 'employee', idNo: '310101199204141235', phone: '13800010014', modules: ['ops:home', 'ops:scan', 'ops:bib-pickup', 'ops:credentials', 'ops:warehouse', 'app:events', 'app:reimbursements', 'app:map', 'app:3d-studio', 'app:credentials', 'app:inventory'] },
-            { code: 'EAST-032', username: 'east.storeroom', name: '沈知夏', role: 'user', title: '普通员工', position: '物资管理员', department: '物资保障组', type: 'employee', idNo: '310101199605321236', phone: '13800010032', modules: ['app:map', 'app:inventory'] },
+            { code: 'EAST-014', username: 'east.ops', name: '顾清禾', role: 'race_admin', title: '高级员工', position: '现场执行经理', department: '执行交付组', type: 'employee', idNo: '310101199204141235', phone: '13800010014', modules: ['ops:home', 'ops:scan', 'ops:bib-pickup', 'ops:credentials', 'ops:warehouse', 'app:events', 'app:reimbursements', 'app:map', 'app:3d-studio', 'app:credentials', 'app:inventory', 'app:assets'] },
+            { code: 'EAST-032', username: 'east.storeroom', name: '沈知夏', role: 'user', title: '普通员工', position: '物资管理员', department: '物资保障组', type: 'employee', idNo: '310101199605321236', phone: '13800010032', modules: ['app:map', 'app:inventory', 'app:assets'] },
             { code: 'EAST-EXT-07', name: '马博文', role: null, title: '长期外援', position: '摄影统筹', department: '品牌传播组', type: 'external_support', externalType: 'long_term', idNo: '310101199708071237', phone: '13800010077' },
         ],
     },

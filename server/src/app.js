@@ -43,6 +43,7 @@ import ocrRoutes from './modules/ocr/ocr.routes.js';
 import credentialRoutes from './modules/credential/credential.routes.js';
 import identityCenterRoutes from './modules/identity-center/identity-center.routes.js';
 import approvalRoutes from './modules/approvals/approval.routes.js';
+import assetRoutes from './modules/assets/asset.routes.js';
 import profileRoutes from './modules/profile/profile.routes.js';
 import authzRoutes from './modules/authz/authz.routes.js';
 import colorSchemeRoutes from './modules/color-scheme/color-scheme.routes.js';
@@ -149,6 +150,7 @@ app.use('/api/app/interviews', appModule('interview'), interviewRoutes);
 app.use('/api/app/warehouse', appModule('inventory'), inventoryRoutes);
 app.use('/api/app/design-requests', appModule('design-requests'), createDesignRequestRoutes('app'));
 app.use('/api/app/approvals', appModule('design-requests'), approvalRoutes);
+app.use('/api/app/assets', appModule('assets'), assetRoutes);
 
 app.use('/api/ops/warehouse', opsModule('warehouse'), inventoryRoutes);
 app.use('/api/ops/credentials', opsModule('credentials'), credentialRoutes);

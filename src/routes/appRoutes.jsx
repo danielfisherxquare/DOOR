@@ -37,6 +37,7 @@ const AssessmentCampaignDetailPage = lazy(() => import('../views/app/assessment/
 const BibTrackingPage = lazy(() => import('../views/app/events/bib-tracking/BibTrackingPage'))
 const RaceDashboardPage = lazy(() => import('../views/app/race-dashboard/RaceDashboardPage'))
 const DesignRequestWorkspace = lazy(() => import('../views/design-requests/DesignRequestWorkspace'))
+const AssetLibraryPage = lazy(() => import('../features/assets/AssetLibraryPage'))
 
 const simpleComponents = {
   home: Home,
@@ -70,6 +71,7 @@ const simpleComponents = {
   'assessment-detail': AssessmentCampaignDetailPage,
   'bib-tracking': BibTrackingPage,
   'race-dashboard': RaceDashboardPage,
+  assets: AssetLibraryPage,
 }
 
 function AppRouteLoader() {

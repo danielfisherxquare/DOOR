@@ -1,0 +1,13 @@
+{
+  "name": "@arcspro/asset-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@arcspro/contracts": "0.1.0"
+  }
+}

@@ -1,0 +1,233 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { open } from '@tauri-apps/plugin-dialog'
+import { readDir, readFile, stat, watch, writeFile } from '@tauri-apps/plugin-fs'
+import { basename, join } from '@tauri-apps/api/path'
+import { desktopAssetClient, login, type DesktopSession } from './asset-api'
+import { loadLocalIndex, saveLocalIndex, type PersistedQueueItem } from './local-index'
+
+interface AssetItem {
+  id: string
+  name: string
+  kind: string
+  size: number
+  revision: number
+  updatedAt: string
+}
+
+type QueueItem = PersistedQueueItem
+
+function mimeType(name: string) {
+  const extension = name.split('.').pop()?.toLowerCase()
+  const types: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml', mp4: 'video/mp4', pdf: 'application/pdf', psd: 'application/octet-stream' }
+  return types[extension || ''] || 'application/octet-stream'
+}
+
+async function collectFiles(directory: string): Promise<string[]> {
+  const entries = await readDir(directory)
+  const result: string[] = []
+  for (const entry of entries) {
+    const fullPath = await join(directory, entry.name)
+    if (entry.isDirectory) result.push(...await collectFiles(fullPath))
+    else if (entry.isFile && !entry.name.startsWith('.')) result.push(fullPath)
+  }
+  return result
+}
+
+async function fingerprint(path: string): Promise<string> {
+  const metadata = await stat(path)
+  return `${metadata.size}:${metadata.mtime?.getTime() || 0}`
+}
+
+export default function App() {
+  const [session, setSession] = useState<DesktopSession | null>(null)
+  const [serverUrl, setServerUrl] = useState('https://www.arcspro.work:18443')
+  const [account, setAccount] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [assets, setAssets] = useState<AssetItem[]>([])
+  const [syncFolder, setSyncFolder] = useState('')
+  const [queue, setQueue] = useState<QueueItem[]>([])
+  const [cursor, setCursor] = useState('0')
+  const [fingerprints, setFingerprints] = useState<Record<string, string>>({})
+  const [assetLinks, setAssetLinks] = useState<Record<string, { assetId: string; revision: number }>>({})
+  const [indexReady, setIndexReady] = useState(false)
+  const fingerprintsRef = useRef(fingerprints)
+  const assetLinksRef = useRef(assetLinks)
+  const client = useMemo(() => session ? desktopAssetClient(session) : null, [session])
+
+  useEffect(() => { fingerprintsRef.current = fingerprints }, [fingerprints])
+  useEffect(() => { assetLinksRef.current = assetLinks }, [assetLinks])
+
+  useEffect(() => {
+    let active = true
+    loadLocalIndex().then((index) => {
+      if (!active) return
+      setServerUrl(index.serverUrl)
+      setSyncFolder(index.syncFolder)
+      setCursor(index.cursor)
+      setFingerprints(index.fingerprints)
+      setAssetLinks(index.assetLinks)
+      setQueue(index.queue)
+      setIndexReady(true)
+    }).catch((indexError) => active && setError(`本地同步索引载入失败：${(indexError as Error).message}`))
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    if (!indexReady) return
+    saveLocalIndex({ serverUrl, syncFolder, cursor, fingerprints, assetLinks, queue }).catch((indexError) => setError(`本地同步索引保存失败：${(indexError as Error).message}`))
+  }, [assetLinks, cursor, fingerprints, indexReady, queue, serverUrl, syncFolder])
+
+  async function refresh() {
+    if (!client) return
+    try {
+      const result = await client.listAssets({ limit: 100 })
+      setAssets(result.items)
+      let nextCursor = cursor
+      let page
+      do {
+        page = await client.pullChanges(nextCursor, 200)
+        nextCursor = page.nextCursor
+      } while (page.hasMore)
+      setCursor(nextCursor)
+    } catch (requestError) { setError((requestError as Error).message) }
+  }
+
+  useEffect(() => { refresh() }, [client])
+
+  useEffect(() => {
+    if (!syncFolder) return undefined
+    let unwatch: (() => void) | undefined
+    watch(syncFolder, async (event) => {
+      const additions: QueueItem[] = []
+      for (const path of event.paths || []) {
+        try {
+          const metadata = await stat(path)
+          if (!metadata.isFile) continue
+          const nextFingerprint = await fingerprint(path)
+          if (fingerprintsRef.current[path] === nextFingerprint) continue
+          additions.push({ id: crypto.randomUUID(), path, state: 'queued', progress: 0, fingerprint: nextFingerprint })
+        } catch { /* deleted paths do not need an upload job */ }
+      }
+      setQueue((current) => {
+        const existing = new Set(current.filter((item) => item.state !== 'completed').map((item) => item.path))
+        return [...current, ...additions.filter((item) => !existing.has(item.path))]
+      })
+    }, { recursive: true, delayMs: 800 }).then((stop) => { unwatch = stop })
+    return () => unwatch?.()
+  }, [syncFolder])
+
+  async function chooseFolder() {
+    const selected = await open({ directory: true, multiple: false, title: '选择素材同步文件夹' })
+    if (typeof selected === 'string') setSyncFolder(selected)
+  }
+
+  async function enqueueDirectory() {
+    if (!syncFolder) return
+    const paths = await collectFiles(syncFolder)
+    const additions: QueueItem[] = []
+    for (const path of paths) {
+      const nextFingerprint = await fingerprint(path)
+      if (fingerprintsRef.current[path] !== nextFingerprint) additions.push({ id: crypto.randomUUID(), path, state: 'queued', progress: 0, fingerprint: nextFingerprint })
+    }
+    setQueue((current) => {
+      const existing = new Set(current.filter((item) => item.state !== 'completed').map((item) => item.path))
+      return [...current.filter((item) => item.state !== 'completed'), ...additions.filter((item) => !existing.has(item.path))]
+    })
+  }
+
+  async function runQueue() {
+    if (!client) return
+    for (const pending of queue.filter((item) => item.state === 'queued' || item.state === 'failed')) {
+      setQueue((current) => current.map((item) => item.id === pending.id ? { ...item, state: 'uploading', error: undefined } : item))
+      try {
+        const bytes = await readFile(pending.path)
+        const name = await basename(pending.path)
+        const file = new File([bytes], name, { type: mimeType(name), lastModified: Date.now() })
+        const linkedAsset = assetLinksRef.current[pending.path]
+        const uploaded = linkedAsset
+          ? await client.uploadNewVersion(linkedAsset.assetId, linkedAsset.revision, file, {
+              onProgress: ({ loaded, total }: { loaded: number; total: number }) => setQueue((current) => current.map((item) => item.id === pending.id ? { ...item, progress: total ? loaded / total : 0 } : item)),
+            })
+          : await client.uploadFile(file, {
+          onProgress: ({ loaded, total }: { loaded: number; total: number }) => setQueue((current) => current.map((item) => item.id === pending.id ? { ...item, progress: total ? loaded / total : 0 } : item)),
+            })
+        setQueue((current) => current.map((item) => item.id === pending.id ? { ...item, state: 'completed', progress: 1 } : item))
+        const uploadedFingerprint = pending.fingerprint || await fingerprint(pending.path)
+        setFingerprints((current) => ({ ...current, [pending.path]: uploadedFingerprint }))
+        setAssetLinks((current) => ({ ...current, [pending.path]: { assetId: uploaded.id, revision: uploaded.revision } }))
+      } catch (uploadError) {
+        setQueue((current) => current.map((item) => item.id === pending.id ? { ...item, state: 'failed', error: (uploadError as Error).message } : item))
+      }
+    }
+    await refresh()
+  }
+
+  async function download(asset: AssetItem) {
+    if (!client || !syncFolder) return setError('请先选择同步文件夹')
+    try {
+      const response = await client.downloadAsset(asset)
+      const bytes = new Uint8Array(await response.data.arrayBuffer())
+      const target = await join(syncFolder, asset.name)
+      await writeFile(target, bytes)
+      const downloadedFingerprint = await fingerprint(target)
+      setFingerprints((current) => ({ ...current, [target]: downloadedFingerprint }))
+      setAssetLinks((current) => ({ ...current, [target]: { assetId: asset.id, revision: asset.revision } }))
+    } catch (downloadError) { setError((downloadError as Error).message) }
+  }
+
+  if (!session) {
+    return (
+      <main className="desktop-login">
+        <section>
+          <span className="brand-mark">AS</span>
+          <p className="eyebrow">ArcSpro Assets</p>
+          <h1>连接团队素材库</h1>
+          <p>密码只用于本次登录，App 不保存密码。</p>
+          <form onSubmit={async (event) => {
+            event.preventDefault()
+            setError('')
+            try { setSession(await login(serverUrl, account, password)); setPassword('') } catch (loginError) { setError((loginError as Error).message) }
+          }}>
+            <label>ArcSpro 服务地址<input value={serverUrl} onChange={(event) => setServerUrl(event.target.value)} type="url" required /></label>
+            <label>账号<input value={account} onChange={(event) => setAccount(event.target.value)} autoComplete="username" required /></label>
+            <label>密码<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" required /></label>
+            {error && <div className="desktop-error" role="alert">{error}</div>}
+            <button type="submit" disabled={!indexReady}>{indexReady ? '登录并同步' : '正在载入本地索引…'}</button>
+          </form>
+        </section>
+      </main>
+    )
+  }
+
+  return (
+    <main className="desktop-shell">
+      <header>
+        <div><span className="brand-mark">AS</span><div><small>ARCSPRO ASSETS</small><h1>团队素材库</h1></div></div>
+        <span className="connection"><i />{session.userName} · 已连接</span>
+      </header>
+      {error && <div className="desktop-error" role="alert">{error}<button onClick={() => setError('')}>&times;</button></div>}
+      <div className="desktop-workspace">
+        <aside>
+          <h2>本地同步</h2>
+          <button onClick={chooseFolder} className="secondary">选择文件夹</button>
+          <code>{syncFolder || '尚未选择'}</code>
+          <small className="index-status">{indexReady ? `本地索引已保存 · 游标 ${cursor} · ${Object.keys(assetLinks).length} 个云端映射` : '正在载入本地索引…'}</small>
+          <button onClick={enqueueDirectory} disabled={!syncFolder}>扫描本地文件</button>
+          <button onClick={runQueue} disabled={!queue.some((item) => item.state !== 'completed')}>开始同步 ({queue.filter((item) => item.state !== 'completed').length})</button>
+          <h2>同步队列</h2>
+          <div className="queue-list">
+            {queue.slice(-8).map((item) => <div key={item.id}><span>{item.path.split(/[\\/]/).pop()}</span><progress value={item.progress} max="1" /><small>{item.state === 'failed' ? item.error : item.state}</small></div>)}
+            {queue.length === 0 && <p>监听目录变化后，新文件会出现在这里。</p>}
+          </div>
+        </aside>
+        <section className="desktop-assets">
+          <div className="section-title"><div><small>CLOUD LIBRARY</small><h2>{assets.length} 个素材</h2></div><button className="secondary" onClick={refresh}>刷新</button></div>
+          <div className="desktop-grid">
+            {assets.map((asset) => <article key={asset.id}><div className="file-kind">{asset.kind.toUpperCase()}</div><strong>{asset.name}</strong><span>{(asset.size / 1024 / 1024).toFixed(1)} MB · r{asset.revision}</span><button onClick={() => download(asset)}>下载到同步文件夹</button></article>)}
+          </div>
+        </section>
+      </div>
+    </main>
+  )
+}

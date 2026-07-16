@@ -3,6 +3,11 @@
 # 用于本地测试环境，不需要 SSL 证书
 
 services:
+  minio:
+    ports:
+      - "${MINIO_API_PORT:-19000}:9000"
+      - "${MINIO_CONSOLE_PORT:-19001}:9001"
+
   nginx:
     ports: !override
       - "${HTTP_PORT:-8080}:80"

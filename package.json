@@ -5,7 +5,8 @@
   "type": "module",
   "workspaces": [
     "server",
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "engines": {
     "node": ">=20.19 <25",
@@ -22,6 +23,8 @@
     "preview": "vite preview",
     "test:branding": "node --test tests/branding/branding.test.mjs",
     "test:contracts": "node --test packages/contracts/tests/contracts.test.js",
+    "test:assets": "node --test packages/asset-sync-core/tests/*.test.js server/tests/assets/*.test.js",
+    "build:asset-desktop": "npm run build --workspace @arcspro/asset-desktop",
     "test:map": "node --test tests/map/map-utils.test.mjs tests/map/terrainRuntimePolicy.test.mjs tests/map/map-e2e.test.mjs tests/map/geometryBbox.test.mjs tests/map/siteModeWorkZone.test.mjs",
     "test:map:unit": "node --test tests/map/map-utils.test.mjs tests/map/terrainRuntimePolicy.test.mjs tests/map/mapArchitecture.test.mjs",
     "test:map:e2e": "node --test tests/map/map-e2e.test.mjs",

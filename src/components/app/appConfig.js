@@ -113,6 +113,16 @@ export const APP_NAV_GROUPS = [
         cardDescription: '查看设计需求、参考样例、尺寸材质和交付时间，上传完成图。',
       },
       {
+        key: 'assets',
+        path: '/assets',
+        moduleId: 'assets',
+        icon: 'photo_library',
+        shortLabel: 'AS',
+        label: '团队素材库',
+        description: '组织级素材、标签与版本同步',
+        cardDescription: '上传、检索和复用团队的图片、视频、文档与设计源文件。',
+      },
+      {
         key: 'map',
         path: '/map',
         moduleId: 'map',
@@ -339,6 +349,7 @@ export const APP_ROUTE_META = [
   { key: 'reimbursement-projects', path: '/app/reimbursements/projects', title: '报销项目管理', summary: '集中维护自己的报销项目，支持创建、编辑、清空和删除。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
   { key: 'reimbursement', path: '/app/reimbursements', title: '我的报销', summary: '管理自己的报销项目、识别结果和导出。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
   { key: 'design-requests', path: '/app/design-requests', title: '设计工作台', summary: '查看设计需求、关联赛事、参考样例和进度，并上传完成图。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
+  { key: 'assets', path: '/app/assets', title: '团队素材库', summary: '管理机构内的素材、标签、版本和同步任务。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
   { key: 'map', path: '/app/map', title: '地图规划', summary: '在空间项目中浏览卫星地图、绘制区域并管理图层数据。', groupKey: 'workspace', sectionLabel: '空间项目', surfaceCode: 'APP' },
   { key: 'three-studio', path: '/app/3d-studio', title: '空间项目', summary: '管理赛事场地、三维场景、空间对象和项目版本。', groupKey: 'workspace', sectionLabel: '我的业务', surfaceCode: 'APP' },
   { key: 'terrain-model', path: '/app/terrain-model', title: '地形与导出', summary: '为当前空间项目生成可预览和导出的轨迹地形模型。', groupKey: 'workspace', sectionLabel: '空间项目', surfaceCode: 'APP' },
@@ -389,6 +400,7 @@ const componentRoutes = [
   ['clothing', 'events/clothing', 'clothing'],
   ['reimbursement', 'reimbursements/*', 'reimbursement'],
   ['design-requests', 'design-requests', 'design-requests'],
+  ['assets', 'assets', 'assets'],
   ['map', 'map/*', 'map', { renderMode: 'immersive' }],
   ['three-studio', '3d-studio', 'studio-projects'],
   ['three-studio-new', '3d-studio/new', 'studio-project', {

@@ -86,6 +86,8 @@ server/uploads/apps/*.zip
 # Build/runtime output
 output/
 dist/
+**/target/
+**/src-tauri/gen/
 
 # Test baselines & regression screenshots
 test-baselines/
