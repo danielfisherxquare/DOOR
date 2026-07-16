@@ -10,21 +10,26 @@ import {
   type DesktopSession,
 } from './asset-api'
 import { loadLocalIndex, saveLocalIndex, type PersistedQueueItem } from './local-index'
-
-interface AssetItem {
-  id: string
-  name: string
-  kind: string
-  size: number
-  revision: number
-  updatedAt: string
-}
+import type { AssetItem } from '@arcspro/asset-client'
+import { AssetPreviewDialog, AssetThumbnail } from './AssetPreviewDialog'
 
 type QueueItem = PersistedQueueItem
 
 function mimeType(name: string) {
   const extension = name.split('.').pop()?.toLowerCase()
-  const types: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml', mp4: 'video/mp4', pdf: 'application/pdf', psd: 'application/octet-stream' }
+  const types: Record<string, string> = {
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml',
+    mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', ogg: 'audio/ogg',
+    pdf: 'application/pdf', txt: 'text/plain', md: 'text/markdown', json: 'application/json', csv: 'text/csv',
+    doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint', pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    psd: 'image/vnd.adobe.photoshop', ai: 'application/illustrator', eps: 'application/postscript', ps: 'application/postscript',
+    psb: 'image/vnd.adobe.photoshop', psdt: 'image/vnd.adobe.photoshop', heic: 'image/heic', heif: 'image/heif',
+    tif: 'image/tiff', tiff: 'image/tiff', tga: 'image/x-tga', hdr: 'image/vnd.radiance', exr: 'image/x-exr', dds: 'image/vnd-ms.dds',
+    jp2: 'image/jp2', j2k: 'image/jp2', pcx: 'image/x-pcx', dng: 'image/x-adobe-dng',
+    otf: 'font/otf', ttf: 'font/ttf', woff: 'font/woff', woff2: 'font/woff2',
+  }
   return types[extension || ''] || 'application/octet-stream'
 }
 
@@ -65,9 +70,22 @@ export default function App() {
   const [fingerprints, setFingerprints] = useState<Record<string, string>>({})
   const [assetLinks, setAssetLinks] = useState<Record<string, { assetId: string; revision: number }>>({})
   const [indexReady, setIndexReady] = useState(false)
+  const [previewAsset, setPreviewAsset] = useState<AssetItem | null>(null)
   const fingerprintsRef = useRef(fingerprints)
   const assetLinksRef = useRef(assetLinks)
   const client = useMemo(() => session ? desktopAssetClient(session) : null, [session])
+  const loadOriginal = useMemo(() => async (asset: AssetItem) => {
+    if (!client) throw new Error('素材库尚未连接')
+    return (await client.downloadAsset(asset)).data
+  }, [client])
+  const loadConverted = useMemo(() => async (asset: AssetItem) => {
+    if (!client) throw new Error('素材库尚未连接')
+    return client.getPreview(asset.id)
+  }, [client])
+  const loadThumbnail = useMemo(() => async (asset: AssetItem) => {
+    if (!client) throw new Error('素材库尚未连接')
+    return client.getThumbnail(asset.id)
+  }, [client])
 
   useEffect(() => { fingerprintsRef.current = fingerprints }, [fingerprints])
   useEffect(() => { assetLinksRef.current = assetLinks }, [assetLinks])
@@ -280,10 +298,16 @@ export default function App() {
         <section className="desktop-assets">
           <div className="section-title"><div><small>CLOUD LIBRARY</small><h2>{assets.length} 个素材</h2></div><button className="secondary" onClick={refresh}>刷新</button></div>
           <div className="desktop-grid">
-            {assets.map((asset) => <article key={asset.id}><div className="file-kind">{asset.kind.toUpperCase()}</div><strong>{asset.name}</strong><span>{(asset.size / 1024 / 1024).toFixed(1)} MB · r{asset.revision}</span><button onClick={() => download(asset)}>下载到同步文件夹</button></article>)}
+            {assets.map((asset) => <article key={asset.id}>
+              <AssetThumbnail asset={asset} loadThumbnail={loadThumbnail} loadConverted={loadConverted} onOpen={() => setPreviewAsset(asset)} />
+              <strong title={asset.name}>{asset.name}</strong>
+              <span>{(asset.size / 1024 / 1024).toFixed(1)} MB · r{asset.revision}</span>
+              <div className="asset-card-actions"><button className="secondary" onClick={() => setPreviewAsset(asset)}>预览</button><button onClick={() => download(asset)}>下载</button></div>
+            </article>)}
           </div>
         </section>
       </div>
+      <AssetPreviewDialog asset={previewAsset} onClose={() => setPreviewAsset(null)} onDownload={download} loadOriginal={loadOriginal} loadConverted={loadConverted} />
     </main>
   )
 }

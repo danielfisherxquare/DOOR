@@ -53,6 +53,7 @@ export interface AssetClient {
   pullChanges(cursor?: string, limit?: number): Promise<{ changes: unknown[]; tombstones: unknown[]; nextCursor: string; hasMore: boolean; serverTime: string }>
   pushChanges(changes: unknown[]): Promise<unknown>
   downloadAsset(asset: { id: string }): Promise<{ data: Blob }>
+  getPreview(assetId: string): Promise<Blob>
   listVersions(assetId: string): Promise<{ items: AssetVersion[] }>
   downloadVersion(assetId: string, versionId: string): Promise<{ data: Blob }>
   getThumbnail(assetId: string): Promise<Blob>

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { resolveAssetContext } from './asset.context.js';
 import * as service from './asset.service.js';
+import { getAssetPreview } from './asset-preview.service.js';
 import { streamObjectToResponse } from './asset.storage.js';
 
 const router = Router();
@@ -91,6 +92,16 @@ router.get('/sync', async (req, res, next) => {
 router.post('/sync/changes', async (req, res, next) => {
     try {
         res.json({ success: true, data: await service.pushChanges(resolveAssetContext(req), req.body) });
+    } catch (error) { next(error); }
+});
+
+router.get('/:assetId/preview', async (req, res, next) => {
+    try {
+        const binary = await getAssetPreview(resolveAssetContext(req), req.params.assetId);
+        res.setHeader('Content-Type', binary.mimeType);
+        res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(binary.fileName)}`);
+        res.setHeader('Cache-Control', 'private, max-age=86400');
+        await streamObjectToResponse(binary.stream, res);
     } catch (error) { next(error); }
 });
 

@@ -125,6 +125,27 @@ export async function getObjectStream(objectKey) {
     return fs.createReadStream(localObjectPath(objectKey));
 }
 
+export async function objectExists(objectKey) {
+    if (providerName() === 'minio') {
+        const client = await getMinioClient();
+        const bucket = await ensureMinioBucket(client);
+        try {
+            await client.statObject(bucket, objectKey);
+            return true;
+        } catch (error) {
+            if (error?.statusCode === 404 || ['NotFound', 'NoSuchKey', 'NoSuchObject'].includes(error?.code)) return false;
+            throw error;
+        }
+    }
+    try {
+        await fsp.access(localObjectPath(objectKey), fs.constants.R_OK);
+        return true;
+    } catch (error) {
+        if (error?.code === 'ENOENT') return false;
+        throw error;
+    }
+}
+
 export async function removeObject(objectKey) {
     if (!objectKey) return;
     if (providerName() === 'minio') {

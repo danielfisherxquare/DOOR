@@ -123,6 +123,12 @@ export function createAssetClient({ request, rawRequest }) {
       return rawRequest.get(`/app/assets/${asset.id}/download`, { responseType: 'blob' })
     },
 
+    async getPreview(assetId) {
+      if (!rawRequest) throw new ApiError('当前客户端未配置二进制请求', { code: 'ASSET_PREVIEW_UNAVAILABLE' })
+      const response = await rawRequest.get(`/app/assets/${assetId}/preview`, { responseType: 'blob' })
+      return response.data
+    },
+
     async listVersions(assetId) {
       return unwrap(await request.get(`/app/assets/${assetId}/versions`))
     },

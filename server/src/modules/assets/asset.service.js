@@ -250,9 +250,16 @@ export async function uploadPart(context, uploadId, rawPartNumber, file) {
 
 async function createThumbnail(assembled, upload) {
     if (!String(upload.mime_type).startsWith('image/')) return { thumbnailKey: null, width: null, height: null };
-    const image = sharp(assembled.filePath, { failOn: 'none' });
-    const metadata = await image.metadata();
-    const buffer = await image.rotate().resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+    let metadata;
+    let buffer;
+    try {
+        const image = sharp(assembled.filePath, { failOn: 'none' });
+        metadata = await image.metadata();
+        buffer = await image.rotate().resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+    } catch {
+        // Unsupported professional image formats remain uploadable and are rendered lazily by the preview endpoint.
+        return { thumbnailKey: null, width: null, height: null };
+    }
     const thumbnailKey = storage.buildObjectKey({ orgId: upload.org_id, sha256: upload.sha256, suffix: 'thumbnail.webp' });
     await storage.putObjectBuffer({ objectKey: thumbnailKey, buffer, mimeType: 'image/webp' });
     return { thumbnailKey, width: metadata.width || null, height: metadata.height || null };

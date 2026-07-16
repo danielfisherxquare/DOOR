@@ -257,7 +257,7 @@ export async function getAssetObject(context, assetId) {
         .select(
             'assets.id', 'assets.name', 'assets.deleted_at',
             'asset_objects.object_key', 'asset_objects.thumbnail_key',
-            'asset_objects.mime_type', 'asset_objects.size',
+            'asset_objects.mime_type', 'asset_objects.size', 'asset_objects.sha256',
         )
         .first();
 }
